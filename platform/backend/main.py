@@ -135,13 +135,16 @@ app.add_middleware(
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Basic health check endpoint"""
-    return JSONResponse(content={
-        "status": "healthy",
-        "service": "taxpoynt_platform_backend",
-        "environment": ENVIRONMENT,
-        "timestamp": "2024-12-31T00:00:00Z"
-    })
+    """Basic health check endpoint for Railway"""
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "healthy",
+            "service": "taxpoynt_platform_backend", 
+            "environment": ENVIRONMENT,
+            "timestamp": "2024-12-31T00:00:00Z"
+        }
+    )
 
 
 @app.get("/", tags=["Root"])
