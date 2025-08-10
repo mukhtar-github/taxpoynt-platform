@@ -1,0 +1,14 @@
+{
+  "code": 200,
+  "data": {
+    "items": null,
+    "page": {
+      "page": 1,
+      "size": 20,
+      "hasNextPage": false,
+      "hasPreviousPage": false,
+      "totalCount": 0
+    },
+    "attributes": null
+  }
+}
