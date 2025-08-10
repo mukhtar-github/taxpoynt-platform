@@ -1,6 +1,5 @@
 {
-  "buildCommand": "cd platform/frontend && npm install && npm run build",
-  "outputDirectory": "platform/frontend/.next",
-  "installCommand": "npm install",
-  "framework": "nextjs"
+  "buildCommand": "ls -la && ls -la platform && cd platform/frontend && npm run build",
+  "installCommand": "cd platform/frontend && npm install",
+  "outputDirectory": "platform/frontend/.next"
 } 
