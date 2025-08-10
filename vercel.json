@@ -1,41 +1,6 @@
 {
-  "version": 2,
-  "name": "taxpoynt-platform-frontend",
   "buildCommand": "cd platform/frontend && npm install && npm run build",
   "outputDirectory": "platform/frontend/.next",
   "installCommand": "cd platform/frontend && npm install",
-  "framework": "nextjs",
-  "rootDirectory": "platform/frontend",
-  "env": {
-    "NEXT_PUBLIC_API_URL": "@next_public_api_url",
-    "NEXT_PUBLIC_ENVIRONMENT": "@next_public_environment",
-    "NEXT_PUBLIC_FIRS_API_URL": "@next_public_firs_api_url"
-  },
-  "functions": {
-    "platform/frontend/pages/api/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin", 
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type,Authorization"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/$1" }
-  ]
+  "framework": "nextjs"
 } 
