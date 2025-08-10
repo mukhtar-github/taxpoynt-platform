@@ -1,0 +1,17 @@
+{
+  "name": "taxpoynt-platform-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "platform/frontend",
+    "platform/backend"
+  ],
+  "scripts": {
+    "build": "cd platform/frontend && npm install && npm run build",
+    "start": "cd platform/frontend && npm start",
+    "dev": "cd platform/frontend && npm run dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
