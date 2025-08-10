@@ -1,1 +1,1 @@
-web: cd backend && python scripts/railway_startup.py
+web: cd platform/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*'

@@ -1,0 +1,3 @@
+# TaxPoynt Platform - Root Requirements
+# Points to platform backend dependencies
+-r platform/backend/requirements.txt
