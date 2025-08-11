@@ -1,41 +1,22 @@
 # TaxPoynt Platform Railway Configuration
-# Optimized for new platform architecture with reliable health checks
+# Simplified for reliable deployment
 
 [build]
 builder = "nixpacks"
 
-[build.nixpacksVersion]
-version = "1.21.0"
-
-[build.nixpacks]
-# Use minimal requirements for reliable deployment
-buildCommand = "cd platform/backend && pip install -r requirements-minimal.txt"
-
 [deploy]
-# Enhanced start command with better error handling and logging
-startCommand = "cd platform/backend && python -u -c 'import sys; print(f\"Python version: {sys.version}\"); print(f\"Working dir: {sys.path[0]}\")' && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --access-log --log-level info"
+# Simplified start command for Railway
+startCommand = "cd platform/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --log-level info"
 
-# Health check configuration - more forgiving for startup
+# Health check configuration 
 healthcheckPath = "/health"
-healthcheckTimeout = 45
-healthcheckInterval = 10
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE" 
 restartPolicyMaxRetries = 3
 
-# Deployment settings for reliability
-deploymentTimeout = 300
-replicas = 1
-
-# Environment-specific variables
+# Environment variables
 [variables]
 ENVIRONMENT = "production"
-DATABASE_URL = "$DATABASE_URL"
-REDIS_URL = "$REDIS_URL"
-# Railway deployment identifier
-RAILWAY_DEPLOYMENT_ID = "$RAILWAY_DEPLOYMENT_ID"
-# Python path for module imports
 PYTHONPATH = "/app/platform/backend:/app"
-# Disable Python bytecode for faster startup
 PYTHONDONTWRITEBYTECODE = "1"
-# Ensure stdout/stderr are flushed immediately
 PYTHONUNBUFFERED = "1"
