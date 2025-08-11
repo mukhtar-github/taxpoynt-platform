@@ -1,0 +1,33 @@
+# TaxPoynt Platform - Railway Deployment Minimal Requirements
+# ============================================================
+# Minimal dependencies for reliable Railway deployment and health checks
+
+# Core web framework - minimal versions for stability
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+starlette==0.27.0
+python-multipart==0.0.6
+
+# Essential performance for uvicorn
+uvloop==0.17.0
+httptools==0.6.1
+
+# Pydantic V1 for compatibility
+pydantic==1.10.22
+
+# Minimal database support (only if needed)
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# Basic security
+cryptography==41.0.7
+
+# Environment support
+python-dotenv==1.0.0
+
+# HTTP client for external APIs
+requests==2.31.0
+aiohttp==3.12.0
+
+# Utilities
+email-validator==2.1.0
