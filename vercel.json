@@ -1,10 +1,7 @@
 {
-  "framework": "nextjs",
   "buildCommand": "cd platform/frontend && npm run build",
   "installCommand": "cd platform/frontend && npm install --legacy-peer-deps",
   "outputDirectory": "platform/frontend/.next",
-  "rootDirectory": "platform/frontend",
-  "regions": ["iad1"],
   "build": {
     "env": {
       "NODE_OPTIONS": "--max_old_space_size=4096",
