@@ -277,6 +277,7 @@ async def startup():
         logger.info(f"🚂 Railway Deployment: {RAILWAY_DEPLOYMENT}")
         logger.info(f"🌐 Port: {PORT}")
         logger.info("✅ FastAPI app ready for Railway deployment!")
+        logger.info("🎯 FIRS Certification Endpoints: LOADED")
         
         # Log successful startup for Railway visibility
         print("=" * 50)
