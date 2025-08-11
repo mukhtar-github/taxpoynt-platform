@@ -4,8 +4,8 @@
 [build]
 
 [deploy]
-# Direct start command - let Railway auto-detect Python and install deps
-startCommand = "cd platform/backend && python3 -m pip install -r requirements.txt && python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --log-level info"
+# Direct start command - use 'python' instead of 'python3' for Railway
+startCommand = "cd platform/backend && python -m pip install -r requirements.txt && python -m uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --log-level info"
 
 # Health check configuration 
 healthcheckPath = "/health"
