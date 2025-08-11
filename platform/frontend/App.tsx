@@ -7,16 +7,16 @@
  */
 import React from 'react';
 import AppRouter from './shared_components/AppRouter';
-import { CombinedProvider } from './role_management/combined_provider';
+import { CombinedRoleProvider } from './role_management/combined_provider';
 import { FeatureFlagProvider } from './role_management/feature_flag_provider';
 
 const App: React.FC = () => {
   return (
     <div className="App">
       <FeatureFlagProvider>
-        <CombinedProvider>
+        <CombinedRoleProvider>
           <AppRouter />
-        </CombinedProvider>
+        </CombinedRoleProvider>
       </FeatureFlagProvider>
     </div>
   );
