@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-08-11T13:37:26.443470",
+  "test_type": "live_firs_comprehensive",
+  "firs_sandbox_url": "https://eivc-k6z6d.ondigitalocean.app",
+  "success_rate": 75.0,
+  "passed_tests": 6,
+  "total_tests": 8,
+  "results": {
+    "health_check": false,
+    "currencies": true,
+    "invoice_types": true,
+    "vat_exemptions": true,
+    "business_search": false,
+    "get_entity": true,
+    "validate_irn": true,
+    "submit_invoice": true
+  },
+  "legacy_comparison": {
+    "meets_threshold": true,
+    "ready_for_uat": true
+  }
+}

@@ -1,0 +1,21 @@
+# Nixpacks configuration for TaxPoynt Platform
+# Tells Railway how to build the Python application
+
+[variables]
+PYTHONPATH = "/app/platform/backend:/app"
+
+[phases.setup]
+nixPkgs = ["python3", "pip"]
+
+[phases.install]
+cmds = [
+  "cd platform/backend",
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "cd platform/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --log-level info"
