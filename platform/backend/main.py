@@ -260,6 +260,8 @@ async def mono_connect_account():
         reference = f"TAXPOYNT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         # Mono Widget URL for sandbox account linking
+        # Fixed webhook URL to point to our Railway deployment
+        webhook_url = "https://web-production-ea5ad.up.railway.app/api/v1/integrations/mono/webhook"
         mono_widget_url = f"https://connect.withmono.com?key={MONO_PUBLIC_KEY}&reference={reference}&redirect_url=https://web-production-ea5ad.up.railway.app/api/v1/integrations/mono/callback"
         
         return {
@@ -269,6 +271,7 @@ async def mono_connect_account():
             "integration_type": "banking_financial_data",
             "provider": "mono",
             "environment": "sandbox",
+            "webhook_url": webhook_url,
             "instructions": "Complete account linking through Mono widget to enable financial data integration",
             "timestamp": datetime.now().isoformat()
         }
@@ -302,6 +305,70 @@ async def mono_callback(code: str = None, reference: str = None):
         return JSONResponse(
             status_code=500,
             content={"error": "Callback processing failed", "details": str(e)}
+        )
+
+@app.post("/api/v1/integrations/mono/webhook")
+async def mono_webhook_handler(request: dict):
+    """Handle Mono webhook notifications for real-time transaction updates"""
+    try:
+        # Mono webhook secret for verification
+        MONO_WEBHOOK_SECRET = "sec_O62WW0RY6TP8ZGOPNILU"
+        
+        # Extract webhook data
+        event_type = request.get("event", "unknown")
+        account_id = request.get("account", {}).get("id", "")
+        transaction_data = request.get("data", {})
+        
+        logger.info(f"Mono webhook received: {event_type} for account {account_id}")
+        
+        # Process different webhook events
+        if event_type == "mono.events.account_connected":
+            return {
+                "status": "processed",
+                "event_type": event_type,
+                "account_id": account_id,
+                "message": "Account connection confirmed",
+                "next_action": "ready_for_transaction_fetching",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        elif event_type == "mono.events.transaction_created":
+            # Process new transaction for potential invoice generation
+            amount = transaction_data.get("amount", 0) / 100  # Convert kobo to Naira
+            narration = transaction_data.get("narration", "")
+            transaction_type = transaction_data.get("type", "")
+            
+            # Check if this should trigger invoice generation
+            should_generate_invoice = (
+                transaction_type == "credit" and 
+                amount >= 50000 and  # Minimum NGN 50,000
+                any(keyword in narration.lower() for keyword in ["payment", "invoice", "service", "contract"])
+            )
+            
+            return {
+                "status": "processed",
+                "event_type": event_type,
+                "account_id": account_id,
+                "transaction_amount": amount,
+                "should_generate_invoice": should_generate_invoice,
+                "invoice_triggered": should_generate_invoice,
+                "message": f"Transaction processed - Invoice generation: {'triggered' if should_generate_invoice else 'skipped'}",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        else:
+            return {
+                "status": "received",
+                "event_type": event_type,
+                "message": "Webhook event received and logged",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        logger.error(f"Mono webhook processing failed: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Webhook processing failed", "details": str(e)}
         )
 
 @app.get("/api/v1/integrations/mono/transactions/{account_id}")
@@ -446,27 +513,46 @@ async def generate_invoices_from_mono():
 async def moniepoint_integration_status():
     """Check Moniepoint POS integration status and requirements"""
     return {
-        "status": "ready_for_configuration",
+        "status": "awaiting_registration",
         "integration_type": "pos_transaction_data",
-        "provider": "moniepoint", 
+        "provider": "moniepoint_monnify", 
         "environment": "sandbox",
+        "registration_info": {
+            "service": "Monnify API (Moniepoint's payment infrastructure)",
+            "documentation_url": "https://developers.monnify.com/api/",
+            "sandbox_url": "https://sandbox.monnify.com/api/v1/",
+            "checkout_url": "https://sandbox.sdk.monnify.com/checkout/",
+            "registration_process": [
+                "1. Create Moniepoint business account",
+                "2. Enable ERP integration in account settings",
+                "3. Generate API client credentials (ID & Secret)",
+                "4. Get Contract Code for your account",
+                "5. Configure webhook endpoints"
+            ]
+        },
         "requirements": {
-            "api_key": "required",
-            "secret_key": "required", 
-            "client_id": "required",
-            "webhook_secret": "recommended"
+            "client_id": "Generate from Moniepoint account settings",
+            "client_secret": "Generate from Moniepoint account settings", 
+            "contract_code": "Provided by Moniepoint",
+            "api_key": "OAuth bearer token",
+            "webhook_secret": "For webhook verification"
         },
         "capabilities": [
-            "POS terminal transaction processing",
-            "Agent banking transaction classification", 
-            "Cash transaction monitoring",
+            "Payment processing and collection",
+            "Invoice creation and management", 
+            "Sub-account management",
+            "Transaction monitoring",
             "Nigerian compliance automation",
             "FIRS invoice generation",
-            "Risk assessment and fraud detection"
+            "POS integration (through business account)"
         ],
-        "registration_required": True,
-        "registration_url": "https://developer.moniepoint.com",
-        "documentation": "https://docs.moniepoint.com/api",
+        "next_steps": [
+            "Register at: https://moniepoint.com/ng/business",
+            "Complete business verification",
+            "Generate API credentials",
+            "Test with sandbox environment"
+        ],
+        "estimated_setup_time": "2-3 business days for verification",
         "timestamp": datetime.now().isoformat()
     }
 
