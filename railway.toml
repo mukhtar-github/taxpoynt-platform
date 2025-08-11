@@ -1,11 +1,11 @@
 # TaxPoynt Platform Railway Configuration
-# Simplified for reliable deployment
+# Python FastAPI deployment
 
 [build]
 
 [deploy]
-# Direct start command - use 'python' instead of 'python3' for Railway
-startCommand = "cd platform/backend && python -m pip install -r requirements.txt && python -m uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*' --log-level info"
+# Use root-level main.py for Railway Python detection
+startCommand = "python main.py"
 
 # Health check configuration 
 healthcheckPath = "/health"

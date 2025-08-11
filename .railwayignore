@@ -1,0 +1,37 @@
+# Railway Ignore - Focus on Python backend deployment
+
+# Ignore frontend files that confuse Railway detection
+package.json
+package-lock.json
+next.config.js
+tsconfig.json
+node_modules/
+.next/
+platform/frontend/
+legacy/frontend/
+
+# Ignore development files
+venv/
+.env.local
+.env.development
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# Ignore documentation
+docs/
+*.md
+!RAILWAY_DEPLOYMENT_FIX.md
+
+# Ignore test files
+tests/
+*_test.py
+test_*.py
+
+# Keep essential files
+!main.py
+!requirements.txt
+!runtime.txt
+!railway.toml
+!Procfile
+!platform/backend/

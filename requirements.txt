@@ -1,3 +1,33 @@
-# TaxPoynt Platform - Root Requirements
-# Points to platform backend dependencies
+# TaxPoynt Platform - Production Dependencies
+# Essential packages for Railway deployment
+
+# Web framework & ASGI server
+fastapi>=0.104.0
+uvicorn[standard]>=0.23.2
+starlette>=0.27.0
+python-multipart>=0.0.6
+
+# Performance enhancements
+uvloop>=0.17.0
+httptools>=0.6.0
+
+# API documentation
+pydantic==1.10.22
+
+# Database
+sqlalchemy>=2.0.22
+psycopg2-binary>=2.9.9
+
+# Authentication & Security
+cryptography>=41.0.4
+PyJWT>=2.8.0
+passlib>=1.7.4
+bcrypt>=4.0.1
+
+# Utilities
+python-dotenv>=1.0.0
+email-validator>=2.0.0
+requests>=2.31.0
+
+# Additional backend dependencies
 -r platform/backend/requirements.txt
