@@ -372,6 +372,41 @@ export interface FIRSEnvironment {
   responseTime: number;
 }
 
+export interface SecurityEvent {
+  id: string;
+  timestamp: Date;
+  type: 'authentication' | 'certificate' | 'access' | 'system' | 'network';
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  message: string;
+  source: string;
+  user: string;
+  resolved: boolean;
+}
+
+export interface AccessLog {
+  id: string;
+  timestamp: Date;
+  user: string;
+  action: 'LOGIN' | 'LOGOUT' | 'ACCESS' | 'CREATE' | 'UPDATE' | 'DELETE';
+  resource: string;
+  ipAddress: string;
+  userAgent: string;
+  success: boolean;
+}
+
+export interface ComplianceStatus {
+  overallScore: number;
+  categories: {
+    authentication: number;
+    encryption: number;
+    accessControl: number;
+    auditLogging: number;
+    dataProtection: number;
+  };
+  lastAssessment: Date;
+  nextAssessment: Date;
+}
+
 // Error Handling Types
 export interface ErrorDetails {
   error_code: string;
