@@ -381,6 +381,14 @@ export interface FIRSEnvironment {
   responseTime: number;
 }
 
+export interface APICredentials {
+  clientId: string;
+  clientSecret: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: Date;
+}
+
 export interface SecurityEvent {
   id: string;
   timestamp: Date;
