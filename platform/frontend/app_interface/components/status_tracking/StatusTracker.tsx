@@ -611,30 +611,30 @@ export const StatusTracker: React.FC = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-48"
                   />
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="transmitting">Transmitting</SelectItem>
-                      <SelectItem value="transmitted">Transmitted</SelectItem>
-                      <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedSLA} onValueChange={setSelectedSLA}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All SLA</SelectItem>
-                      <SelectItem value="on_track">On Track</SelectItem>
-                      <SelectItem value="at_risk">At Risk</SelectItem>
-                      <SelectItem value="breached">Breached</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Select 
+                    value={selectedStatus} 
+                    onChange={(value) => setSelectedStatus(value as string)}
+                    options={[
+                      { value: 'all', label: 'All Status' },
+                      { value: 'pending', label: 'Pending' },
+                      { value: 'transmitting', label: 'Transmitting' },
+                      { value: 'transmitted', label: 'Transmitted' },
+                      { value: 'acknowledged', label: 'Acknowledged' },
+                      { value: 'failed', label: 'Failed' }
+                    ]}
+                    className="w-40"
+                  />
+                  <Select 
+                    value={selectedSLA} 
+                    onChange={(value) => setSelectedSLA(value as string)}
+                    options={[
+                      { value: 'all', label: 'All SLA' },
+                      { value: 'on_track', label: 'On Track' },
+                      { value: 'at_risk', label: 'At Risk' },
+                      { value: 'breached', label: 'Breached' }
+                    ]}
+                    className="w-32"
+                  />
                 </div>
               </CardTitle>
             </CardHeader>
