@@ -277,7 +277,7 @@ export interface ComplianceReport {
   period_start: Date;
   period_end: Date;
   generated_at: Date;
-  status: 'generating' | 'completed' | 'failed';
+  status: 'pending' | 'generating' | 'completed' | 'failed';
   metrics: ComplianceMetrics;
   violations: ComplianceViolation[];
   recommendations: string[];

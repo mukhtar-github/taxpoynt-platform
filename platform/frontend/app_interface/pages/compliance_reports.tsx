@@ -147,7 +147,7 @@ export const ComplianceReportsPage: React.FC<ComplianceReportsPageProps> = ({ cl
         id: 'rpt-003',
         title: 'Quarterly Audit Report',
         report_type: 'quarterly',
-        status: 'generating',
+        status: 'pending',
         generated_at: new Date(),
         period_start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
         period_end: new Date(),
