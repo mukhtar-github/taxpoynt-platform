@@ -112,41 +112,51 @@ export const ComplianceReportsPage: React.FC<ComplianceReportsPageProps> = ({ cl
       {
         id: 'rpt-001',
         title: 'Monthly FIRS Compliance Report',
-        type: 'monthly',
+        report_type: 'monthly',
         status: 'completed',
-        generatedDate: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        period: { start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), end: new Date() },
-        complianceScore: 98.5,
-        totalTransactions: 12450,
-        successfulTransactions: 12260,
-        fileSize: '2.4 MB',
-        format: 'PDF'
+        generated_at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        period_start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        period_end: new Date(),
+        compliance_score: 98.5,
+        total_transactions: 12450,
+        successful_transactions: 12260,
+        file_size: '2.4 MB',
+        format: 'PDF',
+        metrics: {} as any,
+        violations: [],
+        recommendations: []
       },
       {
         id: 'rpt-002',
         title: 'Weekly Transmission Summary',
-        type: 'weekly',
+        report_type: 'weekly',
         status: 'completed',
-        generatedDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        period: { start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), end: new Date() },
-        complianceScore: 97.2,
-        totalTransactions: 3250,
-        successfulTransactions: 3160,
-        fileSize: '1.1 MB',
-        format: 'Excel'
+        generated_at: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        period_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        period_end: new Date(),
+        compliance_score: 97.2,
+        total_transactions: 3250,
+        successful_transactions: 3160,
+        file_size: '1.1 MB',
+        format: 'Excel',
+        metrics: {} as any,
+        violations: [],
+        recommendations: []
       },
       {
         id: 'rpt-003',
         title: 'Quarterly Audit Report',
-        type: 'quarterly',
-        status: 'pending',
-        generatedDate: null,
-        period: { start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), end: new Date() },
-        complianceScore: null,
-        totalTransactions: 45200,
-        successfulTransactions: 44850,
-        fileSize: null,
-        format: 'PDF'
+        report_type: 'quarterly',
+        status: 'generating',
+        generated_at: new Date(),
+        period_start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+        period_end: new Date(),
+        total_transactions: 45200,
+        successful_transactions: 44850,
+        format: 'PDF',
+        metrics: {} as any,
+        violations: [],
+        recommendations: []
       }
     ];
   };
@@ -231,7 +241,7 @@ export const ComplianceReportsPage: React.FC<ComplianceReportsPageProps> = ({ cl
         <div>
           <strong>{title}</strong>
           <br />
-          <small style={{ color: '#666' }}>{record.type.toUpperCase()}</small>
+          <small style={{ color: '#666' }}>{record.report_type.toUpperCase()}</small>
         </div>
       )
     },
@@ -248,20 +258,20 @@ export const ComplianceReportsPage: React.FC<ComplianceReportsPageProps> = ({ cl
       key: 'period',
       render: (record: ComplianceReport) => (
         <div>
-          {record.period.start.toLocaleDateString()} - {record.period.end.toLocaleDateString()}
+          {record.period_start.toLocaleDateString()} - {record.period_end.toLocaleDateString()}
         </div>
       )
     },
     {
       title: 'Transactions',
-      dataIndex: 'totalTransactions',
-      key: 'totalTransactions',
+      dataIndex: 'total_transactions',
+      key: 'total_transactions',
       render: (total: number, record: ComplianceReport) => (
         <div>
           <strong>{total.toLocaleString()}</strong>
           <br />
           <small style={{ color: '#52c41a' }}>
-            {record.successfulTransactions?.toLocaleString()} successful
+            {record.successful_transactions?.toLocaleString()} successful
           </small>
         </div>
       )

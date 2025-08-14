@@ -282,6 +282,13 @@ export interface ComplianceReport {
   violations: ComplianceViolation[];
   recommendations: string[];
   file_path?: string;
+  // Additional properties for UI display
+  title?: string;
+  compliance_score?: number;
+  total_transactions?: number;
+  successful_transactions?: number;
+  file_size?: string;
+  format?: string;
 }
 
 export interface ComplianceMetrics {
