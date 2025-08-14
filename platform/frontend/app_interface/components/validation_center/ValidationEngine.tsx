@@ -37,14 +37,10 @@ import {
   TableHeader,
   TableRow,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Textarea,
   Switch
 } from '@/components/ui';
+import { Select } from '../../../shared_components/forms/Select';
 import { 
   CheckCircle, 
   XCircle, 
@@ -636,30 +632,32 @@ export const ValidationEngine: React.FC = () => {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-48"
                     />
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        <SelectItem value="format">Format</SelectItem>
-                        <SelectItem value="business">Business</SelectItem>
-                        <SelectItem value="compliance">Compliance</SelectItem>
-                        <SelectItem value="security">Security</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Severities</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="error">Error</SelectItem>
-                        <SelectItem value="warning">Warning</SelectItem>
-                        <SelectItem value="info">Info</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Select 
+                      value={selectedCategory} 
+                      onChange={(value) => setSelectedCategory(value as string)}
+                      options={[
+                        { value: "all", label: "All Categories" },
+                        { value: "format", label: "Format" },
+                        { value: "business", label: "Business" },
+                        { value: "compliance", label: "Compliance" },
+                        { value: "security", label: "Security" }
+                      ]}
+                      placeholder="Filter by category"
+                      className="w-32"
+                    />
+                    <Select 
+                      value={selectedSeverity} 
+                      onChange={(value) => setSelectedSeverity(value as string)}
+                      options={[
+                        { value: "all", label: "All Severities" },
+                        { value: "critical", label: "Critical" },
+                        { value: "error", label: "Error" },
+                        { value: "warning", label: "Warning" },
+                        { value: "info", label: "Info" }
+                      ]}
+                      placeholder="Filter by severity"
+                      className="w-32"
+                    />
                   </div>
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
