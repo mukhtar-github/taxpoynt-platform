@@ -97,9 +97,7 @@ const mockCertificates: Certificate[] = [
     valid_from: new Date('2024-01-01'),
     valid_to: new Date('2025-01-01'),
     fingerprint: 'SHA256: 1A:2B:3C:4D:5E:6F:7A:8B:9C:0D:1E:2F:3A:4B:5C:6D',
-    key_size: 2048,
-    algorithm: 'RSA-SHA256',
-    usage: ['Digital Signature', 'Key Encipherment'],
+    key_usage: ['Digital Signature', 'Key Encipherment'],
     certificate_chain: ['Root CA', 'Intermediate CA', 'End Entity']
   },
   {
@@ -113,9 +111,7 @@ const mockCertificates: Certificate[] = [
     valid_from: new Date('2024-01-15'),
     valid_to: new Date('2024-12-15'),
     fingerprint: 'SHA256: 9F:8E:7D:6C:5B:4A:39:28:17:36:45:54:63:72:81:90',
-    key_size: 2048,
-    algorithm: 'RSA-SHA256',
-    usage: ['Server Authentication'],
+    key_usage: ['Server Authentication'],
     certificate_chain: ['ISRG Root X1', 'R3', 'End Entity']
   },
   {
@@ -129,9 +125,7 @@ const mockCertificates: Certificate[] = [
     valid_from: new Date('2023-06-01'),
     valid_to: new Date('2024-06-01'),
     fingerprint: 'SHA256: 5F:4E:3D:2C:1B:0A:98:76:54:32:10:FE:DC:BA:98:76',
-    key_size: 2048,
-    algorithm: 'RSA-SHA256',
-    usage: ['Client Authentication'],
+    key_usage: ['Client Authentication'],
     certificate_chain: ['Internal Root CA', 'End Entity']
   }
 ];
