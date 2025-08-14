@@ -688,7 +688,7 @@ export const StatusTracker: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Dialog>
-                          <DialogTrigger asChild>
+                          <DialogTrigger>
                             <Button 
                               variant="outline" 
                               size="sm"
