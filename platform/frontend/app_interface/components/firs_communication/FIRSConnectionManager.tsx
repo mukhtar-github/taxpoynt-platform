@@ -361,7 +361,7 @@ export const FIRSConnectionManager: React.FC = () => {
                       </div>
                     </div>
                     <Badge 
-                      variant="outline" 
+                      variant="info" 
                       className={
                         service.status === 'available' ? 'bg-green-100 text-green-800' :
                         service.status === 'degraded' ? 'bg-yellow-100 text-yellow-800' :
