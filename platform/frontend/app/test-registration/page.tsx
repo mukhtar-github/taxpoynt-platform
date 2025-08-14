@@ -81,7 +81,7 @@ export default function TestRegistrationPage() {
     setError('');
 
     try {
-      const user = await authService.getCurrentUser();
+      const user = authService.getStoredUser();
       setResult(JSON.stringify(user, null, 2));
       console.log('Current user:', user);
     } catch (err) {
