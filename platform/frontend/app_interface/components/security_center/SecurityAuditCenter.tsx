@@ -290,7 +290,7 @@ export const SecurityAuditCenter: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className={`${getComplianceScoreColor(securityMetrics.compliance_score)} border`}>
+          <Badge variant="info" className={`${getComplianceScoreColor(securityMetrics.compliance_score)} border`}>
             Compliance: {securityMetrics.compliance_score}%
           </Badge>
           <Button variant="outline" size="sm">
@@ -381,7 +381,7 @@ export const SecurityAuditCenter: React.FC = () => {
               <AlertTriangle className="h-8 w-8 text-orange-600" />
             </div>
             <div className="mt-2">
-              <Badge variant="outline" className="bg-green-50 text-green-700">
+              <Badge variant="info" className="bg-green-50 text-green-700">
                 All Clear
               </Badge>
             </div>
@@ -413,7 +413,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <CheckCircle className="h-5 w-5 text-green-500" />
                       <span>Valid Certificates</span>
                     </div>
-                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                    <Badge variant="info" className="bg-green-100 text-green-800">
                       {securityMetrics.certificate_status.valid}
                     </Badge>
                   </div>
@@ -423,7 +423,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <AlertTriangle className="h-5 w-5 text-yellow-500" />
                       <span>Expiring Soon</span>
                     </div>
-                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                    <Badge variant="info" className="bg-yellow-100 text-yellow-800">
                       {securityMetrics.certificate_status.expiring_soon}
                     </Badge>
                   </div>
@@ -433,7 +433,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <XCircle className="h-5 w-5 text-red-500" />
                       <span>Expired</span>
                     </div>
-                    <Badge variant="outline" className="bg-red-100 text-red-800">
+                    <Badge variant="info" className="bg-red-100 text-red-800">
                       {securityMetrics.certificate_status.expired}
                     </Badge>
                   </div>
@@ -452,7 +452,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                       <span>Critical</span>
                     </div>
-                    <Badge variant="outline" className="bg-red-100 text-red-800">
+                    <Badge variant="info" className="bg-red-100 text-red-800">
                       {securityMetrics.vulnerability_summary.critical}
                     </Badge>
                   </div>
@@ -462,7 +462,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
                       <span>High</span>
                     </div>
-                    <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                    <Badge variant="info" className="bg-orange-100 text-orange-800">
                       {securityMetrics.vulnerability_summary.high}
                     </Badge>
                   </div>
@@ -472,7 +472,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                       <span>Medium</span>
                     </div>
-                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                    <Badge variant="info" className="bg-yellow-100 text-yellow-800">
                       {securityMetrics.vulnerability_summary.medium}
                     </Badge>
                   </div>
@@ -482,7 +482,7 @@ export const SecurityAuditCenter: React.FC = () => {
                       <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                       <span>Low</span>
                     </div>
-                    <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                    <Badge variant="info" className="bg-blue-100 text-blue-800">
                       {securityMetrics.vulnerability_summary.low}
                     </Badge>
                   </div>
@@ -508,10 +508,10 @@ export const SecurityAuditCenter: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={getSeverityColor(audit.severity)}>
+                      <Badge variant="info" className={getSeverityColor(audit.severity)}>
                         {audit.severity}
                       </Badge>
-                      <Badge variant="outline" className={
+                      <Badge variant="info" className={
                         audit.status === 'open' ? 'bg-red-100 text-red-800' :
                         audit.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-green-100 text-green-800'
@@ -559,14 +559,14 @@ export const SecurityAuditCenter: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="info" className="capitalize">
                           {cert.type.replace('_', ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getCertificateStatusIcon(cert.status)}
-                          <Badge variant="outline" className={getCertificateStatusColor(cert.status)}>
+                          <Badge variant="info" className={getCertificateStatusColor(cert.status)}>
                             {cert.status.replace('_', ' ')}
                           </Badge>
                         </div>
@@ -655,10 +655,10 @@ export const SecurityAuditCenter: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="font-medium">{audit.title}</h4>
-                            <Badge variant="outline" className={getSeverityColor(audit.severity)}>
+                            <Badge variant="info" className={getSeverityColor(audit.severity)}>
                               {audit.severity}
                             </Badge>
-                            <Badge variant="outline" className="text-xs capitalize">
+                            <Badge variant="info" className="text-xs capitalize">
                               {audit.audit_type}
                             </Badge>
                           </div>
@@ -670,7 +670,7 @@ export const SecurityAuditCenter: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={
+                        <Badge variant="info" className={
                           audit.status === 'open' ? 'bg-red-100 text-red-800' :
                           audit.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-green-100 text-green-800'
@@ -750,7 +750,7 @@ export const SecurityAuditCenter: React.FC = () => {
                   </div>
                   <p className="text-sm text-gray-600 mt-2">Suspicious Activities</p>
                   <div className="mt-2">
-                    <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">
+                    <Badge variant="info" className="bg-orange-100 text-orange-800 text-xs">
                       Under Review
                     </Badge>
                   </div>
@@ -819,15 +819,15 @@ export const SecurityAuditCenter: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <span>ISO 27001</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">Compliant</Badge>
+                      <Badge variant="info" className="bg-green-100 text-green-800">Compliant</Badge>
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <span>SOC 2 Type II</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">Compliant</Badge>
+                      <Badge variant="info" className="bg-green-100 text-green-800">Compliant</Badge>
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <span>GDPR</span>
-                      <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Partial</Badge>
+                      <Badge variant="info" className="bg-yellow-100 text-yellow-800">Partial</Badge>
                     </div>
                   </div>
                 </div>
@@ -837,15 +837,15 @@ export const SecurityAuditCenter: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <span>NDPR Compliance</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">Compliant</Badge>
+                      <Badge variant="info" className="bg-green-100 text-green-800">Compliant</Badge>
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <span>CBN Guidelines</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">Compliant</Badge>
+                      <Badge variant="info" className="bg-green-100 text-green-800">Compliant</Badge>
                     </div>
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <span>FIRS Security Requirements</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">Compliant</Badge>
+                      <Badge variant="info" className="bg-green-100 text-green-800">Compliant</Badge>
                     </div>
                   </div>
                 </div>
