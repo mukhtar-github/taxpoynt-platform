@@ -1,0 +1,26 @@
+{
+  "setup_mode": "production",
+  "timestamp": "2025-08-12T13:07:46.432197",
+  "system_requirements": {
+    "python": true,
+    "fastapi": true,
+    "sqlalchemy": true,
+    "pydantic": true,
+    "redis_optional": true,
+    "psycopg2_optional": true
+  },
+  "database_connectivity": false,
+  "redis_connectivity": false,
+  "initial_tables": false,
+  "overall_success": false,
+  "detailed_results": {
+    "database": {
+      "status": "failed",
+      "error": "DATABASE_URL environment variable is required for production"
+    },
+    "redis": {
+      "status": "failed",
+      "error": "Error 111 connecting to localhost:6379. Connection refused."
+    }
+  }
+}

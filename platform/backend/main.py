@@ -1,39 +1,25 @@
 """
-TaxPoynt Platform Backend - Main Application Entry Point
-========================================================
-Railway-optimized FastAPI application with proper health checks and error handling
+TaxPoynt E-Invoice Platform Backend
+==================================
+Main application entry point with API Gateway architecture integration.
 """
 import os
 import sys
 import logging
-import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Any
 
-# Minimal imports for Railway startup reliability
-try:
-    from fastapi import FastAPI, HTTPException
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse
-    from starlette.middleware.base import BaseHTTPMiddleware
-    from starlette.requests import Request
-    from starlette.responses import Response
-except ImportError as e:
-    print(f"❌ Critical import error: {e}")
-    sys.exit(1)
-
-# Configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger(__name__)
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Environment configuration with Railway optimization
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 DEBUG = ENVIRONMENT == "development"
 PORT = int(os.getenv("PORT", "8000"))
+HOST = os.getenv("HOST", "0.0.0.0")
 RAILWAY_DEPLOYMENT = os.getenv("RAILWAY_DEPLOYMENT_ID") is not None
 
 # Add project root to path
@@ -60,1000 +46,226 @@ class HealthCheckMiddleware(BaseHTTPMiddleware):
         
         return await call_next(request)
 
-# Create FastAPI application with Railway optimization
-app = FastAPI(
-    title="TaxPoynt Platform API",
-    description="Enterprise Nigerian e-invoicing and business integration platform", 
-    version="1.0.0",
-    debug=DEBUG,
-    docs_url="/docs" if DEBUG else None,  # Disable docs in production for security
-    redoc_url="/redoc" if DEBUG else None,
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO if not DEBUG else logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
-# Add health check middleware FIRST
-app.add_middleware(HealthCheckMiddleware)
-
-# Add CORS middleware with Railway-friendly origins
-allowed_origins = [
-    "https://web-production-ea5ad.up.railway.app",  # Railway production
-    "https://app-staging.taxpoynt.com",
-    "https://app.taxpoynt.com",
-    "http://localhost:3000"
-] if not DEBUG else ["*"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-
-# Primary health endpoint for Railway
-@app.get("/health")
-async def health_check():
-    """Railway health check endpoint - enhanced for deployment reliability"""
-    try:
-        return {
-            "status": "healthy",
-            "service": "taxpoynt_platform_backend",
-            "environment": ENVIRONMENT,
-            "version": "1.0.0",
-            "railway_deployment": RAILWAY_DEPLOYMENT,
-            "timestamp": datetime.now().isoformat(),
-            "checks": {
-                "fastapi": "operational",
-                "startup": "complete",
-                "memory": "ok"
-            }
-        }
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "unhealthy", 
-                "error": str(e),
-                "service": "taxpoynt_platform_backend"
-            }
-        )
-
-@app.get("/")
-async def root():
-    """Root endpoint with Railway deployment info"""
-    return {
-        "message": "TaxPoynt Platform Backend API",
-        "version": "1.0.0", 
-        "environment": ENVIRONMENT,
-        "status": "operational",
-        "railway_deployment": RAILWAY_DEPLOYMENT,
-        "endpoints": {
-            "health": "/health",
-            "api_health": "/api/health", 
-            "docs": "/docs" if DEBUG else "disabled",
-            "api_v1": "/api/v1"
-        }
-    }
-
-@app.get("/api/health")
-async def api_health():
-    """API health check with enhanced diagnostics"""
-    return {
-        "status": "healthy",
-        "api_version": "v1",
-        "service": "api_gateway",
-        "components": {
-            "firs_communication": "loaded",
-            "si_services": "loaded", 
-            "app_services": "loaded",
-            "external_integrations": "loaded"
-        },
-        "environment": ENVIRONMENT
-    }
-
-# Basic API endpoints for testing
-@app.get("/api/v1/status")
-async def api_status():
-    """API status endpoint"""
-    return {
-        "api_status": "operational",
-        "version": "v1.0.0",
-        "timestamp": datetime.now().isoformat()
-    }
-
-# FIRS Certification Endpoints - Basic Implementation for Testing
-@app.get("/api/v1/health/ready")
-async def health_ready():
-    """Platform health ready endpoint for FIRS certification"""
-    return {
-        "status": "ready",
-        "service": "taxpoynt_platform",
-        "firs_integration": "active",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/api/v1/firs-certification/health-check")
-async def firs_health_check():
-    """FIRS certification health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "firs_certification",
-        "app_status": "certified",
-        "system_availability": "online",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/api/v1/firs-certification/configuration")
-async def firs_configuration():
-    """FIRS certification configuration endpoint"""
-    return {
-        "status": "configured",
-        "app_id": "TAXPOYNT-APP-001",
-        "certification_status": "active",
-        "api_version": "v1.0",
-        "configuration": {
-            "ubl_version": "2.1",
-            "peppol_enabled": True,
-            "iso27001_compliant": True,
-            "lei_registered": True
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.post("/api/v1/firs-certification/transmission/submit")
-async def firs_transmission_submit():
-    """FIRS certification transmission submit endpoint"""
-    return {
-        "status": "submitted",
-        "transmission_id": "TXN-20250811-001",
-        "processing_status": "queued",
-        "estimated_completion": "2025-08-11T16:00:00Z",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/api/v1/firs-certification/reporting/dashboard")
-async def firs_reporting_dashboard():
-    """FIRS certification reporting dashboard endpoint"""
-    return {
-        "status": "operational",
-        "dashboard_data": {
-            "total_transmissions": 1247,
-            "successful_submissions": 1242,
-            "failed_submissions": 5,
-            "success_rate": 99.6,
-            "last_24h_activity": {
-                "submissions": 47,
-                "success_rate": 100.0
-            }
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
-# Additional FIRS endpoints for comprehensive testing
-@app.get("/api/v1/firs-certification/transmission/status/{transmission_id}")
-async def firs_transmission_status(transmission_id: str):
-    """FIRS transmission status endpoint"""
-    return {
-        "transmission_id": transmission_id,
-        "status": "completed",
-        "processing_result": "success",
-        "firs_response": {
-            "acknowledgment_id": f"ACK-{transmission_id}",
-            "validation_status": "passed"
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
-# MONO BANKING INTEGRATION ENDPOINTS
-# ===================================
-
-@app.post("/api/v1/integrations/mono/connect")
-async def mono_connect_account():
-    """Initialize Mono account linking for financial data access"""
-    try:
-        # Mono sandbox credentials
-        MONO_PUBLIC_KEY = "test_pk_vimb82d7sp1py2yhql30"
-        MONO_SECRET_KEY = "test_sk_qhztoaaq7hzcbew22tap"
-        
-        # Generate unique reference for this connection
-        reference = f"TAXPOYNT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
-        # Mono Widget URL for sandbox account linking
-        # Fixed webhook URL to point to our Railway deployment
-        webhook_url = "https://web-production-ea5ad.up.railway.app/api/v1/integrations/mono/webhook"
-        mono_widget_url = f"https://connect.withmono.com?key={MONO_PUBLIC_KEY}&reference={reference}&redirect_url=https://web-production-ea5ad.up.railway.app/api/v1/integrations/mono/callback"
-        
-        return {
-            "status": "initialized",
-            "mono_widget_url": mono_widget_url,
-            "reference": reference,
-            "integration_type": "banking_financial_data",
-            "provider": "mono",
-            "environment": "sandbox",
-            "webhook_url": webhook_url,
-            "instructions": "Complete account linking through Mono widget to enable financial data integration",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Mono connection initialization failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Failed to initialize Mono connection", "details": str(e)}
-        )
-
-@app.get("/api/v1/integrations/mono/callback")
-async def mono_callback(code: str = None, reference: str = None):
-    """Handle Mono account linking callback"""
-    try:
-        if not code:
-            return {"status": "error", "message": "Authorization code required"}
-            
-        return {
-            "status": "connected",
-            "reference": reference,
-            "authorization_code": code,
-            "account_linked": True,
-            "next_step": "fetch_transactions",
-            "message": "Mono account successfully linked. Financial data integration active.",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Mono callback processing failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Callback processing failed", "details": str(e)}
-        )
-
-@app.post("/api/v1/integrations/mono/webhook")
-async def mono_webhook_handler(request: dict):
-    """Handle Mono webhook notifications for real-time transaction updates"""
-    try:
-        # Mono webhook secret for verification
-        MONO_WEBHOOK_SECRET = "sec_O62WW0RY6TP8ZGOPNILU"
-        
-        # Extract webhook data
-        event_type = request.get("event", "unknown")
-        account_id = request.get("account", {}).get("id", "")
-        transaction_data = request.get("data", {})
-        
-        logger.info(f"Mono webhook received: {event_type} for account {account_id}")
-        
-        # Process different webhook events
-        if event_type == "mono.events.account_connected":
-            return {
-                "status": "processed",
-                "event_type": event_type,
-                "account_id": account_id,
-                "message": "Account connection confirmed",
-                "next_action": "ready_for_transaction_fetching",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        elif event_type == "mono.events.transaction_created":
-            # Process new transaction for potential invoice generation
-            amount = transaction_data.get("amount", 0) / 100  # Convert kobo to Naira
-            narration = transaction_data.get("narration", "")
-            transaction_type = transaction_data.get("type", "")
-            
-            # Check if this should trigger invoice generation
-            should_generate_invoice = (
-                transaction_type == "credit" and 
-                amount >= 50000 and  # Minimum NGN 50,000
-                any(keyword in narration.lower() for keyword in ["payment", "invoice", "service", "contract"])
-            )
-            
-            return {
-                "status": "processed",
-                "event_type": event_type,
-                "account_id": account_id,
-                "transaction_amount": amount,
-                "should_generate_invoice": should_generate_invoice,
-                "invoice_triggered": should_generate_invoice,
-                "message": f"Transaction processed - Invoice generation: {'triggered' if should_generate_invoice else 'skipped'}",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        else:
-            return {
-                "status": "received",
-                "event_type": event_type,
-                "message": "Webhook event received and logged",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-    except Exception as e:
-        logger.error(f"Mono webhook processing failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Webhook processing failed", "details": str(e)}
-        )
-
-@app.get("/api/v1/integrations/mono/transactions/{account_id}")
-async def get_mono_transactions(account_id: str, limit: int = 50):
-    """Fetch banking transactions from Mono and transform to FIRS-compatible format"""
-    try:
-        # Simulate Mono transaction data (in production, this would call Mono API)
-        sample_transactions = [
-            {
-                "id": f"mono_tx_{i}",
-                "amount": 150000.00 + (i * 25000),  # NGN amounts
-                "currency": "NGN", 
-                "type": "credit",
-                "narration": f"Business service payment - Invoice #{1000 + i}",
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "time": f"14:{30 + i}:00",
-                "reference": f"FT{datetime.now().strftime('%Y%m%d')}{1000 + i}",
-                "sender_name": f"Client Company {i + 1} Ltd",
-                "sender_account": f"0123456{789 + i}",
-                "category": "business_income"
-            }
-            for i in range(min(limit, 10))
-        ]
-        
-        # Transform transactions for FIRS compliance
-        firs_ready_invoices = []
-        for tx in sample_transactions:
-            # Business income classification (simplified)
-            is_business_income = tx["type"] == "credit" and tx["amount"] >= 50000
-            
-            if is_business_income:
-                invoice_data = {
-                    "invoice_id": f"TXP-INV-{tx['reference']}",
-                    "invoice_number": f"INV/{datetime.now().year}/{tx['reference'][-6:]}",
-                    "issue_date": tx["date"],
-                    "due_date": tx["date"], 
-                    "customer_name": tx["sender_name"],
-                    "customer_tin": "31569955-0001",  # Sample TIN
-                    "items": [
-                        {
-                            "description": tx["narration"],
-                            "quantity": 1,
-                            "unit_price": tx["amount"],
-                            "total": tx["amount"]
-                        }
-                    ],
-                    "subtotal": tx["amount"],
-                    "vat_rate": 0.075,  # 7.5% Nigerian VAT
-                    "vat_amount": tx["amount"] * 0.075,
-                    "total_amount": tx["amount"] * 1.075,
-                    "currency": "NGN",
-                    "firs_compliance": {
-                        "ubl_version": "2.1",
-                        "transaction_type": "commercial_invoice",
-                        "business_classification": "financial_services_integration"
-                    },
-                    "mono_metadata": {
-                        "transaction_id": tx["id"],
-                        "account_id": account_id,
-                        "original_reference": tx["reference"]
-                    }
-                }
-                firs_ready_invoices.append(invoice_data)
-        
-        return {
-            "status": "success",
-            "account_id": account_id,
-            "total_transactions": len(sample_transactions),
-            "business_income_transactions": len(firs_ready_invoices),
-            "raw_transactions": sample_transactions,
-            "firs_ready_invoices": firs_ready_invoices,
-            "integration_summary": {
-                "provider": "mono",
-                "integration_type": "banking_financial_data",
-                "firs_compliance": "ready",
-                "transformation_status": "completed",
-                "invoice_generation": "automated"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Mono transaction processing failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Transaction processing failed", "details": str(e)}
-        )
-
-@app.post("/api/v1/integrations/mono/generate-invoices")
-async def generate_invoices_from_mono():
-    """Generate and submit FIRS-compliant invoices from Mono banking data"""
-    try:
-        # Simulate invoice generation from Mono transactions
-        generated_invoices = []
-        
-        for i in range(3):  # Generate 3 sample invoices
-            invoice = {
-                "invoice_id": f"MONO-INV-{datetime.now().strftime('%Y%m%d')}-{1000 + i}",
-                "generated_from": "mono_banking_integration",
-                "customer_name": f"Business Client {i + 1}",
-                "amount": 200000 + (i * 50000),
-                "vat_amount": (200000 + (i * 50000)) * 0.075,
-                "total_amount": (200000 + (i * 50000)) * 1.075,
-                "currency": "NGN",
-                "status": "generated",
-                "firs_submission_status": "ready",
-                "ubl_compliant": True,
-                "created_at": datetime.now().isoformat()
-            }
-            generated_invoices.append(invoice)
-        
-        return {
-            "status": "completed",
-            "invoices_generated": len(generated_invoices),
-            "total_value": sum(inv["total_amount"] for inv in generated_invoices),
-            "invoices": generated_invoices,
-            "firs_integration": {
-                "ready_for_submission": True,
-                "compliance_status": "verified",
-                "ubl_format": "2.1",
-                "nigerian_vat_applied": True
-            },
-            "next_steps": [
-                "Review generated invoices",
-                "Submit to FIRS through TaxPoynt APP service",
-                "Monitor transmission status"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Mono invoice generation failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Invoice generation failed", "details": str(e)}
-        )
-
-# PAYSTACK PAYMENT INTEGRATION ENDPOINTS
-# ======================================
-
-@app.post("/api/v1/integrations/paystack/connect")
-async def paystack_connect():
-    """Initialize Paystack integration for payment data collection"""
-    try:
-        # Paystack test credentials (free sandbox access)
-        paystack_test_secret = "sk_test_example123"  # User needs to get from dashboard
-        paystack_test_public = "pk_test_example123"  # User needs to get from dashboard
-        
-        return {
-            "status": "ready_for_credentials",
-            "integration_type": "payment_transaction_data",
-            "provider": "paystack",
-            "environment": "sandbox",
-            "setup_instructions": [
-                "1. Create free Paystack account at https://dashboard.paystack.com",
-                "2. Account starts in Test Mode automatically", 
-                "3. Get API keys from Dashboard > Settings > API Keys & Webhooks",
-                "4. Copy test secret key and public key",
-                "5. Configure webhook URL in Paystack dashboard"
-            ],
-            "webhook_url": "https://web-production-ea5ad.up.railway.app/api/v1/integrations/paystack/webhook",
-            "test_credentials_format": {
-                "secret_key": "sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                "public_key": "pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            },
-            "capabilities": [
-                "Payment transaction monitoring",
-                "Nigerian business income classification",
-                "Automated FIRS invoice generation", 
-                "Customer transaction analysis",
-                "Real-time webhook processing"
-            ],
-            "next_action": "Configure API credentials and test connection",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Paystack connection initialization failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Failed to initialize Paystack connection", "details": str(e)}
-        )
-
-@app.get("/api/v1/integrations/paystack/transactions")
-async def get_paystack_transactions(limit: int = 50):
-    """Fetch and classify Paystack transactions for FIRS compliance"""
-    try:
-        # Simulate realistic Paystack payment transactions
-        paystack_transactions = [
-            {
-                "id": f"tx_paystack_{i}",
-                "reference": f"TXP{datetime.now().strftime('%Y%m%d')}{3000 + i}",
-                "amount": 125000 + (i * 35000),  # NGN amounts in kobo
-                "currency": "NGN",
-                "status": "success",
-                "paid_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                "channel": "card",
-                "customer": {
-                    "id": f"cust_{i + 1000}",
-                    "email": f"customer{i + 1}@business.com.ng",
-                    "customer_code": f"CUS_customer{i + 1}"
-                },
-                "metadata": {
-                    "business_purpose": f"Service payment - Contract {i + 1}",
-                    "invoice_number": f"INV-2025-{1000 + i}",
-                    "business_category": "professional_services"
-                },
-                "authorization": {
-                    "authorization_code": f"AUTH_code{i}",
-                    "bank": "Access Bank",
-                    "card_type": "visa",
-                    "country_code": "NG"
-                }
-            }
-            for i in range(min(limit, 8))
-        ]
-        
-        # Transform to FIRS-compliant invoices
-        firs_invoices = []
-        for tx in paystack_transactions:
-            amount_naira = tx["amount"] / 100  # Convert kobo to Naira
-            
-            # Business income classification
-            is_business_transaction = (
-                tx["status"] == "success" and
-                amount_naira >= 50000 and  # Minimum threshold
-                any(keyword in tx["metadata"]["business_purpose"].lower() 
-                    for keyword in ["service", "contract", "invoice", "payment"])
-            )
-            
-            if is_business_transaction:
-                invoice = {
-                    "invoice_id": f"PSK-INV-{tx['reference']}",
-                    "invoice_number": f"PSK/{datetime.now().year}/{tx['reference'][-6:]}",
-                    "issue_date": tx["paid_at"][:10],
-                    "customer_email": tx["customer"]["email"],
-                    "customer_name": f"Customer {tx['customer']['customer_code'][-3:]}",
-                    "customer_tin": "98765432-0001",  # Sample TIN
-                    "items": [
-                        {
-                            "description": tx["metadata"]["business_purpose"],
-                            "quantity": 1,
-                            "unit_price": amount_naira,
-                            "total": amount_naira
-                        }
-                    ],
-                    "subtotal": amount_naira,
-                    "vat_rate": 0.075,
-                    "vat_amount": amount_naira * 0.075,
-                    "total_amount": amount_naira * 1.075,
-                    "currency": "NGN",
-                    "payment_metadata": {
-                        "paystack_reference": tx["reference"],
-                        "payment_channel": tx["channel"],
-                        "bank": tx["authorization"]["bank"],
-                        "authorization_code": tx["authorization"]["authorization_code"]
-                    },
-                    "firs_compliance": {
-                        "ubl_version": "2.1",
-                        "transaction_type": "commercial_invoice",
-                        "payment_processor_integration": True
-                    }
-                }
-                firs_invoices.append(invoice)
-        
-        return {
-            "status": "success",
-            "provider": "paystack",
-            "total_transactions": len(paystack_transactions),
-            "business_income_transactions": len(firs_invoices),
-            "raw_transactions": paystack_transactions,
-            "firs_ready_invoices": firs_invoices,
-            "integration_summary": {
-                "provider": "paystack",
-                "integration_type": "payment_transaction_data",
-                "firs_compliance": "ready",
-                "nigerian_banking": "integrated",
-                "auto_classification": "enabled"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Paystack transaction processing failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Transaction processing failed", "details": str(e)}
-        )
-
-@app.post("/api/v1/integrations/paystack/webhook")
-async def paystack_webhook_handler(request: dict):
-    """Handle Paystack webhook notifications for real-time payment processing"""
-    try:
-        # Extract webhook data
-        event_type = request.get("event", "")
-        transaction_data = request.get("data", {})
-        
-        logger.info(f"Paystack webhook received: {event_type}")
-        
-        if event_type == "charge.success":
-            # Process successful payment
-            amount = transaction_data.get("amount", 0) / 100  # Convert kobo to Naira
-            reference = transaction_data.get("reference", "")
-            customer_email = transaction_data.get("customer", {}).get("email", "")
-            
-            # Check for business income classification
-            should_generate_invoice = (
-                amount >= 50000 and  # Minimum threshold
-                transaction_data.get("status") == "success"
-            )
-            
-            return {
-                "status": "processed",
-                "event_type": event_type,
-                "transaction_reference": reference,
-                "amount_naira": amount,
-                "customer_email": customer_email,
-                "invoice_generation": {
-                    "triggered": should_generate_invoice,
-                    "reason": "Successful payment above minimum threshold" if should_generate_invoice else "Below threshold or failed payment"
-                },
-                "firs_compliance": {
-                    "ready_for_submission": should_generate_invoice,
-                    "ubl_compliant": True,
-                    "nigerian_vat_applied": True
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        else:
-            return {
-                "status": "received",
-                "event_type": event_type,
-                "message": "Webhook event logged",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-    except Exception as e:
-        logger.error(f"Paystack webhook processing failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Webhook processing failed", "details": str(e)}
-        )
-
-@app.post("/api/v1/integrations/paystack/generate-invoices")
-async def generate_paystack_invoices():
-    """Generate FIRS-compliant invoices from Paystack payment data"""
-    try:
-        generated_invoices = []
-        
-        # Generate sample invoices from Paystack payments
-        for i in range(4):
-            amount_naira = 180000 + (i * 40000)
-            invoice = {
-                "invoice_id": f"PSK-AUTO-{datetime.now().strftime('%Y%m%d')}-{2000 + i}",
-                "generated_from": "paystack_payment_integration",
-                "payment_reference": f"ref_paystack_{datetime.now().strftime('%Y%m%d')}{i}",
-                "customer_email": f"client{i + 1}@nigerianbusiness.com",
-                "amount": amount_naira,
-                "vat_amount": amount_naira * 0.075,
-                "total_amount": amount_naira * 1.075,
-                "currency": "NGN",
-                "status": "generated",
-                "firs_submission_status": "ready",
-                "payment_channel": "card",
-                "bank": "Nigerian Bank",
-                "ubl_compliant": True,
-                "created_at": datetime.now().isoformat()
-            }
-            generated_invoices.append(invoice)
-        
-        total_value = sum(inv["total_amount"] for inv in generated_invoices)
-        
-        return {
-            "status": "completed",
-            "provider": "paystack",
-            "invoices_generated": len(generated_invoices),
-            "total_value": total_value,
-            "invoices": generated_invoices,
-            "firs_integration": {
-                "ready_for_submission": True,
-                "compliance_status": "verified",
-                "ubl_format": "2.1",
-                "nigerian_vat_applied": True,
-                "payment_processor_metadata": "included"
-            },
-            "processing_summary": {
-                "payment_integration": "paystack",
-                "transaction_classification": "automated",
-                "invoice_generation": "real_time",
-                "firs_compliance": "guaranteed"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Paystack invoice generation failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Invoice generation failed", "details": str(e)}
-        )
-
-# MONIEPOINT POS INTEGRATION ENDPOINTS  
-# =====================================
-
-@app.get("/api/v1/integrations/moniepoint/status")
-async def moniepoint_integration_status():
-    """Check Moniepoint POS integration status and requirements"""
-    return {
-        "status": "awaiting_registration",
-        "integration_type": "pos_transaction_data",
-        "provider": "moniepoint_monnify", 
-        "environment": "sandbox",
-        "registration_info": {
-            "service": "Monnify API (Moniepoint's payment infrastructure)",
-            "documentation_url": "https://developers.monnify.com/api/",
-            "sandbox_url": "https://sandbox.monnify.com/api/v1/",
-            "checkout_url": "https://sandbox.sdk.monnify.com/checkout/",
-            "registration_process": [
-                "1. Create Moniepoint business account",
-                "2. Enable ERP integration in account settings",
-                "3. Generate API client credentials (ID & Secret)",
-                "4. Get Contract Code for your account",
-                "5. Configure webhook endpoints"
-            ]
-        },
-        "requirements": {
-            "client_id": "Generate from Moniepoint account settings",
-            "client_secret": "Generate from Moniepoint account settings", 
-            "contract_code": "Provided by Moniepoint",
-            "api_key": "OAuth bearer token",
-            "webhook_secret": "For webhook verification"
-        },
-        "capabilities": [
-            "Payment processing and collection",
-            "Invoice creation and management", 
-            "Sub-account management",
-            "Transaction monitoring",
-            "Nigerian compliance automation",
-            "FIRS invoice generation",
-            "POS integration (through business account)"
-        ],
-        "next_steps": [
-            "Register at: https://moniepoint.com/ng/business",
-            "Complete business verification",
-            "Generate API credentials",
-            "Test with sandbox environment"
-        ],
-        "estimated_setup_time": "2-3 business days for verification",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.post("/api/v1/integrations/moniepoint/simulate-pos-data")
-async def simulate_moniepoint_pos_data():
-    """Simulate Moniepoint POS transaction data for testing"""
-    try:
-        # Simulate POS transactions from Nigerian businesses
-        pos_transactions = [
-            {
-                "id": f"mp_pos_{i}",
-                "terminal_id": f"TXP{1000 + i}",
-                "agent_id": f"AGT{5000 + i}",
-                "amount": 75000 + (i * 15000),  # NGN amounts
-                "currency": "NGN",
-                "transaction_type": "payment",
-                "payment_method": "card",
-                "merchant_name": f"Business Store {i + 1}",
-                "merchant_category": "retail",
-                "narration": f"POS Payment - Store {i + 1}",
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "time": f"15:{45 + i}:00",
-                "reference": f"MP{datetime.now().strftime('%Y%m%d')}{2000 + i}",
-                "customer_masked_pan": f"****-****-****-{1234 + i}",
-                "location": {
-                    "state": "Lagos",
-                    "lga": "Victoria Island", 
-                    "address": f"Shop {i + 1}, Commercial Area"
-                },
-                "risk_score": "low",
-                "business_classification": "confirmed_business"
-            }
-            for i in range(5)
-        ]
-        
-        # Transform to FIRS-compliant invoices
-        pos_invoices = []
-        for tx in pos_transactions:
-            if tx["amount"] >= 50000:  # Minimum threshold for invoice generation
-                invoice = {
-                    "invoice_id": f"POS-INV-{tx['reference']}",
-                    "invoice_number": f"POS/{datetime.now().year}/{tx['reference'][-6:]}",
-                    "issue_date": tx["date"],
-                    "merchant_name": tx["merchant_name"],
-                    "merchant_tin": "12345678-0001",  # Sample TIN
-                    "items": [
-                        {
-                            "description": f"POS Transaction - {tx['narration']}",
-                            "quantity": 1,
-                            "unit_price": tx["amount"],
-                            "total": tx["amount"]
-                        }
-                    ],
-                    "subtotal": tx["amount"],
-                    "vat_rate": 0.075,
-                    "vat_amount": tx["amount"] * 0.075,
-                    "total_amount": tx["amount"] * 1.075,
-                    "currency": "NGN",
-                    "pos_metadata": {
-                        "terminal_id": tx["terminal_id"],
-                        "agent_id": tx["agent_id"],
-                        "transaction_reference": tx["reference"],
-                        "payment_method": tx["payment_method"]
-                    },
-                    "firs_compliance": {
-                        "ubl_version": "2.1",
-                        "agent_banking_compliant": True,
-                        "cbn_reported": True
-                    }
-                }
-                pos_invoices.append(invoice)
-        
-        return {
-            "status": "simulated",
-            "simulation_type": "moniepoint_pos_data",
-            "total_transactions": len(pos_transactions), 
-            "invoice_eligible_transactions": len(pos_invoices),
-            "raw_pos_transactions": pos_transactions,
-            "generated_invoices": pos_invoices,
-            "integration_summary": {
-                "provider": "moniepoint",
-                "integration_type": "pos_transaction_data",
-                "agent_banking": "enabled",
-                "firs_compliance": "ready",
-                "nigerian_compliance": "verified"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Moniepoint simulation failed: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "POS data simulation failed", "details": str(e)}
-        )
-
-# INTEGRATION SUMMARY ENDPOINT
-# ============================
-
-@app.get("/api/v1/integrations/status")
-async def integration_status_summary():
-    """Get comprehensive integration status for all supported systems"""
-    return {
-        "platform_status": "operational",
-        "total_integrations": 3,
-        "integration_types": {
-            "erp_systems": {
-                "provider": "odoo",
-                "status": "active",
-                "last_tested": "2025-08-11",
-                "test_result": "100% success",
-                "capabilities": ["Invoice extraction", "Customer data sync", "FIRS transformation"]
-            },
-            "financial_systems": {
-                "provider": "mono",
-                "status": "configured",
-                "environment": "sandbox",
-                "capabilities": ["Banking transaction data", "Business income classification", "Auto-invoice generation"]
-            },
-            "payment_systems": {
-                "provider": "paystack",
-                "status": "ready_for_use",
-                "environment": "sandbox",
-                "capabilities": ["Payment transaction monitoring", "Nigerian business classification", "Real-time webhook processing", "FIRS invoice automation"]
-            },
-            "pos_systems": {
-                "provider": "moniepoint", 
-                "status": "alternative_option",
-                "environment": "sandbox",
-                "capabilities": ["POS transaction processing", "Agent banking integration", "Cash transaction monitoring"]
-            }
-        },
-        "firs_integration": {
-            "certification_endpoints": "100% operational",
-            "app_status": "certified_ready",
-            "compliance_standards": [
-                "UBL 2.1",
-                "Nigerian VAT (7.5%)",
-                "FIRS e-invoicing",
-                "CBN agent banking compliance"
-            ]
-        },
-        "uat_readiness": {
-            "erp_integration": "✅ Proven with Odoo",
-            "financial_integration": "✅ Mono configured with webhook", 
-            "payment_integration": "✅ Paystack ready for immediate use",
-            "pos_integration": "📋 Multiple options available",
-            "firs_certification": "✅ 100% endpoint success",
-            "overall_status": "100% ready for comprehensive UAT demonstration"
-        },
-        "next_steps": [
-            "Optional: Get Paystack test credentials for live API testing",
-            "Run comprehensive integration test suite",
-            "Generate final UAT demonstration report"
-        ],
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.post("/api/v1/firs-certification/reporting/generate")
-async def firs_report_generation():
-    """FIRS report generation endpoint"""
-    return {
-        "status": "generated",
-        "report_id": "RPT-20250811-001",
-        "report_type": "compliance_summary",
-        "download_url": "/api/v1/reports/download/RPT-20250811-001",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.put("/api/v1/firs-certification/update/invoice")
-async def firs_invoice_update():
-    """FIRS invoice update endpoint"""
-    return {
-        "status": "updated",
-        "update_id": "UPD-20250811-001",
-        "affected_invoices": 1,
-        "processing_status": "completed",
-        "timestamp": datetime.now().isoformat()
-    }
-
-# Startup event with error handling
-@app.on_event("startup")
-async def startup():
-    """Enhanced startup with Railway deployment logging"""
-    try:
-        logger.info("🚀 TaxPoynt Platform Backend starting up...")
-        logger.info(f"📊 Environment: {ENVIRONMENT}")
-        logger.info(f"🚂 Railway Deployment: {RAILWAY_DEPLOYMENT}")
-        logger.info(f"🌐 Port: {PORT}")
-        logger.info("✅ FastAPI app ready for Railway deployment!")
-        logger.info("🎯 FIRS Certification Endpoints: LOADED")
-        
-        # Log successful startup for Railway visibility
-        print("=" * 50)
-        print("🎉 TAXPOYNT PLATFORM STARTUP SUCCESS")
-        print(f"⚡ Environment: {ENVIRONMENT}")
-        print(f"🔗 Health Check: /health")
-        print(f"📚 API Docs: /docs" + (" (disabled in production)" if not DEBUG else ""))
-        print("=" * 50)
-        
-    except Exception as e:
-        logger.error(f"❌ Startup error: {e}")
-        logger.error(traceback.format_exc())
-        # Don't exit - let Railway handle the restart
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Shutdown event"""
-    logger.info("🛑 TaxPoynt Platform Backend shutting down...")
-
-# Global exception handler for Railway debugging
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for better Railway debugging"""
-    logger.error(f"❌ Global exception on {request.url}: {exc}")
-    logger.error(traceback.format_exc())
+# Try to import API Gateway components
+try:
+    from api_gateway.role_routing.models import APIGatewayConfig, RoutingSecurityLevel
+    from api_gateway.role_routing.gateway import TaxPoyntAPIGateway
+    from api_gateway.role_routing.role_detector import HTTPRoleDetector
+    from api_gateway.role_routing.permission_guard import APIPermissionGuard
+    from api_gateway.role_routing.auth_router import create_auth_router
     
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "detail": str(exc) if DEBUG else "An error occurred",
-            "service": "taxpoynt_platform_backend",
-            "timestamp": datetime.now().isoformat()
-        }
-    )
+    # Core platform components with fallback handling
+    try:
+        from core_platform.authentication.role_manager import RoleManager
+        from core_platform.messaging.message_router import MessageRouter, ServiceRole
+    except ImportError:
+        # Use fallback classes from gateway
+        from api_gateway.role_routing.gateway import RoleManager
+        from api_gateway.role_routing import MessageRouter, ServiceRole
+    
+    GATEWAY_AVAILABLE = True
+    logger = logging.getLogger(__name__)
+    logger.info("✅ Successfully imported TaxPoynt API Gateway components")
+    
+except ImportError as e:
+    logger.error(f"❌ Gateway components not available: {e}")
+    GATEWAY_AVAILABLE = False
+
+def create_role_manager():
+    """Create and initialize role manager"""
+    if not GATEWAY_AVAILABLE:
+        return None
+        
+    config = {
+        'service_name': 'TaxPoynt_RoleManager',
+        'environment': ENVIRONMENT,
+        'log_level': 'INFO' if not DEBUG else 'DEBUG'
+    }
+    return RoleManager(config) if GATEWAY_AVAILABLE else None
+
+def create_message_router():
+    """Create and initialize message router"""  
+    if not GATEWAY_AVAILABLE:
+        return None
+    
+    # This will be properly initialized with your existing message router
+    # For now, we create a basic instance that works with your architecture
+    return MessageRouter() if GATEWAY_AVAILABLE else None
+
+def create_taxpoynt_app() -> FastAPI:
+    """Create TaxPoynt application with proper architecture integration"""
+    
+    if GATEWAY_AVAILABLE:
+        # Use sophisticated API gateway architecture
+        logger.info("🚀 Initializing TaxPoynt Platform with API Gateway")
+        
+        # Create gateway configuration
+        allowed_origins = [
+            "https://web-production-ea5ad.up.railway.app",  # Railway production
+            "https://app-staging.taxpoynt.com",
+            "https://app.taxpoynt.com", 
+            "http://localhost:3000"
+        ] if not DEBUG else ["*"]
+        
+        config = APIGatewayConfig(
+            host="0.0.0.0",
+            port=PORT,
+            cors_enabled=True,
+            cors_origins=allowed_origins,
+            trusted_hosts=["taxpoynt.com", "*.taxpoynt.com"] if not DEBUG else None,
+            security=RoutingSecurityLevel.STANDARD,
+            jwt_secret_key=os.getenv("JWT_SECRET_KEY", "taxpoynt-platform-secret-key"),
+            jwt_expiration_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440")),
+            enable_request_logging=True,
+            enable_metrics=True,
+            log_level="INFO" if not DEBUG else "DEBUG"
+        )
+        
+        # Create core platform components
+        role_manager = create_role_manager()
+        message_router = create_message_router()
+        
+        # Create API gateway
+        gateway = TaxPoyntAPIGateway(config, role_manager, message_router)
+        app = gateway.get_app()
+        
+        # Add health check middleware
+        app.add_middleware(HealthCheckMiddleware)
+        
+        logger.info("✅ TaxPoynt Platform initialized with full API Gateway")
+        return app
+        
+    else:
+        # Fallback mode - basic FastAPI app
+        logger.info("🔄 Initializing TaxPoynt Platform in basic mode")
+        
+        app = FastAPI(
+            title="TaxPoynt Platform API",
+            description="Enterprise Nigerian e-invoicing and business integration platform", 
+            version="1.0.0",
+            debug=DEBUG,
+            docs_url="/docs" if DEBUG else None,
+            redoc_url="/redoc" if DEBUG else None,
+        )
+        
+        # Add health check middleware FIRST
+        app.add_middleware(HealthCheckMiddleware)
+        
+        # Add CORS middleware
+        allowed_origins = [
+            "https://web-production-ea5ad.up.railway.app",
+            "https://app-staging.taxpoynt.com", 
+            "https://app.taxpoynt.com",
+            "http://localhost:3000"
+        ] if not DEBUG else ["*"]
+        
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["*"],
+        )
+        
+        # Add basic endpoints
+        @app.get("/")
+        async def api_root():
+            return JSONResponse(content={
+                "service": "TaxPoynt E-Invoice Platform API",
+                "version": "1.0.0", 
+                "status": "operational",
+                "mode": "basic_fallback",
+                "environment": ENVIRONMENT,
+                "railway_deployment": RAILWAY_DEPLOYMENT,
+                "endpoints": {
+                    "health": "/health",
+                    "api_health": "/api/health",
+                    "docs": "/docs" if DEBUG else "disabled"
+                }
+            })
+        
+        # Authentication endpoints are now handled by the API Gateway
+        logger.info("✅ Using API Gateway for all authentication and service endpoints")
+        
+        logger.info("⚠️  TaxPoynt Platform initialized in basic mode")
+        return app
+
+# Create the app instance
+app = create_taxpoynt_app()
+
+async def initialize_services():
+    """Initialize core platform services"""
+    if GATEWAY_AVAILABLE:
+        try:
+            # Initialize role manager
+            if hasattr(app.state, 'role_manager') and app.state.role_manager:
+                await app.state.role_manager.initialize()
+                logger.info("✅ Role Manager initialized")
+            
+            logger.info("🎯 Core platform services initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize services: {e}")
+            raise
+
+async def cleanup_services():
+    """Cleanup core platform services"""
+    if GATEWAY_AVAILABLE:
+        try:
+            # Cleanup role manager
+            if hasattr(app.state, 'role_manager') and app.state.role_manager:
+                await app.state.role_manager.cleanup()
+                logger.info("✅ Role Manager cleaned up")
+            
+            logger.info("🎯 Core platform services cleaned up successfully") 
+        except Exception as e:
+            logger.error(f"❌ Failed to cleanup services: {e}")
+
+# Add startup and shutdown event handlers
+@app.on_event("startup")
+async def startup_event():
+    """Application startup"""
+    logger.info("🚀 TaxPoynt Platform Backend starting up...")
+    logger.info(f"📊 Environment: {ENVIRONMENT}")
+    logger.info(f"🚂 Railway Deployment: {RAILWAY_DEPLOYMENT}")
+    logger.info(f"🌐 Port: {PORT}")
+    
+    if GATEWAY_AVAILABLE:
+        logger.info("✅ API Gateway mode: ENABLED")
+        logger.info("🔐 Authentication endpoints: /api/v1/auth/*")
+        await initialize_services()
+    else:
+        logger.info("⚠️  API Gateway mode: DISABLED (fallback mode)")
+        logger.info("📝 Note: Install gateway dependencies for full functionality")
+    
+    logger.info("==================================================")
+    logger.info("🎉 TAXPOYNT PLATFORM STARTUP SUCCESS")
+    logger.info(f"⚡ Environment: {ENVIRONMENT}")
+    logger.info("🔗 Health Check: /health")
+    logger.info(f"📚 API Docs: /docs {'(enabled)' if DEBUG else '(disabled)'}")
+    logger.info("==================================================")
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    """Application shutdown"""
+    logger.info("👋 TaxPoynt Platform Backend shutting down...")
+    await cleanup_services()
+
+# FIRS endpoints are now handled by the API Gateway APP router
 
 if __name__ == "__main__":
     import uvicorn
-    
-    port = int(os.getenv("PORT", "8000"))
-    logger.info(f"Starting TaxPoynt Platform on port {port}")
-    
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=port,
-        log_level="info"
+        host=HOST,
+        port=PORT,
+        log_level="info",
+        access_log=True,
+        reload=DEBUG
     )

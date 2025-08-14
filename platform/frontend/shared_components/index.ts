@@ -32,6 +32,9 @@ export { default as TableComponents } from './tables';
 export * from './navigation';
 export { default as NavigationComponents } from './navigation';
 
+// Services (API Integration)
+export * from './services';
+
 // Aggregate export for all components
 const SharedComponents = {
   Forms: FormComponents,

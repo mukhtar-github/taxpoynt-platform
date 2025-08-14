@@ -1,0 +1,39 @@
+{
+  "setup_mode": "local",
+  "timestamp": "2025-08-12T11:51:24.851533",
+  "system_requirements": {
+    "python": true,
+    "fastapi": false,
+    "sqlalchemy": false,
+    "pydantic": false,
+    "redis_optional": false,
+    "psycopg2_optional": false
+  },
+  "database_connectivity": true,
+  "redis_connectivity": true,
+  "initial_tables": true,
+  "overall_success": true,
+  "detailed_results": {
+    "database": {
+      "status": "success",
+      "type": "sqlite",
+      "path": "./taxpoynt_platform_dev.db",
+      "test_result": 1
+    },
+    "redis": {
+      "status": "fallback",
+      "type": "in_memory",
+      "note": "Using in-memory cache - install redis for better performance"
+    },
+    "tables": {
+      "status": "success",
+      "type": "sqlite",
+      "tables_created": [
+        "users",
+        "organizations",
+        "integration_credentials",
+        "firs_submissions"
+      ]
+    }
+  }
+}

@@ -15,8 +15,9 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # Import from NEW architecture core components
-from ...core_platform.authentication.role_manager import PlatformRole, RoleScope
-from ...core_platform.messaging.message_router import ServiceRole
+# Fixed import - use from .models import PlatformRole, RoleScope
+# Fixed import - use from .models import ServiceRole
+from .models import PlatformRole, RoleScope, ServiceRole
 
 from .models import (
     HTTPRoutingContext, APIEndpointRule, RoutePermission, 
@@ -95,8 +96,20 @@ class APIPermissionGuard(BaseHTTPMiddleware):
             "authorization_failures": 0
         }
         
+        # Initialize storage for pending rules
+        self._pending_rules = []
+        self._rules_initialized = False
+        
         # Initialize default rules
         self._initialize_default_rules()
+
+    async def _ensure_rules_initialized(self):
+        """Ensure default rules are initialized when event loop is available."""
+        if not self._rules_initialized and self._pending_rules:
+            for rule in self._pending_rules:
+                await self.add_endpoint_rule(rule)
+            self._pending_rules.clear()
+            self._rules_initialized = True
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """
@@ -110,6 +123,9 @@ class APIPermissionGuard(BaseHTTPMiddleware):
             Response object
         """
         start_time = time.time()
+        
+        # Ensure default rules are initialized on first request
+        await self._ensure_rules_initialized()
         
         try:
             self.access_stats["total_requests"] += 1
@@ -487,10 +503,9 @@ class APIPermissionGuard(BaseHTTPMiddleware):
             forward_to_message_router=True
         )
         
-        # Add rules asynchronously
-        asyncio.create_task(self.add_endpoint_rule(admin_rule))
-        asyncio.create_task(self.add_endpoint_rule(si_rule))
-        asyncio.create_task(self.add_endpoint_rule(app_rule))
+        # Add rules synchronously during initialization
+        # Store rules for later async addition when event loop is available
+        self._pending_rules = [admin_rule, si_rule, app_rule]
 
     def _path_matches_pattern(self, path: str, pattern: str) -> bool:
         """Check if path matches pattern (supports wildcards)."""
@@ -538,6 +553,13 @@ class APIPermissionGuard(BaseHTTPMiddleware):
             "ip_whitelist_size": len(self.ip_whitelist),
             "ip_blacklist_size": len(self.ip_blacklist)
         }
+    
+    async def check_endpoint_permission(self, context: HTTPRoutingContext, path: str, method: str) -> bool:
+        """Check if the context has permission to access the endpoint."""
+        # Simple permission check - for production this should be more sophisticated
+        return context.has_role(PlatformRole.SYSTEM_INTEGRATOR) or \
+               context.has_role(PlatformRole.ACCESS_POINT_PROVIDER) or \
+               context.has_role(PlatformRole.HYBRID)
 
     def add_ip_to_whitelist(self, ip: str):
         """Add IP address to whitelist."""

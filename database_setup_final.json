@@ -1,0 +1,38 @@
+{
+  "setup_mode": "local",
+  "timestamp": "2025-08-12T11:53:58.187401",
+  "system_requirements": {
+    "python": true,
+    "fastapi": true,
+    "sqlalchemy": true,
+    "pydantic": true,
+    "redis_optional": true,
+    "psycopg2_optional": false
+  },
+  "database_connectivity": true,
+  "redis_connectivity": false,
+  "initial_tables": true,
+  "overall_success": false,
+  "detailed_results": {
+    "database": {
+      "status": "success",
+      "type": "sqlite",
+      "path": "./taxpoynt_platform_dev.db",
+      "test_result": 1
+    },
+    "redis": {
+      "status": "failed",
+      "error": "Error 111 connecting to localhost:6379. Connection refused."
+    },
+    "tables": {
+      "status": "success",
+      "type": "sqlite",
+      "tables_created": [
+        "users",
+        "organizations",
+        "integration_credentials",
+        "firs_submissions"
+      ]
+    }
+  }
+}

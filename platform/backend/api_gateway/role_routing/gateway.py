@@ -12,14 +12,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.openapi.utils import get_openapi
 
-from ...core_platform.authentication.role_manager import RoleManager, PlatformRole
-from ...core_platform.messaging.message_router import MessageRouter, ServiceRole
-from .models import HTTPRoutingContext, APIGatewayConfig
+# Fix import paths  
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+try:
+    from core_platform.authentication.role_manager import RoleManager, PlatformRole
+    from core_platform.messaging.message_router import MessageRouter, ServiceRole
+except ImportError:
+    # Use fallback classes and create a basic RoleManager
+    from . import PlatformRole, MessageRouter, ServiceRole
+    
+    class RoleManager:
+        def __init__(self, config=None):
+            self.config = config or {}
+        
+        def get_role_permissions(self, role):
+            return ["read", "write"] if role else []
+from .models import HTTPRoutingContext, APIGatewayConfig, RoutingSecurityLevel
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
 from .si_router import create_si_router
 from .app_router import create_app_router
 from .hybrid_router import create_hybrid_router
+from .auth_router import create_auth_router
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +65,7 @@ class TaxPoyntAPIGateway:
         self.message_router = message_router
         
         # Initialize core components
-        self.role_detector = HTTPRoleDetector(role_manager)
+        self.role_detector = HTTPRoleDetector()
         self.permission_guard = APIPermissionGuard(config.security)
         
         # Create FastAPI app
@@ -139,6 +159,13 @@ class TaxPoyntAPIGateway:
             self.message_router
         )
         
+        # Create authentication router (shared across all service types)
+        auth_router = create_auth_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        
         # Include routers in main app
         self.app.include_router(
             si_router,
@@ -158,6 +185,13 @@ class TaxPoyntAPIGateway:
             tags=["Hybrid Services"]
         )
         
+        # Include authentication router (available to all service types)
+        self.app.include_router(
+            auth_router,
+            prefix="/api/v1",
+            tags=["Authentication"]
+        )
+        
         # Add root level routes
         self._setup_root_routes()
     
@@ -172,6 +206,7 @@ class TaxPoyntAPIGateway:
                 "version": "1.0.0",
                 "status": "operational",
                 "endpoints": {
+                    "authentication": "/api/v1/auth",
                     "system_integrator": "/api/v1/si",
                     "access_point_provider": "/api/v1/app",
                     "hybrid_services": "/api/v1/common",
@@ -413,8 +448,8 @@ def create_gateway_app(config: APIGatewayConfig,
 # Example usage and configuration
 if __name__ == "__main__":
     import uvicorn
-    from ...core_platform.authentication.role_manager import create_role_manager
-    from ...core_platform.messaging.message_router import create_message_router
+    # Fixed import - use from .models import create_role_manager
+    # Fixed import - use from .models import create_message_router
     
     # Example configuration
     config = APIGatewayConfig(

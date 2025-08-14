@@ -10,8 +10,6 @@ from .event_bus import (
     EventPriority,
     EventScope,
     EventStatus,
-    EventTrend,
-    EventFrequency,
     get_event_bus,
     initialize_event_bus,
     shutdown_event_bus
@@ -80,8 +78,6 @@ __all__ = [
     "EventPriority",
     "EventScope",
     "EventStatus",
-    "EventTrend",
-    "EventFrequency",
     "get_event_bus",
     "initialize_event_bus",
     "shutdown_event_bus",

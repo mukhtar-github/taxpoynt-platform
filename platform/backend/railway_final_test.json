@@ -1,0 +1,26 @@
+{
+  "setup_mode": "production",
+  "timestamp": "2025-08-12T13:08:58.894120",
+  "system_requirements": {
+    "python": true,
+    "fastapi": true,
+    "sqlalchemy": true,
+    "pydantic": true,
+    "redis_optional": true,
+    "psycopg2_optional": true
+  },
+  "database_connectivity": false,
+  "redis_connectivity": false,
+  "initial_tables": false,
+  "overall_success": false,
+  "detailed_results": {
+    "database": {
+      "status": "failed",
+      "error": "(psycopg2.OperationalError) could not translate host name \"postgres.railway.internal\" to address: Name or service not known\n\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+    },
+    "redis": {
+      "status": "failed",
+      "error": "Error -2 connecting to redis.railway.internal:6379. Name or service not known."
+    }
+  }
+}

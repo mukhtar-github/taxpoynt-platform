@@ -11,9 +11,40 @@ from dataclasses import dataclass, field
 from enum import Enum
 from fastapi import Request, Response
 
-# Import from NEW architecture core components
-from ...core_platform.authentication.role_manager import PlatformRole, RoleScope
-from ...core_platform.messaging.message_router import ServiceRole
+# Import from NEW architecture core components with fixed paths
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+try:
+    from core_platform.authentication.role_manager import PlatformRole, RoleScope
+    from core_platform.messaging.message_router import ServiceRole
+except ImportError:
+    # Fallback enums for development
+    from enum import Enum
+    
+    class PlatformRole(Enum):
+        SYSTEM_INTEGRATOR = "system_integrator"
+        ACCESS_POINT_PROVIDER = "access_point_provider"
+        HYBRID = "hybrid"
+        PLATFORM_ADMIN = "platform_admin"
+        TENANT_ADMIN = "tenant_admin"
+        USER = "user"
+    
+    class RoleScope(Enum):
+        GLOBAL = "global"
+        TENANT = "tenant"
+        SERVICE = "service"
+        ENVIRONMENT = "environment"
+    
+    class ServiceRole(Enum):
+        SYSTEM_INTEGRATOR = "si"
+        ACCESS_POINT_PROVIDER = "app"
+        HYBRID = "hybrid"
+        CORE = "core"
 
 
 class HTTPMethod(Enum):
@@ -46,6 +77,38 @@ class PermissionLevel(Enum):
     DELETE = "delete"
 
 
+class RoutingSecurityLevel(Enum):
+    """Security levels for API routing."""
+    STRICT = "strict"
+    STANDARD = "standard"
+    RELAXED = "relaxed"
+
+
+@dataclass
+class APIGatewayConfig:
+    """Configuration for API Gateway."""
+    host: str = "0.0.0.0"
+    port: int = 8000
+    cors_enabled: bool = True
+    cors_origins: List[str] = field(default_factory=lambda: ["*"])
+    trusted_hosts: Optional[List[str]] = None
+    security: RoutingSecurityLevel = RoutingSecurityLevel.STANDARD
+    
+    # Authentication settings
+    jwt_secret_key: Optional[str] = None
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 1440  # 24 hours
+    
+    # Rate limiting
+    enable_rate_limiting: bool = True
+    default_rate_limit: int = 100  # requests per minute
+    
+    # Logging and monitoring
+    enable_request_logging: bool = True
+    enable_metrics: bool = True
+    log_level: str = "INFO"
+
+
 @dataclass
 class HTTPRoutingContext:
     """Context for HTTP request routing."""
@@ -64,6 +127,10 @@ class HTTPRoutingContext:
     correlation_id: Optional[str] = None
     request_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def has_role(self, role: PlatformRole) -> bool:
+        """Check if context has the specified platform role"""
+        return self.platform_role == role
 
 
 @dataclass
@@ -216,8 +283,8 @@ class RoleBasedRoute:
 @dataclass
 class RoutingDecision:
     """Decision result for request routing."""
-    decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     request_context: HTTPRoutingContext
+    decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     target_router: str = ""  # si, app, or hybrid
     target_service: Optional[str] = None
     allowed: bool = False

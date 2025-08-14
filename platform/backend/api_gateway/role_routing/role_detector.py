@@ -13,9 +13,22 @@ from urllib.parse import urlparse, parse_qs
 from fastapi import Request
 from datetime import datetime, timezone
 
-# Import from NEW architecture core components
-from ...core_platform.authentication.role_manager import PlatformRole, RoleScope
-from ...core_platform.messaging.message_router import ServiceRole
+# Import from NEW architecture core components - Fixed paths
+try:
+    from .models import PlatformRole, RoleScope, ServiceRole
+except ImportError:
+    # Try direct import
+    import sys
+    from pathlib import Path
+    project_root = Path(__file__).parent.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    
+    try:
+        from core_platform.authentication.role_manager import PlatformRole, RoleScope
+        from core_platform.messaging.message_router import ServiceRole
+    except ImportError:
+        from .models import PlatformRole, RoleScope, ServiceRole
 
 from .models import (
     HTTPRoutingContext, RequestAnalysis, RouteType, HTTPMethod,

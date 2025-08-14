@@ -59,6 +59,28 @@ When building any compliance-related features:
 3. Help customers fulfill their existing obligations efficiently
 4. Never position TaxPoynt as tracking customer compliance
 
+## Critical Architecture Integration Principles
+
+**NEVER create simplified/mock versions of existing sophisticated components!**
+
+✅ **Proper Integration Approach**:
+- Use EXISTING `role_manager.py` and `message_router.py` properly
+- Integrate with actual API gateway architecture
+- Examine what's already built and connect to it correctly
+- Follow existing patterns, don't mock them
+
+❌ **Avoid These Anti-Patterns**:
+- Creating "SimplifiedMessageRouter" or similar mocks
+- Bypassing sophisticated existing components
+- Building fake/simplified versions instead of proper integration
+- Undermining clean architecture with technical debt
+
+**Integration Process**:
+1. Examine existing core platform components
+2. Understand how they should be properly initialized
+3. Integrate main.py with REAL architecture
+4. Use existing sophisticated system, not mocking it
+
 ## Clean Architecture Guidelines
 
 ### Repository Structure Standards
