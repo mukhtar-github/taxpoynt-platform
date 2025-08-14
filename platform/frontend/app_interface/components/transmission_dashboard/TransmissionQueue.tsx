@@ -179,8 +179,8 @@ export const TransmissionQueue: React.FC = () => {
               <label className="block text-sm font-medium mb-2">Max Concurrent Processing</label>
               <div className="space-y-2">
                 <Slider
-                  value={[maxConcurrent]}
-                  onValueChange={(value) => setMaxConcurrent(value[0])}
+                  value={maxConcurrent}
+                  onChange={(e) => setMaxConcurrent(parseInt(e.target.value))}
                   max={50}
                   min={5}
                   step={1}
@@ -198,8 +198,8 @@ export const TransmissionQueue: React.FC = () => {
               <label className="block text-sm font-medium mb-2">Batch Size</label>
               <div className="space-y-2">
                 <Slider
-                  value={[batchSize]}
-                  onValueChange={(value) => setBatchSize(value[0])}
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(parseInt(e.target.value))}
                   max={50}
                   min={1}
                   step={1}
