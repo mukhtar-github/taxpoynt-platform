@@ -9,8 +9,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from './design_system/components/Button';
-import { colors } from './design_system/tokens';
+import { Button } from '../design_system/components/Button';
+import { colors } from '../design_system/tokens';
 
 export const LandingPage: React.FC = () => {
   const router = useRouter();
