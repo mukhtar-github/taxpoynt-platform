@@ -265,7 +265,7 @@ export const TransmissionMonitor: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <Button
-            variant={isAutoRefresh ? "default" : "outline"}
+            variant={isAutoRefresh ? "primary" : "outline"}
             size="sm"
             onClick={() => setIsAutoRefresh(!isAutoRefresh)}
           >
