@@ -402,14 +402,14 @@ export const FIRSDashboardPage: React.FC<FIRSDashboardProps> = ({ className }) =
                     }
                   >
                     <Timeline>
-                      <Timeline.Item icon={<SafetyCertificateOutlined />}>
+                      <Timeline.Item dot={<SafetyCertificateOutlined />}>
                         <strong>Type:</strong> {cert.type}
                       </Timeline.Item>
-                      <Timeline.Item icon={<CheckCircleOutlined />}>
+                      <Timeline.Item dot={<CheckCircleOutlined />}>
                         <strong>Issuer:</strong> {cert.issuer}
                       </Timeline.Item>
                       <Timeline.Item 
-                        icon={<WarningOutlined />}
+                        dot={<WarningOutlined />}
                         color={new Date(cert.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000 ? 'red' : 'green'}
                       >
                         <strong>Expires:</strong> {cert.expiryDate.toLocaleDateString()}
