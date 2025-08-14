@@ -619,29 +619,29 @@ export const SecurityAuditCenter: React.FC = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-48"
                   />
-                  <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Severities</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedType} onValueChange={setSelectedType}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="certificate">Certificate</SelectItem>
-                      <SelectItem value="access">Access</SelectItem>
-                      <SelectItem value="transmission">Transmission</SelectItem>
-                      <SelectItem value="configuration">Configuration</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Select 
+                    value={selectedSeverity} 
+                    onChange={(value) => setSelectedSeverity(value as string)}
+                    options={[
+                      { value: 'all', label: 'All Severities' },
+                      { value: 'high', label: 'High' },
+                      { value: 'medium', label: 'Medium' },
+                      { value: 'low', label: 'Low' }
+                    ]}
+                    className="w-32"
+                  />
+                  <Select 
+                    value={selectedType} 
+                    onChange={(value) => setSelectedType(value as string)}
+                    options={[
+                      { value: 'all', label: 'All Types' },
+                      { value: 'certificate', label: 'Certificate' },
+                      { value: 'access', label: 'Access' },
+                      { value: 'transmission', label: 'Transmission' },
+                      { value: 'configuration', label: 'Configuration' }
+                    ]}
+                    className="w-32"
+                  />
                 </div>
               </CardTitle>
             </CardHeader>
