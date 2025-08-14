@@ -313,7 +313,7 @@ export const FIRSConnectionManager: React.FC = () => {
               </div>
               <div className="text-sm text-gray-600">API Version</div>
               <div className="mt-2">
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                <Badge variant="info" className="bg-blue-50 text-blue-700">
                   {activeConnection.environment}
                 </Badge>
               </div>
@@ -507,10 +507,10 @@ export const FIRSConnectionManager: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={getStatusColor(connection.status)}>
+                        <Badge variant="info" className={getStatusColor(connection.status)}>
                           {connection.status}
                         </Badge>
-                        <Badge variant="outline" className={
+                        <Badge variant="info" className={
                           connection.environment === 'production' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
                         }>
                           {connection.environment}
