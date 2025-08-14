@@ -682,15 +682,6 @@ export const components = {
   Progress
 };
 
-// Export all components individually for named imports
-export {
-  // Navigation Components
-  Tabs,
-  TabsList,
-  TabsTrigger, 
-  TabsContent,
-  ScrollArea,
-  Separator
-};
+// Note: Individual exports are already handled above via the components object
 
 export default components;
