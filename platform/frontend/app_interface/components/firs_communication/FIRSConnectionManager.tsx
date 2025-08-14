@@ -400,7 +400,7 @@ export const FIRSConnectionManager: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant="outline" 
+                          variant="info" 
                           className={getResponseStatusColor(response.status_code)}
                         >
                           {response.status_code}
