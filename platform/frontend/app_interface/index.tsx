@@ -237,7 +237,7 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
   ];
 
   // Default breadcrumb
-  const currentBreadcrumb = [
+  const currentBreadcrumb: Array<{ title: string; path?: string }> = [
     { title: 'APP Interface' },
     { title: 'Transmission Monitor' }
   ];
