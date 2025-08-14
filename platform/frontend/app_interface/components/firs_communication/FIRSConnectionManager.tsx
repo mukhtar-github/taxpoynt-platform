@@ -585,7 +585,7 @@ export const FIRSConnectionManager: React.FC = () => {
                 </div>
                 <Switch
                   checked={autoFailover}
-                  onCheckedChange={setAutoFailover}
+                  onChange={(e) => setAutoFailover(e.target.checked)}
                 />
               </div>
 
