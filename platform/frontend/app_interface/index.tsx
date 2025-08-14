@@ -18,7 +18,6 @@
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Breadcrumb, Spin, Alert, Avatar, Dropdown, Badge, Space } from 'antd';
 import {
   DashboardOutlined,
@@ -207,38 +206,14 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
   userInfo,
   className 
 }) => {
-  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [openKeys, setOpenKeys] = useState<string[]>(['setup']);
 
-  // Update selected menu items based on current route
+  // Default to transmission monitoring
   useEffect(() => {
-    const path = location.pathname;
-    
-    if (path.includes('/transmission')) {
-      setSelectedKeys(['transmission']);
-    } else if (path.includes('/firs')) {
-      if (path.includes('/setup/firs')) {
-        setSelectedKeys(['firs-setup']);
-        setOpenKeys(prev => [...prev, 'setup']);
-      } else {
-        setSelectedKeys(['firs']);
-      }
-    } else if (path.includes('/security')) {
-      if (path.includes('/setup/security')) {
-        setSelectedKeys(['security-setup']);
-        setOpenKeys(prev => [...prev, 'setup']);
-      } else {
-        setSelectedKeys(['security']);
-      }
-    } else if (path.includes('/compliance')) {
-      setSelectedKeys(['compliance']);
-    } else if (path.includes('/setup/transmission')) {
-      setSelectedKeys(['transmission-config']);
-      setOpenKeys(prev => [...prev, 'setup']);
-    }
-  }, [location.pathname]);
+    setSelectedKeys(['transmission']);
+  }, []);
 
   // User dropdown menu
   const userMenuItems = [
@@ -261,10 +236,10 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
     }
   ];
 
-  // Get current breadcrumb
-  const currentBreadcrumb = breadcrumbMap[location.pathname] || [
+  // Default breadcrumb
+  const currentBreadcrumb = [
     { title: 'APP Interface' },
-    { title: 'Dashboard' }
+    { title: 'Transmission Monitor' }
   ];
 
   return (
@@ -399,27 +374,36 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
           minHeight: 'calc(100vh - 112px)'
         }}>
           <ErrorBoundary>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/app/transmission" replace />} />
-                <Route path="/app" element={<Navigate to="/app/transmission" replace />} />
-                
-                {/* Main Pages */}
-                <Route path="/app/transmission" element={<TransmissionMonitorPage />} />
-                <Route path="/app/firs" element={<FIRSDashboardPage />} />
-                <Route path="/app/security" element={<SecurityAuditPage />} />
-                <Route path="/app/compliance" element={<ComplianceReportsPage />} />
-                
-                {/* Setup Workflows */}
-                <Route path="/app/setup/firs" element={<FIRSSetupWorkflow />} />
-                <Route path="/app/setup/transmission" element={<TransmissionConfigWorkflow />} />
-                <Route path="/app/setup/security" element={<SecuritySetupWorkflow />} />
-                
-                {/* Catch all - redirect to transmission monitor */}
-                <Route path="*" element={<Navigate to="/app/transmission" replace />} />
-              </Routes>
-            </Suspense>
+            <div className="text-center py-20">
+              <div className="max-w-md mx-auto">
+                <div className="mb-6">
+                  <SendOutlined style={{ fontSize: '3rem', color: '#1890ff' }} />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">APP Interface Dashboard</h2>
+                <p className="text-gray-600 mb-6">
+                  Welcome to your Access Point Provider dashboard. Manage FIRS transmission, 
+                  security audits, and compliance reporting.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-blue-900 mb-2">Transmission Status</h3>
+                    <p className="text-blue-700 text-sm">Monitor invoice transmission to FIRS</p>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-green-900 mb-2">FIRS Integration</h3>
+                    <p className="text-green-700 text-sm">Manage FIRS API connections</p>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-purple-900 mb-2">Security Audit</h3>
+                    <p className="text-purple-700 text-sm">Review security compliance</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-orange-900 mb-2">Compliance</h3>
+                    <p className="text-orange-700 text-sm">Generate compliance reports</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </ErrorBoundary>
         </Content>
       </Layout>
@@ -429,11 +413,7 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
 
 // Main APP Interface Component
 export const APPInterface: React.FC<APPInterfaceProps> = (props) => {
-  return (
-    <Router>
-      <AppLayout {...props} />
-    </Router>
-  );
+  return <AppLayout {...props} />;
 };
 
 // Default export
