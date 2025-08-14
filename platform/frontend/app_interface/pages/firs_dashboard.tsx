@@ -27,8 +27,7 @@ import {
   CheckCircleOutlined,
   DisconnectOutlined,
   SettingOutlined,
-  ReloadOutlined,
-  WarningOutlined
+  ReloadOutlined
 } from '@ant-design/icons';
 
 // Import APP Interface components
