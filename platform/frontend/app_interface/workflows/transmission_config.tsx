@@ -44,7 +44,7 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined as ExclamationTriangleOutlined,
   ClockCircleOutlined,
   BellOutlined,
   RocketOutlined,

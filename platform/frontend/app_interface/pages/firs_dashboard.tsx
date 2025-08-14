@@ -23,7 +23,7 @@ import {
   CloudServerOutlined,
   SafetyCertificateOutlined,
   ApiOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined,
   CheckCircleOutlined,
   DisconnectOutlined,
   SettingOutlined,
@@ -417,7 +417,7 @@ export const FIRSDashboardPage: React.FC<FIRSDashboardProps> = ({ className }) =
                         <strong>Issuer:</strong> {cert.issuer}
                       </Timeline.Item>
                       <Timeline.Item 
-                        icon={<ExclamationTriangleOutlined />}
+                        icon={<WarningOutlined />}
                         color={new Date(cert.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000 ? 'red' : 'green'}
                       >
                         <strong>Expires:</strong> {cert.expiryDate.toLocaleDateString()}

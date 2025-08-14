@@ -23,7 +23,7 @@ import {
   DashboardOutlined,
   SendOutlined,
   CloudServerOutlined,
-  ShieldCheckOutlined,
+  SafetyCertificateOutlined,
   FileTextOutlined,
   SettingOutlined,
   UserOutlined,
@@ -87,7 +87,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     key: 'security',
-    icon: <ShieldCheckOutlined />,
+    icon: <SafetyCertificateOutlined />,
     label: 'Security Audit',
     path: '/app/security'
   },
@@ -117,7 +117,7 @@ const navigationItems: NavigationItem[] = [
       },
       {
         key: 'security-setup',
-        icon: <ShieldCheckOutlined />,
+        icon: <SafetyCertificateOutlined />,
         label: 'Security Setup',
         path: '/app/setup/security'
       }

@@ -41,9 +41,9 @@ import {
   SafetyCertificateOutlined,
   SettingOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined as ExclamationTriangleOutlined,
   UploadOutlined,
-  TestOutlined,
+  ExperimentOutlined as TestOutlined,
   RocketOutlined
 } from '@ant-design/icons';
 

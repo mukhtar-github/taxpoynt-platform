@@ -21,10 +21,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Alert, Badge, Timeline, Progress, Tabs, Space, Button } from 'antd';
 import {
   DashboardOutlined,
-  IntegrationOutlined,
+  ApiOutlined as IntegrationOutlined,
   SendOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined as ExclamationTriangleOutlined,
   ClockCircleOutlined,
   TrophyOutlined,
   RocketOutlined,

@@ -20,10 +20,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Tabs, Button, Space, Table, Alert, Badge, Timeline, Statistic } from 'antd';
 import {
-  ShieldCheckOutlined,
+  SafetyCertificateOutlined as ShieldCheckOutlined,
   SafetyCertificateOutlined,
   AuditOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined as ExclamationTriangleOutlined,
   UserOutlined,
   LockOutlined,
   ReloadOutlined,

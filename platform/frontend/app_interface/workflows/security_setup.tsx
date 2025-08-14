@@ -43,13 +43,13 @@ import {
   Checkbox
 } from 'antd';
 import {
-  ShieldCheckOutlined,
+  SafetyCertificateOutlined as ShieldCheckOutlined,
   SafetyCertificateOutlined,
   KeyOutlined,
   AuditOutlined,
   LockOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined as ExclamationTriangleOutlined,
   UploadOutlined,
   UserOutlined,
   WarningOutlined,

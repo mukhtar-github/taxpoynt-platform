@@ -25,7 +25,7 @@ import {
   CalendarOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  WarningOutlined,
   ReloadOutlined,
   SettingOutlined,
   TrophyOutlined,
@@ -555,7 +555,7 @@ export const ComplianceReportsPage: React.FC<ComplianceReportsPageProps> = ({ cl
           <TabPane 
             tab={
               <span>
-                <ExclamationTriangleOutlined />
+                <WarningOutlined />
                 Audit Requirements
               </span>
             } 
