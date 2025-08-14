@@ -34,7 +34,7 @@ import {
 import { FIRSConnectionManager } from '../components/firs_communication/FIRSConnectionManager';
 
 // Import types
-import type { FIRSConnectionStatus, CertificateInfo, APIQuotaInfo } from '../types';
+import type { FIRSConnectionStatus, CertificateInfo, APIQuotaInfo, FIRSEnvironment } from '../types';
 
 const { TabPane } = Tabs;
 
@@ -42,13 +42,6 @@ interface FIRSDashboardProps {
   className?: string;
 }
 
-interface FIRSEnvironment {
-  name: string;
-  url: string;
-  status: 'active' | 'inactive' | 'maintenance';
-  lastSync: Date;
-  responseTime: number;
-}
 
 interface FIRSMetrics {
   totalRequests: number;

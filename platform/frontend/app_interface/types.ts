@@ -337,6 +337,41 @@ export interface AuditRequirement {
   category: 'regulatory' | 'security' | 'operational' | 'compliance';
 }
 
+export interface FIRSConnectionStatus {
+  isConnected: boolean;
+  environment: 'production' | 'sandbox';
+  lastSync: Date;
+  latency: number;
+  certificateStatus: 'valid' | 'expired' | 'expiring_soon' | 'invalid';
+  rateLimitRemaining: number;
+}
+
+export interface CertificateInfo {
+  id: string;
+  name: string;
+  type: string;
+  status: 'valid' | 'expired' | 'expiring_soon' | 'invalid';
+  expiryDate: Date;
+  issuer: string;
+  environment: 'production' | 'sandbox';
+}
+
+export interface APIQuotaInfo {
+  dailyLimit: number;
+  dailyUsed: number;
+  monthlyLimit: number;
+  monthlyUsed: number;
+  resetTime: Date;
+}
+
+export interface FIRSEnvironment {
+  name: string;
+  url: string;
+  status: 'active' | 'inactive' | 'maintenance';
+  lastSync: Date;
+  responseTime: number;
+}
+
 // Error Handling Types
 export interface ErrorDetails {
   error_code: string;
