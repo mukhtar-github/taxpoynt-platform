@@ -386,7 +386,7 @@ export const StatusTracker: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="info" className="bg-blue-50 text-blue-700 border-blue-200">
             {statusSummary.total} Documents Tracked
           </Badge>
           <Button variant="outline" size="sm">
@@ -408,7 +408,7 @@ export const StatusTracker: React.FC = () => {
                     <span className="font-medium">{alert.title}</span>
                     <span className="ml-2 text-sm">{alert.description}</span>
                   </div>
-                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                  <Badge variant="info" className="bg-orange-100 text-orange-800">
                     {alert.severity}
                   </Badge>
                 </div>
@@ -485,11 +485,11 @@ export const StatusTracker: React.FC = () => {
             </div>
             <div className="mt-2">
               {statusSummary.sla_breached === 0 ? (
-                <Badge variant="outline" className="bg-green-50 text-green-700">
+                <Badge variant="info" className="bg-green-50 text-green-700">
                   All On Track
                 </Badge>
               ) : (
-                <Badge variant="outline" className="bg-red-50 text-red-700">
+                <Badge variant="info" className="bg-red-50 text-red-700">
                   Attention Required
                 </Badge>
               )}
@@ -585,10 +585,10 @@ export const StatusTracker: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={getStatusColor(doc.current_status)}>
+                      <Badge variant="info" className={getStatusColor(doc.current_status)}>
                         {doc.current_status}
                       </Badge>
-                      <Badge variant="outline" className={getSLAStatusColor(doc.sla_status)}>
+                      <Badge variant="info" className={getSLAStatusColor(doc.sla_status)}>
                         {doc.sla_status.replace('_', ' ')}
                       </Badge>
                     </div>
@@ -658,7 +658,7 @@ export const StatusTracker: React.FC = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(doc.current_status)}
-                          <Badge variant="outline" className={getStatusColor(doc.current_status)}>
+                          <Badge variant="info" className={getStatusColor(doc.current_status)}>
                             {doc.current_status}
                           </Badge>
                         </div>
@@ -677,7 +677,7 @@ export const StatusTracker: React.FC = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getSLAStatusColor(doc.sla_status)}>
+                        <Badge variant="info" className={getSLAStatusColor(doc.sla_status)}>
                           {doc.sla_status.replace('_', ' ')}
                         </Badge>
                       </TableCell>
@@ -713,7 +713,7 @@ export const StatusTracker: React.FC = () => {
                                       <div className="flex-1">
                                         <div className="flex items-center gap-2">
                                           <span className="font-medium capitalize">{entry.status.replace('_', ' ')}</span>
-                                          <Badge variant="outline" className="text-xs">
+                                          <Badge variant="info" className="text-xs">
                                             {entry.timestamp.toLocaleString()}
                                           </Badge>
                                         </div>
@@ -833,7 +833,7 @@ export const StatusTracker: React.FC = () => {
                   </div>
                   <p className="text-sm text-gray-600 mt-2">Average Processing Time</p>
                   <div className="mt-2">
-                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                    <Badge variant="info" className="bg-green-50 text-green-700">
                       12% improvement
                     </Badge>
                   </div>
@@ -845,7 +845,7 @@ export const StatusTracker: React.FC = () => {
                   </div>
                   <p className="text-sm text-gray-600 mt-2">SLA Compliance</p>
                   <div className="mt-2">
-                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                    <Badge variant="info" className="bg-green-50 text-green-700">
                       On Target
                     </Badge>
                   </div>
@@ -857,7 +857,7 @@ export const StatusTracker: React.FC = () => {
                   </div>
                   <p className="text-sm text-gray-600 mt-2">Success Rate</p>
                   <div className="mt-2">
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700">
+                    <Badge variant="info" className="bg-purple-50 text-purple-700">
                       +5% this week
                     </Badge>
                   </div>
