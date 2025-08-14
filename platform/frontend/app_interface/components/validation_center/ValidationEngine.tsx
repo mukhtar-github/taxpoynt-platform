@@ -675,7 +675,7 @@ export const ValidationEngine: React.FC = () => {
                         <div className="flex items-center gap-2 mt-1">
                           <Switch
                             checked={rule.active}
-                            onCheckedChange={() => handleToggleRule(rule.id)}
+                            onChange={() => handleToggleRule(rule.id)}
                           />
                           {getSeverityIcon(rule.severity)}
                         </div>
