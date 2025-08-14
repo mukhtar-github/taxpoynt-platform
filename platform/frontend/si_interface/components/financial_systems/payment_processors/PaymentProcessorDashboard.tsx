@@ -331,10 +331,10 @@ export const PaymentProcessorDashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <Badge variant="info" className="bg-green-50 text-green-700 border-green-200">
             🇳🇬 Nigerian Focus
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="info" className="bg-blue-50 text-blue-700 border-blue-200">
             {activeProviders.length} Active
           </Badge>
         </div>
@@ -364,7 +364,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                   <DollarSign className="h-8 w-8 text-green-600" />
                 </div>
                 <div className="mt-2">
-                  <Badge variant="outline" className="bg-green-50 text-green-700">
+                  <Badge variant="info" className="bg-green-50 text-green-700">
                     +12.5% from last month
                   </Badge>
                 </div>
@@ -383,7 +383,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                   <BarChart3 className="h-8 w-8 text-blue-600" />
                 </div>
                 <div className="mt-2">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  <Badge variant="info" className="bg-blue-50 text-blue-700">
                     +8.3% from last month
                   </Badge>
                 </div>
@@ -419,7 +419,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                   <Users className="h-8 w-8 text-orange-600" />
                 </div>
                 <div className="mt-2">
-                  <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                  <Badge variant="info" className="bg-orange-50 text-orange-700">
                     +5.2% from last month
                   </Badge>
                 </div>
@@ -442,7 +442,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                       </div>
                       <div>
                         <h4 className="font-medium">{provider.name}</h4>
-                        <Badge variant="outline" className={
+                        <Badge variant="info" className={
                           provider.type === 'nigerian' ? 'bg-green-50 text-green-700' :
                           provider.type === 'international' ? 'bg-blue-50 text-blue-700' :
                           'bg-purple-50 text-purple-700'
@@ -458,7 +458,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Integration:</span>
-                        <Badge variant="outline" className={
+                        <Badge variant="info" className={
                           provider.integration.status === 'connected' ? 'bg-green-50 text-green-700' :
                           provider.integration.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
                           'bg-red-50 text-red-700'
@@ -507,7 +507,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   🇳🇬 Nigerian Providers
-                  <Badge variant="outline" className="bg-green-50 text-green-700">
+                  <Badge variant="info" className="bg-green-50 text-green-700">
                     {NIGERIAN_PROVIDERS.length} Available
                   </Badge>
                 </CardTitle>
@@ -523,7 +523,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                           </div>
                           <div>
                             <h4 className="font-medium">{provider.name}</h4>
-                            <Badge variant="outline" className={getStatusColor(provider.status)}>
+                            <Badge variant="info" className={getStatusColor(provider.status)}>
                               {provider.status}
                             </Badge>
                           </div>
@@ -563,7 +563,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   🌍 International Providers
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  <Badge variant="info" className="bg-blue-50 text-blue-700">
                     {INTERNATIONAL_PROVIDERS.length} Available
                   </Badge>
                 </CardTitle>
@@ -579,7 +579,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                           </div>
                           <div>
                             <h4 className="font-medium">{provider.name}</h4>
-                            <Badge variant="outline" className={getStatusColor(provider.status)}>
+                            <Badge variant="info" className={getStatusColor(provider.status)}>
                               {provider.status}
                             </Badge>
                           </div>
@@ -673,12 +673,12 @@ export const PaymentProcessorDashboard: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="info" className="capitalize">
                           {transaction.provider}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getStatusColor(transaction.status)}>
+                        <Badge variant="info" className={getStatusColor(transaction.status)}>
                           {transaction.status}
                         </Badge>
                       </TableCell>

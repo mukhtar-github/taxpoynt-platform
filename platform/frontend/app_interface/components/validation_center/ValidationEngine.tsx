@@ -324,10 +324,10 @@ export const ValidationEngine: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <Badge variant="info" className="bg-green-50 text-green-700 border-green-200">
             🇳🇬 Nigerian Compliant
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="info" className="bg-blue-50 text-blue-700 border-blue-200">
             {validationRules.filter(r => r.active).length} Active Rules
           </Badge>
         </div>
@@ -347,7 +347,7 @@ export const ValidationEngine: React.FC = () => {
               <FileText className="h-8 w-8 text-blue-600" />
             </div>
             <div className="mt-2">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700">
+              <Badge variant="info" className="bg-blue-50 text-blue-700">
                 +12% this week
               </Badge>
             </div>
@@ -381,7 +381,7 @@ export const ValidationEngine: React.FC = () => {
               <Clock className="h-8 w-8 text-purple-600" />
             </div>
             <div className="mt-2">
-              <Badge variant="outline" className="bg-green-50 text-green-700">
+              <Badge variant="info" className="bg-green-50 text-green-700">
                 Within SLA
               </Badge>
             </div>
@@ -440,7 +440,7 @@ export const ValidationEngine: React.FC = () => {
                     <TableRow key={session.id}>
                       <TableCell className="font-mono">{session.document_id}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="info" className="capitalize">
                           {session.document_type.replace('_', ' ')}
                         </Badge>
                       </TableCell>
@@ -466,7 +466,7 @@ export const ValidationEngine: React.FC = () => {
                       <TableCell>{session.duration}s</TableCell>
                       <TableCell>
                         <Badge 
-                          variant="outline" 
+                          variant="info" 
                           className={
                             session.status === 'completed' ? 'bg-green-100 text-green-800' :
                             session.status === 'failed' ? 'bg-red-100 text-red-800' :
@@ -596,7 +596,7 @@ export const ValidationEngine: React.FC = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-medium text-sm">{result.rule_name}</span>
-                                  <Badge variant="outline" className={getSeverityColor(result.severity)}>
+                                  <Badge variant="info" className={getSeverityColor(result.severity)}>
                                     {result.severity}
                                   </Badge>
                                 </div>
@@ -684,10 +684,10 @@ export const ValidationEngine: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="font-medium">{rule.name}</h4>
-                            <Badge variant="outline" className={getSeverityColor(rule.severity)}>
+                            <Badge variant="info" className={getSeverityColor(rule.severity)}>
                               {rule.severity}
                             </Badge>
-                            <Badge variant="outline" className="text-xs capitalize">
+                            <Badge variant="info" className="text-xs capitalize">
                               {rule.category}
                             </Badge>
                           </div>
@@ -742,7 +742,7 @@ export const ValidationEngine: React.FC = () => {
                         <div className="flex items-center gap-2 mb-2">
                           {getSeverityIcon(result.severity)}
                           <h4 className="font-medium">{result.rule_name}</h4>
-                          <Badge variant="outline" className={getSeverityColor(result.severity)}>
+                          <Badge variant="info" className={getSeverityColor(result.severity)}>
                             {result.severity}
                           </Badge>
                         </div>

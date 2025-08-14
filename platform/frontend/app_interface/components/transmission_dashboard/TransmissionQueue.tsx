@@ -253,7 +253,7 @@ export const TransmissionQueue: React.FC = () => {
                 <Zap className="h-5 w-5 text-red-600" />
                 <span>High Priority</span>
               </div>
-              <Badge variant="outline" className={getPriorityBadgeColor('high')}>
+              <Badge variant="info" className={getPriorityBadgeColor('high')}>
                 {queueStatus.high_priority.processing} active
               </Badge>
             </CardTitle>
@@ -315,7 +315,7 @@ export const TransmissionQueue: React.FC = () => {
                 <Activity className="h-5 w-5 text-blue-600" />
                 <span>Normal Priority</span>
               </div>
-              <Badge variant="outline" className={getPriorityBadgeColor('normal')}>
+              <Badge variant="info" className={getPriorityBadgeColor('normal')}>
                 {queueStatus.normal_priority.processing} active
               </Badge>
             </CardTitle>
@@ -377,7 +377,7 @@ export const TransmissionQueue: React.FC = () => {
                 <Clock className="h-5 w-5 text-gray-600" />
                 <span>Low Priority</span>
               </div>
-              <Badge variant="outline" className={getPriorityBadgeColor('low')}>
+              <Badge variant="info" className={getPriorityBadgeColor('low')}>
                 {queueStatus.low_priority.processing} active
               </Badge>
             </CardTitle>
@@ -489,7 +489,7 @@ export const TransmissionQueue: React.FC = () => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="font-medium">Queue Processing</span>
               </div>
-              <Badge variant="outline" className="bg-green-100 text-green-800">
+              <Badge variant="info" className="bg-green-100 text-green-800">
                 Healthy
               </Badge>
             </div>
@@ -499,7 +499,7 @@ export const TransmissionQueue: React.FC = () => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="font-medium">Worker Threads</span>
               </div>
-              <Badge variant="outline" className="bg-green-100 text-green-800">
+              <Badge variant="info" className="bg-green-100 text-green-800">
                 {queueStatus.total_processing}/{queueStatus.max_concurrent} Active
               </Badge>
             </div>
@@ -509,7 +509,7 @@ export const TransmissionQueue: React.FC = () => {
                 <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                 <span className="font-medium">Memory Usage</span>
               </div>
-              <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+              <Badge variant="info" className="bg-yellow-100 text-yellow-800">
                 68% Utilized
               </Badge>
             </div>
@@ -519,7 +519,7 @@ export const TransmissionQueue: React.FC = () => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="font-medium">FIRS Connectivity</span>
               </div>
-              <Badge variant="outline" className="bg-green-100 text-green-800">
+              <Badge variant="info" className="bg-green-100 text-green-800">
                 Connected
               </Badge>
             </div>

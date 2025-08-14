@@ -747,7 +747,7 @@ export const StatusTracker: React.FC = () => {
                                           {milestone.actual_time ? `${milestone.actual_time}min` : `Target: ${milestone.target_time}min`}
                                         </div>
                                         <Badge 
-                                          variant="outline" 
+                                          variant="info" 
                                           className={`text-xs ${
                                             milestone.status === 'completed' ? 'bg-green-100 text-green-800' :
                                             milestone.status === 'overdue' ? 'bg-red-100 text-red-800' :

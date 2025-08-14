@@ -553,10 +553,10 @@ export const FinancialValidator: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <Badge variant="info" className="bg-green-50 text-green-700 border-green-200">
             🇳🇬 CBN Compliant
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="info" className="bg-blue-50 text-blue-700 border-blue-200">
             {NIGERIAN_VALIDATION_RULES.length} Rules
           </Badge>
         </div>
@@ -631,7 +631,7 @@ export const FinancialValidator: React.FC = () => {
                   <BarChart3 className="h-5 w-5" />
                   Validation Results
                   {currentSession && (
-                    <Badge variant="outline" className={getScoreColor(currentSession.overallScore)}>
+                    <Badge variant="info" className={getScoreColor(currentSession.overallScore)}>
                       Score: {currentSession.overallScore}%
                     </Badge>
                   )}
@@ -675,7 +675,7 @@ export const FinancialValidator: React.FC = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-medium text-sm">{result.rule.name}</span>
-                                  <Badge variant="outline" className={`text-xs ${getSeverityColor(result.rule.severity)}`}>
+                                  <Badge variant="info" className={`text-xs ${getSeverityColor(result.rule.severity)}`}>
                                     {result.rule.severity}
                                   </Badge>
                                 </div>
@@ -688,7 +688,7 @@ export const FinancialValidator: React.FC = () => {
                                 )}
                                 <div className="flex items-center gap-2 mt-2">
                                   <span className="text-xs text-gray-500">Confidence: {result.confidence}%</span>
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="info" className="text-xs">
                                     {result.rule.regulation}
                                   </Badge>
                                 </div>
@@ -736,14 +736,14 @@ export const FinancialValidator: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h4 className="font-medium">{rule.name}</h4>
-                          <Badge variant="outline" className={getSeverityColor(rule.severity)}>
+                          <Badge variant="info" className={getSeverityColor(rule.severity)}>
                             {rule.severity}
                           </Badge>
-                          <Badge variant="outline" className="text-xs capitalize">
+                          <Badge variant="info" className="text-xs capitalize">
                             {rule.category}
                           </Badge>
                           {rule.autoFix && (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                            <Badge variant="info" className="bg-blue-50 text-blue-700 text-xs">
                               Auto-Fix
                             </Badge>
                           )}
@@ -781,7 +781,7 @@ export const FinancialValidator: React.FC = () => {
                     <div key={session.id} className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <Badge variant="outline" className={
+                          <Badge variant="info" className={
                             session.status === 'completed' ? 'bg-green-50 text-green-700' :
                             session.status === 'failed' ? 'bg-red-50 text-red-700' :
                             'bg-yellow-50 text-yellow-700'
@@ -789,7 +789,7 @@ export const FinancialValidator: React.FC = () => {
                             {session.status}
                           </Badge>
                           <span className="font-medium capitalize">{session.dataType} validation</span>
-                          <Badge variant="outline" className={getScoreColor(session.overallScore)}>
+                          <Badge variant="info" className={getScoreColor(session.overallScore)}>
                             {session.overallScore}%
                           </Badge>
                         </div>

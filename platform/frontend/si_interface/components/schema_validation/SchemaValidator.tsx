@@ -506,10 +506,10 @@ export const SchemaValidator: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <Badge variant="info" className="bg-green-50 text-green-700 border-green-200">
             🇳🇬 Nigerian Compliance
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="info" className="bg-blue-50 text-blue-700 border-blue-200">
             FIRS Certified
           </Badge>
         </div>
@@ -550,7 +550,7 @@ export const SchemaValidator: React.FC = () => {
                       {NIGERIAN_SCHEMAS.map(schema => (
                         <SelectItem key={schema.id} value={schema.id}>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="info" className="text-xs">
                               {schema.type.toUpperCase()}
                             </Badge>
                             {schema.name} v{schema.version}
@@ -618,7 +618,7 @@ export const SchemaValidator: React.FC = () => {
                   <BarChart3 className="h-5 w-5" />
                   Validation Results
                   {currentSession && (
-                    <Badge variant="outline" className={getScoreColor(currentSession.score)}>
+                    <Badge variant="info" className={getScoreColor(currentSession.score)}>
                       Score: {currentSession.score}%
                     </Badge>
                   )}
@@ -687,7 +687,7 @@ export const SchemaValidator: React.FC = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-medium text-sm">{result.rule.name}</span>
-                                  <Badge variant="outline" className={`text-xs ${getSeverityColor(result.rule.severity)}`}>
+                                  <Badge variant="info" className={`text-xs ${getSeverityColor(result.rule.severity)}`}>
                                     {result.rule.severity}
                                   </Badge>
                                 </div>
@@ -714,7 +714,7 @@ export const SchemaValidator: React.FC = () => {
               <Card key={schema.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <Badge variant="outline" className={
+                    <Badge variant="info" className={
                       schema.type === 'firs' ? 'bg-blue-50 text-blue-700' :
                       schema.type === 'vat' ? 'bg-green-50 text-green-700' :
                       schema.type === 'cbn' ? 'bg-purple-50 text-purple-700' :
@@ -779,12 +779,12 @@ export const SchemaValidator: React.FC = () => {
                     <TableRow key={rule.id}>
                       <TableCell className="font-medium">{rule.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="info" className="text-xs">
                           {rule.category}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={`text-xs ${getSeverityColor(rule.severity)}`}>
+                        <Badge variant="info" className={`text-xs ${getSeverityColor(rule.severity)}`}>
                           {rule.severity}
                         </Badge>
                       </TableCell>
@@ -824,7 +824,7 @@ export const SchemaValidator: React.FC = () => {
                     <div key={session.id} className="p-4 border rounded-lg hover:bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <Badge variant="outline" className={
+                          <Badge variant="info" className={
                             session.status === 'completed' ? 'bg-green-50 text-green-700' :
                             session.status === 'failed' ? 'bg-red-50 text-red-700' :
                             'bg-yellow-50 text-yellow-700'
@@ -832,7 +832,7 @@ export const SchemaValidator: React.FC = () => {
                             {session.status}
                           </Badge>
                           <span className="font-medium">{session.schema.name}</span>
-                          <Badge variant="outline" className={getScoreColor(session.score)}>
+                          <Badge variant="info" className={getScoreColor(session.score)}>
                             {session.score}%
                           </Badge>
                         </div>

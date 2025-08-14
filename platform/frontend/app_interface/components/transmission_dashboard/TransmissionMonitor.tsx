@@ -291,7 +291,7 @@ export const TransmissionMonitor: React.FC = () => {
                     <span className="font-medium">{alert.title}</span>
                     <span className="ml-2 text-sm">{alert.description}</span>
                   </div>
-                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                  <Badge variant="info" className="bg-orange-100 text-orange-800">
                     {alert.severity}
                   </Badge>
                 </div>
@@ -347,7 +347,7 @@ export const TransmissionMonitor: React.FC = () => {
               <Timer className="h-8 w-8 text-purple-600" />
             </div>
             <div className="mt-2">
-              <Badge variant="outline" className="bg-green-50 text-green-700">
+              <Badge variant="info" className="bg-green-50 text-green-700">
                 Within SLA
               </Badge>
             </div>
@@ -436,20 +436,20 @@ export const TransmissionMonitor: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="info" className="capitalize">
                           {job.document_type.replace('_', ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(job.status)}
-                          <Badge variant="outline" className={getStatusColor(job.status)}>
+                          <Badge variant="info" className={getStatusColor(job.status)}>
                             {job.status}
                           </Badge>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getPriorityColor(job.priority)}>
+                        <Badge variant="info" className={getPriorityColor(job.priority)}>
                           {job.priority}
                         </Badge>
                       </TableCell>
