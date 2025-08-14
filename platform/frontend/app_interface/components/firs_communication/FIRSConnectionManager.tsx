@@ -268,7 +268,7 @@ export const FIRSConnectionManager: React.FC = () => {
               )}
               Active Connection: {activeConnection.name}
             </span>
-            <Badge variant="outline" className={getStatusColor(activeConnection.status)}>
+            <Badge variant="default" className={getStatusColor(activeConnection.status)}>
               {activeConnection.status}
             </Badge>
           </CardTitle>
