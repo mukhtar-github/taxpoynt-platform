@@ -33,7 +33,7 @@ import { TransmissionMonitor } from '../components/transmission_dashboard/Transm
 import { TransmissionQueue } from '../components/transmission_dashboard/TransmissionQueue';
 
 // Import types
-import type { TransmissionMetrics, QueueStatus } from '../types';
+import type { TransmissionStats, QueueStatus } from '../types';
 
 const { TabPane } = Tabs;
 

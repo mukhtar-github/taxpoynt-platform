@@ -62,6 +62,15 @@ export interface StatusBreakdown {
   percentage: number;
 }
 
+export interface QueueStatus {
+  total: number;
+  processing: number;
+  pending: number;
+  failed: number;
+  priority: number;
+  throughput: number;
+}
+
 // FIRS Communication Types
 export interface FIRSConnection {
   id: string;
