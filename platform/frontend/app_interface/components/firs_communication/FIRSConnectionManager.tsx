@@ -551,7 +551,7 @@ export const FIRSConnectionManager: React.FC = () => {
                           Test
                         </Button>
                         <Button 
-                          variant={activeConnection.id === connection.id ? "default" : "outline"} 
+                          variant={activeConnection.id === connection.id ? "primary" : "outline"} 
                           size="sm"
                           onClick={() => handleSwitchConnection(connection.id)}
                           disabled={activeConnection.id === connection.id}
