@@ -36,13 +36,9 @@ import {
   TableRow,
   Alert,
   AlertDescription,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Input
 } from '@/components/ui';
+import { Select } from '../../../shared_components/forms/Select';
 import { 
   Activity, 
   Send, 
@@ -395,20 +391,21 @@ export const TransmissionMonitor: React.FC = () => {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-48"
                     />
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="transmitting">Transmitting</SelectItem>
-                        <SelectItem value="transmitted">Transmitted</SelectItem>
-                        <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                        <SelectItem value="retrying">Retrying</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Select 
+                      value={filterStatus} 
+                      onChange={(value) => setFilterStatus(value as string)}
+                      options={[
+                        { value: "all", label: "All Status" },
+                        { value: "pending", label: "Pending" },
+                        { value: "transmitting", label: "Transmitting" },
+                        { value: "transmitted", label: "Transmitted" },
+                        { value: "acknowledged", label: "Acknowledged" },
+                        { value: "failed", label: "Failed" },
+                        { value: "retrying", label: "Retrying" }
+                      ]}
+                      placeholder="Filter by status"
+                      className="w-40"
+                    />
                   </div>
                 </div>
               </CardTitle>
