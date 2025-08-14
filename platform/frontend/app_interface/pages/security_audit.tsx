@@ -505,14 +505,14 @@ export const SecurityAuditPage: React.FC<SecurityAuditPageProps> = ({ className 
                     }
                   >
                     <Timeline>
-                      <Timeline.Item icon={<SafetyCertificateOutlined />}>
+                      <Timeline.Item dot={<SafetyCertificateOutlined />}>
                         <strong>Type:</strong> {cert.type}
                       </Timeline.Item>
-                      <Timeline.Item icon={<LockOutlined />}>
+                      <Timeline.Item dot={<LockOutlined />}>
                         <strong>Issuer:</strong> {cert.issuer}
                       </Timeline.Item>
                       <Timeline.Item 
-                        icon={<ExclamationTriangleOutlined />}
+                        dot={<ExclamationTriangleOutlined />}
                         color={new Date(cert.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000 ? 'red' : 'green'}
                       >
                         <strong>Expires:</strong> {cert.expiryDate.toLocaleDateString()}
