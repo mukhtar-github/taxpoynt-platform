@@ -156,7 +156,7 @@ export const TransmissionQueue: React.FC = () => {
             </span>
             <div className="flex items-center gap-3">
               <Button
-                variant={isProcessingPaused ? "default" : "outline"}
+                variant={isProcessingPaused ? "primary" : "outline"}
                 size="sm"
                 onClick={handlePauseProcessing}
               >
