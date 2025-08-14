@@ -225,6 +225,7 @@ export const ValidationEngine: React.FC = () => {
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [documentContent, setDocumentContent] = useState('');
+  const [validationStrictness, setValidationStrictness] = useState('standard');
 
   const getSeverityIcon = (severity: ValidationSeverity) => {
     switch (severity) {
@@ -789,16 +790,17 @@ export const ValidationEngine: React.FC = () => {
             <CardContent className="space-y-6">
               <div>
                 <h4 className="font-medium mb-3">Validation Strictness</h4>
-                <Select defaultValue="standard">
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="strict">Strict (All rules)</SelectItem>
-                    <SelectItem value="standard">Standard (Critical + Error)</SelectItem>
-                    <SelectItem value="permissive">Permissive (Critical only)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Select 
+                  value={validationStrictness}
+                  onChange={(value) => setValidationStrictness(value as string)}
+                  options={[
+                    { value: "strict", label: "Strict (All rules)" },
+                    { value: "standard", label: "Standard (Critical + Error)" },
+                    { value: "permissive", label: "Permissive (Critical only)" }
+                  ]}
+                  placeholder="Select validation strictness"
+                  className="w-48"
+                />
               </div>
 
               <div>
