@@ -218,7 +218,7 @@ export const TransmissionQueue: React.FC = () => {
                 <label className="text-sm font-medium">Auto-scaling</label>
                 <Switch
                   checked={autoScale}
-                  onCheckedChange={setAutoScale}
+                  onChange={(e) => setAutoScale(e.target.checked)}
                 />
               </div>
               <div className="p-3 bg-blue-50 rounded-lg">
