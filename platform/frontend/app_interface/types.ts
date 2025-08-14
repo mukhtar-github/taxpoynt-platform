@@ -306,6 +306,30 @@ export interface ComplianceViolation {
   resolution_status: 'open' | 'resolved' | 'acknowledged';
 }
 
+export interface ReportMetrics {
+  averageComplianceScore: number;
+  totalDocumentsProcessed: number;
+  successRate: number;
+  averageResponseTime: number;
+  peakTransmissionHour: number;
+  complianceByCategory: {
+    authentication: number;
+    validation: number;
+    transmission: number;
+    security: number;
+  };
+}
+
+export interface AuditRequirement {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: Date;
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  priority: 'high' | 'medium' | 'low';
+  category: 'regulatory' | 'security' | 'operational' | 'compliance';
+}
+
 // Error Handling Types
 export interface ErrorDetails {
   error_code: string;
