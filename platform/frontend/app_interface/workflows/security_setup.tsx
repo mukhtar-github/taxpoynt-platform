@@ -385,7 +385,7 @@ export const SecuritySetupWorkflow: React.FC<SecuritySetupProps> = ({
       render: (compliance: string[]) => (
         <Space>
           {compliance.map(c => (
-            <Tag key={c} size="small">{c}</Tag>
+            <Tag key={c}>{c}</Tag>
           ))}
         </Space>
       )
