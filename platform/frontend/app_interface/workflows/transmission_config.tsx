@@ -52,7 +52,36 @@ import {
 } from '@ant-design/icons';
 
 // Import types
-import type { TransmissionRule, QueueConfiguration, AlertConfiguration } from '../types';
+import type { TransmissionJob, QueueConfig, RetryConfiguration } from '../types';
+
+// Local types specific to transmission configuration
+interface TransmissionRule {
+  id: string;
+  name: string;
+  description: string;
+  condition: string;
+  action: string;
+  priority: 'high' | 'normal' | 'low';
+  enabled: boolean;
+}
+
+interface QueueConfiguration {
+  maxConcurrentJobs: number;
+  retryAttempts: number;
+  retryDelay: number;
+  priorityQueues: boolean;
+  batchSize: number;
+}
+
+interface AlertConfiguration {
+  enableAlerts: boolean;
+  alertThresholds: {
+    errorRate: number;
+    queueBacklog: number;
+    responseTime: number;
+  };
+  notificationChannels: string[];
+}
 
 const { Step } = Steps;
 const { Option } = Select;
