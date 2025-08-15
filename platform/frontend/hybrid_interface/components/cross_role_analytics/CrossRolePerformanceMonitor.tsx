@@ -668,7 +668,6 @@ export const CrossRolePerformanceMonitor: React.FC<CrossRolePerformanceMonitorPr
                 <Alert
                   type="warning"
                   message={`Bottleneck: ${process.bottlenecks[0].stage} stage delayed by ${process.bottlenecks[0].delay_percentage.toFixed(0)}%`}
-                  size="small"
                   style={{ marginTop: 8 }}
                   action={
                     <Button 
