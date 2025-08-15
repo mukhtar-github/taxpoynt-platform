@@ -187,6 +187,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
   onMetricClick,
   refreshInterval = 30000,
   className,
+  onError,
   ...props
 }) => {
   const [trends, setTrends] = useState<Record<string, MetricTrend>>({});
