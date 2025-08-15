@@ -27,7 +27,7 @@ import {
   DownloadOutlined,
   FilterOutlined,
   CalendarOutlined,
-  TrendingUpOutlined,
+  RiseOutlined,
   DashboardOutlined,
   ExportOutlined,
   ReloadOutlined
@@ -463,7 +463,7 @@ export const AnalyticsAggregator: React.FC<AnalyticsComponentProps> = ({
                   <div style={{ fontSize: 10, marginTop: 4 }}>
                     <span style={{ color: getChangeColor(metric.change) }}>
                       {metric.change > 0 ? '+' : ''}{metric.change.toFixed(1)}%
-                      {metric.trend === 'up' ? <TrendingUpOutlined /> : ''}
+                      {metric.trend === 'up' ? <RiseOutlined /> : ''}
                     </span>
                   </div>
                 }
@@ -577,7 +577,7 @@ export const AnalyticsAggregator: React.FC<AnalyticsComponentProps> = ({
                   : 0
               }
               suffix="%"
-              prefix={<TrendingUpOutlined />}
+              prefix={<RiseOutlined />}
             />
           </Col>
           <Col xs={24} sm={6}>
@@ -607,7 +607,7 @@ export const AnalyticsAggregator: React.FC<AnalyticsComponentProps> = ({
                        performanceMetrics.filter(m => m.trend === 'down').length
                   ? '#52c41a' : '#faad14'
               }}
-              prefix={<TrendingUpOutlined />}
+              prefix={<RiseOutlined />}
             />
           </Col>
         </Row>
