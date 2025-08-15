@@ -30,6 +30,7 @@ import { Button } from '../../design_system/components/Button';
 // ========================================
 
 // Import existing sophisticated components
+export { Button };
 
 export { Input, inputVariants } from '../../design_system/components/Input';
 export type { InputProps } from '../../design_system/components/Input';
