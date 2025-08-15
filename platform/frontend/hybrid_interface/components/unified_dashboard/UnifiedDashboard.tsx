@@ -63,7 +63,7 @@ import type {
   EndToEndProcess, 
   CrossRoleWorkflow,
   DashboardComponentProps
-} from '../types';
+} from '../../types';
 
 interface UnifiedDashboardProps extends DashboardComponentProps {
   userRole: HybridRole;
