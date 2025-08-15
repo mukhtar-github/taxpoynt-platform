@@ -45,7 +45,7 @@ import {
 } from 'antd';
 import {
   SafetyOutlined,
-  ExclamationTriangleOutlined,
+  ExclamationCircleOutlined,
   CalendarOutlined,
   FileTextOutlined,
   TrophyOutlined,
@@ -668,7 +668,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
                   <Statistic
                     title="Platform Issues"
                     value={complianceStatus.recent_violations.length}
-                    prefix={<ExclamationTriangleOutlined />}
+                    prefix={<ExclamationCircleOutlined />}
                     valueStyle={{ color: complianceStatus.recent_violations.length > 0 ? '#ff4d4f' : '#52c41a' }}
                   />
                 </Col>
@@ -791,7 +791,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
             <TabPane
               tab={
                 <span>
-                  <ExclamationTriangleOutlined />
+                  <ExclamationCircleOutlined />
                   Violations ({complianceStatus.recent_violations.length})
                 </span>
               }
