@@ -829,7 +829,48 @@ export const SecuritySetupWorkflow: React.FC<SecuritySetupProps> = ({
         title="Security Setup Complete!"
         subTitle="Your Access Point Provider security configuration is complete and compliant."
         extra={[
-          <Button type="primary" key="done" onClick={onComplete}>
+          <Button type="primary" key="done" onClick={() => {
+            const finalConfig: SecurityConfiguration = {
+              authenticationSettings: configuration.authenticationSettings || {
+                method: 'oauth2',
+                tokenExpiryMinutes: 60,
+                enableMFA: true,
+                passwordPolicy: {
+                  minLength: 8,
+                  requireUppercase: true,
+                  requireLowercase: true,
+                  requireNumbers: true,
+                  requireSpecialChars: true,
+                  expiryDays: 90
+                },
+                sessionTimeout: 30
+              },
+              certificateSettings: configuration.certificateSettings || {
+                sslCertificate: '',
+                privateKey: '',
+                caCertificate: '',
+                autoRenewal: true,
+                expiryNotificationDays: 30
+              },
+              apiSecurity: configuration.apiSecurity || {
+                enableRateLimit: true,
+                rateLimitPerMinute: 1000,
+                enableIPWhitelist: false,
+                allowedIPs: [],
+                enableRequestSigning: true,
+                encryptionMethod: 'AES-256'
+              },
+              auditConfiguration: configuration.auditConfiguration || {
+                enableAuditLogging: true,
+                logLevel: 'info',
+                retentionDays: 90,
+                logEvents: ['authentication', 'access', 'changes']
+              },
+              accessPolicies: configuration.accessPolicies || [],
+              complianceRules: configuration.complianceRules || securityRules
+            };
+            onComplete?.(finalConfig);
+          }}>
             Continue to Dashboard
           </Button>
         ]}
