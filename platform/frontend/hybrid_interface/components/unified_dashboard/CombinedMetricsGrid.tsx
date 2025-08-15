@@ -24,7 +24,7 @@ import {
   ArrowDownOutlined,
   RiseOutlined,
   FallOutlined,
-  IntegrationOutlined,
+  InteractionOutlined,
   SendOutlined,
   ShieldCheckOutlined,
   CheckCircleOutlined,
@@ -71,7 +71,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'si',
     format: 'percentage',
     thresholds: { excellent: 98, good: 95, warning: 90 },
-    icon: <IntegrationOutlined />
+    icon: <InteractionOutlined />
   },
   {
     key: 'si_active_connections',
@@ -80,7 +80,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'si',
     format: 'number',
     thresholds: { excellent: 40, good: 30, warning: 20 },
-    icon: <IntegrationOutlined />
+    icon: <InteractionOutlined />
   },
   {
     key: 'si_documents_processed_today',
