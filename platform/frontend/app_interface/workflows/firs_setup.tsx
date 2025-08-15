@@ -499,7 +499,20 @@ export const FIRSSetupWorkflow: React.FC<FIRSSetupProps> = ({
         title="FIRS Integration Ready!"
         subTitle="Your Access Point Provider is now connected to FIRS and ready for e-invoice transmission."
         extra={[
-          <Button type="primary" key="done" onClick={() => onComplete?.(configuration)}>
+          <Button type="primary" key="done" onClick={() => {
+            const finalConfig: FIRSConfiguration = {
+              environment: configuration.environment || 'sandbox',
+              apiUrl: configuration.apiUrl || '',
+              credentials: configuration.credentials || {} as APICredentials,
+              certificates: configuration.certificates || [],
+              connectionSettings: configuration.connectionSettings || {
+                timeout: 30000,
+                retryAttempts: 3,
+                rateLimitPerSecond: 10
+              }
+            };
+            onComplete?.(finalConfig);
+          }}>
             Continue to Dashboard
           </Button>
         ]}
