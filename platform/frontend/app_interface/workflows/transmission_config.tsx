@@ -172,7 +172,8 @@ export const TransmissionConfigWorkflow: React.FC<TransmissionConfigProps> = ({
       id: '1',
       name: 'Critical Documents',
       condition: 'documentType === "invoice" && amount > 1000000',
-      priority: 1,
+      action: 'prioritize',
+      priority: 'high',
       description: 'High-value invoices (> ₦1M)',
       enabled: true
     },
@@ -180,7 +181,8 @@ export const TransmissionConfigWorkflow: React.FC<TransmissionConfigProps> = ({
       id: '2',
       name: 'Government Clients',
       condition: 'clientType === "government"',
-      priority: 2,
+      action: 'expedite',
+      priority: 'normal',
       description: 'Government sector documents',
       enabled: true
     },
@@ -188,7 +190,8 @@ export const TransmissionConfigWorkflow: React.FC<TransmissionConfigProps> = ({
       id: '3',
       name: 'Standard Processing',
       condition: 'true',
-      priority: 3,
+      action: 'queue',
+      priority: 'low',
       description: 'Default priority for all other documents',
       enabled: true
     }
