@@ -20,7 +20,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Select, Badge, Space, Alert, Tooltip, Dropdown, Avatar } from 'antd';
 import {
   UserSwitchOutlined,
-  IntegrationOutlined,
+  InteractionOutlined,
   SendOutlined,
   DashboardOutlined,
   SwapOutlined,
@@ -62,7 +62,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     role: 'si_user',
     label: 'System Integrator',
     description: 'Focus on ERP/CRM integrations and data processing',
-    icon: <IntegrationOutlined />,
+    icon: <InteractionOutlined />,
     color: '#722ed1',
     permissions: ['si_view', 'si_manage', 'integration_config'],
     interfaces: ['si'],
@@ -273,7 +273,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
 
   const interfaceMenuItems = currentRoleDef?.interfaces.map(iface => ({
     key: iface,
-    icon: iface === 'si' ? <IntegrationOutlined /> : 
+    icon: iface === 'si' ? <InteractionOutlined /> : 
           iface === 'app' ? <SendOutlined /> : <DashboardOutlined />,
     label: `${iface.toUpperCase()} Interface`,
     onClick: () => handleInterfaceSwitch(iface)
@@ -389,7 +389,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
               <Button
                 key={iface}
                 icon={
-                  iface === 'si' ? <IntegrationOutlined /> :
+                  iface === 'si' ? <InteractionOutlined /> :
                   iface === 'app' ? <SendOutlined /> :
                   <DashboardOutlined />
                 }
