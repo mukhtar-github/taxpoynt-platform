@@ -24,10 +24,10 @@ import {
   SwapOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  ExclamationCircleOutlined,
   ArrowRightOutlined,
-  TrendingUpOutlined,
-  TrendingDownOutlined,
+  RiseOutlined,
+  FallOutlined,
   WarningOutlined,
   ReloadOutlined,
   BarChartOutlined
@@ -327,9 +327,9 @@ export const CrossRolePerformanceMonitor: React.FC<CrossRolePerformanceMonitorPr
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case 'improving':
-        return <TrendingUpOutlined style={{ color: '#52c41a' }} />;
+        return <RiseOutlined style={{ color: '#52c41a' }} />;
       case 'declining':
-        return <TrendingDownOutlined style={{ color: '#ff4d4f' }} />;
+        return <FallOutlined style={{ color: '#ff4d4f' }} />;
       default:
         return <ArrowRightOutlined style={{ color: '#666' }} />;
     }
