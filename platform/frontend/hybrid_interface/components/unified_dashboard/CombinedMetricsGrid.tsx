@@ -22,8 +22,8 @@ import { Card, Row, Col, Statistic, Badge, Tooltip, Progress, Space, Button } fr
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
-  TrendingUpOutlined,
-  TrendingDownOutlined,
+  RiseOutlined,
+  FallOutlined,
   IntegrationOutlined,
   SendOutlined,
   ShieldCheckOutlined,
@@ -147,7 +147,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'hybrid',
     format: 'percentage',
     thresholds: { excellent: 95, good: 90, warning: 85 },
-    icon: <TrendingUpOutlined />
+    icon: <RiseOutlined />
   },
   {
     key: 'hybrid_unified_compliance_score',
@@ -176,7 +176,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'cross_role',
     format: 'percentage',
     thresholds: { excellent: 95, good: 90, warning: 85 },
-    icon: <TrendingUpOutlined />
+    icon: <RiseOutlined />
   }
 ];
 
@@ -255,7 +255,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
       case 'down':
         return <ArrowDownOutlined style={{ color: '#ff4d4f' }} />;
       default:
-        return <TrendingUpOutlined style={{ color: '#666' }} />;
+        return <RiseOutlined style={{ color: '#666' }} />;
     }
   };
 
@@ -406,7 +406,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
               <Statistic
                 title="Total Documents"
                 value={metrics.si_metrics.documents_processed_today + metrics.app_metrics.total_transmissions}
-                prefix={<TrendingUpOutlined />}
+                prefix={<RiseOutlined />}
                 valueStyle={{ color: '#1890ff' }}
               />
             </Col>
