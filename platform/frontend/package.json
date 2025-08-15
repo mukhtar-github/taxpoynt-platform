@@ -24,7 +24,8 @@
     "framer-motion": "^10.16.5",
     "react-router-dom": "^6.8.0",
     "antd": "^5.0.0",
-    "@heroicons/react": "^2.0.18"
+    "@heroicons/react": "^2.0.18",
+    "recharts": "^2.8.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
