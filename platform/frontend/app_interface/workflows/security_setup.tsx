@@ -57,7 +57,33 @@ import {
 } from '@ant-design/icons';
 
 // Import types
-import type { SecurityRule, AccessPolicy, AuditConfiguration } from '../types';
+import type { SecurityAudit, Certificate, SecurityConfig } from '../types';
+
+// Local types specific to security setup
+interface SecurityRule {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  enabled: boolean;
+  compliance: string[];
+}
+
+interface AccessPolicy {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  roles: string[];
+}
+
+interface AuditConfiguration {
+  enableAuditLogging: boolean;
+  logLevel: 'info' | 'warning' | 'error' | 'debug';
+  retentionDays: number;
+  logEvents: string[];
+}
 
 const { Step } = Steps;
 const { Option } = Select;
