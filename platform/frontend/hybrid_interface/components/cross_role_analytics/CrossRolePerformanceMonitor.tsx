@@ -95,6 +95,7 @@ export const CrossRolePerformanceMonitor: React.FC<CrossRolePerformanceMonitorPr
   refreshInterval = 10000,
   autoRefresh = true,
   className,
+  onError,
   ...props
 }) => {
   // State management
