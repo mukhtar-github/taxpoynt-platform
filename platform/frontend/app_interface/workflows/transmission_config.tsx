@@ -704,7 +704,42 @@ export const TransmissionConfigWorkflow: React.FC<TransmissionConfigProps> = ({
         title="Transmission Configuration Complete!"
         subTitle="Your transmission settings have been configured and optimized for maximum performance."
         extra={[
-          <Button type="primary" key="done" onClick={onComplete}>
+          <Button type="primary" key="done" onClick={() => {
+            const finalConfig: TransmissionConfiguration = {
+              queueSettings: configuration.queueSettings || {
+                maxConcurrentJobs: 10,
+                retryAttempts: 3,
+                retryDelay: 5000,
+                priorityQueues: true,
+                batchSize: 50
+              },
+              priorityRules: configuration.priorityRules || priorityRules,
+              retryPolicy: configuration.retryPolicy || {
+                maxAttempts: 3,
+                backoffStrategy: 'exponential',
+                baseDelay: 1000,
+                maxDelay: 30000,
+                retryOnErrors: ['timeout', 'network_error', 'server_error']
+              },
+              performanceSettings: configuration.performanceSettings || {
+                maxConcurrentTransmissions: 5,
+                batchSize: 50,
+                processingTimeout: 30000,
+                enableCompression: true,
+                connectionPoolSize: 10
+              },
+              alertConfiguration: configuration.alertConfiguration || {
+                enableAlerts: true,
+                alertThresholds: {
+                  errorRate: 5,
+                  queueBacklog: 100,
+                  responseTime: 10000
+                },
+                notificationChannels: ['email', 'dashboard']
+              }
+            };
+            onComplete?.(finalConfig);
+          }}>
             Continue to Dashboard
           </Button>
         ]}
