@@ -499,7 +499,7 @@ export const FIRSSetupWorkflow: React.FC<FIRSSetupProps> = ({
         title="FIRS Integration Ready!"
         subTitle="Your Access Point Provider is now connected to FIRS and ready for e-invoice transmission."
         extra={[
-          <Button type="primary" key="done" onClick={onComplete}>
+          <Button type="primary" key="done" onClick={() => onComplete?.(configuration)}>
             Continue to Dashboard
           </Button>
         ]}
