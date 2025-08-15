@@ -44,7 +44,7 @@ import {
   Divider
 } from 'antd';
 import {
-  ShieldCheckOutlined,
+  SafetyOutlined,
   ExclamationTriangleOutlined,
   CalendarOutlined,
   FileTextOutlined,
@@ -106,7 +106,7 @@ const FIRS_MANDATED_STANDARDS = [
   { code: 'UBL', name: 'Universal Business Language', description: 'Document format standards', icon: <FileTextOutlined />, color: '#1890ff' },
   { code: 'WCO_HS', name: 'WCO Harmonized System Code', description: 'World Customs Organization classification', icon: <BankOutlined />, color: '#52c41a' },
   { code: 'NITDA_GDPR', name: 'NITDA GDPR & NDPA', description: 'Nigerian data protection requirements', icon: <SafetyCertificateOutlined />, color: '#722ed1' },
-  { code: 'ISO_20022', name: 'ISO 20022', description: 'Financial messaging standards', icon: <ShieldCheckOutlined />, color: '#fa8c16' },
+  { code: 'ISO_20022', name: 'ISO 20022', description: 'Financial messaging standards', icon: <SafetyOutlined />, color: '#fa8c16' },
   { code: 'ISO_27001', name: 'ISO 27001', description: 'Information security management', icon: <TrophyOutlined />, color: '#13c2c2' },
   { code: 'LEI', name: 'Legal Entity Identifier', description: 'Global entity identification', icon: <FileTextOutlined />, color: '#faad14' },
   { code: 'PEPPOL', name: 'PEPPOL', description: 'Pan-European Public Procurement Online', icon: <BankOutlined />, color: '#eb2f96' }
@@ -600,7 +600,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
         <Row justify="space-between" align="middle">
           <Col>
             <h3 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
-              <ShieldCheckOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+              <SafetyOutlined style={{ marginRight: 8, color: '#1890ff' }} />
               TaxPoynt Platform Compliance (Admin Dashboard)
               {refreshing && <ReloadOutlined spin style={{ marginLeft: 8, color: '#52c41a' }} />}
             </h3>
