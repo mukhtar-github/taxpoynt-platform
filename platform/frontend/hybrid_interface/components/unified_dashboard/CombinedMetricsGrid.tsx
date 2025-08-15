@@ -28,7 +28,7 @@ import {
   SendOutlined,
   SafetyCertificateOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  ExclamationCircleOutlined,
   InfoCircleOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
@@ -127,7 +127,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'app',
     format: 'number',
     thresholds: { excellent: 10, good: 25, warning: 50 },
-    icon: <ExclamationTriangleOutlined />
+    icon: <ExclamationCircleOutlined />
   },
   {
     key: 'app_security_score',
@@ -416,7 +416,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
                 value={metrics.si_metrics.average_processing_time}
                 suffix="min"
                 precision={1}
-                prefix={<ExclamationTriangleOutlined />}
+                prefix={<ExclamationCircleOutlined />}
                 valueStyle={{ color: '#fa8c16' }}
               />
             </Col>
