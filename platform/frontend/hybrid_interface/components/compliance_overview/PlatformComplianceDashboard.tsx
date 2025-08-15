@@ -277,7 +277,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
           due_date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
           priority: 'medium',
           progress_percentage: 60,
-          assigned_roles: ['admin'],
+          assigned_roles: ['platform_admin'],
           estimated_hours: 8
         }
       ],
