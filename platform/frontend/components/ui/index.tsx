@@ -89,7 +89,7 @@ const textareaVariants = cva(
 );
 
 export interface TextareaProps
-  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'>,
+  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size' | 'role'>,
     VariantProps<typeof textareaVariants> {}
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
