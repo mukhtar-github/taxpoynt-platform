@@ -28,7 +28,7 @@ import {
   TeamOutlined,
   SettingOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 
 import type { HybridRole, HybridUserSession, RecentActivity } from '../../types';
