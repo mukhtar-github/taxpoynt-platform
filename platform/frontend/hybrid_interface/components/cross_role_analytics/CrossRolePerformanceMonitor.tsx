@@ -497,7 +497,7 @@ export const CrossRolePerformanceMonitor: React.FC<CrossRolePerformanceMonitorPr
 
   if (loading) {
     return (
-      <Card className={className} {...props}>
+      <Card className={className}>
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <ReloadOutlined spin style={{ fontSize: 24, marginBottom: 16 }} />
           <p>Loading cross-role performance data...</p>

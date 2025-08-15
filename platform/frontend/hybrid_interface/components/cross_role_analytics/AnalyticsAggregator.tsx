@@ -376,7 +376,7 @@ export const AnalyticsAggregator: React.FC<AnalyticsComponentProps> = ({
 
   if (loading || externalLoading) {
     return (
-      <Card className={className} {...props}>
+      <Card className={className}>
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <ReloadOutlined spin style={{ fontSize: 24, marginBottom: 16 }} />
           <p>Loading analytics data...</p>

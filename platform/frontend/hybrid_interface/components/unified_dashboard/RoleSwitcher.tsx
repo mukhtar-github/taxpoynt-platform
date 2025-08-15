@@ -414,7 +414,6 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
               message={`Role switched ${Math.floor((Date.now() - userSession.role_switched_at.getTime()) / 60000)} minutes ago`}
               showIcon
               style={{ marginBottom: 12 }}
-              size="small"
             />
           )}
 
@@ -461,7 +460,6 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
           description="Contact your administrator to request access to additional roles and features."
           showIcon
           style={{ marginTop: 16 }}
-          size="small"
         />
       )}
     </Card>

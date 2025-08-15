@@ -565,7 +565,6 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                       description={`${process.bottlenecks[0].stage} stage delayed by ${process.bottlenecks[0].delay_percentage.toFixed(1)}%`}
                       showIcon
                       style={{ marginTop: 8 }}
-                      size="small"
                     />
                   )}
                 </Card>
