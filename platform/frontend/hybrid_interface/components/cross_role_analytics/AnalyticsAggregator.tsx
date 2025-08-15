@@ -95,6 +95,7 @@ export const AnalyticsAggregator: React.FC<AnalyticsComponentProps> = ({
   onReportGenerated,
   className,
   loading: externalLoading = false,
+  onError,
   ...props
 }) => {
   // State management
