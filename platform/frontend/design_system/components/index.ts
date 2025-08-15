@@ -9,6 +9,10 @@
  * @version 1.0.0
  */
 
+// Import components for local use
+import { Button } from './Button';
+import { Input } from './Input';
+
 // Export all primitive components
 export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
