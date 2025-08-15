@@ -23,14 +23,13 @@
 import React, { useState } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { clsx } from 'clsx';
+import { Button } from '../../design_system/components/Button';
 
 // ========================================
 // CORE FORM COMPONENTS
 // ========================================
 
 // Import existing sophisticated components
-export { Button, buttonVariants } from '../../design_system/components/Button';
-export type { ButtonProps } from '../../design_system/components/Button';
 
 export { Input, inputVariants } from '../../design_system/components/Input';
 export type { InputProps } from '../../design_system/components/Input';
