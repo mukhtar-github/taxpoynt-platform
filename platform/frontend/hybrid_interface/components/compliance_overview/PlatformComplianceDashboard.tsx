@@ -121,6 +121,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
   refreshInterval = 300000, // 5 minutes
   autoRefresh = true,
   className,
+  onError,
   ...props
 }) => {
   // State management
