@@ -26,7 +26,7 @@ import {
   FallOutlined,
   InteractionOutlined,
   SendOutlined,
-  ShieldCheckOutlined,
+  SafetyCertificateOutlined,
   CheckCircleOutlined,
   ExclamationTriangleOutlined,
   InfoCircleOutlined,
@@ -98,7 +98,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'si',
     format: 'percentage',
     thresholds: { excellent: 95, good: 90, warning: 80 },
-    icon: <ShieldCheckOutlined />
+    icon: <SafetyCertificateOutlined />
   },
 
   // APP Metrics
@@ -136,7 +136,7 @@ const METRIC_DEFINITIONS: MetricDefinition[] = [
     source: 'app',
     format: 'percentage',
     thresholds: { excellent: 95, good: 90, warning: 80 },
-    icon: <ShieldCheckOutlined />
+    icon: <SafetyCertificateOutlined />
   },
 
   // Hybrid Metrics
