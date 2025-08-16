@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SignUpPage } from '../../../business_interface/auth/SignUpPage';
 import { authService } from '../../../shared_components/services/auth';
 
-export default function SignUpPageWrapper() {
+function SignUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -79,5 +79,13 @@ export default function SignUpPageWrapper() {
       isLoading={isLoading}
       error={error}
     />
+  );
+}
+
+export default function SignUpPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignUpPageContent />
+    </Suspense>
   );
 }
