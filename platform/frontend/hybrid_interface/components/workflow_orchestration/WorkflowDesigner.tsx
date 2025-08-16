@@ -545,7 +545,6 @@ export const WorkflowDesigner: React.FC<WorkflowDesignerProps> = ({
               type="warning"
               message={warning}
               style={{ marginBottom: 4 }}
-              size="small"
             />
           ))}
         </div>
