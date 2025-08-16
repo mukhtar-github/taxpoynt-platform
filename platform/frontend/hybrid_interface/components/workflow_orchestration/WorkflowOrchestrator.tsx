@@ -489,7 +489,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
               icon: <CopyOutlined />,
               label: 'Duplicate'
             },
-            { type: 'divider' as const },
+            { key: 'divider', type: 'divider' },
             {
               key: 'delete',
               icon: <DeleteOutlined />,
