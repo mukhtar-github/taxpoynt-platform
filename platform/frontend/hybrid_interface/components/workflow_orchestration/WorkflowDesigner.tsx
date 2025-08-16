@@ -49,7 +49,7 @@ import {
   CopyOutlined,
   LinkOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 
 import type { 
