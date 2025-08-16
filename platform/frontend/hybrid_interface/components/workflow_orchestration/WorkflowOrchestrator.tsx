@@ -463,7 +463,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
       title: 'Actions',
       key: 'actions',
       render: (record: CrossRoleWorkflow) => {
-        const menuItems = [
+        const menuItems: any[] = [
           {
             key: 'execute',
             icon: <PlayCircleOutlined />,
