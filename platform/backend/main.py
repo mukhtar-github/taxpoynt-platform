@@ -110,8 +110,11 @@ def create_taxpoynt_app() -> FastAPI:
         allowed_origins = [
             "https://web-production-ea5ad.up.railway.app",  # Railway production
             "https://app-staging.taxpoynt.com",
-            "https://app.taxpoynt.com", 
-            "http://localhost:3000"
+            "https://app.taxpoynt.com",
+            "https://taxpoynt.com",  # Main domain
+            "https://www.taxpoynt.com",  # WWW subdomain
+            "http://localhost:3000",
+            "http://localhost:3001"  # Frontend dev port
         ] if not DEBUG else ["*"]
         
         config = APIGatewayConfig(
@@ -163,7 +166,10 @@ def create_taxpoynt_app() -> FastAPI:
             "https://web-production-ea5ad.up.railway.app",
             "https://app-staging.taxpoynt.com", 
             "https://app.taxpoynt.com",
-            "http://localhost:3000"
+            "https://taxpoynt.com",  # Main Vercel domain
+            "https://www.taxpoynt.com",  # WWW subdomain
+            "http://localhost:3000",
+            "http://localhost:3001"  # Frontend dev port
         ] if not DEBUG else ["*"]
         
         app.add_middleware(
