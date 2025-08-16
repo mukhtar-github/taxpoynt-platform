@@ -95,6 +95,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
   filters,
   className,
   loading: externalLoading = false,
+  onError,
   ...props
 }) => {
   // State management
