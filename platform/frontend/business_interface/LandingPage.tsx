@@ -55,7 +55,7 @@ export const LandingPage: React.FC = () => {
             <div className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
               Nigeria's Premier Intelligent Universal E-Invoicing Platform
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight font-heading text-shadow-sm">
+            <h1 className="text-hero font-heading text-shadow-sm text-gray-900 mb-8">
               Connect Every System.
               <br />
               <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -65,7 +65,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Subtitle */}
-          <p className="text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed font-body">
+          <p className="text-body-lg text-gray-600 mb-16 max-w-3xl mx-auto font-body">
             Advanced technology that understands Nigerian business reality. Universal connectivity from SAP to Paystack. 
             From Lagos to Kano, from Computer Village to Alaba Market - built for how Nigeria actually works.
           </p>
@@ -119,8 +119,8 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 font-heading text-shadow-sm">Choose Your Service</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto font-body">
+            <h2 className="text-display font-heading text-gray-900 mb-6">Choose Your Service</h2>
+            <p className="text-body-lg text-gray-600 max-w-2xl mx-auto font-body">
               Select the perfect solution for your e-invoicing needs
             </p>
           </div>
@@ -133,8 +133,8 @@ export const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">🔗</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4 font-heading">System Integrator</h3>
-                <p className="text-gray-600 mb-6 font-body">
+                <h3 className="text-heading font-heading text-gray-900 mb-4">System Integrator</h3>
+                <p className="text-body text-gray-600 mb-6 font-body">
                   Connect 40+ business and financial systems for automated e-invoicing workflows
                 </p>
                 <ul className="text-left space-y-2 mb-8">
@@ -172,8 +172,8 @@ export const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">🚀</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4 font-heading">Access Point Provider</h3>
-                <p className="text-gray-600 mb-6 font-body">
+                <h3 className="text-heading font-heading text-gray-900 mb-4">Access Point Provider</h3>
+                <p className="text-body text-gray-600 mb-6 font-body">
                   Secure invoice transmission via TaxPoynt's certified APP service
                 </p>
                 <ul className="text-left space-y-2 mb-8">
@@ -206,8 +206,8 @@ export const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">👑</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4 font-heading">Hybrid Premium</h3>
-                <p className="text-gray-600 mb-6 font-body">
+                <h3 className="text-heading font-heading text-gray-900 mb-4">Hybrid Premium</h3>
+                <p className="text-body text-gray-600 mb-6 font-body">
                   Combined SI + APP with advanced features and premium support
                 </p>
                 <ul className="text-left space-y-2 mb-8">
@@ -242,8 +242,8 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4 font-heading text-shadow">Three Ways to Integrate</h2>
-            <p className="text-xl text-gray-300 font-body">
+            <h2 className="text-display font-heading text-white mb-6 text-shadow">Three Ways to Integrate</h2>
+            <p className="text-body-lg text-gray-300 font-body">
               Choose the integration method that works best for your team
             </p>
           </div>
@@ -255,8 +255,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <span className="text-3xl">🔌</span>
               </div>
-              <h3 className="text-xl font-bold mb-4 text-center font-heading">Ready-made Integrations</h3>
-              <p className="text-gray-300 mb-6 text-center font-body">
+              <h3 className="text-heading font-heading text-white mb-4 text-center">Ready-made Integrations</h3>
+              <p className="text-body text-gray-300 mb-6 text-center font-body">
                 Connect instantly to 40+ popular business systems
               </p>
               <div className="space-y-2 text-sm text-gray-400">
@@ -278,8 +278,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <span className="text-3xl">💻</span>
               </div>
-              <h3 className="text-xl font-bold mb-4 text-center font-heading">SDK Integration</h3>
-              <p className="text-white/90 mb-6 text-center font-body">
+              <h3 className="text-heading font-heading text-white mb-4 text-center">SDK Integration</h3>
+              <p className="text-body text-white/90 mb-6 text-center font-body">
                 Install our SDK and integrate in minutes
               </p>
               <div className="bg-gray-900 rounded-lg p-4 mb-4">
@@ -301,8 +301,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <span className="text-3xl">⚡</span>
               </div>
-              <h3 className="text-xl font-bold mb-4 text-center font-heading">Custom API</h3>
-              <p className="text-gray-300 mb-6 text-center font-body">
+              <h3 className="text-heading font-heading text-white mb-4 text-center">Custom API</h3>
+              <p className="text-body text-gray-300 mb-6 text-center font-body">
                 Build custom integrations with our REST API
               </p>
               <div className="space-y-2 text-sm text-gray-400">
@@ -321,8 +321,8 @@ export const LandingPage: React.FC = () => {
       <section className="px-6 py-20">
         <div className="max-w-6xl mx-auto text-center">
           
-          <h2 className="text-3xl font-bold text-gray-900 mb-4 font-heading text-shadow-sm">What Makes TaxPoynt Different?</h2>
-          <p className="text-xl text-gray-600 mb-16 max-w-3xl mx-auto font-body">
+          <h2 className="text-display font-heading text-gray-900 mb-6">What Makes TaxPoynt Different?</h2>
+          <p className="text-body-lg text-gray-600 mb-16 max-w-3xl mx-auto font-body">
             The only platform built specifically for Nigerian business reality
           </p>
           
@@ -331,8 +331,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <span className="text-white text-xl">🧠</span>
               </div>
-              <h3 className="font-bold text-gray-900 mb-3">Nigerian Business Intelligence</h3>
-              <p className="text-gray-700 text-sm">
+              <h3 className="text-subheading font-heading text-gray-900 mb-4">Nigerian Business Intelligence</h3>
+              <p className="text-body text-gray-700 font-body">
                 System trained on Nigerian patterns. Knows the difference between family support and business payment. 
                 Understands Alaba Market operates differently from Victoria Island.
               </p>
@@ -398,10 +398,10 @@ export const LandingPage: React.FC = () => {
       {/* CTA Section */}
       <section className="px-6 py-20 bg-blue-600">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4 font-heading text-shadow">
+          <h2 className="text-display font-heading text-white mb-6 text-shadow">
             Ready to Transform Your E-Invoicing?
           </h2>
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto font-body">
+          <p className="text-body-lg text-blue-100 mb-12 max-w-2xl mx-auto font-body">
             Join hundreds of Nigerian businesses saving time and ensuring compliance with TaxPoynt
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
