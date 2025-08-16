@@ -27,7 +27,7 @@ function SignUpPageContent() {
         'hybrid': 'hybrid_user'
       };
 
-      const response = await fetch('https://taxpoynt-platform-production.up.railway.app/api/v1/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
