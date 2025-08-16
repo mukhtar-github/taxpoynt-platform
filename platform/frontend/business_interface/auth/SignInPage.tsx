@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../design_system/components/Button';
+import { Logo } from '../../design_system/components/Logo';
 
 interface SignInPageProps {
   onSignIn: (credentials: { email: string; password: string }) => Promise<void>;
@@ -38,17 +39,11 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, isLoading, err
         
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">T</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">TaxPoynt</h1>
-              <p className="text-sm text-gray-600">E-Invoice Platform</p>
-            </div>
+          <div className="flex items-center justify-center mb-6">
+            <Logo size="xl" variant="full" showTagline={true} />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900">Welcome Back</h2>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h2 className="text-xl font-semibold text-gray-900 font-heading">Welcome Back</h2>
+          <p className="text-gray-600 font-body">Sign in to your account</p>
         </div>
 
         {/* Sign In Form */}
@@ -68,7 +63,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, isLoading, err
             
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2 font-body">
                 Email Address
               </label>
               <input
@@ -85,7 +80,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, isLoading, err
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2 font-body">
                 Password
               </label>
               <input
@@ -110,7 +105,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, isLoading, err
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   disabled={isLoading}
                 />
-                <span className="ml-2 text-sm text-gray-600">Remember me</span>
+                <span className="ml-2 text-sm text-gray-600 font-body">Remember me</span>
               </label>
               
               <Link
@@ -155,11 +150,11 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, isLoading, err
 
         {/* Sign Up Link */}
         <div className="text-center mt-6">
-          <p className="text-gray-600">
+          <p className="text-gray-600 font-body">
             Don't have an account?{' '}
             <Link 
               href="/auth/signup"
-              className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+              className="text-blue-600 hover:text-blue-700 font-medium hover:underline font-body"
             >
               Create account
             </Link>

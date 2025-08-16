@@ -19,6 +19,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { Layout, Menu, Breadcrumb, Spin, Alert, Avatar, Dropdown, Badge, Space } from 'antd';
+import { Logo } from '../design_system/components/Logo';
 import {
   DashboardOutlined,
   SendOutlined,
@@ -264,17 +265,18 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
         <div style={{ 
           height: 64, 
           margin: 16,
-          background: 'rgba(255, 255, 255, 0.2)',
-          borderRadius: 6,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontWeight: 'bold',
-          fontSize: collapsed ? 14 : 16
+          justifyContent: 'center'
         }}>
-          <RocketOutlined style={{ marginRight: collapsed ? 0 : 8 }} />
-          {!collapsed && 'TaxPoynt APP'}
+          {collapsed ? (
+            <Logo size="sm" variant="icon" color="white" />
+          ) : (
+            <div className="flex items-center">
+              <Logo size="sm" variant="icon" color="white" />
+              <span className="ml-2 text-white font-heading font-semibold">TaxPoynt APP</span>
+            </div>
+          )}
         </div>
 
         {/* Navigation Menu */}
@@ -379,27 +381,27 @@ const AppLayout: React.FC<APPInterfaceProps> = ({
                 <div className="mb-6">
                   <SendOutlined style={{ fontSize: '3rem', color: '#1890ff' }} />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">APP Interface Dashboard</h2>
-                <p className="text-gray-600 mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4 font-heading">APP Interface Dashboard</h2>
+                <p className="text-gray-600 mb-6 font-body">
                   Welcome to your Access Point Provider dashboard. Manage FIRS transmission, 
                   security audits, and compliance reporting.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-blue-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-blue-900 mb-2">Transmission Status</h3>
-                    <p className="text-blue-700 text-sm">Monitor invoice transmission to FIRS</p>
+                    <h3 className="font-semibold text-blue-900 mb-2 font-heading">Transmission Status</h3>
+                    <p className="text-blue-700 text-sm font-body">Monitor invoice transmission to FIRS</p>
                   </div>
                   <div className="bg-green-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-green-900 mb-2">FIRS Integration</h3>
-                    <p className="text-green-700 text-sm">Manage FIRS API connections</p>
+                    <h3 className="font-semibold text-green-900 mb-2 font-heading">FIRS Integration</h3>
+                    <p className="text-green-700 text-sm font-body">Manage FIRS API connections</p>
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-purple-900 mb-2">Security Audit</h3>
-                    <p className="text-purple-700 text-sm">Review security compliance</p>
+                    <h3 className="font-semibold text-purple-900 mb-2 font-heading">Security Audit</h3>
+                    <p className="text-purple-700 text-sm font-body">Review security compliance</p>
                   </div>
                   <div className="bg-orange-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-orange-900 mb-2">Compliance</h3>
-                    <p className="text-orange-700 text-sm">Generate compliance reports</p>
+                    <h3 className="font-semibold text-orange-900 mb-2 font-heading">Compliance</h3>
+                    <p className="text-orange-700 text-sm font-body">Generate compliance reports</p>
                   </div>
                 </div>
               </div>

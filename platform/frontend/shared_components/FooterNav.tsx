@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/router';
+import { Logo } from '../design_system/components/Logo';
 
 interface FooterLink {
   label: string;

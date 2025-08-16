@@ -10,6 +10,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../design_system/components/Button';
+import { Logo } from '../design_system/components/Logo';
 
 export const LandingPage: React.FC = () => {
   const router = useRouter();
@@ -20,15 +21,7 @@ export const LandingPage: React.FC = () => {
       {/* Navigation */}
       <nav className="px-6 py-4 border-b border-gray-200">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">T</span>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">TaxPoynt</h1>
-              <p className="text-xs text-gray-500">E-Invoice Platform</p>
-            </div>
-          </div>
+          <Logo size="lg" variant="full" showTagline={true} />
           
           <div className="flex items-center space-x-4">
             <button
@@ -62,7 +55,7 @@ export const LandingPage: React.FC = () => {
             <div className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
               Nigeria's Premier Intelligent Universal E-Invoicing Platform
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight">
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight font-heading text-shadow-sm">
               Connect Every System.
               <br />
               <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -72,7 +65,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Subtitle */}
-          <p className="text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed font-body">
             Advanced technology that understands Nigerian business reality. Universal connectivity from SAP to Paystack. 
             From Lagos to Kano, from Computer Village to Alaba Market - built for how Nigeria actually works.
           </p>
@@ -126,8 +119,8 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Choose Your Service</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4 font-heading text-shadow-sm">Choose Your Service</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto font-body">
               Select the perfect solution for your e-invoicing needs
             </p>
           </div>
@@ -140,8 +133,8 @@ export const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">🔗</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">System Integrator</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 font-heading">System Integrator</h3>
+                <p className="text-gray-600 mb-6 font-body">
                   Connect 40+ business and financial systems for automated e-invoicing workflows
                 </p>
                 <ul className="text-left space-y-2 mb-8">
@@ -179,8 +172,8 @@ export const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">🚀</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Access Point Provider</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 font-heading">Access Point Provider</h3>
+                <p className="text-gray-600 mb-6 font-body">
                   Secure invoice transmission via TaxPoynt's certified APP service
                 </p>
                 <ul className="text-left space-y-2 mb-8">
@@ -213,8 +206,8 @@ export const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <span className="text-3xl">👑</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Hybrid Premium</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 font-heading">Hybrid Premium</h3>
+                <p className="text-gray-600 mb-6 font-body">
                   Combined SI + APP with advanced features and premium support
                 </p>
                 <ul className="text-left space-y-2 mb-8">
@@ -249,8 +242,8 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Three Ways to Integrate</h2>
-            <p className="text-xl text-gray-300">
+            <h2 className="text-3xl font-bold mb-4 font-heading text-shadow">Three Ways to Integrate</h2>
+            <p className="text-xl text-gray-300 font-body">
               Choose the integration method that works best for your team
             </p>
           </div>
@@ -262,8 +255,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <span className="text-3xl">🔌</span>
               </div>
-              <h3 className="text-xl font-bold mb-4 text-center">Ready-made Integrations</h3>
-              <p className="text-gray-300 mb-6 text-center">
+              <h3 className="text-xl font-bold mb-4 text-center font-heading">Ready-made Integrations</h3>
+              <p className="text-gray-300 mb-6 text-center font-body">
                 Connect instantly to 40+ popular business systems
               </p>
               <div className="space-y-2 text-sm text-gray-400">
@@ -285,8 +278,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <span className="text-3xl">💻</span>
               </div>
-              <h3 className="text-xl font-bold mb-4 text-center">SDK Integration</h3>
-              <p className="text-white/90 mb-6 text-center">
+              <h3 className="text-xl font-bold mb-4 text-center font-heading">SDK Integration</h3>
+              <p className="text-white/90 mb-6 text-center font-body">
                 Install our SDK and integrate in minutes
               </p>
               <div className="bg-gray-900 rounded-lg p-4 mb-4">
@@ -308,8 +301,8 @@ export const LandingPage: React.FC = () => {
               <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <span className="text-3xl">⚡</span>
               </div>
-              <h3 className="text-xl font-bold mb-4 text-center">Custom API</h3>
-              <p className="text-gray-300 mb-6 text-center">
+              <h3 className="text-xl font-bold mb-4 text-center font-heading">Custom API</h3>
+              <p className="text-gray-300 mb-6 text-center font-body">
                 Build custom integrations with our REST API
               </p>
               <div className="space-y-2 text-sm text-gray-400">
@@ -328,8 +321,8 @@ export const LandingPage: React.FC = () => {
       <section className="px-6 py-20">
         <div className="max-w-6xl mx-auto text-center">
           
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">What Makes TaxPoynt Different?</h2>
-          <p className="text-xl text-gray-600 mb-16 max-w-3xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4 font-heading text-shadow-sm">What Makes TaxPoynt Different?</h2>
+          <p className="text-xl text-gray-600 mb-16 max-w-3xl mx-auto font-body">
             The only platform built specifically for Nigerian business reality
           </p>
           
@@ -405,10 +398,10 @@ export const LandingPage: React.FC = () => {
       {/* CTA Section */}
       <section className="px-6 py-20 bg-blue-600">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-3xl font-bold text-white mb-4 font-heading text-shadow">
             Ready to Transform Your E-Invoicing?
           </h2>
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto font-body">
             Join hundreds of Nigerian businesses saving time and ensuring compliance with TaxPoynt
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -436,15 +429,7 @@ export const LandingPage: React.FC = () => {
       <footer className="px-6 py-12 bg-gray-900 text-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">T</span>
-              </div>
-              <div>
-                <div className="font-bold">TaxPoynt</div>
-                <div className="text-xs text-gray-400">Nigeria's Premier E-Invoice Platform</div>
-              </div>
-            </div>
+            <Logo size="md" variant="full" color="white" showTagline={true} className="mb-4 md:mb-0" />
             
             <div className="flex items-center space-x-6 text-sm text-gray-400">
               <a href="/privacy" className="hover:text-white">Privacy</a>

@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../design_system/components/Button';
+import { Logo } from '../../design_system/components/Logo';
 
 interface SignUpPageProps {
   onContinueToRegistration: (basicInfo: {
@@ -108,17 +109,11 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({
         
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">T</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">TaxPoynt</h1>
-              <p className="text-sm text-gray-600">E-Invoice Platform</p>
-            </div>
+          <div className="flex items-center justify-center mb-6">
+            <Logo size="xl" variant="full" showTagline={true} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Create Your Account</h2>
-          <p className="text-gray-600">Choose your service type and get started</p>
+          <h2 className="text-2xl font-bold text-gray-900 font-heading">Create Your Account</h2>
+          <p className="text-gray-600 font-body">Choose your service type and get started</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8">

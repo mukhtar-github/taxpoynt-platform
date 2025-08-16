@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '../../shared_components/services/auth';
+import { Logo } from '../../design_system/components/Logo';
 
 export default function DashboardRedirect() {
   const router = useRouter();
@@ -47,11 +48,11 @@ export default function DashboardRedirect() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">T</span>
+          <div className="mb-6">
+            <Logo size="xl" variant="full" showTagline={true} />
           </div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <p className="text-gray-600 font-body">Loading your dashboard...</p>
         </div>
       </div>
     );

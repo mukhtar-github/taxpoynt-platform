@@ -12,6 +12,7 @@
 // Import components for local use
 import { Button } from './Button';
 import { Input } from './Input';
+import { Logo } from './Logo';
 
 // Export all primitive components
 export { Button, buttonVariants } from './Button';
@@ -20,10 +21,13 @@ export type { ButtonProps } from './Button';
 export { Input, inputVariants } from './Input';  
 export type { InputProps } from './Input';
 
+export { Logo } from './Logo';
+
 // Default export for convenience
 const DesignSystemComponents = {
   Button,
-  Input
+  Input,
+  Logo
 };
 
 export default DesignSystemComponents;

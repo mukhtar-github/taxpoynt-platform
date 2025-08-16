@@ -19,6 +19,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Alert, Badge, Timeline, Progress, Tabs, Space, Button } from 'antd';
+import { Logo } from '../../../design_system/components/Logo';
 import {
   DashboardOutlined,
   InteractionOutlined,
@@ -36,8 +37,8 @@ import {
 // Placeholder components for missing imports
 const TransmissionMonitor: React.FC<{ compact?: boolean }> = ({ compact }) => (
   <div className="p-4 bg-blue-50 rounded-lg">
-    <h3 className="font-semibold text-blue-900 mb-2">Transmission Monitor</h3>
-    <p className="text-blue-700 text-sm">Real-time transmission monitoring dashboard</p>
+    <h3 className="font-semibold text-blue-900 mb-2 font-heading">Transmission Monitor</h3>
+    <p className="text-blue-700 text-sm font-body">Real-time transmission monitoring dashboard</p>
     <div className="mt-2 flex items-center space-x-2">
       <div className="w-2 h-2 bg-green-400 rounded-full"></div>
       <span className="text-xs text-gray-600">Active</span>
@@ -47,8 +48,8 @@ const TransmissionMonitor: React.FC<{ compact?: boolean }> = ({ compact }) => (
 
 const FIRSConnectionManager: React.FC<{ compact?: boolean }> = ({ compact }) => (
   <div className="p-4 bg-green-50 rounded-lg">
-    <h3 className="font-semibold text-green-900 mb-2">FIRS Connection</h3>
-    <p className="text-green-700 text-sm">FIRS API connection management</p>
+    <h3 className="font-semibold text-green-900 mb-2 font-heading">FIRS Connection</h3>
+    <p className="text-green-700 text-sm font-body">FIRS API connection management</p>
     <div className="mt-2 flex items-center space-x-2">
       <div className="w-2 h-2 bg-green-400 rounded-full"></div>
       <span className="text-xs text-gray-600">Connected</span>

@@ -2,8 +2,8 @@ import React from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'TaxPoynt Platform',
-  description: 'Enterprise Nigerian e-invoicing and business integration platform',
+  title: 'TaxPoynt Platform - Nigerian E-Invoice Solution',
+  description: 'Nigeria\'s Premier Intelligent Universal E-Invoicing Platform - Connect Every System, Automate Every Transaction',
 };
 
 export default function RootLayout({

@@ -7,16 +7,23 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui';
+import { Logo } from '../design_system/components/Logo';
 
 export const SIInterface: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <div className="flex items-center mb-6">
+            <Logo size="lg" variant="full" showTagline={false} />
+            <div className="ml-4">
+              <span className="text-sm text-blue-600 font-body font-medium">SI Interface</span>
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 font-heading">
             System Integrator Dashboard
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 font-body">
             Manage business system integrations and automated e-invoicing workflows
           </p>
         </div>
@@ -32,7 +39,7 @@ export const SIInterface: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 font-body">
                 Connect and configure business systems for automated e-invoicing
               </p>
               <div className="space-y-2">
