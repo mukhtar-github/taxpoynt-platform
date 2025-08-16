@@ -151,6 +151,7 @@ export const WorkflowDesigner: React.FC<WorkflowDesignerProps> = ({
   onExport,
   templates = STAGE_TEMPLATES,
   className,
+  onError,
   ...props
 }) => {
   // State management
