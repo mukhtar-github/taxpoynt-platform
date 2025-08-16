@@ -47,7 +47,7 @@ import {
   DatabaseOutlined,
   CloudUploadOutlined,
   FileTextOutlined,
-  ShieldCheckOutlined
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
 
 const { Step } = Steps;

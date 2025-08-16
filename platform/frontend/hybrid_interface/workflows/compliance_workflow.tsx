@@ -46,14 +46,14 @@ import {
   Tag
 } from 'antd';
 import {
-  ShieldCheckOutlined,
+  SafetyCertificateOutlined,
   AuditOutlined,
   SafetyCertificateOutlined,
   ClockCircleOutlined,
   PlayCircleOutlined,
   PauseCircleOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  ExclamationCircleOutlined,
   FileTextOutlined,
   SettingOutlined,
   CalendarOutlined,
@@ -239,7 +239,7 @@ export const ComplianceWorkflow: React.FC<ComplianceWorkflowProps> = ({
 
   const getStepIcon = (step: WorkflowStep) => {
     switch (step.type) {
-      case 'validation': return <ShieldCheckOutlined />;
+      case 'validation': return <SafetyCertificateOutlined />;
       case 'audit': return <AuditOutlined />;
       case 'certification': return <SafetyCertificateOutlined />;
       case 'reporting': return <FileTextOutlined />;
@@ -352,7 +352,7 @@ export const ComplianceWorkflow: React.FC<ComplianceWorkflowProps> = ({
               title="Overall Progress"
               value={Math.round(currentWorkflow.steps.reduce((sum, step) => sum + step.progress, 0) / currentWorkflow.steps.length)}
               suffix="%"
-              prefix={<ShieldCheckOutlined />}
+              prefix={<SafetyCertificateOutlined />}
             />
           </Card>
         </Col>

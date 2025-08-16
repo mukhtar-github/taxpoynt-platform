@@ -42,8 +42,8 @@ import {
   DatePicker
 } from 'antd';
 import {
-  ShieldCheckOutlined,
-  ExclamationTriangleOutlined,
+  SafetyCertificateOutlined,
+  ExclamationCircleOutlined,
   CalendarOutlined,
   FileTextOutlined,
   SettingOutlined,
@@ -285,7 +285,7 @@ export const ComplianceCenter: React.FC<ComplianceCenterProps> = ({
           <Row justify="space-between" align="middle">
             <Col>
               <h2 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
-                <ShieldCheckOutlined style={{ marginRight: '12px', color: '#1890ff' }} />
+                <SafetyCertificateOutlined style={{ marginRight: '12px', color: '#1890ff' }} />
                 TaxPoynt Compliance Center (Admin Only)
               </h2>
               <p style={{ margin: '4px 0 0 0', color: '#666' }}>
@@ -322,7 +322,7 @@ export const ComplianceCenter: React.FC<ComplianceCenterProps> = ({
           <TabPane
             tab={
               <span>
-                <ShieldCheckOutlined />
+                <SafetyCertificateOutlined />
                 Platform Dashboard
               </span>
             }
@@ -472,7 +472,7 @@ export const ComplianceCenter: React.FC<ComplianceCenterProps> = ({
                 <Col xs={24} sm={8}>
                   <Card size="small">
                     <div style={{ textAlign: 'center' }}>
-                      <ShieldCheckOutlined style={{ fontSize: '32px', color: '#faad14' }} />
+                      <SafetyCertificateOutlined style={{ fontSize: '32px', color: '#faad14' }} />
                       <h3>Security Endpoints</h3>
                       <Badge status="warning" text="Review Required" />
                     </div>

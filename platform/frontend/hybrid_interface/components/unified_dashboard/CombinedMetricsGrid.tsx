@@ -188,7 +188,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
   refreshInterval = 30000,
   className,
   onError,
-  ...props
+  ...restProps
 }) => {
   const [trends, setTrends] = useState<Record<string, MetricTrend>>({});
   const [loading, setLoading] = useState(false);
@@ -361,7 +361,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
   }
 
   return (
-    <div className={`combined-metrics-grid ${className || ''}`} {...props}>
+    <div className={`combined-metrics-grid ${className || ''}`} {...restProps}>
       {!compactView && (
         <div style={{ marginBottom: 16 }}>
           <Row justify="space-between" align="middle">

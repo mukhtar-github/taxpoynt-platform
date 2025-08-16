@@ -50,7 +50,7 @@ import {
   CopyOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
-  ExclamationTriangleOutlined,
+  ExclamationCircleOutlined,
   ReloadOutlined,
   EyeOutlined,
   BranchesOutlined,
@@ -904,7 +904,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
                 dot={
                   stageExec.status === 'completed' ? <CheckCircleOutlined /> :
                   stageExec.status === 'running' ? <ClockCircleOutlined /> :
-                  stageExec.status === 'failed' ? <ExclamationTriangleOutlined /> :
+                  stageExec.status === 'failed' ? <ExclamationCircleOutlined /> :
                   <ClockCircleOutlined />
                 }
               >

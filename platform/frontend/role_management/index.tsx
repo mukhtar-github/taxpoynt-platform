@@ -36,6 +36,8 @@
  * ```
  */
 
+import React from 'react';
+
 // Core role detection
 export {
   RoleDetectorProvider,

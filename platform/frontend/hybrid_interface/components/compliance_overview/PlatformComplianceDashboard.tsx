@@ -122,7 +122,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
   autoRefresh = true,
   className,
   onError,
-  ...props
+  ...restProps
 }) => {
   // State management
   const [complianceStatus, setComplianceStatus] = useState<UnifiedComplianceStatus | null>(null);
@@ -595,7 +595,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
   }
 
   return (
-    <div className={`unified-compliance-overview ${className || ''}`} {...props}>
+    <div className={`unified-compliance-overview ${className || ''}`} {...restProps}>
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <Row justify="space-between" align="middle">

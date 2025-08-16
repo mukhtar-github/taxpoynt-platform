@@ -35,7 +35,7 @@ import {
   BarChartOutlined,
   LineChartOutlined,
   PieChartOutlined,
-  TrendingUpOutlined,
+  RiseOutlined,
   DownloadOutlined,
   ReloadOutlined,
   FilterOutlined
@@ -197,7 +197,7 @@ export const AnalyticsCenter: React.FC<AnalyticsCenterProps> = ({
                 prefix="₦"
                 suffix={
                   <span style={{ fontSize: '14px', color: '#52c41a' }}>
-                    <TrendingUpOutlined /> +{analyticsData.growthRate}%
+                    <RiseOutlined /> +{analyticsData.growthRate}%
                   </span>
                 }
               />
@@ -237,7 +237,7 @@ export const AnalyticsCenter: React.FC<AnalyticsCenterProps> = ({
                 value={analyticsData.growthRate}
                 precision={1}
                 suffix="%"
-                prefix={<TrendingUpOutlined />}
+                prefix={<RiseOutlined />}
                 valueStyle={{ color: '#52c41a' }}
               />
             </Card>
@@ -328,7 +328,7 @@ export const AnalyticsCenter: React.FC<AnalyticsCenterProps> = ({
           <TabPane
             tab={
               <span>
-                <TrendingUpOutlined />
+                <RiseOutlined />
                 Business Intelligence
               </span>
             }

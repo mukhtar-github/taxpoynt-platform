@@ -105,7 +105,7 @@ const monoBankingConsents: MonoBankingConsent[] = [
     id: 'mono_income_analysis',
     category: 'financial_banking',
     title: 'Income and Financial Analysis',
-    description: 'Analyze income patterns to provide better invoicing insights and business intelligence.'
+    description: 'Analyze income patterns to provide better invoicing insights and business intelligence.',
     required: false,
     legalBasis: 'Consent - Value-added service',
     dataTypes: [

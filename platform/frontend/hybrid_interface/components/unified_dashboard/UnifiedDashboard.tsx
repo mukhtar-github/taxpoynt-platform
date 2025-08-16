@@ -21,10 +21,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Alert, Badge, Timeline, Progress, Tabs, Space, Button } from 'antd';
 import {
   DashboardOutlined,
-  ApiOutlined as IntegrationOutlined,
+  InteractionOutlined,
   SendOutlined,
   CheckCircleOutlined,
-  WarningOutlined as ExclamationTriangleOutlined,
+  ExclamationCircleOutlined,
   ClockCircleOutlined,
   TrophyOutlined,
   RocketOutlined,
@@ -409,7 +409,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 value={metrics.si_metrics.processing_success_rate}
                 suffix="%"
                 precision={1}
-                prefix={<IntegrationOutlined />}
+                prefix={<InteractionOutlined />}
                 valueStyle={{ color: getMetricColor(metrics.si_metrics.processing_success_rate, { good: 95, warning: 90 }) }}
               />
             </Card>
@@ -497,13 +497,13 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                     <Timeline>
                       <Timeline.Item 
                         color={metrics.si_metrics.active_connections > 40 ? 'green' : 'orange'}
-                        dot={metrics.si_metrics.active_connections > 40 ? <CheckCircleOutlined /> : <ExclamationTriangleOutlined />}
+                        dot={metrics.si_metrics.active_connections > 40 ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
                       >
                         SI Integrations: {metrics.si_metrics.active_connections}/{metrics.si_metrics.total_integrations} active
                       </Timeline.Item>
                       <Timeline.Item 
                         color={metrics.app_metrics.firs_connection_status === 'connected' ? 'green' : 'red'}
-                        dot={metrics.app_metrics.firs_connection_status === 'connected' ? <CheckCircleOutlined /> : <ExclamationTriangleOutlined />}
+                        dot={metrics.app_metrics.firs_connection_status === 'connected' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
                       >
                         FIRS Connection: {metrics.app_metrics.firs_connection_status.toUpperCase()}
                       </Timeline.Item>
@@ -577,7 +577,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
         <Tabs.TabPane
           tab={
             <span>
-              <IntegrationOutlined />
+              <InteractionOutlined />
               SI Interface
             </span>
           }

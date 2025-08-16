@@ -537,7 +537,6 @@ export const WorkflowDesigner: React.FC<WorkflowDesignerProps> = ({
               type="error"
               message={error}
               style={{ marginBottom: 4 }}
-              size="small"
             />
           ))}
           {validation.warnings.map((warning, index) => (
