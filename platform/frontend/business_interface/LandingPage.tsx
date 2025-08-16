@@ -55,10 +55,10 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="relative px-6 py-20 overflow-hidden">
-        {/* Subtle Animated Background */}
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" style={{animationDuration: '4s'}}></div>
-          <div className="absolute bottom-20 right-1/4 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{animationDuration: '6s', animationDelay: '2s'}}></div>
+        {/* Enhanced Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50">
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '4s'}}></div>
+          <div className="absolute bottom-20 right-1/4 w-80 h-80 bg-purple-500/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '6s', animationDelay: '2s'}}></div>
         </div>
         
         <div className="max-w-4xl mx-auto text-center relative z-10">
@@ -150,7 +150,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-lg transition-shadow">
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-blue-200 transition-colors">
-                  <GitBranch className="w-8 h-8 text-blue-600" />
+                  <GitBranch className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
                 </div>
                 <h3 className="text-heading font-heading text-gray-900 mb-4">System Integrator</h3>
                 <p className="text-body text-gray-600 mb-6 font-body">
@@ -189,7 +189,7 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-green-200 transition-colors">
-                  <Rocket className="w-8 h-8 text-green-600" />
+                  <Rocket className="w-8 h-8 text-green-600" stroke="currentColor" fill="none" />
                 </div>
                 <h3 className="text-heading font-heading text-gray-900 mb-4">Access Point Provider</h3>
                 <p className="text-body text-gray-600 mb-6 font-body">
@@ -223,7 +223,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-lg transition-shadow">
               <div className="text-center">
                 <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-purple-200 transition-colors">
-                  <Crown className="w-8 h-8 text-purple-600" />
+                  <Crown className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
                 </div>
                 <h3 className="text-heading font-heading text-gray-900 mb-4">Hybrid Premium</h3>
                 <p className="text-body text-gray-600 mb-6 font-body">
@@ -258,10 +258,10 @@ export const LandingPage: React.FC = () => {
 
       {/* Developer Integration Section */}
       <section className="relative px-6 py-20 bg-gray-900 text-white overflow-hidden">
-        {/* Subtle Dark Background Effects */}
+        {/* Enhanced Dark Background Effects */}
         <div className="absolute inset-0">
-          <div className="absolute top-10 right-1/3 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl animate-pulse" style={{animationDuration: '8s'}}></div>
-          <div className="absolute bottom-10 left-1/3 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl animate-pulse" style={{animationDuration: '10s', animationDelay: '3s'}}></div>
+          <div className="absolute top-10 right-1/3 w-72 h-72 bg-blue-600/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '8s'}}></div>
+          <div className="absolute bottom-10 left-1/3 w-64 h-64 bg-purple-600/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '10s', animationDelay: '3s'}}></div>
         </div>
         
         <div className="max-w-6xl mx-auto relative z-10">
@@ -278,7 +278,7 @@ export const LandingPage: React.FC = () => {
             {/* Ready-made Integrations */}
             <div className="bg-gray-800 rounded-2xl p-8">
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-blue-200 transition-colors">
-                <Plug className="w-8 h-8 text-blue-600" />
+                <Plug className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-heading font-heading text-white mb-4 text-center">Ready-made Integrations</h3>
               <p className="text-body text-gray-300 mb-6 text-center font-body">
@@ -301,7 +301,7 @@ export const LandingPage: React.FC = () => {
                 </span>
               </div>
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-gray-50 transition-colors">
-                <Laptop className="w-8 h-8 text-gray-700" />
+                <Laptop className="w-8 h-8 text-gray-700" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-heading font-heading text-white mb-4 text-center">SDK Integration</h3>
               <p className="text-body text-white/90 mb-6 text-center font-body">
@@ -324,7 +324,7 @@ export const LandingPage: React.FC = () => {
             {/* Custom API */}
             <div className="bg-gray-800 rounded-2xl p-8">
               <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-purple-200 transition-colors">
-                <Zap className="w-8 h-8 text-purple-600" />
+                <Zap className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-heading font-heading text-white mb-4 text-center">Custom API</h3>
               <p className="text-body text-gray-300 mb-6 text-center font-body">
@@ -343,8 +343,14 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Why TaxPoynt - Unique Value Props */}
-      <section className="px-6 py-20">
-        <div className="max-w-6xl mx-auto text-center">
+      <section className="relative px-6 py-20 bg-gradient-to-b from-gray-50 to-white overflow-hidden">
+        {/* Subtle Background Effects */}
+        <div className="absolute inset-0">
+          <div className="absolute top-10 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-10 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div className="max-w-6xl mx-auto text-center relative z-10">
           
           <h2 className="text-display font-heading text-gray-900 mb-6">What Makes TaxPoynt Different?</h2>
           <p className="text-body-lg text-gray-600 mb-16 max-w-3xl mx-auto font-body">
@@ -354,7 +360,7 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-blue-700 transition-colors">
-                <Brain className="w-6 h-6 text-white" />
+                <Brain className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-subheading font-heading text-gray-900 mb-4">Nigerian Business Intelligence</h3>
               <p className="text-body text-gray-700 font-body">
@@ -365,7 +371,7 @@ export const LandingPage: React.FC = () => {
             
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-green-700 transition-colors">
-                <Link className="w-6 h-6 text-white" />
+                <Link className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Universal Connectivity</h3>
               <p className="text-gray-700 text-sm">
@@ -376,7 +382,7 @@ export const LandingPage: React.FC = () => {
             
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-purple-700 transition-colors">
-                <Zap className="w-6 h-6 text-white" />
+                <Zap className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">End-to-End Automation</h3>
               <p className="text-gray-700 text-sm">
@@ -387,7 +393,7 @@ export const LandingPage: React.FC = () => {
             
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-orange-700 transition-colors">
-                <Target className="w-6 h-6 text-white" />
+                <Target className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">360° Customer Intelligence</h3>
               <p className="text-gray-700 text-sm">
@@ -397,7 +403,7 @@ export const LandingPage: React.FC = () => {
             
             <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-cyan-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-cyan-700 transition-colors">
-                <Globe className="w-6 h-6 text-white" />
+                <Globe className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Global Compliance Standards</h3>
               <p className="text-gray-700 text-sm">
@@ -408,7 +414,7 @@ export const LandingPage: React.FC = () => {
             
             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-red-700 transition-colors">
-                <Code className="w-6 h-6 text-white" />
+                <Code className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Developer-First SDKs</h3>
               <p className="text-gray-700 text-sm">
@@ -422,10 +428,10 @@ export const LandingPage: React.FC = () => {
 
       {/* CTA Section */}
       <section className="relative px-6 py-20 bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 overflow-hidden">
-        {/* Subtle CTA Background */}
+        {/* Enhanced CTA Background */}
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/3 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-pulse" style={{animationDuration: '6s'}}></div>
-          <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-purple-300/10 rounded-full blur-3xl animate-pulse" style={{animationDuration: '8s', animationDelay: '2s'}}></div>
+          <div className="absolute top-0 left-1/3 w-96 h-96 bg-white/15 rounded-full blur-3xl animate-pulse" style={{animationDuration: '6s'}}></div>
+          <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-purple-300/25 rounded-full blur-3xl animate-pulse" style={{animationDuration: '8s', animationDelay: '2s'}}></div>
         </div>
         
         <div className="max-w-4xl mx-auto text-center relative z-10">
