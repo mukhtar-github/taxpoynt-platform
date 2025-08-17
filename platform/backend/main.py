@@ -76,6 +76,9 @@ try:
     
 except ImportError as e:
     logger.error(f"❌ Gateway components not available: {e}")
+    logger.error(f"🔍 Import error details: {type(e).__name__}: {str(e)}")
+    import traceback
+    logger.error(f"📝 Full traceback:\n{traceback.format_exc()}")
     GATEWAY_AVAILABLE = False
 
 def create_role_manager():
@@ -249,11 +252,13 @@ async def startup_event():
     
     if GATEWAY_AVAILABLE:
         logger.info("✅ API Gateway mode: ENABLED")
-        logger.info("🔐 Authentication endpoints: /api/v1/auth/*")
+        logger.info("🔐 Authentication endpoints: /api/v1/auth/* (SOPHISTICATED)")
+        logger.info("🎯 Features: Consent validation, business data, role routing")
         await initialize_services()
     else:
         logger.info("⚠️  API Gateway mode: DISABLED (fallback mode)")
-        logger.info("📝 Note: Install gateway dependencies for full functionality")
+        logger.info("🔐 Using minimal auth endpoints: /api/v1/auth/* (BASIC)")
+        logger.info("📝 Note: Check import errors above for gateway issues")
     
     logger.info("==================================================")
     logger.info("🎉 TAXPOYNT PLATFORM STARTUP SUCCESS")
