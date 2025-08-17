@@ -38,18 +38,23 @@ logger = logging.getLogger(__name__)
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PGDATABASE") 
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+logger.info(f"🔍 Database URL found: {'Yes' if DATABASE_URL else 'No'}")
+if DATABASE_URL:
+    logger.info(f"🔗 Database URL starts with: {DATABASE_URL[:20]}...")
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Initialize database
 db_layer = None
 if DatabaseAbstractionLayer and DATABASE_URL:
     try:
         db_layer = DatabaseAbstractionLayer(DATABASE_URL)
-        logger.info("PostgreSQL database connection established")
+        logger.info("✅ PostgreSQL database connection established")
     except Exception as e:
-        logger.error(f"Failed to connect to PostgreSQL: {e}")
+        logger.error(f"❌ Failed to connect to PostgreSQL: {e}")
         db_layer = None
+else:
+    logger.warning(f"⚠️ Database not available - DatabaseAbstractionLayer: {DatabaseAbstractionLayer is not None}, DATABASE_URL: {DATABASE_URL is not None}")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -135,7 +140,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
                 return {
                     "id": str(user.id),
                     "email": user.email,
-                    "hashed_password": user.password_hash,
+                    "hashed_password": user.hashed_password,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
@@ -177,7 +182,7 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             new_user = User(
                 id=uuid.uuid4(),
                 email=user_data["email"],
-                password_hash=user_data["hashed_password"],
+                hashed_password=user_data["hashed_password"],
                 first_name=user_data["first_name"],
                 last_name=user_data["last_name"],
                 role=role_enum,
