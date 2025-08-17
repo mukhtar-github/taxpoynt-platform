@@ -20,54 +20,29 @@ function SignUpPageContent() {
     setError('');
 
     try {
-      // Map frontend roles to backend roles
-      const roleMapping = {
-        'si': 'system_integrator',
-        'app': 'access_point_provider', 
-        'hybrid': 'hybrid_user'
+      // Use enhanced auth service with Axios
+      const registrationData = {
+        email: basicInfo.email,
+        password: basicInfo.password,
+        first_name: 'User', // Will be collected in onboarding flow
+        last_name: 'Name',   // Will be collected in onboarding flow
+        service_package: basicInfo.selectedRole,
+        business_name: 'TBD', // Will be collected in onboarding flow
+        business_type: 'TBD', // Will be collected in onboarding flow
+        terms_accepted: true,
+        privacy_accepted: true
       };
 
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: basicInfo.email,
-          password: basicInfo.password,
-          first_name: 'User', // Will be collected in onboarding flow
-          last_name: 'Name',   // Will be collected in onboarding flow
-          role: roleMapping[basicInfo.selectedRole]
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Registration failed');
-      }
-
-      const data = await response.json();
+      const authResponse = await authService.register(registrationData);
       
-      // Store auth data
-      localStorage.setItem('taxpoynt_token', data.access_token);
-      localStorage.setItem('taxpoynt_user', JSON.stringify(data.user));
+      // Redirect to role-based dashboard using auth service helper
+      const redirectUrl = authService.getDashboardRedirectUrl(authResponse.user.role);
+      router.push(redirectUrl);
       
-      // Redirect to role-based dashboard
-      switch (basicInfo.selectedRole) {
-        case 'si':
-          router.push('/dashboard/si');
-          break;
-        case 'app':
-          router.push('/dashboard/app');
-          break;
-        case 'hybrid':
-          router.push('/dashboard/hybrid');
-          break;
-        default:
-          router.push('/dashboard');
-      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      // Use auth service error handling for consistent user-friendly messages
+      const errorMessage = authService.handleAuthError(err);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

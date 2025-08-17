@@ -197,8 +197,13 @@ def create_taxpoynt_app() -> FastAPI:
                 }
             })
         
-        # Authentication endpoints are now handled by the API Gateway
-        logger.info("✅ Using API Gateway for all authentication and service endpoints")
+        # Add minimal authentication endpoints for production reliability
+        try:
+            from api_gateway.auth_endpoints_minimal import router as auth_router
+            app.include_router(auth_router)
+            logger.info("✅ Minimal authentication endpoints added successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to add auth endpoints: {e}")
         
         logger.info("⚠️  TaxPoynt Platform initialized in basic mode")
         return app
