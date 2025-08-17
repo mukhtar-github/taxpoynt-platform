@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '../../../role_management';
+import { Button } from '../../../../design_system/components/Button';
 
 // Mono-specific consent items that extend TaxPoynt's base consent structure
 interface MonoBankingConsent {
