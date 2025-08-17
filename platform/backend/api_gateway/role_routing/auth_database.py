@@ -24,7 +24,16 @@ class AuthDatabaseManager:
     
     def __init__(self, database_url: str = None):
         """Initialize database connection using existing infrastructure patterns."""
-        self.database_url = database_url or "sqlite:///taxpoynt_auth.db"  # Development fallback
+        import os
+        
+        # Use Railway PostgreSQL database URL
+        railway_db_url = os.getenv("DATABASE_URL") or os.getenv("PGDATABASE")
+        if railway_db_url and railway_db_url.startswith("postgres://"):
+            railway_db_url = railway_db_url.replace("postgres://", "postgresql://", 1)
+            
+        self.database_url = database_url or railway_db_url or "sqlite:///taxpoynt_auth.db"  # PostgreSQL first, SQLite fallback
+        
+        logger.info(f"🔗 AuthDatabase connecting to: {'PostgreSQL' if 'postgresql://' in self.database_url else 'SQLite'}")
         
         # Create engine using patterns from existing database manager
         self.engine = create_engine(

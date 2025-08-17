@@ -14,8 +14,8 @@ from enum import Enum
 import logging
 import uuid
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import (
+from ..shared.base_service import BaseService
+from ..shared.exceptions import (
     AuthenticationError,
     AuthorizationError,
     ValidationError
