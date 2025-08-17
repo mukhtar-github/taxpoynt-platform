@@ -8,7 +8,7 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxpoynt-platform-production.up.railway.app/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-ea5ad.up.railway.app/api/v1';
 const API_TIMEOUT = 30000; // 30 seconds for production reliability
 
 // Token storage keys
