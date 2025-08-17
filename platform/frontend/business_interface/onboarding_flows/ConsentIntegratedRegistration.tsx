@@ -364,6 +364,46 @@ export const ConsentIntegratedRegistration: React.FC<ConsentIntegratedRegistrati
         </div>
       </div>
 
+      {/* Financial Systems Integration Section */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Financial Systems Integration
+        </label>
+        <p className="text-sm text-gray-600 mb-3">Select financial services you want to integrate (optional):</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[
+            { id: 'mono_banking', name: 'Mono (Bank Account)', description: 'Connect bank accounts for automated reconciliation' },
+            { id: 'monipoint', name: 'Monipoint', description: 'Payment processing integration' },
+            { id: 'opay', name: 'OPay', description: 'Digital payment solutions' }
+          ].map((system) => (
+            <div key={system.id} className="border border-gray-200 rounded-lg p-3 hover:border-blue-300 transition-colors">
+              <label className="flex items-start cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
+                  checked={(formData.financialSystems || []).includes(system.id)}
+                  onChange={(e) => {
+                    const systems = formData.financialSystems || [];
+                    if (e.target.checked) {
+                      setFormData({...formData, financialSystems: [...systems, system.id]});
+                    } else {
+                      setFormData({...formData, financialSystems: systems.filter((s: string) => s !== system.id)});
+                    }
+                  }}
+                />
+                <div className="ml-3">
+                  <span className="text-sm font-medium text-gray-900">{system.name}</span>
+                  <p className="text-xs text-gray-500 mt-1">{system.description}</p>
+                </div>
+              </label>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          💡 These integrations can be set up later from your dashboard if you prefer to skip for now.
+        </p>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Monthly Invoice Volume (Estimate)
