@@ -75,6 +75,17 @@ class BankingEndpointsV1:
             response_model=V1ResponseModel
         )
         
+        # Mono-specific widget link generation
+        self.router.add_api_route(
+            "/open-banking/mono/link",
+            self.create_mono_widget_link,
+            methods=["POST"],
+            summary="Generate Mono widget link",
+            description="Generate secure Mono widget link for bank account linking",
+            response_model=V1ResponseModel,
+            status_code=201
+        )
+        
         self.router.add_api_route(
             "/open-banking",
             self.create_open_banking_connection,
@@ -208,6 +219,51 @@ class BankingEndpointsV1:
             logger.error(f"Error listing open banking connections in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list open banking connections")
     
+    async def create_mono_widget_link(self,
+                                     request: Request,
+                                     context: HTTPRoutingContext = Depends(lambda: None)):
+        """Generate Mono widget link for bank account linking"""
+        try:
+            body = await request.json()
+            
+            # Validate required fields for Mono widget
+            required_fields = ["customer", "scope", "redirect_url"]
+            missing_fields = [field for field in required_fields if field not in body]
+            if missing_fields:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required fields: {', '.join(missing_fields)}"
+                )
+            
+            # Validate customer object
+            if not isinstance(body["customer"], dict):
+                raise HTTPException(status_code=400, detail="Customer must be an object")
+            
+            customer_required = ["name", "email"]
+            customer_missing = [field for field in customer_required if field not in body["customer"]]
+            if customer_missing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing customer fields: {', '.join(customer_missing)}"
+                )
+            
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="create_mono_widget_link",
+                payload={
+                    "widget_config": body,
+                    "si_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "mono_widget_link_created", status_code=201)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error creating Mono widget link in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create Mono widget link")
+
     async def create_open_banking_connection(self, 
                                            request: Request,
                                            context: HTTPRoutingContext = Depends(lambda: None)):

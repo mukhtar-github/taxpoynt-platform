@@ -22,6 +22,7 @@ class ServiceRole(str, Enum):
     SYSTEM_INTEGRATOR = "si"
     ACCESS_POINT_PROVIDER = "app"
     HYBRID = "hybrid"
+    HYBRID_COORDINATOR = "hybrid_coordinator"
     CORE = "core"
 
 

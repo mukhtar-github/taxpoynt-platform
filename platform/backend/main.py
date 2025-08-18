@@ -219,7 +219,35 @@ async def initialize_services():
                 await app.state.role_manager.initialize()
                 logger.info("✅ Role Manager initialized")
             
-            logger.info("🎯 Core platform services initialized successfully")
+            # Initialize message router and register all services
+            if hasattr(app.state, 'message_router') and app.state.message_router:
+                logger.info("🔄 Registering platform services...")
+                
+                # Register SI services
+                try:
+                    from si_services import initialize_si_services
+                    si_registry = await initialize_si_services(app.state.message_router)
+                    logger.info(f"✅ SI Services registered: {len(si_registry.service_endpoints)} services")
+                except Exception as e:
+                    logger.error(f"❌ Failed to register SI services: {e}")
+                
+                # Register APP services  
+                try:
+                    from app_services import initialize_app_services
+                    app_registry = await initialize_app_services(app.state.message_router)
+                    logger.info(f"✅ APP Services registered: {len(app_registry.service_endpoints)} services")
+                except Exception as e:
+                    logger.error(f"❌ Failed to register APP services: {e}")
+                
+                # Register Hybrid services
+                try:
+                    from hybrid_services import initialize_hybrid_services
+                    hybrid_registry = await initialize_hybrid_services(app.state.message_router)
+                    logger.info(f"✅ Hybrid Services registered: {len(hybrid_registry.service_endpoints)} services")
+                except Exception as e:
+                    logger.error(f"❌ Failed to register Hybrid services: {e}")
+            
+            logger.info("🎯 All platform services initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize services: {e}")
             raise
@@ -228,12 +256,34 @@ async def cleanup_services():
     """Cleanup core platform services"""
     if GATEWAY_AVAILABLE:
         try:
+            # Cleanup all service registries
+            try:
+                from si_services import cleanup_si_services
+                await cleanup_si_services()
+                logger.info("✅ SI Services cleaned up")
+            except Exception as e:
+                logger.error(f"❌ Failed to cleanup SI services: {e}")
+            
+            try:
+                from app_services import cleanup_app_services
+                await cleanup_app_services()
+                logger.info("✅ APP Services cleaned up")
+            except Exception as e:
+                logger.error(f"❌ Failed to cleanup APP services: {e}")
+                
+            try:
+                from hybrid_services import cleanup_hybrid_services
+                await cleanup_hybrid_services()
+                logger.info("✅ Hybrid Services cleaned up")
+            except Exception as e:
+                logger.error(f"❌ Failed to cleanup Hybrid services: {e}")
+            
             # Cleanup role manager
             if hasattr(app.state, 'role_manager') and app.state.role_manager:
                 await app.state.role_manager.cleanup()
                 logger.info("✅ Role Manager cleaned up")
             
-            logger.info("🎯 Core platform services cleaned up successfully") 
+            logger.info("🎯 All platform services cleaned up successfully") 
         except Exception as e:
             logger.error(f"❌ Failed to cleanup services: {e}")
 

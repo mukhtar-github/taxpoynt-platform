@@ -10,6 +10,37 @@ from .user import User, UserRole, UserServiceAccess
 from .organization import Organization, OrganizationUser
 from .integration import Integration, IntegrationCredentials
 from .firs_submission import FIRSSubmission
+from .banking import (
+    BankingConnection, BankAccount, BankTransaction, 
+    BankingWebhook, BankingSyncLog, BankingCredentials,
+    BankingProvider, ConnectionStatus, TransactionType, AccountType
+)
+from .business_systems import (
+    # ERP Models
+    ERPConnection, ERPSyncLog,
+    # CRM Models  
+    CRMConnection, CRMSyncLog,
+    # POS Models
+    POSConnection, POSTransactionLog,
+    # Certificate Models
+    Certificate,
+    # Document Models
+    DocumentTemplate, DocumentGenerationLog,
+    # IRN/QR Models
+    IRNGeneration,
+    # Taxpayer Models
+    Taxpayer,
+    # Webhook Models
+    WebhookEvent,
+    # Analytics Models
+    AnalyticsReport,
+    # Audit Models
+    AuditLog, ComplianceCheck,
+    # Enums
+    IntegrationType, ERPProvider, CRMProvider, POSProvider, EcommerceProvider,
+    SyncStatus, CertificateType, CertificateStatus, DocumentType,
+    TaxpayerStatus, WebhookEventType, AuditEventType
+)
 
 __all__ = [
     "Base",
@@ -20,5 +51,44 @@ __all__ = [
     "OrganizationUser", 
     "Integration",
     "IntegrationCredentials",
-    "FIRSSubmission"
+    "FIRSSubmission",
+    "BankingConnection",
+    "BankAccount",
+    "BankTransaction",
+    "BankingWebhook",
+    "BankingSyncLog",
+    "BankingCredentials",
+    "BankingProvider",
+    "ConnectionStatus",
+    "TransactionType",
+    "AccountType",
+    # Business Systems Models
+    "ERPConnection",
+    "ERPSyncLog",
+    "CRMConnection",
+    "CRMSyncLog",
+    "POSConnection",
+    "POSTransactionLog",
+    "Certificate",
+    "DocumentTemplate",
+    "DocumentGenerationLog",
+    "IRNGeneration",
+    "Taxpayer",
+    "WebhookEvent",
+    "AnalyticsReport",
+    "AuditLog",
+    "ComplianceCheck",
+    # Enums
+    "IntegrationType",
+    "ERPProvider",
+    "CRMProvider",
+    "POSProvider",
+    "EcommerceProvider",
+    "SyncStatus",
+    "CertificateType",
+    "CertificateStatus",
+    "DocumentType",
+    "TaxpayerStatus",
+    "WebhookEventType",
+    "AuditEventType"
 ]

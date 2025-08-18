@@ -16,6 +16,16 @@ from core_platform.data_management.models.user import User, UserServiceAccess
 from core_platform.data_management.models.organization import Organization, OrganizationUser  
 from core_platform.data_management.models.integration import Integration, IntegrationCredentials
 from core_platform.data_management.models.firs_submission import FIRSSubmission
+from core_platform.data_management.models.banking import (
+    BankingConnection, BankAccount, BankTransaction, 
+    BankingWebhook, BankingSyncLog, BankingCredentials
+)
+from core_platform.data_management.models.business_systems import (
+    ERPConnection, ERPSyncLog, CRMConnection, CRMSyncLog,
+    POSConnection, POSTransactionLog, Certificate,
+    DocumentTemplate, DocumentGenerationLog, IRNGeneration,
+    Taxpayer, WebhookEvent, AnalyticsReport, AuditLog, ComplianceCheck
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

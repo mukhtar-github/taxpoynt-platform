@@ -182,7 +182,7 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
   useEffect(() => {
     const initialMonoConsents: Record<string, boolean> = {};
     monoBankingConsents.forEach(consent => {
-      initialMonoConsents[consent.id] = consent.required; // Required consents start as true
+      initialMonoConsents[consent.id] = false; // All consents start unchecked - user must actively consent
     });
     
     setConsentState(prev => ({
@@ -296,8 +296,8 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
             id={consent.id}
             checked={consentState.mono[consent.id] || false}
             onChange={(e) => handleMonoConsentChange(consent.id, e.target.checked)}
-            disabled={consent.required}
             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            required={consent.required}
           />
         </div>
         

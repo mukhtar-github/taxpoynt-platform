@@ -270,13 +270,19 @@ class TaxPoyntAPIClient {
    */
   public async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
+      console.log('🚀 TaxPoynt API: Attempting registration to:', `${API_BASE_URL}/auth/register`);
+      console.log('📝 Registration data:', { ...userData, password: '***hidden***' });
+      
       const response = await this.client.post<AuthResponse>('/auth/register', userData);
+      
+      console.log('✅ Registration successful:', response.data.user.email);
       
       // Store authentication data
       this.storeAuth(response.data);
       
       return response.data;
     } catch (error) {
+      console.error('❌ Registration failed:', error);
       throw error; // Re-throw formatted error from interceptor
     }
   }
