@@ -20,7 +20,7 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional
 
-from ..core_platform.messaging.message_router import MessageRouter, ServiceRole
+from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
 # Import Hybrid services
 from .analytics.analytics_processor import AnalyticsProcessor
