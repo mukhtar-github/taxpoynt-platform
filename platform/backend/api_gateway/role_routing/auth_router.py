@@ -461,15 +461,80 @@ def create_auth_router(
             )
     
     @router.post("/logout")
-    async def logout_user():
-        """Logout user (client should discard token)"""
-        # Since we're using stateless JWT tokens, logout is primarily client-side
-        # In a production system, you might want to maintain a token blacklist
-        return JSONResponse(content={
-            "message": "Logged out successfully",
-            "timestamp": datetime.utcnow().isoformat()
-        })
+    async def logout_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Logout user and revoke token"""
+        try:
+            # Import JWT manager for token revocation
+            from core_platform.security import get_jwt_manager
+            jwt_manager = get_jwt_manager()
+            
+            # Extract token from authorization header
+            token = credentials.credentials
+            
+            # Revoke the token
+            revoked = jwt_manager.revoke_token(token)
+            
+            if revoked:
+                logger.info("User token revoked successfully on logout")
+                return JSONResponse(content={
+                    "message": "Logged out successfully - token revoked",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+            else:
+                logger.warning("Token revocation failed during logout")
+                return JSONResponse(content={
+                    "message": "Logged out (token may still be valid)",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+                
+        except Exception as e:
+            logger.error(f"Logout error: {e}")
+            # Even if revocation fails, we should allow logout
+            return JSONResponse(content={
+                "message": "Logged out (revocation unavailable)",
+                "timestamp": datetime.utcnow().isoformat()
+            })
     
+    @router.post("/admin/revoke-user-tokens")
+    async def revoke_user_tokens(user_id: str, credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Admin endpoint to revoke all tokens for a user (security incident response)"""
+        try:
+            # Import JWT manager and verify admin permissions
+            from core_platform.security import get_jwt_manager
+            jwt_manager = get_jwt_manager()
+            
+            # Verify current user is admin (basic check)
+            current_token = credentials.credentials
+            payload = jwt_manager.verify_token(current_token)
+            current_role = payload.get("role", "")
+            
+            if current_role not in ["admin", "platform_admin"]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin access required"
+                )
+            
+            # Revoke all tokens for the specified user
+            revoked_count = jwt_manager.revoke_user_tokens(user_id)
+            
+            logger.info(f"Admin revoked {revoked_count} tokens for user {user_id}")
+            
+            return JSONResponse(content={
+                "message": f"Revoked {revoked_count} tokens for user {user_id}",
+                "user_id": user_id,
+                "tokens_revoked": revoked_count,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Token revocation error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to revoke user tokens"
+            )
+
     @router.get("/health")
     async def auth_health_check():
         """Authentication service health check"""

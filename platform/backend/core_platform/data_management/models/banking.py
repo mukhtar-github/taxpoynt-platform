@@ -67,9 +67,9 @@ class BankingConnection(BaseModel):
     account_name = Column(String(255), nullable=True)
     account_type = Column(Enum(AccountType), nullable=True)
     
-    # Authentication and tokens
-    access_token = Column(Text, nullable=True)  # Encrypted
-    refresh_token = Column(Text, nullable=True)  # Encrypted
+    # Authentication and tokens (encrypted using JWT Manager)
+    access_token = Column(Text, nullable=True)  # Encrypted with ProductionJWTManager
+    refresh_token = Column(Text, nullable=True)  # Encrypted with ProductionJWTManager
     token_expires_at = Column(DateTime(timezone=True), nullable=True)
     
     # Connection metadata
@@ -240,11 +240,11 @@ class BankingCredentials(BaseModel):
     provider = Column(Enum(BankingProvider), nullable=False)
     environment = Column(String(20), default="production")  # sandbox, production
     
-    # Credentials (encrypted)
-    api_key = Column(Text, nullable=True)
-    client_id = Column(Text, nullable=True)
-    client_secret = Column(Text, nullable=True)
-    webhook_secret = Column(Text, nullable=True)
+    # Credentials (encrypted with ProductionJWTManager)
+    api_key = Column(Text, nullable=True)  # Encrypted with ProductionJWTManager.encrypt_sensitive_data()
+    client_id = Column(Text, nullable=True)  # Encrypted with ProductionJWTManager.encrypt_sensitive_data()
+    client_secret = Column(Text, nullable=True)  # Encrypted with ProductionJWTManager.encrypt_sensitive_data()
+    webhook_secret = Column(Text, nullable=True)  # Encrypted with ProductionJWTManager.encrypt_sensitive_data()
     
     # Credential status
     is_active = Column(Boolean, default=True)

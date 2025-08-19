@@ -71,6 +71,44 @@ from .dead_letter_handler import (
     initialize_dead_letter_handler
 )
 
+# Redis Message Router Components (Phase 3)
+from .redis_message_router import (
+    RedisMessageRouter,
+    get_redis_message_router
+)
+
+# Horizontal Scaling Coordinator Components (Phase 3)
+from .horizontal_scaling_coordinator import (
+    HorizontalScalingCoordinator,
+    ScalingPolicy,
+    InstanceMetrics,
+    ScalingConfiguration,
+    get_horizontal_scaling_coordinator
+)
+
+# Circuit Breaker Components (Phase 3)
+from .circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerMetrics,
+    CircuitBreakerException,
+    CircuitBreakerManager,
+    CircuitState,
+    get_circuit_breaker_manager,
+    circuit_breaker
+)
+
+# Async Health Checker Components (Phase 3)
+from .async_health_checker import (
+    AsyncHealthCheckManager,
+    ServiceHealthChecker,
+    HealthCheckConfig,
+    HealthMetrics,
+    HealthStatus,
+    get_health_check_manager,
+    setup_default_health_checks
+)
+
 __all__ = [
     # Event Bus
     "EventBus",
@@ -128,7 +166,43 @@ __all__ = [
     "DeadLetterStats",
     "AlertLevel",
     "get_dead_letter_handler",
-    "initialize_dead_letter_handler"
+    "initialize_dead_letter_handler",
+    
+    # Redis Message Router (Phase 3)
+    "RedisMessageRouter",
+    "get_redis_message_router",
+    
+    # Horizontal Scaling Coordinator (Phase 3)
+    "HorizontalScalingCoordinator",
+    "ScalingPolicy",
+    "InstanceMetrics", 
+    "ScalingConfiguration",
+    "get_horizontal_scaling_coordinator",
+    
+    # Circuit Breaker (Phase 3)
+    "CircuitBreaker",
+    "CircuitBreakerConfig",
+    "CircuitBreakerMetrics",
+    "CircuitBreakerException",
+    "CircuitBreakerManager",
+    "CircuitState",
+    "get_circuit_breaker_manager",
+    "circuit_breaker",
+    
+    # Async Health Checker (Phase 3)
+    "AsyncHealthCheckManager",
+    "ServiceHealthChecker",
+    "HealthCheckConfig",
+    "HealthMetrics",
+    "HealthStatus",
+    "get_health_check_manager",
+    "setup_default_health_checks",
+    
+    # Infrastructure Functions
+    "initialize_messaging_infrastructure",
+    "initialize_production_messaging_infrastructure",
+    "shutdown_messaging_infrastructure",
+    "get_messaging_stats"
 ]
 
 # Version information
@@ -146,7 +220,11 @@ PACKAGE_INFO = {
         "Message Router - Role-based routing", 
         "Queue Manager - Message queue management",
         "Pub-Sub Coordinator - Publish-subscribe patterns",
-        "Dead Letter Handler - Failed message processing"
+        "Dead Letter Handler - Failed message processing",
+        "Redis Message Router - Distributed scalable routing (Phase 3)",
+        "Horizontal Scaling Coordinator - Auto-scaling management (Phase 3)",
+        "Circuit Breaker - Service failure protection (Phase 3)",
+        "Async Health Checker - Non-blocking health monitoring (Phase 3)"
     ],
     "features": [
         "Cross-service event communication",
@@ -157,7 +235,12 @@ PACKAGE_INFO = {
         "Message persistence",
         "Real-time monitoring",
         "Automatic recovery",
-        "Poison message detection"
+        "Poison message detection",
+        "Redis-backed distributed state (Phase 3)",
+        "Horizontal auto-scaling (Phase 3)",
+        "Circuit breaker protection (Phase 3)",
+        "Non-blocking health checks (Phase 3)",
+        "1M+ daily transaction capability (Phase 3)"
     ]
 }
 
@@ -203,6 +286,56 @@ async def initialize_messaging_infrastructure(
         "queue_manager": queue_manager,
         "pubsub_coordinator": pubsub_coordinator,
         "dead_letter_handler": dead_letter_handler
+    }
+
+
+async def initialize_production_messaging_infrastructure(
+    redis_client=None,
+    scaling_config: ScalingConfiguration = None
+) -> dict:
+    """
+    Initialize Phase 3 production messaging infrastructure
+    
+    Features:
+    - Redis-backed message routing
+    - Horizontal scaling coordination  
+    - Circuit breaker protection
+    - Async health monitoring
+    - 1M+ daily transaction capability
+    
+    Returns dictionary with initialized components
+    """
+    import redis.asyncio as redis
+    import os
+    
+    # Get Redis client
+    if redis_client is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+    
+    # Initialize Redis Message Router
+    redis_message_router = get_redis_message_router(redis_client)
+    await redis_message_router.initialize()
+    
+    # Initialize Horizontal Scaling Coordinator
+    scaling_config = scaling_config or ScalingConfiguration()
+    scaling_coordinator = get_horizontal_scaling_coordinator(redis_client, scaling_config)
+    await scaling_coordinator.initialize()
+    
+    # Initialize Circuit Breaker Manager
+    circuit_breaker_manager = get_circuit_breaker_manager(redis_client)
+    
+    # Initialize Async Health Check Manager
+    health_check_manager = get_health_check_manager(redis_client)
+    await setup_default_health_checks(health_check_manager)
+    await health_check_manager.start_all_monitoring()
+    
+    return {
+        "redis_message_router": redis_message_router,
+        "scaling_coordinator": scaling_coordinator,
+        "circuit_breaker_manager": circuit_breaker_manager,
+        "health_check_manager": health_check_manager,
+        "redis_client": redis_client
     }
 
 

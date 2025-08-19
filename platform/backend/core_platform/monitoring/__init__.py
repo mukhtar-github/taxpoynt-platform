@@ -93,6 +93,36 @@ from .log_aggregator import (
     shutdown_log_aggregation
 )
 
+# Prometheus Integration (Phase 4)
+from .prometheus_integration import (
+    PrometheusIntegration,
+    PrometheusMetric,
+    PrometheusMetricsType,
+    get_prometheus_integration,
+    initialize_prometheus_integration,
+    shutdown_prometheus_integration,
+    record_invoice_processed,
+    record_firs_request,
+    record_banking_transaction,
+    record_revenue
+)
+
+# OpenTelemetry Integration (Phase 4)
+from .opentelemetry_integration import (
+    OpenTelemetryIntegration,
+    TracingConfiguration,
+    TracingBackend,
+    TracedSpan,
+    get_opentelemetry_integration,
+    initialize_opentelemetry_integration,
+    shutdown_opentelemetry_integration,
+    trace_async,
+    trace_sync,
+    trace_invoice_processing,
+    trace_firs_integration,
+    trace_banking_operation
+)
+
 # Global instances for easy access
 __all__ = [
     # Metrics Aggregation
@@ -167,8 +197,35 @@ __all__ = [
     'setup_default_log_patterns',
     'shutdown_log_aggregation',
     
+    # Prometheus Integration (Phase 4)
+    'PrometheusIntegration',
+    'PrometheusMetric',
+    'PrometheusMetricsType',
+    'get_prometheus_integration',
+    'initialize_prometheus_integration',
+    'shutdown_prometheus_integration',
+    'record_invoice_processed',
+    'record_firs_request',
+    'record_banking_transaction',
+    'record_revenue',
+    
+    # OpenTelemetry Integration (Phase 4)
+    'OpenTelemetryIntegration',
+    'TracingConfiguration',
+    'TracingBackend',
+    'TracedSpan',
+    'get_opentelemetry_integration',
+    'initialize_opentelemetry_integration',
+    'shutdown_opentelemetry_integration',
+    'trace_async',
+    'trace_sync',
+    'trace_invoice_processing',
+    'trace_firs_integration',
+    'trace_banking_operation',
+    
     # Convenience functions
     'setup_platform_observability',
+    'setup_production_observability',
     'shutdown_platform_observability',
     'get_platform_observability_health'
 ]
@@ -218,13 +275,85 @@ async def setup_platform_observability():
     print("📝 Log Aggregation: Active")
 
 
+async def setup_production_observability(
+    enable_prometheus: bool = True,
+    prometheus_port: int = 9090,
+    enable_opentelemetry: bool = True,
+    tracing_backend: TracingBackend = TracingBackend.JAEGER,
+    service_name: str = "taxpoynt-platform"
+):
+    """
+    Setup Phase 4 production observability with Prometheus and OpenTelemetry.
+    
+    This function sets up both the existing monitoring system and the new
+    Prometheus/OpenTelemetry integrations for production-grade observability.
+    """
+    import os
+    # Setup existing platform observability
+    await setup_platform_observability()
+    
+    # Setup Prometheus integration
+    if enable_prometheus:
+        try:
+            prometheus_integration = await initialize_prometheus_integration(
+                metrics_aggregator=metrics_aggregator,
+                metrics_port=prometheus_port,
+                auto_start_server=True
+            )
+            print(f"✅ Prometheus Metrics: Active on port {prometheus_port}")
+        except Exception as e:
+            print(f"❌ Prometheus initialization failed: {e}")
+    
+    # Setup OpenTelemetry integration
+    if enable_opentelemetry:
+        try:
+            tracing_config = TracingConfiguration(
+                service_name=service_name,
+                service_version="1.0.0",
+                environment=os.getenv("ENVIRONMENT", "production"),
+                backend=tracing_backend,
+                sample_rate=1.0,  # 100% sampling for comprehensive tracing
+                auto_instrument_fastapi=True,
+                auto_instrument_sqlalchemy=True,
+                auto_instrument_redis=True,
+                auto_instrument_http=True
+            )
+            
+            opentelemetry_integration = await initialize_opentelemetry_integration(
+                config=tracing_config,
+                trace_collector=trace_collector
+            )
+            print(f"✅ OpenTelemetry Tracing: Active ({tracing_backend})")
+        except Exception as e:
+            print(f"❌ OpenTelemetry initialization failed: {e}")
+    
+    print("🚀 Production Observability: Fully Active")
+    print("   📊 Business Metrics: E-invoice processing, FIRS integration, Banking")
+    print("   🔍 Platform Metrics: HTTP requests, Database queries, Redis operations")  
+    print("   🔗 Distributed Tracing: End-to-end request flows")
+    print("   📈 Ready for Grafana/Jaeger visualization")
+
+
 async def shutdown_platform_observability():
     """
     Shutdown complete platform observability system.
     
     Gracefully shuts down all observability components and cleans up resources.
     """
-    # Shutdown in reverse order
+    # Shutdown Phase 4 components first
+    try:
+        await shutdown_opentelemetry_integration()
+        print("✅ OpenTelemetry integration shutdown")
+    except Exception as e:
+        print(f"⚠️ OpenTelemetry shutdown error: {e}")
+    
+    try:
+        await shutdown_prometheus_integration() 
+        print("✅ Prometheus integration shutdown")
+    except Exception as e:
+        print(f"⚠️ Prometheus shutdown error: {e}")
+    
+    # Shutdown existing components in reverse order
     await shutdown_log_aggregation()
     await shutdown_trace_collection()
     await shutdown_alert_management()

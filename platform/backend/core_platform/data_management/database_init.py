@@ -135,9 +135,32 @@ class DatabaseInitializer:
             table_names = list(Base.metadata.tables.keys())
             logger.info(f"📊 Tables: {', '.join(table_names)}")
             
+            # Create production indexes for performance (PostgreSQL only)
+            if "postgresql" in self.database_url:
+                await self._create_production_indexes()
+            
         except Exception as e:
             logger.error(f"❌ Failed to create tables: {e}")
             raise
+    
+    async def _create_production_indexes(self):
+        """Create production database indexes for performance"""
+        try:
+            logger.info("🔧 Creating production database indexes...")
+            
+            from .database_indexes import create_production_indexes
+            
+            with self.SessionLocal() as session:
+                index_results = create_production_indexes(session)
+                
+                total_indexes = sum(len(result) for result in index_results.values() if isinstance(result, list))
+                logger.info(f"✅ Created {total_indexes} production indexes for high-volume transactions")
+                
+        except ImportError:
+            logger.warning("⚠️  Database indexes module not available, skipping index creation")
+        except Exception as e:
+            logger.error(f"❌ Failed to create production indexes: {e}")
+            # Don't raise - indexes are important but not critical for basic functionality
     
     async def _seed_initial_data(self):
         """Seed initial data for the platform"""

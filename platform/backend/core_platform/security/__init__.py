@@ -63,6 +63,29 @@ from .incident_responder import (
     initialize_incident_responder
 )
 
+from .jwt_manager import (
+    ProductionJWTManager,
+    get_jwt_manager,
+    initialize_jwt_manager
+)
+
+from .rate_limiter import (
+    ProductionRateLimiter,
+    RateLimitRule,
+    RateLimitType,
+    RateLimitWindow,
+    get_rate_limiter,
+    initialize_rate_limiter,
+    rate_limit_middleware
+)
+
+from .security_headers import (
+    OWASPSecurityHeaders,
+    get_security_headers,
+    initialize_security_headers,
+    security_headers_middleware
+)
+
 __all__ = [
     # Security Orchestrator
     'SecurityOrchestrator',
@@ -116,7 +139,27 @@ __all__ = [
     'IncidentCategory',
     'ResponseAction',
     'incident_responder',
-    'initialize_incident_responder'
+    'initialize_incident_responder',
+    
+    # JWT Manager
+    'ProductionJWTManager',
+    'get_jwt_manager',
+    'initialize_jwt_manager',
+    
+    # Rate Limiter
+    'ProductionRateLimiter',
+    'RateLimitRule',
+    'RateLimitType',
+    'RateLimitWindow',
+    'get_rate_limiter',
+    'initialize_rate_limiter',
+    'rate_limit_middleware',
+    
+    # Security Headers
+    'OWASPSecurityHeaders',
+    'get_security_headers',
+    'initialize_security_headers',
+    'security_headers_middleware'
 ]
 
 async def initialize_platform_security():
@@ -125,6 +168,30 @@ async def initialize_platform_security():
     This function should be called during platform startup.
     """
     success = True
+    
+    # Initialize JWT Manager first (critical for all authentication)
+    try:
+        initialize_jwt_manager()
+        print("✅ JWT Manager initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize JWT Manager: {e}")
+        success = False
+    
+    # Initialize Rate Limiter (critical for security)
+    try:
+        initialize_rate_limiter()
+        print("✅ Rate Limiter initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize Rate Limiter: {e}")
+        success = False
+    
+    # Initialize Security Headers (OWASP compliance)
+    try:
+        initialize_security_headers()
+        print("✅ OWASP Security Headers initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize Security Headers: {e}")
+        success = False
     
     # Initialize security orchestrator
     if not await initialize_security_orchestrator():

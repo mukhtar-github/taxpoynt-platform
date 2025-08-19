@@ -1,21 +1,186 @@
 # TaxPoynt Platform Railway Configuration
-# Python FastAPI deployment
+# Enterprise FastAPI deployment optimized for Hobby Plan (8GB RAM / 8 vCPU)
 
 [build]
+# Build optimization
+buildCommand = "echo 'Build complete - using pre-built platform structure'"
 
 [deploy]
 # Use root-level main.py for Railway Python detection
 startCommand = "python main.py"
 
-# Health check configuration 
+# Enhanced health check configuration for production workloads
 healthcheckPath = "/health"
 healthcheckTimeout = 60
+healthcheckInterval = 30
 restartPolicyType = "ON_FAILURE" 
 restartPolicyMaxRetries = 3
 
-# Environment variables
+# Resource optimization for Railway Hobby Plan (8GB RAM / 8 vCPU)
+[experimental]
+# Utilize Railway's resource allocation effectively
+replicas = 1
+
+# Production environment variables optimized for 8GB RAM / 8 vCPU
 [variables]
 ENVIRONMENT = "production"
 PYTHONPATH = "/app/platform/backend:/app"
 PYTHONDONTWRITEBYTECODE = "1"
 PYTHONUNBUFFERED = "1"
+
+# ============================================================================
+# RESOURCE OPTIMIZATION FOR RAILWAY HOBBY PLAN (8GB RAM / 8 vCPU)
+# ============================================================================
+
+# FastAPI/Uvicorn Configuration (optimize for 8 vCPU)
+UVICORN_WORKERS = "4"                    # Use half of available vCPUs for optimal performance
+UVICORN_HOST = "0.0.0.0"
+UVICORN_PORT = "8000"
+UVICORN_LOG_LEVEL = "info"
+WEB_CONCURRENCY = "4"                    # Gunicorn-style worker count
+
+# Database Connection Pool (optimize for 8GB RAM)
+DB_POOL_SIZE = "20"                      # Optimal for high-volume transactions
+DB_MAX_OVERFLOW = "30"                   # Allow burst capacity
+DB_POOL_TIMEOUT = "30"                   # Connection timeout
+DB_POOL_RECYCLE = "3600"                 # Recycle connections every hour
+DB_POOL_PRE_PING = "true"                # Verify connections before use
+
+# Redis Configuration (optimize for caching with available RAM)
+REDIS_MAX_CONNECTIONS = "100"            # Optimal connection pool
+REDIS_TIMEOUT = "10"                     # Connection timeout
+REDIS_RETRY_ON_TIMEOUT = "true"          # Retry failed connections
+
+# ============================================================================
+# PHASE 4 OBSERVABILITY OPTIMIZATION
+# ============================================================================
+
+# Prometheus Metrics (integrate with existing Phase 4 infrastructure)
+PROMETHEUS_ENABLED = "true"
+PROMETHEUS_PORT = "9090"
+METRICS_COLLECTION_INTERVAL = "15"       # Collect metrics every 15 seconds
+
+# OpenTelemetry Tracing (production-ready)
+OTEL_ENABLED = "true"
+OTEL_SERVICE_NAME = "taxpoynt-platform"
+OTEL_SERVICE_VERSION = "1.0.0"
+OTEL_RESOURCE_ATTRIBUTES = "service.name=taxpoynt-platform,service.version=1.0.0,deployment.environment=production"
+
+# ============================================================================
+# PHASE 6 FAULT TOLERANCE OPTIMIZATION 
+# ============================================================================
+
+# Circuit Breaker Configuration (integrate with existing Phase 6 infrastructure)
+CIRCUIT_BREAKER_ENABLED = "true"
+CIRCUIT_BREAKER_FAILURE_THRESHOLD = "5"
+CIRCUIT_BREAKER_RECOVERY_TIMEOUT = "30"
+CIRCUIT_BREAKER_SUCCESS_THRESHOLD = "3"
+
+# Retry Configuration (optimize for production reliability)
+RETRY_MAX_ATTEMPTS = "3"
+RETRY_INITIAL_DELAY = "1.0"
+RETRY_MAX_DELAY = "60.0"
+RETRY_EXPONENTIAL_BASE = "2.0"
+RETRY_JITTER = "true"
+
+# ============================================================================
+# HORIZONTAL SCALING COORDINATOR OPTIMIZATION
+# ============================================================================
+
+# Auto-scaling Configuration (integrate with Railway resources)
+SCALING_ENABLED = "true"
+SCALING_MIN_INSTANCES = "1"              # Single instance on Hobby plan
+SCALING_MAX_INSTANCES = "1"              # Hobby plan limitation
+SCALING_TARGET_CPU_PERCENTAGE = "70.0"   # Optimal CPU utilization
+SCALING_TARGET_MEMORY_PERCENTAGE = "80.0"  # Optimal memory utilization
+SCALING_MESSAGES_PER_SECOND_THRESHOLD = "1000.0"  # Message processing threshold
+
+# Load Balancing (for future Railway Pro upgrade)
+LOAD_BALANCER_ENABLED = "false"          # Disabled for single instance
+LOAD_BALANCER_ALGORITHM = "round_robin"
+
+# ============================================================================
+# BUSINESS LOGIC OPTIMIZATION
+# ============================================================================
+
+# FIRS Integration Optimization (high-volume transaction processing)
+FIRS_CONNECTION_POOL_SIZE = "10"         # FIRS API connection pool
+FIRS_REQUEST_TIMEOUT = "30"              # Request timeout
+FIRS_BATCH_SIZE = "100"                  # Batch processing size
+FIRS_PARALLEL_REQUESTS = "4"             # Parallel FIRS requests
+
+# Banking Integration Optimization
+BANKING_CONNECTION_POOL_SIZE = "8"       # Banking API connections
+BANKING_SYNC_INTERVAL = "300"            # 5-minute sync interval
+BANKING_BATCH_PROCESSING = "true"        # Enable batch processing
+
+# E-invoice Processing Optimization
+INVOICE_PROCESSING_WORKERS = "2"         # Dedicated invoice workers
+INVOICE_BATCH_SIZE = "50"                # Invoice batch size
+INVOICE_PARALLEL_PROCESSING = "true"     # Enable parallel processing
+
+# ============================================================================
+# SECURITY & COMPLIANCE
+# ============================================================================
+
+# JWT Configuration (production security)
+JWT_ALGORITHM = "RS256"
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = "60"
+JWT_REFRESH_TOKEN_EXPIRE_DAYS = "30"
+
+# Rate Limiting (protect against abuse)
+RATE_LIMIT_ENABLED = "true"
+RATE_LIMIT_REQUESTS_PER_MINUTE = "1000"  # High limit for business users
+RATE_LIMIT_BURST = "100"                 # Burst capacity
+
+# CORS Configuration (production domains)
+CORS_ALLOW_ORIGINS = "https://app.taxpoynt.com,https://web-production-ea5ad.up.railway.app"
+
+# ============================================================================
+# LOGGING & MONITORING
+# ============================================================================
+
+# Structured Logging (production-ready)
+LOG_LEVEL = "INFO"
+LOG_FORMAT = "json"                      # Structured JSON logs
+LOG_REQUEST_ID = "true"                  # Include request IDs
+LOG_PERFORMANCE_METRICS = "true"         # Log performance data
+
+# Health Monitoring (integrate with Railway)
+HEALTH_CHECK_INTERVAL = "30"             # Health check every 30 seconds
+HEALTH_CHECK_TIMEOUT = "10"              # Health check timeout
+HEALTH_CHECK_DEPENDENCIES = "true"       # Check database, Redis, external APIs
+
+# ============================================================================
+# PERFORMANCE TUNING
+# ============================================================================
+
+# Memory Management (optimize for 8GB RAM)
+PYTHON_GC_THRESHOLD = "700,10,10"        # Optimized garbage collection
+MALLOC_ARENA_MAX = "2"                   # Limit memory arenas
+MALLOC_MMAP_THRESHOLD = "131072"         # Memory mapping threshold
+
+# CPU Optimization (optimize for 8 vCPU)
+OMP_NUM_THREADS = "8"                    # OpenMP threads
+MKL_NUM_THREADS = "8"                    # Intel MKL threads
+NUMEXPR_MAX_THREADS = "8"                # NumExpr threads
+
+# I/O Optimization
+PYTHON_ASYNCIO_LOOP = "uvloop"           # High-performance event loop
+UVLOOP_ENABLED = "true"                  # Enable uvloop for FastAPI
+
+# ============================================================================
+# RAILWAY INTEGRATION
+# ============================================================================
+
+# Railway-specific optimizations
+RAILWAY_OPTIMIZED = "true"
+RAILWAY_PLAN = "hobby"
+RAILWAY_RESOURCES_RAM_GB = "8"
+RAILWAY_RESOURCES_VCPU = "8"
+RAILWAY_DEPLOYMENT_REGION = "ap-southeast-1"  # Southeast Asia (Singapore)
+
+# Deployment Metadata
+DEPLOYMENT_TIMESTAMP = "${RAILWAY_DEPLOYMENT_ID}"
+DEPLOYMENT_ENVIRONMENT = "production"
+DEPLOYMENT_VERSION = "1.0.0"
