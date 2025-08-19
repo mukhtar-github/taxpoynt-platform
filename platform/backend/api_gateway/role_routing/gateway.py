@@ -24,7 +24,7 @@ if str(project_root) not in sys.path:
 # Production imports - no fallbacks
 from core_platform.authentication.role_manager import RoleManager, PlatformRole
 from core_platform.messaging.redis_message_router import RedisMessageRouter
-from core_platform.messaging.message_router import ServiceRole
+from core_platform.messaging.message_router import ServiceRole, MessageRouter
 from .models import HTTPRoutingContext, APIGatewayConfig, RoutingSecurityLevel
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
