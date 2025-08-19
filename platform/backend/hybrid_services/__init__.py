@@ -22,32 +22,40 @@ from typing import Dict, Any, Optional
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
-# Import Hybrid services
-from .analytics.analytics_processor import AnalyticsProcessor
-from .analytics.advanced_analytics_engine import AdvancedAnalyticsEngine
-from .analytics.business_intelligence_service import BusinessIntelligenceService
+# Import Hybrid services (using existing files only)
+# Analytics - using available files
+from .analytics_aggregation.unified_metrics import UnifiedMetrics
+from .analytics_aggregation.kpi_calculator import KPICalculator  
+from .analytics_aggregation.trend_analyzer import TrendAnalyzer
 
-from .billing.subscription_manager import SubscriptionManager
-from .billing.usage_tracker import UsageTracker
-from .billing.billing_processor import BillingProcessor
+# Billing - using existing files
+from .billing_orchestration.subscription_manager import SubscriptionManager
+from .billing_orchestration.usage_tracker import UsageTracker
+from .billing_orchestration.billing_engine import BillingEngine
 
-from .compliance.cross_role_compliance_monitor import CrossRoleComplianceMonitor
-from .compliance.regulatory_alignment_service import RegulatoryAlignmentService
+# Compliance - using existing files
+from .compliance_coordination.compliance_orchestrator import ComplianceOrchestrator
+from .compliance_coordination.cross_role_validator import CrossRoleValidator
 
-from .configuration_management.dynamic_config_manager import DynamicConfigManager
+# Configuration Management - using existing files
+from .configuration_management.config_coordinator import ConfigCoordinator
 from .configuration_management.environment_manager import EnvironmentManager
 
+# Data Synchronization - using existing files  
 from .data_synchronization.consistency_manager import ConsistencyManager
-from .data_synchronization.cross_role_sync import CrossRoleSync
+from .data_synchronization.state_synchronizer import StateSynchronizer
 
-from .error_management.unified_error_handler import UnifiedErrorHandler
-from .error_management.error_analytics import ErrorAnalytics
+# Error Management - using existing files
+from .error_management.error_coordinator import ErrorCoordinator
+from .error_management.recovery_orchestrator import RecoveryOrchestrator
 
-from .access_control.unified_rbac import UnifiedRBAC
-from .access_control.permission_bridge import PermissionBridge
+# Service Access Control - using existing files
+from .service_access_control.access_middleware import AccessMiddleware
+from .service_access_control.quota_manager import QuotaManager
 
-from .workflow_orchestration.business_process_engine import BusinessProcessEngine
-from .workflow_orchestration.multi_role_coordinator import MultiRoleCoordinator
+# Workflow Orchestration - using existing files
+from .workflow_orchestration.process_coordinator import ProcessCoordinator
+from .workflow_orchestration.e2e_workflow_engine import E2EWorkflowEngine
 
 logger = logging.getLogger(__name__)
 
