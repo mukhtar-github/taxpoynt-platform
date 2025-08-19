@@ -17,13 +17,13 @@ import logging
 import uuid
 from ipaddress import ip_address, ip_network
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    ValidationError,
-    SecurityError
-)
+# Import from parent module where BaseService and exceptions are defined
+from . import BaseService, AuthenticationError, AuthorizationError, ValidationError
+
+# Additional exception for session manager
+class SecurityError(Exception):
+    """Security related errors"""
+    pass
 
 
 class SessionStatus(Enum):

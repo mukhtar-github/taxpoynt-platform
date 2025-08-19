@@ -14,12 +14,8 @@ from enum import Enum
 import logging
 import uuid
 
-from ..shared.base_service import BaseService
-from ..shared.exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    ValidationError
-)
+# Import from parent module where BaseService and exceptions are defined
+from . import BaseService, AuthenticationError, AuthorizationError, ValidationError
 
 
 class PlatformRole(Enum):

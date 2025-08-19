@@ -17,12 +17,44 @@ import logging
 from typing import Dict, List, Optional, Any, Union, Set
 from datetime import datetime, timedelta
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    ValidationError
-)
+# Use simple base class instead of complex shared service
+import abc
+from typing import Optional
+
+class BaseService(abc.ABC):
+    """Simple base service class for authentication components"""
+    
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
+    
+    @abc.abstractmethod
+    async def initialize(self) -> None:
+        """Initialize the service"""
+        pass
+    
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Get service health status"""
+        return {
+            "status": "healthy",
+            "service": self.__class__.__name__
+        }
+    
+    async def cleanup(self) -> None:
+        """Cleanup service resources"""
+        pass
+
+# Simple exception classes
+class AuthenticationError(Exception):
+    """Authentication related errors"""
+    pass
+
+class AuthorizationError(Exception):
+    """Authorization related errors"""
+    pass
+
+class ValidationError(Exception):
+    """Validation related errors"""
+    pass
 
 from .role_manager import RoleManager, PlatformRole, RoleScope, RoleAssignment
 from .permission_engine import PermissionEngine, PermissionContext, PermissionEvaluation, AccessLevel

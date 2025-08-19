@@ -19,12 +19,8 @@ import urllib.parse
 from urllib.parse import urlencode, parse_qs
 import aiohttp
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    ValidationError
-)
+# Import from parent module where BaseService and exceptions are defined
+from . import BaseService, AuthenticationError, AuthorizationError, ValidationError
 
 
 class OAuthFlow(Enum):
