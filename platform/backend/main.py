@@ -14,6 +14,7 @@ Phase 6 Enterprise Fault Tolerance Integration:
 """
 import os
 import sys
+import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -189,77 +190,77 @@ def create_taxpoynt_app() -> FastAPI:
     
     # Use production API gateway architecture
     logger.info("🚀 Initializing TaxPoynt Platform with Production Architecture")
-        
-        # Create gateway configuration
-        allowed_origins = [
-            "https://web-production-ea5ad.up.railway.app",  # Railway production
-            "https://app-staging.taxpoynt.com",
-            "https://app.taxpoynt.com",
-            "https://taxpoynt.com",  # Main domain
-            "https://www.taxpoynt.com",  # WWW subdomain
-            "http://localhost:3000",
-            "http://localhost:3001"  # Frontend dev port
-        ] if not DEBUG else ["*"]
-        
-        # Initialize secure JWT manager (no hardcoded secrets)
-        from core_platform.security import initialize_jwt_manager, get_jwt_manager
-        from core_platform.security.rate_limiter import initialize_rate_limiter, rate_limit_middleware
-        from core_platform.security.security_headers import initialize_security_headers, security_headers_middleware
-        
-        jwt_manager = initialize_jwt_manager()
-        rate_limiter = initialize_rate_limiter()
-        security_headers = initialize_security_headers()
-        
-        config = APIGatewayConfig(
-            host="0.0.0.0",
-            port=PORT,
-            cors_enabled=True,
-            cors_origins=allowed_origins,
-            trusted_hosts=["taxpoynt.com", "*.taxpoynt.com"] if not DEBUG else None,
-            security=RoutingSecurityLevel.STANDARD,
-            jwt_secret_key="SECURE_JWT_MANAGED_BY_JWT_MANAGER",  # Placeholder - actual security handled by JWT Manager
-            jwt_expiration_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")),  # Reduced from 1440 to 60 minutes
-            enable_request_logging=True,
-            enable_metrics=True,
-            log_level="INFO" if not DEBUG else "DEBUG"
-        )
-        
-        # Create core platform components
-        role_manager = create_role_manager()
-        
-        # Create temporary message router for gateway initialization
-        # (will be replaced with production messaging in startup)
-        from core_platform.messaging import get_redis_message_router
-        temp_message_router = get_redis_message_router()
-        
-        # Create API gateway
-        gateway = TaxPoyntAPIGateway(config, role_manager, temp_message_router)
-        app = gateway.get_app()
-        
-        # Add health check middleware FIRST
-        app.add_middleware(HealthCheckMiddleware)
-        
-        # Add observability middleware (Phase 4)
-        from core_platform.monitoring.fastapi_middleware import ObservabilityMiddleware
-        app.add_middleware(
-            ObservabilityMiddleware,
-            collect_metrics=True,
-            collect_traces=True,
-            track_business_operations=True
-        )
-        
-        # Add OWASP security headers middleware (critical security)
-        app.middleware("http")(security_headers_middleware)
-        
-        # Add rate limiting middleware (critical security)
-        app.middleware("http")(rate_limit_middleware)
-        
-        logger.info("✅ TaxPoynt Platform initialized with Phase 4 Production Architecture")
-        logger.info("   🔐 Security: JWT, Rate Limiting, OWASP Headers, Circuit Breakers")
-        logger.info("   🚀 Scaling: Redis Routing, Horizontal Coordinator, Auto-scaling")
-        logger.info("   📊 Observability: Prometheus Metrics, OpenTelemetry Tracing")
-        logger.info("   💓 Monitoring: Async Health Checks, Business Metrics")
-        return app
+    
+    # Create gateway configuration
+    allowed_origins = [
+        "https://web-production-ea5ad.up.railway.app",  # Railway production
+        "https://app-staging.taxpoynt.com",
+        "https://app.taxpoynt.com",
+        "https://taxpoynt.com",  # Main domain
+        "https://www.taxpoynt.com",  # WWW subdomain
+        "http://localhost:3000",
+        "http://localhost:3001"  # Frontend dev port
+    ] if not DEBUG else ["*"]
+    
+    # Initialize secure JWT manager (no hardcoded secrets)
+    from core_platform.security import initialize_jwt_manager, get_jwt_manager
+    from core_platform.security.rate_limiter import initialize_rate_limiter, rate_limit_middleware
+    from core_platform.security.security_headers import initialize_security_headers, security_headers_middleware
+    
+    jwt_manager = initialize_jwt_manager()
+    rate_limiter = initialize_rate_limiter()
+    security_headers = initialize_security_headers()
+    
+    config = APIGatewayConfig(
+        host="0.0.0.0",
+        port=PORT,
+        cors_enabled=True,
+        cors_origins=allowed_origins,
+        trusted_hosts=["taxpoynt.com", "*.taxpoynt.com"] if not DEBUG else None,
+        security=RoutingSecurityLevel.STANDARD,
+        jwt_secret_key="SECURE_JWT_MANAGED_BY_JWT_MANAGER",  # Placeholder - actual security handled by JWT Manager
+        jwt_expiration_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")),  # Reduced from 1440 to 60 minutes
+        enable_request_logging=True,
+        enable_metrics=True,
+        log_level="INFO" if not DEBUG else "DEBUG"
+    )
+    
+    # Create core platform components
+    role_manager = create_role_manager()
+    
+    # Create temporary message router for gateway initialization
+    # (will be replaced with production messaging in startup)
+    from core_platform.messaging import get_redis_message_router
+    temp_message_router = get_redis_message_router()
+    
+    # Create API gateway
+    gateway = TaxPoyntAPIGateway(config, role_manager, temp_message_router)
+    app = gateway.get_app()
+    
+    # Add health check middleware FIRST
+    app.add_middleware(HealthCheckMiddleware)
+    
+    # Add observability middleware (Phase 4)
+    from core_platform.monitoring.fastapi_middleware import ObservabilityMiddleware
+    app.add_middleware(
+        ObservabilityMiddleware,
+        collect_metrics=True,
+        collect_traces=True,
+        track_business_operations=True
+    )
+    
+    # Add OWASP security headers middleware (critical security)
+    app.middleware("http")(security_headers_middleware)
+    
+    # Add rate limiting middleware (critical security)
+    app.middleware("http")(rate_limit_middleware)
+    
+    logger.info("✅ TaxPoynt Platform initialized with Phase 4 Production Architecture")
+    logger.info("   🔐 Security: JWT, Rate Limiting, OWASP Headers, Circuit Breakers")
+    logger.info("   🚀 Scaling: Redis Routing, Horizontal Coordinator, Auto-scaling")
+    logger.info("   📊 Observability: Prometheus Metrics, OpenTelemetry Tracing")
+    logger.info("   💓 Monitoring: Async Health Checks, Business Metrics")
+    return app
 
 # Create the app instance
 app = create_taxpoynt_app()
