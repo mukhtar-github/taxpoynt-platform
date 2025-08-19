@@ -35,7 +35,7 @@ from .auth_router import create_auth_router
 
 # Phase 4 Performance Infrastructure
 from core_platform.data_management.cache_manager import CacheManager, CacheConfig
-from core_platform.messaging.async_health_checker import AsyncHealthChecker
+from core_platform.messaging.async_health_checker import AsyncHealthCheckManager
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class TaxPoyntAPIGateway:
         
         # Phase 4: Initialize performance infrastructure
         self.cache_manager = self._initialize_cache_manager()
-        self.health_checker = AsyncHealthChecker()
+        self.health_checker = AsyncHealthCheckManager()
         
         # Create FastAPI app
         self.app = FastAPI(

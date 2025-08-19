@@ -430,6 +430,76 @@ class AsyncHealthCheckManager:
         
         logger.info(f"Reset metrics for service: {service_name}")
         return True
+    
+    async def comprehensive_health_check(self, check_definitions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Perform comprehensive health checks for multiple services
+        
+        Args:
+            check_definitions: List of dictionaries with 'name' and 'check_func' keys
+            
+        Returns:
+            Dictionary with health check results for each service
+        """
+        results = {}
+        
+        for check_def in check_definitions:
+            service_name = check_def.get("name", "unknown")
+            check_func = check_def.get("check_func")
+            
+            try:
+                if check_func:
+                    # Execute the health check function
+                    if asyncio.iscoroutinefunction(check_func):
+                        result = await check_func()
+                    else:
+                        result = check_func()
+                    
+                    results[service_name] = {
+                        "healthy": bool(result),
+                        "status": "healthy" if result else "unhealthy",
+                        "result": result
+                    }
+                else:
+                    # If no check function, check if service is registered
+                    if service_name in self.health_checkers:
+                        metrics = await self.check_service_now(service_name)
+                        if metrics:
+                            results[service_name] = {
+                                "healthy": metrics.status == HealthStatus.HEALTHY,
+                                "status": metrics.status.value,
+                                "result": metrics
+                            }
+                        else:
+                            results[service_name] = {
+                                "healthy": False,
+                                "status": "unknown",
+                                "result": None
+                            }
+                    else:
+                        results[service_name] = {
+                            "healthy": False,
+                            "status": "not_registered",
+                            "result": None
+                        }
+                        
+            except Exception as e:
+                logger.error(f"Health check failed for {service_name}: {e}")
+                results[service_name] = {
+                    "healthy": False,
+                    "status": "error",
+                    "result": str(e)
+                }
+        
+        return results
+    
+    async def cleanup(self):
+        """Cleanup health check manager resources"""
+        try:
+            await self.stop_all_monitoring()
+            logger.info("AsyncHealthCheckManager cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during AsyncHealthCheckManager cleanup: {e}")
 
 
 # Global health check manager
