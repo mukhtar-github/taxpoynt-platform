@@ -34,6 +34,17 @@ try:
     from opentelemetry.trace.status import Status, StatusCode
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
+    # Create mock classes for type hints when OpenTelemetry is not available
+    class Resource:
+        pass
+    class TracerProvider:
+        pass
+    class OtelSpan:
+        pass
+    class BatchSpanProcessor:
+        pass
+    class Status:
+        pass
     OPENTELEMETRY_AVAILABLE = False
 
 from .trace_collector import TraceCollector, Span as PlatformSpan, SpanKind, SpanStatus
