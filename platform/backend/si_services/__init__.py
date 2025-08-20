@@ -22,7 +22,7 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional
 
-from ..core_platform.messaging.message_router import MessageRouter, ServiceRole
+from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
 # Import SI services
 from .banking_integration.banking_service import SIBankingService
