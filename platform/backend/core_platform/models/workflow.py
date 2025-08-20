@@ -100,6 +100,74 @@ class WorkflowExecution:
 
 
 @dataclass
+class WorkflowExecution:
+    """Workflow execution instance"""
+    execution_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    workflow_id: str = ""
+    status: WorkflowStatus = WorkflowStatus.PENDING
+    started_at: datetime = field(default_factory=datetime.now)
+    completed_at: Optional[datetime] = None
+    input_data: Dict[str, Any] = field(default_factory=dict)
+    output_data: Dict[str, Any] = field(default_factory=dict)
+    error_message: Optional[str] = None
+    current_step: str = ""
+    progress_percentage: float = 0.0
+
+
+@dataclass
+class WorkflowStep:
+    """Individual workflow step definition"""
+    step_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    workflow_id: str = ""
+    step_name: str = ""
+    step_order: int = 0
+    step_type: str = "action"
+    configuration: Dict[str, Any] = field(default_factory=dict)
+    dependencies: List[str] = field(default_factory=list)
+    timeout_seconds: Optional[int] = None
+    retry_count: int = 0
+    is_active: bool = True
+
+
+@dataclass
+class WorkflowState:
+    """Workflow state management"""
+    state_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    workflow_id: str = ""
+    execution_id: str = ""
+    current_state: str = "initial"
+    previous_state: Optional[str] = None
+    state_data: Dict[str, Any] = field(default_factory=dict)
+    transition_history: List[Dict[str, Any]] = field(default_factory=list)
+    updated_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class StateTransition:
+    """State transition definition"""
+    transition_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    from_state: str = ""
+    to_state: str = ""
+    trigger: str = ""
+    condition: Optional[str] = None
+    action: Optional[str] = None
+    is_automatic: bool = False
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class StateMachine:
+    """State machine definition"""
+    machine_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
+    initial_state: str = ""
+    states: List[str] = field(default_factory=list)
+    transitions: List[StateTransition] = field(default_factory=list)
+    context: Dict[str, Any] = field(default_factory=dict)
+    is_active: bool = True
+
+
+@dataclass
 class WorkflowMetrics:
     """Workflow execution metrics"""
     metrics_id: str = field(default_factory=lambda: str(uuid.uuid4()))
