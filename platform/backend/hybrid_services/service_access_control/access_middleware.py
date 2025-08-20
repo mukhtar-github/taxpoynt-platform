@@ -24,11 +24,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 # Import existing platform services
-from ...billing_orchestration.tier_manager import TierManager, AccessDecision
-from ...billing_orchestration.usage_tracker import UsageTracker
-from ....app_services.security_compliance.access_controller import AccessController
-from ....core_platform.monitoring import MetricsCollector
-from ....core_platform.data_management.cache_manager import CacheManager
+from ..billing_orchestration.tier_manager import TierManager, AccessDecision
+from ..billing_orchestration.usage_tracker import UsageTracker
+from app_services.security_compliance.access_controller import AccessController
+from core_platform.monitoring import MetricsCollector
+from core_platform.data_management.cache_manager import CacheManager
 
 logger = logging.getLogger(__name__)
 
