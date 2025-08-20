@@ -45,6 +45,13 @@ except ImportError:
         pass
     class Status:
         pass
+    
+    # Create mock trace module
+    class MockTraceModule:
+        class Context:
+            pass
+    
+    trace = MockTraceModule()
     OPENTELEMETRY_AVAILABLE = False
 
 from .trace_collector import TraceCollector, Span as PlatformSpan, SpanKind, SpanStatus
