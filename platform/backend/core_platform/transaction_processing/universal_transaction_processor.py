@@ -916,15 +916,31 @@ def create_universal_transaction_processor(
     duplicate_detector: UniversalDuplicateDetector,
     amount_validator: UniversalAmountValidator,
     business_rule_engine: UniversalBusinessRuleEngine,
+    nigerian_classifier: Optional[NigerianTransactionClassifier],
     pattern_matcher: UniversalPatternMatcher,
     processing_configs: Optional[Dict[ConnectorType, ConnectorProcessingConfig]] = None
 ) -> UniversalTransactionProcessor:
-    """Factory function to create universal transaction processor."""
+    """
+    Factory function to create universal transaction processor with AI classification.
+    
+    Args:
+        validator: Universal transaction validator
+        duplicate_detector: Duplicate detection engine
+        amount_validator: Amount validation engine
+        business_rule_engine: Business rules engine
+        nigerian_classifier: AI-powered Nigerian transaction classifier (optional)
+        pattern_matcher: Pattern matching engine
+        processing_configs: Custom processing configurations
+        
+    Returns:
+        Configured universal transaction processor
+    """
     return UniversalTransactionProcessor(
         validator,
         duplicate_detector,
         amount_validator,
         business_rule_engine,
+        nigerian_classifier,
         pattern_matcher,
         processing_configs
     )

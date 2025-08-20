@@ -38,10 +38,10 @@ Usage:
         create_universal_transaction_processor
     )
     
-    # Initialize universal processor
+    # Initialize universal processor with AI classification
     processor = create_universal_transaction_processor(
         validator, duplicate_detector, amount_validator,
-        business_rule_engine, pattern_matcher
+        business_rule_engine, nigerian_classifier, pattern_matcher
     )
     
     # Process transaction from any connector type
@@ -160,6 +160,17 @@ class TransactionProcessingService:
             from .rules.universal_business_rule_engine import UniversalBusinessRuleEngine
             from .matching.universal_pattern_matcher import UniversalPatternMatcher
             
+            # Import Nigerian Classifier (optional)
+            try:
+                from ...external_integrations.connector_framework.classification_engine.nigerian_classifier import (
+                    NigerianTransactionClassifier
+                )
+                nigerian_classifier = NigerianTransactionClassifier()
+                logger.info("Nigerian Classifier initialized for universal transaction processing")
+            except ImportError as e:
+                logger.warning(f"Nigerian Classifier not available: {e} - AI classification will be disabled")
+                nigerian_classifier = None
+            
             # Create component instances
             validator = UniversalTransactionValidator()
             duplicate_detector = UniversalDuplicateDetector()
@@ -167,12 +178,13 @@ class TransactionProcessingService:
             business_rule_engine = UniversalBusinessRuleEngine()
             pattern_matcher = UniversalPatternMatcher()
             
-            # Create universal processor
+            # Create universal processor with AI classification
             self.processor = create_universal_transaction_processor(
                 validator,
                 duplicate_detector,
                 amount_validator,
                 business_rule_engine,
+                nigerian_classifier,
                 pattern_matcher,
                 processing_configs
             )
