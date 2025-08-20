@@ -1,33 +1,45 @@
-# TaxPoynt Platform - Production Dependencies
-# Essential packages for Railway deployment
+# TaxPoynt Platform - Railway Deployment Requirements
+# ===================================================
+# Essential packages for Railway deployment without hash verification
 
-# Web framework & ASGI server
-fastapi>=0.104.0
-uvicorn[standard]>=0.23.2
-starlette>=0.27.0
-python-multipart>=0.0.6
+# Core web framework - pinned versions for stability
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+starlette==0.27.0
+python-multipart==0.0.6
 
 # Performance enhancements
-uvloop>=0.17.0
-httptools>=0.6.0
+uvloop==0.17.0
+httptools==0.6.1
 
-# API documentation
+# API documentation (Keep V1 for compatibility)
 pydantic==1.10.22
 
 # Database
-sqlalchemy>=2.0.22
-psycopg2-binary>=2.9.9
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
 
 # Authentication & Security
-cryptography>=41.0.4
-PyJWT>=2.8.0
-passlib>=1.7.4
-bcrypt>=4.0.1
+cryptography==41.0.7
+PyJWT==2.8.0
+passlib==1.7.4
+bcrypt==4.0.1
 
-# Utilities
-python-dotenv>=1.0.0
-email-validator>=2.0.0
-requests>=2.31.0
+# Email & Validation
+python-dotenv==1.0.0
+email-validator==2.1.0
+requests==2.31.0
 
-# Additional backend dependencies
--r platform/backend/requirements.txt
+# Async HTTP for external APIs
+aiohttp==3.12.0
+
+# Redis for caching
+redis==5.0.1
+
+# OpenAI for AI classification
+openai==1.37.1
+
+# Additional utilities needed by the platform
+tenacity==8.2.3
+jinja2==3.1.4
+jsonschema==4.19.2
