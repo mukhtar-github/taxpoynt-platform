@@ -13,7 +13,7 @@ import uuid
 import operator
 import re
 
-from core_platform.database import get_db_session
+from core_platform.data_management.database_init import get_db_session
 from core_platform.models.decision import DecisionRule, DecisionExecution, DecisionContext
 from core_platform.cache import CacheService
 from core_platform.events import EventBus

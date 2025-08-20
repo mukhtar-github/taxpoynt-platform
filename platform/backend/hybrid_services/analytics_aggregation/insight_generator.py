@@ -13,7 +13,7 @@ import uuid
 import statistics
 import math
 
-from core_platform.database import get_db_session
+from core_platform.data_management.database_init import get_db_session
 from core_platform.models.insights import BusinessInsight, InsightRule, InsightExecution, InsightReport
 from core_platform.cache import CacheService
 from core_platform.events import EventBus

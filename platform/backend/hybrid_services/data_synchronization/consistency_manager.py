@@ -13,7 +13,7 @@ import uuid
 import hashlib
 import time
 
-from core_platform.database import get_db_session
+from core_platform.data_management.database_init import get_db_session
 from core_platform.models.consistency import ConsistencyRule, ConsistencyViolation, ConsistencyCheck
 from core_platform.cache import CacheService
 from core_platform.events import EventBus

@@ -12,7 +12,7 @@ from enum import Enum
 import uuid
 import statistics
 
-from core_platform.database import get_db_session
+from core_platform.data_management.database_init import get_db_session
 from core_platform.models.workflow import WorkflowExecution, WorkflowMetrics, WorkflowAlert
 from core_platform.cache import CacheService
 from core_platform.events import EventBus
