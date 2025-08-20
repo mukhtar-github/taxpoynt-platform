@@ -15,6 +15,8 @@ Usage:
     )
 """
 
+from typing import Optional
+
 # TLS Management
 from .tls_manager import (
     TLSManager,
