@@ -15,6 +15,8 @@ Usage:
     )
 """
 
+from typing import List
+
 # Seal generation services
 from .seal_generator import (
     SealGenerator,
