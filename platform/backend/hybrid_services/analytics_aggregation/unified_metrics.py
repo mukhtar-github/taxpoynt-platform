@@ -12,11 +12,12 @@ from enum import Enum
 import uuid
 import statistics
 
-from core_platform.database import get_db_session
+# Fixed imports to use actual existing modules
+from core_platform.data_management.database_init import get_db_session
 from core_platform.models.metrics import MetricRecord, MetricAggregation, MetricSnapshot
-from core_platform.cache import CacheService
+from core_platform.data_management.cache_manager import CacheManager
 from core_platform.events import EventBus
-from core_platform.monitoring import MetricsCollector
+from core_platform.monitoring.prometheus_integration import PrometheusIntegration
 from core_platform.notifications import NotificationService
 
 logger = logging.getLogger(__name__)
