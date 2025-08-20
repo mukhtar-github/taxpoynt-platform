@@ -7,6 +7,7 @@ AI service for generating insights and intelligent analysis.
 import asyncio
 import logging
 import json
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, asdict
@@ -14,6 +15,14 @@ from enum import Enum
 import uuid
 
 logger = logging.getLogger(__name__)
+
+# OpenAI client import with fallback
+try:
+    from openai import AsyncOpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    logger.warning("OpenAI package not available - AI service will run in mock mode")
+    OPENAI_AVAILABLE = False
 
 
 class AIProvider(Enum):
@@ -107,6 +116,7 @@ class AIService:
         self.is_initialized = False
         self._available = False
         self._capabilities: List[AICapability] = []
+        self._openai_client: Optional[AsyncOpenAI] = None
         
     async def initialize(self) -> bool:
         """
@@ -116,8 +126,38 @@ class AIService:
             True if initialization successful, False otherwise
         """
         try:
-            if self.config.provider == AIProvider.MOCK:
-                # Mock AI service for development
+            if self.config.provider == AIProvider.OPENAI:
+                # Real OpenAI service initialization
+                if not OPENAI_AVAILABLE:
+                    logger.error("OpenAI package not available - falling back to mock mode")
+                    self.config.provider = AIProvider.MOCK
+                    return await self._initialize_mock()
+                
+                # Get API key from config or environment
+                api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    logger.error("OpenAI API key not provided - falling back to mock mode")
+                    self.config.provider = AIProvider.MOCK
+                    return await self._initialize_mock()
+                
+                # Initialize OpenAI client
+                self._openai_client = AsyncOpenAI(api_key=api_key)
+                
+                # Test the connection
+                try:
+                    # Simple test to verify API key works
+                    response = await self._openai_client.chat.completions.create(
+                        model=self.config.model_name,
+                        messages=[{"role": "user", "content": "Hello"}],
+                        max_tokens=5
+                    )
+                    logger.info(f"OpenAI connection test successful - Model: {self.config.model_name}")
+                except Exception as e:
+                    logger.error(f"OpenAI connection test failed: {e} - falling back to mock mode")
+                    self.config.provider = AIProvider.MOCK
+                    self._openai_client = None
+                    return await self._initialize_mock()
+                
                 self._available = True
                 self._capabilities = [
                     AICapability.INSIGHT_GENERATION,
@@ -126,13 +166,14 @@ class AIService:
                     AICapability.CLASSIFICATION,
                     AICapability.SUMMARIZATION
                 ]
-                logger.info("Mock AI service initialized successfully")
+                logger.info(f"✅ Real OpenAI AI service initialized successfully - Model: {self.config.model_name}")
+                
+            elif self.config.provider == AIProvider.MOCK:
+                return await self._initialize_mock()
             else:
-                # Real AI service initialization would go here
-                # For now, mark as unavailable if not mock
-                self._available = False
-                self._capabilities = []
-                logger.warning(f"AI provider {self.config.provider} not implemented, AI features disabled")
+                logger.warning(f"AI provider {self.config.provider} not implemented, falling back to mock mode")
+                self.config.provider = AIProvider.MOCK
+                return await self._initialize_mock()
             
             self.is_initialized = True
             return True
@@ -141,6 +182,19 @@ class AIService:
             logger.error(f"Failed to initialize AI service: {e}")
             self._available = False
             return False
+    
+    async def _initialize_mock(self) -> bool:
+        """Initialize mock AI service"""
+        self._available = True
+        self._capabilities = [
+            AICapability.INSIGHT_GENERATION,
+            AICapability.TREND_ANALYSIS,
+            AICapability.ANOMALY_DETECTION,
+            AICapability.CLASSIFICATION,
+            AICapability.SUMMARIZATION
+        ]
+        logger.info("Mock AI service initialized successfully")
+        return True
     
     def is_available(self) -> bool:
         """
@@ -175,15 +229,117 @@ class AIService:
             return {"insights": []}
         
         try:
-            if self.config.provider == AIProvider.MOCK:
+            if self.config.provider == AIProvider.OPENAI and self._openai_client:
+                return await self._generate_openai_insights(data)
+            elif self.config.provider == AIProvider.MOCK:
                 return await self._generate_mock_insights(data)
             else:
-                # Real AI insight generation would go here
-                return {"insights": []}
+                # Fallback to mock if real AI not available
+                return await self._generate_mock_insights(data)
                 
         except Exception as e:
             logger.error(f"Error generating insights: {e}")
-            return {"insights": []}
+            # Fallback to mock insights on error
+            try:
+                return await self._generate_mock_insights(data)
+            except:
+                return {"insights": []}
+    
+    async def _generate_openai_insights(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate insights using OpenAI.
+        
+        Args:
+            data: Input data for insight generation
+            
+        Returns:
+            OpenAI-generated insights response
+        """
+        try:
+            # Create prompt for business insights
+            prompt = self._create_insights_prompt(data)
+            
+            response = await self._openai_client.chat.completions.create(
+                model=self.config.model_name,
+                messages=[
+                    {"role": "system", "content": "You are a TaxPoynt AI assistant specializing in Nigerian business e-invoicing insights. Provide actionable business insights based on financial data."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.config.max_tokens,
+                temperature=self.config.temperature
+            )
+            
+            # Parse OpenAI response into structured insights
+            content = response.choices[0].message.content
+            insights = self._parse_openai_insights_response(content, data)
+            
+            return {
+                "insights": insights,
+                "source": "openai",
+                "model": self.config.model_name,
+                "tokens_used": response.usage.total_tokens if response.usage else 0,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating OpenAI insights: {e}")
+            # Fallback to mock insights
+            return await self._generate_mock_insights(data)
+    
+    def _create_insights_prompt(self, data: Dict[str, Any]) -> str:
+        """Create prompt for OpenAI insights generation"""
+        prompt_parts = [
+            "Analyze the following Nigerian business financial data and provide actionable insights:",
+            "",
+            f"Data Summary: {json.dumps(data, indent=2)[:1000]}...",  # Limit prompt size
+            "",
+            "Please provide insights in the following areas:",
+            "1. Revenue patterns and trends",
+            "2. Tax compliance opportunities",
+            "3. Cash flow optimization",
+            "4. Business performance indicators",
+            "5. Risk factors and recommendations",
+            "",
+            "Format your response as structured insights with clear titles, descriptions, and actionable recommendations."
+        ]
+        return "\n".join(prompt_parts)
+    
+    def _parse_openai_insights_response(self, content: str, original_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Parse OpenAI response into structured insights format"""
+        insights = []
+        
+        # Basic parsing - split by numbered sections
+        sections = content.split('\n\n')
+        
+        for i, section in enumerate(sections):
+            if len(section.strip()) > 20:  # Only meaningful sections
+                insights.append({
+                    "title": f"AI Insight {i+1}",
+                    "description": section.strip()[:500],  # Limit description length
+                    "type": "ai_generated",
+                    "confidence": 0.8,  # Default confidence for OpenAI
+                    "impact": 0.7,
+                    "source": "openai",
+                    "recommendations": [
+                        "Review this AI-generated insight",
+                        "Validate with your business context",
+                        "Consider implementing suggested actions"
+                    ]
+                })
+        
+        # If no meaningful insights parsed, create a summary insight
+        if not insights:
+            insights.append({
+                "title": "AI Business Analysis",
+                "description": content[:500] + "..." if len(content) > 500 else content,
+                "type": "ai_summary",
+                "confidence": 0.7,
+                "impact": 0.6,
+                "source": "openai",
+                "recommendations": ["Review AI analysis for business insights"]
+            })
+        
+        return insights[:5]  # Limit to 5 insights max
     
     async def _generate_mock_insights(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -447,6 +447,54 @@ async def initialize_services():
         if hasattr(app.state, 'role_manager') and app.state.role_manager:
             await app.state.role_manager.initialize()
             logger.info("✅ Role Manager initialized")
+        
+        # Initialize AI service with real OpenAI integration
+        logger.info("🤖 Initializing AI Service with OpenAI integration...")
+        try:
+            from core_platform.ai import AIService, AIConfig, AIProvider
+            
+            # Create AI config with environment variables
+            ai_config = AIConfig(
+                provider=AIProvider.OPENAI,
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model_name=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),  # Cost-effective default
+                max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "4000")),
+                temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.7")),
+                mock_responses=False  # Enable real OpenAI integration
+            )
+            
+            # Initialize AI service
+            ai_service = AIService(ai_config)
+            ai_initialized = await ai_service.initialize()
+            
+            if ai_initialized:
+                app.state.ai_service = ai_service
+                logger.info(f"✅ AI Service initialized successfully - Provider: {ai_config.provider.value}, Model: {ai_config.model_name}")
+                logger.info(f"   🧠 Available capabilities: {len(ai_service.get_capabilities())} AI features")
+            else:
+                logger.warning("⚠️  AI Service initialization failed - falling back to mock mode")
+                app.state.ai_service = None
+                
+        except Exception as e:
+            # Phase 6: AI service error handling
+            if app.state.error_management:
+                await handle_platform_error(
+                    app.state.error_management, e, {
+                        "service_name": "ai_service",
+                        "operation_name": "initialization",
+                        "severity": "medium",  # AI is important but not critical for core functionality
+                        "user_id": None,
+                        "request_id": None,
+                        "retry_attempts": 2,
+                        "degradation_mode": "continue_without_ai_features"
+                    }, "ai_service", "medium"
+                )
+            else:
+                logger.error(f"❌ Failed to initialize AI service: {e}")
+            
+            # Continue without AI features
+            app.state.ai_service = None
+            logger.warning("⚠️  Operating without AI features")
             
         # Register services with Redis message router
         if hasattr(app.state, 'redis_message_router') and app.state.redis_message_router:
