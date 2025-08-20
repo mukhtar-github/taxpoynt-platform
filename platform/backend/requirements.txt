@@ -66,6 +66,12 @@ tenacity>=8.2.3
 uuid>=1.30
 aiofiles>=23.0.0  # Async file operations
 
+# Analytics & Data Science
+numpy>=1.24.0  # Numerical computing for analytics
+pandas>=2.0.0  # Data analysis and manipulation
+matplotlib>=3.7.0  # Plotting and visualization
+scipy>=1.10.0  # Scientific computing library
+
 # Cloud Services
 boto3>=1.34.0  # AWS SDK for backup operations
 botocore>=1.34.0  # AWS core library
