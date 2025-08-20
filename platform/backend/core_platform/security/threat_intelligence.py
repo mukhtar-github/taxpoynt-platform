@@ -1223,6 +1223,32 @@ class ThreatIntelligencePlatform:
         }
 
 
+# Additional classes for compatibility with imports
+ThreatIntelligence = ThreatIntelligencePlatform  # Alias for compatibility
+
+@dataclass
+class ThreatFeed:
+    """Threat intelligence feed configuration"""
+    feed_id: str
+    name: str
+    url: str
+    feed_type: str
+    update_interval_hours: int = 24
+    enabled: bool = True
+    last_updated: Optional[datetime] = None
+    
+@dataclass 
+class ThreatReport:
+    """Threat intelligence report"""
+    report_id: str
+    title: str
+    description: str
+    threat_actors: List[str] = field(default_factory=list)
+    indicators: List[str] = field(default_factory=list)
+    severity: ThreatSeverity = ThreatSeverity.MEDIUM
+    published_date: datetime = field(default_factory=datetime.now)
+    source: str = "internal"
+
 # Global instance for platform-wide access
 threat_intelligence = ThreatIntelligencePlatform()
 
@@ -1258,6 +1284,13 @@ async def setup_default_threat_intelligence():
     )
     
     logger.info("Default threat intelligence setup completed")
+
+
+async def initialize_threat_intelligence():
+    """Initialize threat intelligence platform with default configuration"""
+    await threat_intelligence.start_threat_intelligence()
+    await setup_default_threat_intelligence()
+    logger.info("Threat intelligence platform initialized successfully")
 
 
 async def shutdown_threat_intelligence():
