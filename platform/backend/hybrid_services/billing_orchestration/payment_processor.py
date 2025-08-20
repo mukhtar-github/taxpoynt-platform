@@ -67,42 +67,33 @@ class FraudRiskLevel(str, Enum):
 @dataclass
 class PaymentTransaction:
     """Payment transaction record"""
+    # Required fields (no defaults)
     transaction_id: str
     tenant_id: UUID
     organization_id: UUID
     invoice_id: str
-    
-    # Payment details
     amount: Decimal
     currency: str
     payment_method: PaymentMethod
     gateway: PaymentGateway
-    gateway_transaction_id: Optional[str]
-    
-    # Status and timestamps
     status: PaymentStatus
     created_at: datetime
     updated_at: datetime
+    customer_email: str
+    
+    # Optional fields (with defaults)
+    gateway_transaction_id: Optional[str] = None
     authorized_at: Optional[datetime] = None
     captured_at: Optional[datetime] = None
     failed_at: Optional[datetime] = None
-    
-    # Customer details
-    customer_email: str
     customer_phone: Optional[str] = None
     billing_address: Optional[Dict[str, str]] = None
-    
-    # Fraud detection
     fraud_risk_level: FraudRiskLevel = FraudRiskLevel.LOW
     fraud_score: float = 0.0
-    fraud_checks: Dict[str, Any] = None
-    
-    # Gateway response
-    gateway_response: Dict[str, Any] = None
+    fraud_checks: Optional[Dict[str, Any]] = None
+    gateway_response: Optional[Dict[str, Any]] = None
     failure_reason: Optional[str] = None
-    
-    # Metadata
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass
