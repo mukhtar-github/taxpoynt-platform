@@ -21,6 +21,7 @@ from .cross_role_endpoints import create_cross_role_router
 from .shared_resources_endpoints import create_shared_resources_router
 from .orchestration_endpoints import create_orchestration_router
 from .monitoring_endpoints import create_monitoring_router
+from .ai_endpoints import create_ai_router
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,10 @@ class HybridRouterV1:
             self.message_router
         )
         self.router.include_router(monitoring_router)
+        
+        # AI Service Routes
+        ai_router = create_ai_router()
+        self.router.include_router(ai_router)
     
     def _setup_routes(self):
         """Configure general hybrid v1 routes"""
