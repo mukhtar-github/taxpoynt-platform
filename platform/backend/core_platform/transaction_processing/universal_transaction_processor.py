@@ -45,6 +45,9 @@ from ..detection.universal_duplicate_detector import UniversalDuplicateDetector,
 from ..validation.universal_amount_validator import UniversalAmountValidator, AmountValidationResult
 from ..rules.universal_business_rule_engine import UniversalBusinessRuleEngine, BusinessRuleEngineResult
 from ..matching.universal_pattern_matcher import UniversalPatternMatcher, PatternResult
+from ...external_integrations.connector_framework.classification_engine.nigerian_classifier import (
+    NigerianTransactionClassifier, TransactionClassificationRequest, TransactionClassificationResult
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +90,7 @@ class UniversalTransactionProcessor:
         duplicate_detector: UniversalDuplicateDetector,
         amount_validator: UniversalAmountValidator,
         business_rule_engine: UniversalBusinessRuleEngine,
+        nigerian_classifier: Optional[NigerianTransactionClassifier],
         pattern_matcher: UniversalPatternMatcher,
         processing_configs: Dict[ConnectorType, ConnectorProcessingConfig] = None
     ):
@@ -94,6 +98,7 @@ class UniversalTransactionProcessor:
         self.duplicate_detector = duplicate_detector
         self.amount_validator = amount_validator
         self.business_rule_engine = business_rule_engine
+        self.nigerian_classifier = nigerian_classifier
         self.pattern_matcher = pattern_matcher
         
         # Load connector-specific configurations
@@ -236,7 +241,25 @@ class UniversalTransactionProcessor:
                     self._get_transaction_id(transaction)
                 )
             
-            # Stage 5: Pattern Matching (connector-specific patterns)
+            # Create processed transaction early for classification
+            processed_transaction = await self._create_universal_processed_transaction(
+                transaction, connector_type, config, validation_result,
+                duplicate_result, amount_result, business_rules_result
+            )
+            
+            # Stage 5: AI Classification (Nigerian transaction classification)
+            classification_result = None
+            if hasattr(config, 'enable_ai_classification') and config.enable_ai_classification and self.nigerian_classifier:
+                result.processing_stage = ProcessingStage.CLASSIFICATION
+                classification_result = await self._process_ai_classification(
+                    processed_transaction, config
+                )
+                if classification_result:
+                    result.stage_results['ai_classification'] = classification_result
+                else:
+                    result.warnings.append("AI classification failed - using fallback logic")
+            
+            # Stage 6: Pattern Matching (connector-specific patterns, enhanced by AI classification)
             if config.enable_pattern_matching:
                 result.processing_stage = ProcessingStage.PATTERN_MATCHING
                 pattern_result = await self.pattern_matcher.match_patterns(
@@ -248,21 +271,14 @@ class UniversalTransactionProcessor:
                     self._get_transaction_id(transaction)
                 )
             
-            # Stage 6: Enrichment and Integration
+            # Stage 7: Enrichment and Integration
             result.processing_stage = ProcessingStage.ENRICHMENT
-            processed_transaction = await self._create_universal_processed_transaction(
-                transaction,
-                connector_type,
-                config,
-                validation_result,
-                duplicate_result,
-                amount_result,
-                business_rules_result,
-                pattern_result,
-                start_time
+            # Update processed transaction with pattern matching results
+            await self._enrich_processed_transaction(
+                processed_transaction, pattern_result, config, connector_type
             )
             
-            # Stage 7: Finalization
+            # Stage 8: Finalization
             result.processing_stage = ProcessingStage.FINALIZATION
             await self._finalize_processing(processed_transaction, result, config)
             
@@ -504,6 +520,136 @@ class UniversalTransactionProcessor:
                 enrichment.customer_confidence = customer_info.get('confidence', 0.0)
         
         # Determine final status based on connector type and Nigerian compliance
+        processed_tx.status = self._determine_universal_processing_status(
+            processed_tx, business_rules_result
+        )
+    
+    async def _process_ai_classification(
+        self,
+        processed_tx: UniversalProcessedTransaction,
+        config: ConnectorProcessingConfig
+    ) -> Optional[TransactionClassificationResult]:
+        """
+        Process AI-powered Nigerian transaction classification.
+        
+        This is the unified classification stage that replaces connector-specific
+        classification with a universal AI-powered approach.
+        """
+        if not self.nigerian_classifier:
+            logger.warning("Nigerian Classifier not available - skipping AI classification")
+            return None
+            
+        try:
+            # Build classification request from universal transaction data
+            classification_request = TransactionClassificationRequest(
+                transaction_id=processed_tx.transaction_id,
+                amount=float(processed_tx.amount),
+                currency_code=processed_tx.currency_code,
+                description=processed_tx.description,
+                counterparty_name=processed_tx.counterparty_name,
+                counterparty_account=getattr(processed_tx, 'counterparty_account', None),
+                merchant_category_code=getattr(processed_tx, 'merchant_category_code', None),
+                transaction_type=processed_tx.transaction_type,
+                
+                # Universal transaction context
+                source_system=processed_tx.connector_type.value,
+                business_context={
+                    'connector_type': processed_tx.connector_type.value,
+                    'processing_stage': 'universal_pipeline',
+                    'validation_passed': processed_tx.is_valid(),
+                    'duplicate_detected': processed_tx.is_duplicate(),
+                    'risk_level': processed_tx.processing_metadata.risk_level.value if processed_tx.processing_metadata.risk_level else 'unknown'
+                },
+                
+                # Include any existing enrichment data
+                metadata={
+                    'universal_processing': True,
+                    'enrichment_data': processed_tx.enrichment_data.__dict__ if processed_tx.enrichment_data else {},
+                    'processing_version': self.pipeline_version
+                }
+            )
+            
+            # Perform AI classification
+            logger.debug(f"Performing AI classification for transaction {processed_tx.transaction_id}")
+            classification_result = await self.nigerian_classifier.classify_transaction_async(
+                classification_request
+            )
+            
+            # Store classification results in processing metadata
+            if classification_result and classification_result.is_business_transaction:
+                processed_tx.enrichment_data.ai_classified = True
+                processed_tx.enrichment_data.classification_confidence = classification_result.confidence_score
+                processed_tx.enrichment_data.business_category = classification_result.business_category
+                processed_tx.enrichment_data.is_invoice_eligible = classification_result.is_business_transaction
+                processed_tx.enrichment_data.classification_reasoning = classification_result.reasoning
+                
+                # Add classification metadata
+                processed_tx.processing_metadata.add_stage_result('ai_classification', {
+                    'classification_id': classification_result.classification_id,
+                    'confidence': classification_result.confidence_score,
+                    'business_category': classification_result.business_category,
+                    'is_business': classification_result.is_business_transaction,
+                    'model_version': classification_result.model_version,
+                    'classified_at': datetime.utcnow().isoformat()
+                })
+                
+                logger.info(f"AI classification completed for {processed_tx.transaction_id}: {classification_result.business_category} ({classification_result.confidence_score:.2f})")
+            else:
+                logger.debug(f"AI classification determined transaction {processed_tx.transaction_id} is not business-related")
+            
+            return classification_result
+            
+        except Exception as e:
+            logger.error(f"AI classification failed for transaction {processed_tx.transaction_id}: {e}")
+            # Add failure metadata but don't fail the entire pipeline
+            processed_tx.processing_metadata.add_stage_result('ai_classification', {
+                'error': str(e),
+                'status': 'failed',
+                'fallback_used': True,
+                'classified_at': datetime.utcnow().isoformat()
+            })
+            return None
+    
+    async def _enrich_processed_transaction(
+        self,
+        processed_tx: UniversalProcessedTransaction,
+        pattern_result: PatternResult,
+        config: ConnectorProcessingConfig,
+        connector_type: ConnectorType
+    ):
+        """Enrich processed transaction with pattern matching and connector-specific data."""
+        
+        # Apply pattern matching results
+        if pattern_result.merchant_identified:
+            processed_tx.enrichment_data.merchant_name = pattern_result.merchant_name
+            processed_tx.enrichment_data.merchant_category = pattern_result.merchant_category
+            
+        if pattern_result.primary_category:
+            processed_tx.enrichment_data.primary_category = pattern_result.primary_category
+            
+        # Apply connector-specific enrichment
+        if connector_type.value.startswith('erp_'):
+            await self._enrich_erp_specific(processed_tx, pattern_result)
+        elif connector_type.value.startswith('banking_'):
+            await self._enrich_banking_specific(processed_tx, pattern_result)
+        elif connector_type.value.startswith('pos_'):
+            await self._enrich_pos_specific(processed_tx, pattern_result)
+        elif connector_type.value.startswith('crm_'):
+            await self._enrich_crm_specific(processed_tx, pattern_result)
+        
+        # Universal customer matching (works across all connector types)
+        if config.enable_customer_matching:
+            customer_info = await self._match_universal_customer(processed_tx, pattern_result)
+            if customer_info:
+                processed_tx.enrichment_data.customer_matched = True
+                processed_tx.enrichment_data.customer_id = customer_info.get('id')
+                processed_tx.enrichment_data.customer_name = customer_info.get('name')
+                processed_tx.enrichment_data.customer_type = customer_info.get('type')
+                processed_tx.enrichment_data.customer_confidence = customer_info.get('confidence', 0.0)
+        
+        # Determine final status based on connector type and Nigerian compliance
+        # (This includes AI classification results if available)
+        business_rules_result = BusinessRuleEngineResult.create_default(processed_tx.transaction_id)
         processed_tx.status = self._determine_universal_processing_status(
             processed_tx, business_rules_result
         )

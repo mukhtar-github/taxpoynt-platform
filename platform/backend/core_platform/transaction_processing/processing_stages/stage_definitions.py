@@ -12,7 +12,7 @@ consistent quality and compliance standards.
 
 Pipeline Architecture:
 Raw Transaction → Validation → Duplicate Detection → Amount Validation → 
-Business Rules → Pattern Matching → Enrichment → Finalization → Completed
+Business Rules → AI Classification → Pattern Matching → Enrichment → Finalization → Completed
 """
 
 from typing import Dict, List, Optional, Any, Set
@@ -30,6 +30,7 @@ class ProcessingStage(Enum):
     DUPLICATE_DETECTION = "duplicate_detection"
     AMOUNT_VALIDATION = "amount_validation"
     BUSINESS_RULES = "business_rules"
+    CLASSIFICATION = "classification"  # AI-powered Nigerian transaction classification
     PATTERN_MATCHING = "pattern_matching"
     ENRICHMENT = "enrichment"
     FINALIZATION = "finalization"
@@ -205,13 +206,28 @@ class PipelineProfileBuilder:
             }
         )
         
+        # AI Classification (Nigerian transaction classification)
+        pipeline.stage_configs[ProcessingStage.CLASSIFICATION] = StageConfiguration(
+            stage=ProcessingStage.CLASSIFICATION,
+            execution_mode=StageExecutionMode.OPTIONAL,  # Optional for trusted ERP data
+            failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
+            timeout_seconds=12,
+            dependencies={ProcessingStage.BUSINESS_RULES},
+            connector_specific_settings={
+                "use_nigerian_classifier": True,
+                "erp_classification_optimization": True,
+                "trust_erp_categories": True,
+                "classification_confidence_threshold": 0.6  # Lower threshold for ERP
+            }
+        )
+        
         # Pattern Matching (important for categorization)
         pipeline.stage_configs[ProcessingStage.PATTERN_MATCHING] = StageConfiguration(
             stage=ProcessingStage.PATTERN_MATCHING,
             execution_mode=StageExecutionMode.REQUIRED,
             failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
             timeout_seconds=25,
-            dependencies={ProcessingStage.BUSINESS_RULES},
+            dependencies={ProcessingStage.CLASSIFICATION},
             connector_specific_settings={
                 "use_erp_categories": True,
                 "enable_account_code_matching": True,
@@ -317,13 +333,28 @@ class PipelineProfileBuilder:
             }
         )
         
+        # AI Classification (Nigerian transaction classification)
+        pipeline.stage_configs[ProcessingStage.CLASSIFICATION] = StageConfiguration(
+            stage=ProcessingStage.CLASSIFICATION,
+            execution_mode=StageExecutionMode.REQUIRED,
+            failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
+            timeout_seconds=12,
+            dependencies={ProcessingStage.BUSINESS_RULES},
+            connector_specific_settings={
+                "use_nigerian_classifier": True,
+                "sme_classification_optimization": True,
+                "business_vs_personal_detection": True,
+                "classification_confidence_threshold": 0.7
+            }
+        )
+        
         # Pattern Matching
         pipeline.stage_configs[ProcessingStage.PATTERN_MATCHING] = StageConfiguration(
             stage=ProcessingStage.PATTERN_MATCHING,
             execution_mode=StageExecutionMode.REQUIRED,
             failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
             timeout_seconds=15,
-            dependencies={ProcessingStage.BUSINESS_RULES},
+            dependencies={ProcessingStage.CLASSIFICATION},
             connector_specific_settings={
                 "sme_pattern_library": True,
                 "simplified_categorization": True
@@ -430,13 +461,28 @@ class PipelineProfileBuilder:
             }
         )
         
+        # AI Classification (Nigerian transaction classification)
+        pipeline.stage_configs[ProcessingStage.CLASSIFICATION] = StageConfiguration(
+            stage=ProcessingStage.CLASSIFICATION,
+            execution_mode=StageExecutionMode.REQUIRED,
+            failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
+            timeout_seconds=10,
+            dependencies={ProcessingStage.BUSINESS_RULES, ProcessingStage.AMOUNT_VALIDATION},
+            connector_specific_settings={
+                "use_nigerian_classifier": True,
+                "customer_transaction_classification": True,
+                "retail_pattern_recognition": True,
+                "classification_confidence_threshold": 0.8  # Higher for customer-facing
+            }
+        )
+        
         # Pattern Matching (customer behavior patterns)
         pipeline.stage_configs[ProcessingStage.PATTERN_MATCHING] = StageConfiguration(
             stage=ProcessingStage.PATTERN_MATCHING,
             execution_mode=StageExecutionMode.REQUIRED,
             failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
             timeout_seconds=12,
-            dependencies={ProcessingStage.BUSINESS_RULES, ProcessingStage.AMOUNT_VALIDATION},
+            dependencies={ProcessingStage.CLASSIFICATION},
             connector_specific_settings={
                 "customer_pattern_recognition": True,
                 "product_categorization": True,
@@ -551,18 +597,36 @@ class PipelineProfileBuilder:
             }
         )
         
+        # AI Classification (Nigerian transaction classification)
+        pipeline.stage_configs[ProcessingStage.CLASSIFICATION] = StageConfiguration(
+            stage=ProcessingStage.CLASSIFICATION,
+            execution_mode=StageExecutionMode.REQUIRED,
+            failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
+            timeout_seconds=15,
+            dependencies={ProcessingStage.BUSINESS_RULES, ProcessingStage.AMOUNT_VALIDATION},
+            connector_specific_settings={
+                "use_nigerian_classifier": True,
+                "enable_openai_classification": True,
+                "business_vs_personal_detection": True,
+                "privacy_first_processing": True,
+                "enable_classification_caching": True,
+                "classification_confidence_threshold": 0.7
+            }
+        )
+        
         # Pattern Matching (financial patterns)
         pipeline.stage_configs[ProcessingStage.PATTERN_MATCHING] = StageConfiguration(
             stage=ProcessingStage.PATTERN_MATCHING,
             execution_mode=StageExecutionMode.REQUIRED,
             failure_action=StageFailureAction.CONTINUE_WITH_WARNING,
             timeout_seconds=20,
-            dependencies={ProcessingStage.BUSINESS_RULES, ProcessingStage.AMOUNT_VALIDATION},
+            dependencies={ProcessingStage.CLASSIFICATION},
             connector_specific_settings={
                 "financial_pattern_recognition": True,
                 "merchant_identification": True,
                 "transaction_categorization": True,
-                "behavioral_analysis": True
+                "behavioral_analysis": True,
+                "use_ai_classification_context": True  # Use AI classification results
             }
         )
         
