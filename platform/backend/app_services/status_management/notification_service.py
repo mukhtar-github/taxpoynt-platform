@@ -19,8 +19,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 from collections import defaultdict, deque
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import uuid
 import re
 import aiohttp
@@ -716,18 +716,18 @@ Status Description: {self._get_status_description(new_status)}
             raise ValueError("SMTP configuration not provided")
         
         # Create email message
-        msg = MimeMultipart('alternative')
+        msg = MIMEMultipart('alternative')
         msg['Subject'] = message.subject
         msg['From'] = self.smtp_config.get('from_email', 'noreply@taxpoynt.com')
         msg['To'] = email_address
         
         # Add text part
-        text_part = MimeText(message.body, 'plain')
+        text_part = MIMEText(message.body, 'plain')
         msg.attach(text_part)
         
         # Add HTML part if available
         if message.html_body:
-            html_part = MimeText(message.html_body, 'html')
+            html_part = MIMEText(message.html_body, 'html')
             msg.attach(html_part)
         
         # Send email
