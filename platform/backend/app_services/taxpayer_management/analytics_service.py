@@ -14,14 +14,18 @@ import numpy as np
 from sqlalchemy import and_, or_, func, distinct
 from sqlalchemy.orm import Session
 
-from core_platform.database import get_db_session
-from core_platform.models.taxpayer import Taxpayer, TaxpayerProfile
-from core_platform.models.onboarding import OnboardingApplication, OnboardingDocument
-from core_platform.models.compliance import ComplianceRecord, ComplianceIssue
-from core_platform.cache import CacheService
+from core_platform.data_management.database_init import get_db_session
+from core_platform.data_management.models.business_systems import Taxpayer
 from core_platform.events import EventBus
-from core_platform.monitoring import MetricsCollector
 from core_platform.notifications import NotificationService
+from core_platform.cache import CacheService
+from si_services.integration_management.metrics_collector import MetricsCollector
+from app_services.taxpayer_management.taxpayer_onboarding import (
+    TaxpayerProfile, OnboardingApplication, OnboardingDocument
+)
+from app_services.taxpayer_management.compliance_monitor import (
+    ComplianceRecord, ComplianceIssue
+)
 from core_platform.data_management.grant_tracking_repository import GrantTrackingRepository, TaxpayerSize, MilestoneType
 from hybrid_services.analytics_aggregation.kpi_calculator import KPICalculator
 
