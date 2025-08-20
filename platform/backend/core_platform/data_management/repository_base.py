@@ -691,3 +691,7 @@ def create_sort(field: str, direction: SortDirection = SortDirection.ASC) -> Sor
 def create_pagination(page: int = 1, page_size: int = 20, max_page_size: int = 1000) -> PaginationParams:
     """Create pagination parameters."""
     return PaginationParams(page, page_size, max_page_size)
+
+
+# Backward compatibility alias
+RepositoryBase = BaseRepository
