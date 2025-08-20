@@ -109,6 +109,64 @@ class RetryRequest:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass 
+class RetryResult:
+    """Result of retry operations"""
+    retry_id: str
+    original_request: TransmissionRequest
+    final_result: Optional[TransmissionResult] = None
+    success: bool = False
+    total_attempts: int = 0
+    total_delay: float = 0.0
+    completion_time: Optional[datetime] = None
+    error_details: Optional[str] = None
+    retry_attempts: List[RetryAttempt] = field(default_factory=list)
+    
+    # Analytics and metrics
+    first_attempt_at: Optional[datetime] = None
+    last_attempt_at: Optional[datetime] = None
+    success_attempt_number: Optional[int] = None
+    failed_reasons: List[RetryReason] = field(default_factory=list)
+    
+    # Business context
+    cost_impact: float = 0.0  # Cost of retry operations
+    business_priority: str = "normal"
+    customer_impact: str = "low"
+    sla_compliance: bool = True
+    
+    # Performance metrics
+    average_response_time: float = 0.0
+    fastest_attempt_time: float = 0.0
+    slowest_attempt_time: float = 0.0
+    
+    def __post_init__(self):
+        """Calculate derived metrics after initialization"""
+        if self.retry_attempts:
+            # Set timing metrics
+            if not self.first_attempt_at and self.retry_attempts:
+                self.first_attempt_at = self.retry_attempts[0].attempted_at
+            if not self.last_attempt_at and self.retry_attempts:
+                self.last_attempt_at = self.retry_attempts[-1].attempted_at
+                
+            # Calculate performance metrics  
+            response_times = [attempt.response_time for attempt in self.retry_attempts 
+                            if attempt.response_time is not None]
+            if response_times:
+                self.average_response_time = sum(response_times) / len(response_times)
+                self.fastest_attempt_time = min(response_times)
+                self.slowest_attempt_time = max(response_times)
+            
+            # Track failed reasons
+            self.failed_reasons = [attempt.reason for attempt in self.retry_attempts 
+                                 if attempt.reason is not None and not attempt.success]
+            
+            # Find success attempt
+            for i, attempt in enumerate(self.retry_attempts):
+                if attempt.success:
+                    self.success_attempt_number = i + 1
+                    break
+
+
 @dataclass
 class CircuitBreaker:
     """Circuit breaker for endpoint protection"""
