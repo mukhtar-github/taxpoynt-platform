@@ -1,1 +1,1 @@
-web: python main.py
+web: python debug_start.py
