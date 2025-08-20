@@ -24,12 +24,12 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from decimal import Decimal
 
-from ...external_integrations.financial_systems.banking.open_banking.providers.mono.connector import (
+from external_integrations.financial_systems.banking.open_banking.providers.mono.connector import (
     MonoConnector, 
     MonoConfig,
     AccountLinkingSession
 )
-from ...external_integrations.financial_systems.banking.open_banking.providers.mono.exceptions import (
+from external_integrations.financial_systems.banking.open_banking.providers.mono.exceptions import (
     MonoBaseException,
     MonoAuthenticationError,
     MonoConnectionError,

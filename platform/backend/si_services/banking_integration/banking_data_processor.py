@@ -22,7 +22,7 @@ import json
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
-from ...external_integrations.financial_systems.banking.open_banking.providers.mono.models import (
+from external_integrations.financial_systems.banking.open_banking.providers.mono.models import (
     MonoTransaction,
     MonoAccount,
     MonoTransactionType
