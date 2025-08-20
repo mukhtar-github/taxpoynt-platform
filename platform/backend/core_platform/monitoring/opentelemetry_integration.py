@@ -46,6 +46,12 @@ except ImportError:
     class Status:
         pass
     
+    # Create mock status codes
+    class StatusCode:
+        OK = "OK"
+        ERROR = "ERROR"
+        UNSET = "UNSET"
+    
     # Create mock trace module
     class MockTraceModule:
         class Context:
