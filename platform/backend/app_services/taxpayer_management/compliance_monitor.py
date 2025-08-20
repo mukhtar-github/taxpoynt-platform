@@ -860,3 +860,132 @@ def get_compliance_requirements_by_type(taxpayer_type: TaxpayerType) -> List[Com
     }
     
     return requirements_map.get(taxpayer_type, [])
+
+
+# Missing classes that are being imported
+@dataclass
+class ComplianceCheck:
+    """Individual compliance check result"""
+    check_id: str
+    requirement: ComplianceRequirement
+    status: ComplianceStatus
+    description: str
+    checked_at: datetime
+    next_check_date: Optional[datetime] = None
+    evidence: Optional[Dict[str, Any]] = None
+    remediation_required: bool = False
+
+
+@dataclass
+class ComplianceIssue:
+    """Compliance issue or violation"""
+    issue_id: str
+    taxpayer_id: str
+    requirement: ComplianceRequirement
+    severity: ComplianceSeverity
+    description: str
+    identified_at: datetime
+    due_date: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+    remediation_notes: Optional[str] = None
+    cost_impact: float = 0.0
+
+
+@dataclass
+class ComplianceMetrics:
+    """Compliance monitoring metrics"""
+    taxpayer_id: str
+    overall_compliance_rate: float
+    compliant_requirements: int
+    total_requirements: int
+    high_priority_issues: int
+    overdue_items: int
+    last_assessment_date: datetime
+    next_review_date: datetime
+    compliance_trend: str = "stable"  # improving, declining, stable
+
+
+@dataclass
+class ComplianceAlert:
+    """Compliance alert for urgent attention"""
+    alert_id: str
+    taxpayer_id: str
+    alert_type: str
+    severity: ComplianceSeverity
+    message: str
+    created_at: datetime
+    acknowledged: bool = False
+    resolved: bool = False
+    action_required: Optional[str] = None
+
+
+@dataclass
+class ComplianceRemediation:
+    """Compliance remediation action plan"""
+    remediation_id: str
+    issue_id: str
+    taxpayer_id: str
+    action_plan: str
+    assigned_to: Optional[str] = None
+    due_date: datetime
+    status: str = "pending"  # pending, in_progress, completed
+    progress_notes: List[str] = None
+    completion_date: Optional[datetime] = None
+    
+    def __post_init__(self):
+        if self.progress_notes is None:
+            self.progress_notes = []
+
+
+class ComplianceMonitor:
+    """Main compliance monitoring service - alias for TaxpayerComplianceMonitor"""
+    
+    def __init__(self):
+        self._internal_monitor = TaxpayerComplianceMonitor()
+    
+    async def monitor_taxpayer(self, taxpayer_id: str) -> ComplianceAssessment:
+        """Monitor compliance for a specific taxpayer"""
+        return await self._internal_monitor.monitor_taxpayer(taxpayer_id)
+    
+    async def check_requirement(self, taxpayer_id: str, requirement: ComplianceRequirement) -> ComplianceCheck:
+        """Check specific compliance requirement"""
+        return await self._internal_monitor.check_requirement(taxpayer_id, requirement)
+    
+    async def get_compliance_metrics(self, taxpayer_id: str) -> ComplianceMetrics:
+        """Get compliance metrics for taxpayer"""
+        assessment = await self.monitor_taxpayer(taxpayer_id)
+        
+        total_requirements = len(assessment.checks)
+        compliant_count = sum(1 for check in assessment.checks if check.status == ComplianceStatus.COMPLIANT)
+        high_priority_issues = sum(1 for violation in assessment.violations if violation.severity == ComplianceSeverity.HIGH)
+        
+        return ComplianceMetrics(
+            taxpayer_id=taxpayer_id,
+            overall_compliance_rate=assessment.overall_compliance_rate,
+            compliant_requirements=compliant_count,
+            total_requirements=total_requirements,
+            high_priority_issues=high_priority_issues,
+            overdue_items=len(assessment.violations),
+            last_assessment_date=assessment.assessment_date,
+            next_review_date=assessment.next_review_date
+        )
+    
+    async def create_alert(self, taxpayer_id: str, alert_type: str, message: str, 
+                          severity: ComplianceSeverity = ComplianceSeverity.MEDIUM) -> ComplianceAlert:
+        """Create compliance alert"""
+        import uuid
+        return ComplianceAlert(
+            alert_id=str(uuid.uuid4()),
+            taxpayer_id=taxpayer_id,
+            alert_type=alert_type,
+            severity=severity,
+            message=message,
+            created_at=datetime.now()
+        )
+
+
+# Factory function
+async def create_compliance_monitor() -> ComplianceMonitor:
+    """Create and initialize compliance monitor"""
+    monitor = ComplianceMonitor()
+    return monitor
