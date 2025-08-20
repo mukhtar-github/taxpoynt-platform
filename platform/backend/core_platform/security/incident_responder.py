@@ -926,4 +926,17 @@ if __name__ == "__main__":
         stats = incident_responder.get_incident_statistics()
         print(f"Incident statistics: {stats}")
     
+# Global instance for platform-wide access
+incident_responder = IncidentResponder()
+
+
+async def initialize_incident_responder():
+    """Initialize incident responder with default configuration"""
+    await incident_responder.start_incident_response()
+    logger.info("Incident responder initialized successfully")
+    return True
+
+
+# For testing
+if __name__ == "__main__":
     asyncio.run(main())

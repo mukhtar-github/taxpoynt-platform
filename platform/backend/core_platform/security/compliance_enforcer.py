@@ -777,4 +777,17 @@ if __name__ == "__main__":
         print(f"Compliance Score: {report.compliance_score:.1f}%")
         print(f"Violations: {len(report.violations)}")
     
+# Global instance for platform-wide access
+compliance_enforcer = ComplianceEnforcer()
+
+
+async def initialize_compliance_enforcer():
+    """Initialize compliance enforcer with default configuration"""
+    await compliance_enforcer.start_compliance_monitoring()
+    logger.info("Compliance enforcer initialized successfully")
+    return True
+
+
+# For testing
+if __name__ == "__main__":
     asyncio.run(main())
