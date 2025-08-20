@@ -6,7 +6,7 @@ Protects against XSS, clickjacking, MIME sniffing, and other web vulnerabilities
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 import os
