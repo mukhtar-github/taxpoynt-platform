@@ -12,6 +12,8 @@ Components:
 - IncidentTracker: Tracks incidents and their resolution across roles
 """
 
+from typing import List
+
 from .error_coordinator import (
     ErrorCoordinator,
     ErrorType,
