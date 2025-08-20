@@ -18,8 +18,8 @@ import logging
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import ConfigurationError
+from core_platform.shared.base_service import BaseService
+from core_platform.shared.exceptions import ConfigurationError
 
 from .config_coordinator import ConfigCoordinator
 from .feature_flag_manager import FeatureFlagManager
