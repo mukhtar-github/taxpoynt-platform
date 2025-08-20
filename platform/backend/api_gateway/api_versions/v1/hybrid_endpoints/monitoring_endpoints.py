@@ -80,6 +80,37 @@ class MonitoringEndpointsV1:
             response_model=V1ResponseModel,
             dependencies=[Depends(self._require_monitoring_access)]
         )
+        
+        # Core Platform Metrics Routes
+        self.router.add_api_route(
+            "/metrics",
+            self.create_metric_record,
+            methods=["POST"],
+            summary="Create metric record",
+            description="Create a new metric record",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_monitoring_access)]
+        )
+        
+        self.router.add_api_route(
+            "/metrics",
+            self.get_metrics,
+            methods=["GET"],
+            summary="Get metrics",
+            description="Get metrics data with filtering",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_monitoring_access)]
+        )
+        
+        self.router.add_api_route(
+            "/metrics/aggregate",
+            self.aggregate_metrics,
+            methods=["POST"],
+            summary="Aggregate metrics",
+            description="Get aggregated metrics data",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_monitoring_access)]
+        )
     
     async def _require_monitoring_access(self, request: Request) -> HTTPRoutingContext:
         """Require monitoring access"""
@@ -100,18 +131,131 @@ class MonitoringEndpointsV1:
         
         return context
     
-    # Placeholder implementations
+    # =============================================================================
+    # Core Platform Metrics Services
+    # =============================================================================
+    
+    async def create_metric_record(self, request: Request, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
+        """Create a new metric record"""
+        try:
+            body = await request.json()
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="create_metric_record",
+                payload={
+                    "user_id": context.user_id,
+                    "metric_data": body,
+                    "creator_role": context.primary_role
+                }
+            )
+            return self._create_v1_response(result, "metric_record_created")
+        except Exception as e:
+            logger.error(f"Error creating metric record in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create metric record")
+    
+    async def get_metrics(self, request: Request, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
+        """Get metrics data with filtering and aggregation"""
+        try:
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="get_metrics",
+                payload={
+                    "user_id": context.user_id,
+                    "role": context.primary_role,
+                    "filters": dict(request.query_params)
+                }
+            )
+            return self._create_v1_response(result, "metrics_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting metrics in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get metrics")
+    
+    async def aggregate_metrics(self, request: Request, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
+        """Get aggregated metrics data"""
+        try:
+            body = await request.json()
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="aggregate_metrics",
+                payload={
+                    "user_id": context.user_id,
+                    "aggregation_params": body,
+                    "requester_role": context.primary_role
+                }
+            )
+            return self._create_v1_response(result, "metrics_aggregated")
+        except Exception as e:
+            logger.error(f"Error aggregating metrics in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to aggregate metrics")
+    
+    # Enhanced monitoring implementations
     async def get_health_overview(self, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
-        """Get health overview - placeholder"""
-        return self._create_v1_response({"overall_health": "healthy"}, "health_overview_retrieved")
+        """Get comprehensive health overview"""
+        try:
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="get_platform_health",
+                payload={
+                    "user_id": context.user_id,
+                    "role": context.primary_role,
+                    "detailed": True
+                }
+            )
+            return self._create_v1_response(result, "health_overview_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting health overview in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get health overview")
     
-    async def get_performance_metrics(self, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
-        """Get performance metrics - placeholder"""
-        return self._create_v1_response({"metrics": {}}, "performance_metrics_retrieved")
+    async def get_performance_metrics(self, request: Request, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
+        """Get performance metrics"""
+        try:
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="get_performance_metrics",
+                payload={
+                    "user_id": context.user_id,
+                    "role": context.primary_role,
+                    "filters": dict(request.query_params)
+                }
+            )
+            return self._create_v1_response(result, "performance_metrics_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting performance metrics in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get performance metrics")
     
-    async def list_alerts(self, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
-        """List alerts - placeholder"""
-        return self._create_v1_response({"alerts": []}, "alerts_listed")
+    async def list_alerts(self, request: Request, context: HTTPRoutingContext = Depends(_require_monitoring_access)):
+        """List system alerts"""
+        try:
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="list_alerts",
+                payload={
+                    "user_id": context.user_id,
+                    "role": context.primary_role,
+                    "filters": dict(request.query_params)
+                }
+            )
+            return self._create_v1_response(result, "alerts_listed")
+        except Exception as e:
+            logger.error(f"Error listing alerts in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to list alerts")
+    
+    def _get_primary_service_role(self, context: HTTPRoutingContext) -> ServiceRole:
+        """Map user role to appropriate service role"""
+        if context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
+            return ServiceRole.SYSTEM_INTEGRATOR
+        elif context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            return ServiceRole.ACCESS_POINT_PROVIDER
+        elif context.has_role(PlatformRole.ADMINISTRATOR):
+            return ServiceRole.ADMINISTRATOR
+        else:
+            return ServiceRole.SYSTEM_INTEGRATOR  # Default
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
         """Create standardized v1 response format"""

@@ -131,12 +131,63 @@ class SharedResourcesEndpointsV1:
         )
         
         # Notification Services Routes
+        # Core Platform Services Routes
         self.router.add_api_route(
             "/notifications/send",
             self.send_notification,
             methods=["POST"],
             summary="Send notification",
             description="Send notification to users across roles",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_shared_access)]
+        )
+        
+        self.router.add_api_route(
+            "/notifications/send-email",
+            self.send_email_notification,
+            methods=["POST"],
+            summary="Send email notification",
+            description="Send email notification through the platform",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_shared_access)]
+        )
+        
+        self.router.add_api_route(
+            "/notifications/stats",
+            self.get_notification_stats,
+            methods=["GET"],
+            summary="Get notification statistics",
+            description="Get notification delivery statistics",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_shared_access)]
+        )
+        
+        self.router.add_api_route(
+            "/events/publish",
+            self.publish_event,
+            methods=["POST"],
+            summary="Publish event",
+            description="Publish an event to the platform event bus",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_shared_access)]
+        )
+        
+        self.router.add_api_route(
+            "/events/subscribe",
+            self.subscribe_to_events,
+            methods=["POST"],
+            summary="Subscribe to events",
+            description="Subscribe to platform events",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_shared_access)]
+        )
+        
+        self.router.add_api_route(
+            "/events/subscribers",
+            self.get_event_subscribers,
+            methods=["GET"],
+            summary="Get event subscribers",
+            description="Get list of event subscribers",
             response_model=V1ResponseModel,
             dependencies=[Depends(self._require_shared_access)]
         )
@@ -254,10 +305,133 @@ class SharedResourcesEndpointsV1:
         """Get shared file - placeholder"""
         return self._create_v1_response({"file_id": file_id}, "shared_file_retrieved")
     
-    async def send_notification(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
-        """Send notification - placeholder"""
-        return self._create_v1_response({"notification_sent": True}, "notification_sent")
+    # =============================================================================
+    # Core Platform Services - Notification & Event Bus
+    # =============================================================================
     
+    async def send_notification(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
+        """Send a notification through the platform notification service"""
+        try:
+            body = await request.json()
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="send_notification",
+                payload={
+                    "user_id": context.user_id,
+                    "notification_data": body,
+                    "sender_role": context.primary_role
+                }
+            )
+            return self._create_v1_response(result, "notification_sent")
+        except Exception as e:
+            logger.error(f"Error sending notification in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to send notification")
+    
+    async def send_email_notification(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
+        """Send an email notification"""
+        try:
+            body = await request.json()
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="send_email_notification",
+                payload={
+                    "user_id": context.user_id,
+                    "email_data": body,
+                    "sender_role": context.primary_role
+                }
+            )
+            return self._create_v1_response(result, "email_notification_sent")
+        except Exception as e:
+            logger.error(f"Error sending email notification in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to send email notification")
+    
+    async def get_notification_stats(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
+        """Get notification delivery statistics"""
+        try:
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="get_notification_stats",
+                payload={
+                    "user_id": context.user_id,
+                    "role": context.primary_role,
+                    "filters": dict(request.query_params)
+                }
+            )
+            return self._create_v1_response(result, "notification_stats_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting notification stats in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get notification statistics")
+    
+    async def publish_event(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
+        """Publish an event to the platform event bus"""
+        try:
+            body = await request.json()
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="publish_event",
+                payload={
+                    "user_id": context.user_id,
+                    "event_data": body,
+                    "publisher_role": context.primary_role
+                }
+            )
+            return self._create_v1_response(result, "event_published")
+        except Exception as e:
+            logger.error(f"Error publishing event in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to publish event")
+    
+    async def subscribe_to_events(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
+        """Subscribe to platform events"""
+        try:
+            body = await request.json()
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="subscribe_to_events",
+                payload={
+                    "user_id": context.user_id,
+                    "subscription_data": body,
+                    "subscriber_role": context.primary_role
+                }
+            )
+            return self._create_v1_response(result, "event_subscription_created")
+        except Exception as e:
+            logger.error(f"Error subscribing to events in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to subscribe to events")
+    
+    async def get_event_subscribers(self, request: Request, context: HTTPRoutingContext = Depends(_require_shared_access)):
+        """Get list of event subscribers"""
+        try:
+            service_role = self._get_primary_service_role(context)
+            result = await self.message_router.route_message(
+                service_role=service_role,
+                operation="get_event_subscribers",
+                payload={
+                    "user_id": context.user_id,
+                    "role": context.primary_role,
+                    "filters": dict(request.query_params)
+                }
+            )
+            return self._create_v1_response(result, "event_subscribers_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting event subscribers in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get event subscribers")
+    
+    def _get_primary_service_role(self, context: HTTPRoutingContext) -> ServiceRole:
+        """Map user role to appropriate service role"""
+        if context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
+            return ServiceRole.SYSTEM_INTEGRATOR
+        elif context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            return ServiceRole.ACCESS_POINT_PROVIDER
+        elif context.has_role(PlatformRole.ADMINISTRATOR):
+            return ServiceRole.ADMINISTRATOR
+        else:
+            return ServiceRole.SYSTEM_INTEGRATOR  # Default
+
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
         """Create standardized v1 response format"""
         response_data = {
