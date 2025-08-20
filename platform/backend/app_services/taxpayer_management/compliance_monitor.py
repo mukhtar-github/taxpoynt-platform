@@ -926,8 +926,8 @@ class ComplianceRemediation:
     issue_id: str
     taxpayer_id: str
     action_plan: str
-    assigned_to: Optional[str] = None
     due_date: datetime
+    assigned_to: Optional[str] = None
     status: str = "pending"  # pending, in_progress, completed
     progress_notes: List[str] = None
     completion_date: Optional[datetime] = None
