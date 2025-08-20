@@ -19,7 +19,7 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional
 
-from ..core_platform.messaging.message_router import MessageRouter, ServiceRole
+from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
 # Import APP services
 from .webhook_services.webhook_receiver import WebhookReceiver
