@@ -14,7 +14,7 @@ import time
 import hashlib
 import gzip
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union, Callable
+from typing import Dict, Any, Optional, List, Union, Callable, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 import logging
