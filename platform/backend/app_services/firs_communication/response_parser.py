@@ -74,7 +74,7 @@ class FIRSError:
     """FIRS error information"""
     code: str
     message: str
-    field: Optional[str] = None
+    field_name: Optional[str] = None
     severity: str = "error"  # error, warning, info
     details: Optional[Dict[str, Any]] = None
     suggestions: List[str] = field(default_factory=list)
