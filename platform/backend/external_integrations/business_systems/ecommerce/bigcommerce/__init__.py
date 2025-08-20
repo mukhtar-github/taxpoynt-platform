@@ -31,7 +31,7 @@ Key Features:
 
 Usage Example:
     ```python
-    from taxpoynt_platform.external_integrations.business_systems.ecommerce.bigcommerce import (
+    from external_integrations.business_systems.ecommerce.bigcommerce import (
         BigCommerceEcommerceConnector,
         BigCommerceAuthManager,
         BigCommerceRESTClient
@@ -321,7 +321,7 @@ def create_connector(config: dict) -> BigCommerceEcommerceConnector:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.bigcommerce import (
+        from external_integrations.business_systems.ecommerce.bigcommerce import (
             create_connector
         )
         
@@ -362,7 +362,7 @@ def validate_config(config: dict) -> dict:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.bigcommerce import (
+        from external_integrations.business_systems.ecommerce.bigcommerce import (
             validate_config
         )
         
@@ -436,7 +436,7 @@ def generate_oauth_url(client_id: str, redirect_uri: str, scope: str = None, sta
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.bigcommerce import (
+        from external_integrations.business_systems.ecommerce.bigcommerce import (
             generate_oauth_url
         )
         

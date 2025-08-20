@@ -21,7 +21,7 @@ import ssl
 from contextlib import asynccontextmanager
 
 # Import authentication services
-from taxpoynt_platform.si_services.authentication import (
+from si_services.authentication import (
     AuthenticationManager,
     ERPAuthProvider,
     TokenManager,

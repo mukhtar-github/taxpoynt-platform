@@ -25,7 +25,7 @@ Components:
 - InterswitchWebhookHandler: Webhook processing and validation
 
 Usage:
-    from taxpoynt_platform.external_integrations.financial_systems.payments.nigerian_processors.interswitch import (
+    from external_integrations.financial_systems.payments.nigerian_processors.interswitch import (
         InterswitchConnector, InterswitchConfig
     )
     

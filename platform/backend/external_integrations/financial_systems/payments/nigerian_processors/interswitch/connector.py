@@ -23,9 +23,9 @@ from .models import InterswitchTransaction, InterswitchCustomer, NIGERIAN_BANKS
 from .auth import InterswitchAuthManager, InterswitchCredentials
 from .payment_processor import InterswitchPaymentProcessor, InterswitchConfig
 from .webhook_handler import InterswitchWebhookHandler, InterswitchWebhookConfig
-from taxpoynt_platform.external_integrations.connector_framework.base_payment_connector import BasePaymentConnector
-from taxpoynt_platform.core_platform.monitoring.logging.service import LoggingService
-from taxpoynt_platform.core_platform.data_management.privacy.models import PrivacyLevel
+from external_integrations.connector_framework.base_payment_connector import BasePaymentConnector
+from core_platform.monitoring.logging.service import LoggingService
+from core_platform.data_management.privacy.models import PrivacyLevel
 
 
 @dataclass

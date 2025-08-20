@@ -21,8 +21,8 @@ from .models import (
 )
 from .auth import PalmPayAuthManager
 from .payment_processor import PalmPayPaymentProcessor, PalmPayConfig
-from taxpoynt_platform.core_platform.monitoring.logging.service import LoggingService
-from taxpoynt_platform.core_platform.transaction_processing.universal_processor import UniversalTransactionProcessor
+from core_platform.monitoring.logging.service import LoggingService
+from core_platform.transaction_processing.universal_processor import UniversalTransactionProcessor
 
 
 class PalmPayWebhookEventType(Enum):

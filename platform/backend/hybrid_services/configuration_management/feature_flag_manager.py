@@ -16,8 +16,8 @@ import logging
 import random
 from pathlib import Path
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import (
+from core_platform.shared.base_service import BaseService
+from core_platform.shared.exceptions import (
     ConfigurationError,
     ValidationError,
     SecurityError

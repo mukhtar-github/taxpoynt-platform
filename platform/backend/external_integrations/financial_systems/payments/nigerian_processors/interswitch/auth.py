@@ -16,8 +16,8 @@ import asyncio
 import aiohttp
 from dataclasses import dataclass
 
-from taxpoynt_platform.core_platform.security.encryption.service import EncryptionService
-from taxpoynt_platform.core_platform.monitoring.logging.service import LoggingService
+from core_platform.security.encryption.service import EncryptionService
+from core_platform.monitoring.logging.service import LoggingService
 
 
 @dataclass

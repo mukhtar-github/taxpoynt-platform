@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Import integrated services
-from taxpoynt_platform.si_services.authentication import (
+from si_services.authentication import (
     AuthenticationManager,
     ERPAuthProvider,
     FIRSAuthService,
@@ -27,17 +27,17 @@ from taxpoynt_platform.si_services.authentication import (
     ERPSystem
 )
 
-from taxpoynt_platform.si_services.erp_integration import (
+from si_services.erp_integration import (
     create_authenticated_erp_session_manager,
     ERPType,
     SessionManagerConfig
 )
 
-from taxpoynt_platform.si_services.certificate_management import (
+from si_services.certificate_management import (
     CertificateService
 )
 
-from taxpoynt_platform.si_services.irn_qr_generation import (
+from si_services.irn_qr_generation import (
     IRNGenerationService
 )
 

@@ -19,7 +19,7 @@ from .duplicate_detector import DuplicateDetector
 from .irn_validator import IRNValidator, ValidationLevel
 
 # Import authentication services for FIRS integration
-from taxpoynt_platform.si_services.authentication import (
+from si_services.authentication import (
     FIRSAuthService,
     AuthenticationManager,
     AuthenticationError

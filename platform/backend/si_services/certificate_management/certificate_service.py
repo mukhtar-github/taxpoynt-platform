@@ -20,7 +20,7 @@ from .lifecycle_manager import LifecycleManager
 from .ca_integration import CAIntegration
 
 # Import authentication services for certificate-based auth
-from taxpoynt_platform.si_services.authentication import (
+from si_services.authentication import (
     CertificateAuth,
     AuthenticationManager,
     AuthenticationError

@@ -20,10 +20,10 @@ from .models import (
     InterswitchTransactionStatus, InterswitchApiResponse, NIGERIAN_BANKS
 )
 from .auth import InterswitchAuthManager, InterswitchCredentials
-from taxpoynt_platform.core_platform.ai.classification.service import ClassificationService
-from taxpoynt_platform.core_platform.data_management.privacy.service import PrivacyService
-from taxpoynt_platform.core_platform.monitoring.logging.service import LoggingService
-from taxpoynt_platform.core_platform.data_management.privacy.models import PrivacyLevel
+from core_platform.ai.classification.service import ClassificationService
+from core_platform.data_management.privacy.service import PrivacyService
+from core_platform.monitoring.logging.service import LoggingService
+from core_platform.data_management.privacy.models import PrivacyLevel
 
 
 @dataclass

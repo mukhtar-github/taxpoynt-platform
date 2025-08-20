@@ -367,7 +367,7 @@ LINE_ITEM_TYPES = {
 INTEGRATION_EXAMPLES = {
     "basic_setup": '''
 # Basic FreshBooks integration setup
-from taxpoynt_platform.external_integrations.business_systems.accounting.freshbooks import create_freshbooks_connector
+from external_integrations.business_systems.accounting.freshbooks import create_freshbooks_connector
 
 async def setup_freshbooks_integration():
     connector = create_freshbooks_connector(
@@ -473,7 +473,7 @@ async def create_client_and_invoice(connector, account_id=None):
     
     "error_handling": '''
 # Comprehensive error handling
-from taxpoynt_platform.external_integrations.business_systems.accounting.freshbooks import (
+from external_integrations.business_systems.accounting.freshbooks import (
     FreshBooksException, FreshBooksAuthenticationError, FreshBooksRateLimitError
 )
 

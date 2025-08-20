@@ -25,7 +25,7 @@ Nigerian Market Integration:
 - CBN (Central Bank of Nigeria) compliance
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.moniepoint import (
+    from external_integrations.business_systems.pos.moniepoint import (
         MoniepointPOSConnector,
         MoniepointAuthManager,
         MoniepointRestClient,

@@ -18,8 +18,8 @@ import logging
 from pathlib import Path
 import secrets as py_secrets
 
-from taxpoynt_platform.core_platform.shared.base_service import BaseService
-from taxpoynt_platform.core_platform.shared.exceptions import (
+from core_platform.shared.base_service import BaseService
+from core_platform.shared.exceptions import (
     ConfigurationError,
     ValidationError,
     SecurityError

@@ -27,7 +27,7 @@ E-commerce Features:
 - Inventory and fulfillment tracking
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.ecommerce.shopify import (
+    from external_integrations.business_systems.ecommerce.shopify import (
         ShopifyEcommerceConnector,
         ShopifyAuthManager,
         ShopifyRestClient,

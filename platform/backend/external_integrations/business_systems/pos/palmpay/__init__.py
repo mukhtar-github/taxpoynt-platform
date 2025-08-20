@@ -29,7 +29,7 @@ Nigerian Mobile Money Integration:
 - Agent network transaction support
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.palmpay import (
+    from external_integrations.business_systems.pos.palmpay import (
         PalmPayPOSConnector,
         PalmPayAuthManager,
         PalmPayRestClient,

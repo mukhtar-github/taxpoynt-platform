@@ -35,7 +35,7 @@ Key Features:
 
 Usage Example:
     ```python
-    from taxpoynt_platform.external_integrations.business_systems.ecommerce.jumia import (
+    from external_integrations.business_systems.ecommerce.jumia import (
         JumiaEcommerceConnector,
         JumiaAuthManager,
         JumiaRESTClient
@@ -347,7 +347,7 @@ def create_connector(config: dict) -> JumiaEcommerceConnector:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.jumia import (
+        from external_integrations.business_systems.ecommerce.jumia import (
             create_connector
         )
         
@@ -379,7 +379,7 @@ def validate_config(config: dict) -> dict:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.jumia import (
+        from external_integrations.business_systems.ecommerce.jumia import (
             validate_config
         )
         
@@ -449,7 +449,7 @@ def get_marketplace_info(country_code: str) -> dict:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.jumia import (
+        from external_integrations.business_systems.ecommerce.jumia import (
             get_marketplace_info
         )
         

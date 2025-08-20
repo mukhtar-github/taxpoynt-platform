@@ -9,7 +9,7 @@ This package provides comprehensive validation services including:
 - Validation error handling
 
 Usage:
-    from taxpoynt_platform.app_services.validation import (
+    from app_services.validation import (
         FIRSValidator, SubmissionValidator, FormatValidator,
         CompletenessChecker, ValidationErrorHandler
     )

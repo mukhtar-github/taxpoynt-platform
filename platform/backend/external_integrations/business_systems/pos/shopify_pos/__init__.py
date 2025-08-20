@@ -12,7 +12,7 @@ Main Components:
 - ShopifyTransactionTransformer: FIRS-compliant invoice transformation
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.shopify_pos import ShopifyPOSConnector
+    from external_integrations.business_systems.pos.shopify_pos import ShopifyPOSConnector
     
     # OAuth 2.0 configuration
     config = {

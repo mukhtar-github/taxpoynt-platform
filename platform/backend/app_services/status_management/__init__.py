@@ -9,7 +9,7 @@ This package provides comprehensive submission status management services includ
 - Webhook callback management with retry mechanisms
 
 Usage:
-    from taxpoynt_platform.app_services.status_management import (
+    from app_services.status_management import (
         StatusTracker, AcknowledgmentHandler, ErrorProcessor,
         NotificationService, CallbackManager
     )

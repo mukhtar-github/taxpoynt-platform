@@ -26,7 +26,7 @@ Key Features:
 
 Usage Example:
     ```python
-    from taxpoynt_platform.external_integrations.business_systems.ecommerce.magento import (
+    from external_integrations.business_systems.ecommerce.magento import (
         MagentoEcommerceConnector,
         MagentoAuthManager,
         MagentoRESTClient
@@ -272,7 +272,7 @@ def create_connector(config: dict) -> MagentoEcommerceConnector:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.magento import (
+        from external_integrations.business_systems.ecommerce.magento import (
             create_connector
         )
         
@@ -313,7 +313,7 @@ def validate_config(config: dict) -> dict:
         
     Example:
         ```python
-        from taxpoynt_platform.external_integrations.business_systems.ecommerce.magento import (
+        from external_integrations.business_systems.ecommerce.magento import (
             validate_config
         )
         

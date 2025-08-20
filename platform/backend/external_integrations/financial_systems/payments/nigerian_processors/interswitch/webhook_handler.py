@@ -21,8 +21,8 @@ from .models import (
 )
 from .auth import InterswitchAuthManager
 from .payment_processor import InterswitchPaymentProcessor, InterswitchConfig
-from taxpoynt_platform.core_platform.monitoring.logging.service import LoggingService
-from taxpoynt_platform.core_platform.transaction_processing.universal_processor import UniversalTransactionProcessor
+from core_platform.monitoring.logging.service import LoggingService
+from core_platform.transaction_processing.universal_processor import UniversalTransactionProcessor
 
 
 class InterswitchWebhookEventType(Enum):

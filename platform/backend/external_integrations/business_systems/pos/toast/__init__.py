@@ -22,7 +22,7 @@ Nigerian Tax Compliance:
 - FIRS-compliant invoice generation
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.toast import (
+    from external_integrations.business_systems.pos.toast import (
         ToastPOSConnector,
         ToastAuthManager,
         ToastRestClient,

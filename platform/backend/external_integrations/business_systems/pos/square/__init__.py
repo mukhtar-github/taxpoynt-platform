@@ -12,7 +12,7 @@ Main Components:
 - SquareTransactionTransformer: FIRS-compliant invoice transformation
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.square import SquarePOSConnector
+    from external_integrations.business_systems.pos.square import SquarePOSConnector
     
     config = {
         'application_id': 'your_square_application_id',

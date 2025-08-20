@@ -13,7 +13,7 @@ This package provides:
 - Repository pattern with caching and filtering
 
 Usage:
-    from taxpoynt_platform.core_platform.data_management import (
+    from core_platform.data_management import (
         DataManagementService,
         DatabaseAbstractionLayer,
         MultiTenantManager,

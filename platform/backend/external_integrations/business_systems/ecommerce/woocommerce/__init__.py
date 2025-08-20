@@ -26,7 +26,7 @@ WordPress Integration Features:
 - WordPress multisite support
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.ecommerce.woocommerce import (
+    from external_integrations.business_systems.ecommerce.woocommerce import (
         WooCommerceEcommerceConnector,
         WooCommerceAuthManager,
         WooCommerceRestClient,

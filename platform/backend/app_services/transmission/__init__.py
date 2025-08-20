@@ -9,7 +9,7 @@ This package provides comprehensive document transmission capabilities including
 - Delivery tracking with full audit trails
 
 Usage:
-    from taxpoynt_platform.app_services.transmission import (
+    from app_services.transmission import (
         SecureTransmitter, BatchTransmitter, RealTimeTransmitter,
         RetryHandler, DeliveryTracker
     )

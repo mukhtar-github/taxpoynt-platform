@@ -12,7 +12,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
-from taxpoynt_platform.core_platform.data_management.privacy.models import (
+from core_platform.data_management.privacy.models import (
     PrivacyLevel, DataClassification, ConsentStatus
 )
 

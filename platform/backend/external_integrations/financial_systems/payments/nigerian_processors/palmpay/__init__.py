@@ -25,7 +25,7 @@ Components:
 - PalmPayWebhookHandler: Webhook processing and validation
 
 Usage:
-    from taxpoynt_platform.external_integrations.financial_systems.payments.nigerian_processors.palmpay import (
+    from external_integrations.financial_systems.payments.nigerian_processors.palmpay import (
         PalmPayConnector, PalmPayConfig
     )
     

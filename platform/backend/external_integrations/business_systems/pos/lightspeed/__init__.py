@@ -13,7 +13,7 @@ Main Components:
 - LightspeedTransactionTransformer: FIRS-compliant invoice transformation
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.lightspeed import LightspeedPOSConnector
+    from external_integrations.business_systems.pos.lightspeed import LightspeedPOSConnector
     
     # Lightspeed Retail configuration
     config = {

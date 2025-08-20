@@ -9,7 +9,7 @@ This package provides comprehensive security and compliance services including:
 - Threat detection and response
 
 Usage:
-    from taxpoynt_platform.app_services.security_compliance import (
+    from app_services.security_compliance import (
         TLSManager, EncryptionService, AuditLogger, 
         AccessController, ThreatDetector
     )

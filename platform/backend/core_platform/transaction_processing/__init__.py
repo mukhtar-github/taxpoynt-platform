@@ -29,7 +29,7 @@ This package provides:
 - Performance optimization and enterprise monitoring
 
 Usage:
-    from taxpoynt_platform.core_platform.transaction_processing import (
+    from core_platform.transaction_processing import (
         UniversalTransactionProcessor,
         ConnectorType,
         ConnectorProcessingConfig,

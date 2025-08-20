@@ -513,11 +513,11 @@ def get_cloud_based_platforms() -> List[str]:
 INTEGRATION_EXAMPLES = {
     "basic_setup": '''
 # Basic inventory integration setup
-from taxpoynt_platform.external_integrations.business_systems.inventory import create_inventory_connector
+from external_integrations.business_systems.inventory import create_inventory_connector
 
 async def setup_inventory_integration():
     # Check available platforms
-    from taxpoynt_platform.external_integrations.business_systems.inventory import list_available_platforms
+    from external_integrations.business_systems.inventory import list_available_platforms
     available = list_available_platforms()
     print(f"Available platforms: {[p['name'] for p in available]}")
     

@@ -9,7 +9,7 @@ This package provides comprehensive authentication seal services including:
 - Document verification services
 
 Usage:
-    from taxpoynt_platform.app_services.authentication_seals import (
+    from app_services.authentication_seals import (
         SealGenerator, StampValidator, IntegrityChecker, 
         SealRepository, VerificationService
     )

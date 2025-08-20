@@ -33,7 +33,7 @@ role-specific documentation, SDKs, and Postman collections.
 ## Usage
 
 ```python
-from taxpoynt_platform.api_gateway.documentation import (
+from api_gateway.documentation import (
     generate_si_api_docs,
     generate_app_api_docs, 
     generate_hybrid_api_docs,

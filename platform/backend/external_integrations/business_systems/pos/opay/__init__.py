@@ -26,7 +26,7 @@ Nigerian Mobile Money Integration:
 - CBN (Central Bank of Nigeria) compliance
 
 Usage:
-    from taxpoynt_platform.external_integrations.business_systems.pos.opay import (
+    from external_integrations.business_systems.pos.opay import (
         OPayPOSConnector,
         OPayAuthManager,
         OPayRestClient,

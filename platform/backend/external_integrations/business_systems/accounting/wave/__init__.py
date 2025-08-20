@@ -329,7 +329,7 @@ SUPPORTED_COUNTRIES = {
 INTEGRATION_EXAMPLES = {
     "basic_setup": '''
 # Basic Wave integration setup
-from taxpoynt_platform.external_integrations.business_systems.accounting.wave import create_wave_connector
+from external_integrations.business_systems.accounting.wave import create_wave_connector
 
 async def setup_wave_integration():
     connector = create_wave_connector(
@@ -396,7 +396,7 @@ async def batch_process_invoices(connector, invoice_ids):
     
     "error_handling": '''
 # Comprehensive error handling
-from taxpoynt_platform.external_integrations.business_systems.accounting.wave import (
+from external_integrations.business_systems.accounting.wave import (
     WaveException, WaveAuthenticationError, WaveRateLimitError
 )
 
