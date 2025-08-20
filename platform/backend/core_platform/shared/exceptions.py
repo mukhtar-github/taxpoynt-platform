@@ -53,3 +53,9 @@ class NetworkError(ServiceError):
     """Network-related errors"""
     def __init__(self, message: str, error_code: str = None, details: dict = None):
         super().__init__(message, error_code or "NETWORK_ERROR", details)
+
+
+class SecurityError(ServiceError):
+    """Security-related errors"""
+    def __init__(self, message: str, error_code: str = None, details: dict = None):
+        super().__init__(message, error_code or "SECURITY_ERROR", details)
