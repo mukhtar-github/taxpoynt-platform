@@ -32,6 +32,9 @@ from .metrics_aggregator import (
     shutdown_metrics_aggregation
 )
 
+# Backward compatibility alias
+MetricsCollector = MetricCollector
+
 from .health_orchestrator import (
     HealthOrchestrator,
     HealthCheck,
@@ -131,6 +134,7 @@ __all__ = [
     'AggregatedMetric',
     'MetricSource',
     'MetricCollector',
+    'MetricsCollector',  # Backward compatibility alias
     'ServiceRole',
     'MetricType',
     'AggregationMethod',

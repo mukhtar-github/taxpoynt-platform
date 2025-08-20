@@ -22,6 +22,19 @@ try:
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    # Mock classes for when prometheus_client is not available
+    class CollectorRegistry:
+        pass
+    class Counter:
+        pass
+    class Gauge:
+        pass
+    class Histogram:
+        pass
+    class Summary:
+        pass
+    class Info:
+        pass
 
 from .metrics_aggregator import MetricsAggregator, MetricType, ServiceRole
 
