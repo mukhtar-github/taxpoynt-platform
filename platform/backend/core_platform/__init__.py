@@ -26,6 +26,9 @@ from . import security
 # Commonly used imports
 from .events import EventBus, get_event_bus
 from .notifications import NotificationService, get_notification_service
+from .ai import AIService, get_ai_service
+from .cache import CacheService, get_cache_service
+from .storage import FileStorage, get_file_storage
 
 __all__ = [
     'authentication',
@@ -36,5 +39,11 @@ __all__ = [
     'EventBus',
     'get_event_bus',
     'NotificationService',
-    'get_notification_service'
+    'get_notification_service',
+    'AIService',
+    'get_ai_service',
+    'CacheService',
+    'get_cache_service',
+    'FileStorage',
+    'get_file_storage'
 ]
