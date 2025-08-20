@@ -73,6 +73,14 @@ class SecurityEventType(Enum):
     SUSPICIOUS_ACTIVITY = "suspicious_activity"
 
 
+class ThreatLevel(Enum):
+    """Threat severity levels"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 @dataclass
 class SecurityPolicy:
     """Security policy configuration"""
@@ -120,6 +128,30 @@ class SecurityMetric:
     timestamp: datetime
     tags: Dict[str, str] = field(default_factory=dict)
     threshold_breached: bool = False
+
+
+class SecurityMetrics:
+    """Security metrics collection and management"""
+    
+    def __init__(self):
+        self.metrics: Dict[str, SecurityMetric] = {}
+        self.aggregated_metrics: Dict[str, Dict[str, Any]] = {}
+    
+    def add_metric(self, metric: SecurityMetric) -> None:
+        """Add a security metric"""
+        self.metrics[metric.metric_id] = metric
+    
+    def get_metric(self, metric_id: str) -> Optional[SecurityMetric]:
+        """Get a specific metric"""
+        return self.metrics.get(metric_id)
+    
+    def get_metrics_by_domain(self, domain: SecurityDomain) -> List[SecurityMetric]:
+        """Get metrics for a specific security domain"""
+        return [metric for metric in self.metrics.values() if metric.security_domain == domain]
+    
+    def get_metrics_by_service(self, service_role: ServiceRole) -> List[SecurityMetric]:
+        """Get metrics for a specific service role"""
+        return [metric for metric in self.metrics.values() if metric.service_role == service_role]
 
 
 @dataclass
@@ -1327,6 +1359,12 @@ async def setup_default_security_policies():
     )
     
     logger.info("Default security policies setup completed")
+
+
+async def initialize_security_orchestrator():
+    """Initialize security orchestrator with default configuration"""
+    await security_orchestrator.start_security_orchestration()
+    logger.info("Security orchestrator initialized successfully")
 
 
 async def shutdown_security_orchestration():
