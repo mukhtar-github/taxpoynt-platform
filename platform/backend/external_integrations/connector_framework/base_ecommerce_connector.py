@@ -14,11 +14,11 @@ from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
 from .base_connector import ConnectorConfig
-from ..shared.exceptions.integration_exceptions import (
-    ConnectionError,
+from core_platform.shared.exceptions import (
     AuthenticationError,
-    DataSyncError,
-    ValidationError
+    ValidationError,
+    IntegrationError as DataSyncError,
+    NetworkError as ConnectionError
 )
 
 logger = logging.getLogger(__name__)
