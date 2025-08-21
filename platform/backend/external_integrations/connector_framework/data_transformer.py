@@ -19,7 +19,25 @@ import re
 
 from .base_connector import DataFormat
 
+# Re-export DataFormat for convenience
+__all__ = ['DataTransformer', 'TransformationConfig', 'DataFormat']
+
 logger = logging.getLogger(__name__)
+
+@dataclass
+class TransformationConfig:
+    """Configuration for data transformation operations"""
+    profile_id: str
+    source_format: DataFormat
+    target_format: DataFormat
+    validation_level: Optional[str] = "moderate"
+    field_mappings: List[Dict[str, Any]] = field(default_factory=list)
+    transformation_rules: List[Dict[str, Any]] = field(default_factory=list)
+    custom_functions: Dict[str, str] = field(default_factory=dict)
+    batch_size: int = 1000
+    timeout_seconds: int = 30
+    retry_attempts: int = 3
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 class TransformationType(Enum):
     FORMAT_CONVERSION = "format_conversion"
