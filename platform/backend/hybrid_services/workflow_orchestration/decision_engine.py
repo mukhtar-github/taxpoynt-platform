@@ -14,7 +14,7 @@ import operator
 import re
 
 from core_platform.data_management.database_init import get_db_session
-from core_platform.models.decision import DecisionRule, DecisionExecution, DecisionContext
+# DecisionRule, DecisionExecution, DecisionContext are defined locally in this file
 from core_platform.cache import CacheService
 from core_platform.events import EventBus
 from core_platform.monitoring import MetricsCollector
