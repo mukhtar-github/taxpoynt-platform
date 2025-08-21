@@ -148,7 +148,7 @@ class MonoIdentity(BaseModel):
     email: Optional[str] = Field(None, description="Email address")
     phone: Optional[str] = Field(None, description="Phone number")
     gender: Optional[str] = Field(None, description="Gender")
-    dob: Optional[date] = Field(None, description="Date of birth")
+    dob: Optional[Date] = Field(None, description="Date of birth")
     bvn: Optional[str] = Field(None, description="Bank Verification Number")
     address: Optional[Dict[str, str]] = Field(None, description="Address information")
 
