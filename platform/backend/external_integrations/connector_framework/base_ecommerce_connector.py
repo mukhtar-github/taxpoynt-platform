@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
-from ..framework.models.base_models import ConnectionConfig
+from .base_connector import ConnectorConfig
 from ..shared.exceptions.integration_exceptions import (
     ConnectionError,
     AuthenticationError,
@@ -192,7 +192,7 @@ class BaseEcommerceConnector(ABC):
     - Nigerian tax compliance (7.5% VAT)
     """
     
-    def __init__(self, config: ConnectionConfig):
+    def __init__(self, config: ConnectorConfig):
         """
         Initialize base e-commerce connector.
         
