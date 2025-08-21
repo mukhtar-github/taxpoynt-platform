@@ -28,7 +28,7 @@ from ..connector_configs.processing_config import get_processing_config
 from ..processing_stages.stage_definitions import get_default_pipeline_for_connector
 from ..models.universal_transaction import UniversalTransaction
 from ..models.universal_processed_transaction import UniversalProcessedTransaction
-from ...external_integrations.connector_framework.base_erp_connector import BaseERPConnector
+from external_integrations.connector_framework.base_erp_connector import BaseERPConnector
 
 logger = logging.getLogger(__name__)
 

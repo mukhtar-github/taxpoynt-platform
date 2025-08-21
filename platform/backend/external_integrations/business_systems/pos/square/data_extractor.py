@@ -12,7 +12,7 @@ from datetime import datetime
 
 from .rest_client import SquareRESTClient
 from .exceptions import SquareAPIError, SquareNotFoundError
-from ....connector_framework.base_pos_connector import (
+from external_integrations.connector_framework.base_pos_connector import (
     POSTransaction, POSLocation, POSPaymentMethod, POSInventoryItem
 )
 

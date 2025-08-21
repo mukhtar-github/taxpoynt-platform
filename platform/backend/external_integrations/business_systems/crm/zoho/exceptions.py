@@ -3,7 +3,7 @@ Zoho CRM Connector - Custom Exceptions
 Exception classes for Zoho CRM integration and error handling.
 """
 
-from ....connector_framework import CRMConnectionError, CRMAuthenticationError, CRMDataError
+from external_integrations.connector_framework import CRMConnectionError, CRMAuthenticationError, CRMDataError
 
 
 class ZohoCRMConnectionError(CRMConnectionError):

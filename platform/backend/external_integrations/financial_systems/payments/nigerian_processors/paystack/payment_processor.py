@@ -18,7 +18,7 @@ from .models import (
     PaystackTransaction, PaystackCustomer, PaystackRefund,
     PaystackApiResponse, PaystackSettlement
 )
-from ....connector_framework.base_payment_connector import (
+from external_integrations.connector_framework.base_payment_connector import (
     PaymentStatus, PaymentMethod, TransactionType
 )
 

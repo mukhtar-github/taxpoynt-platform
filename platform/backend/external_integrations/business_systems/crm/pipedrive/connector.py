@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 import asyncio
 
-from ....connector_framework import BaseCRMConnector, CRMConnectionError, CRMDataError
+from external_integrations.connector_framework import BaseCRMConnector, CRMConnectionError, CRMDataError
 from .auth import PipedriveAuthenticator
 from .rest_client import PipedriveRestClient
 from .data_extractor import PipedriveDataExtractor

@@ -10,7 +10,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from ....framework.models.pos_models import (
+from external_integrations.connector_framework.models.pos_models import (
     CustomerInfo,
     POSLineItem,
     POSTransaction,
@@ -18,8 +18,8 @@ from ....framework.models.pos_models import (
     TaxInfo,
     WebhookPayload
 )
-from ....shared.utils.data_transformer import DataTransformer
-from ....shared.utils.validation_utils import ValidationUtils
+from external_integrations.shared.utils.data_transformer import DataTransformer
+from external_integrations.shared.utils.validation_utils import ValidationUtils
 from .rest_client import ToastRestClient
 from .exceptions import ToastDataExtractionError, create_toast_exception
 

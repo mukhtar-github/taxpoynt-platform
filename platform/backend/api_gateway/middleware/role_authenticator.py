@@ -14,7 +14,7 @@ from fastapi import Request, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ...core_platform.authentication.role_manager import (
+from core_platform.authentication.role_manager import (
     RoleManager, PlatformRole, RoleScope, UserRoleContext
 )
 from ..role_routing.models import HTTPRoutingContext

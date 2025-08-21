@@ -5,7 +5,7 @@ Custom exceptions for Magento e-commerce platform integration errors.
 
 from typing import Optional, Dict, Any
 
-from ....shared.exceptions.integration_exceptions import (
+from external_integrations.shared.exceptions.integration_exceptions import (
     ConnectionError,
     AuthenticationError,
     DataSyncError,

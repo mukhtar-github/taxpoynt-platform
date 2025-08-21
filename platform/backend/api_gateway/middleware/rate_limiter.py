@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ...core_platform.authentication.role_manager import PlatformRole
+from core_platform.authentication.role_manager import PlatformRole
 from ..role_routing.models import HTTPRoutingContext, HTTPMethod
 
 logger = logging.getLogger(__name__)

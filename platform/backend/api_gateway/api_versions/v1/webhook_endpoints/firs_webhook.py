@@ -30,10 +30,10 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Request, HTTPException, Header, status
 from fastapi.responses import JSONResponse
 
-from .....core_platform.messaging.message_router import MessageRouter, ServiceRole
-from .....app_services.webhook_services.webhook_receiver import WebhookReceiver
-from .....app_services.status_management.callback_manager import CallbackManager
-from ...version_models import V1ResponseModel
+from core_platform.messaging.message_router import MessageRouter, ServiceRole
+from app_services.webhook_services.webhook_receiver import WebhookReceiver
+from app_services.status_management.callback_manager import CallbackManager
+from api_gateway.api_versions.models import V1ResponseModel
 
 logger = logging.getLogger(__name__)
 

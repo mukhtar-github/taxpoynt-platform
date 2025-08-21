@@ -14,7 +14,7 @@ from .wave import WaveConnector, create_wave_connector
 from .freshbooks import FreshBooksConnector, create_freshbooks_connector
 
 # Import base connector for type hints
-from ...framework.accounting.base_connector import BaseAccountingConnector
+from external_integrations.connector_framework.accounting.base_connector import BaseAccountingConnector
 
 # Import common exceptions
 from .quickbooks.exceptions import QuickBooksException

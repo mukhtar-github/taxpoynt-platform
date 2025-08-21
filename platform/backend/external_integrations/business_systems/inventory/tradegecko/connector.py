@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 import asyncio
 
-from ....connector_framework.inventory.base_inventory_connector import BaseInventoryConnector
+from external_integrations.connector_framework.inventory.base_inventory_connector import BaseInventoryConnector
 from .auth import TradeGeckoAuthManager
 from .rest_client import TradeGeckoRestClient
 from .data_extractor import TradeGeckoDataExtractor

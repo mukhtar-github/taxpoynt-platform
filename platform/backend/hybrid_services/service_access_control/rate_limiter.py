@@ -25,9 +25,9 @@ from functools import wraps
 import threading
 
 # Import existing platform services
-from ...billing_orchestration.tier_manager import TierManager
-from ....core_platform.monitoring import MetricsCollector
-from ....core_platform.data_management.cache_manager import CacheManager
+from hybrid_services.billing_orchestration.tier_manager import TierManager
+from core_platform.monitoring import MetricsCollector
+from core_platform.data_management.cache_manager import CacheManager
 
 logger = logging.getLogger(__name__)
 

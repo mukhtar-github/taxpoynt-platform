@@ -20,11 +20,11 @@ from enum import Enum
 from decimal import Decimal
 
 # Import existing platform services
-from ...billing_orchestration.tier_manager import TierManager, AccessDecision
-from ...billing_orchestration.subscription_manager import SubscriptionManager
-from ....core_platform.monitoring import MetricsCollector
-from ....core_platform.data_management.cache_manager import CacheManager
-from ....core_platform.notifications import NotificationService
+from hybrid_services.billing_orchestration.tier_manager import TierManager, AccessDecision
+from hybrid_services.billing_orchestration.subscription_manager import SubscriptionManager
+from core_platform.monitoring import MetricsCollector
+from core_platform.data_management.cache_manager import CacheManager
+from core_platform.notifications import NotificationService
 
 logger = logging.getLogger(__name__)
 

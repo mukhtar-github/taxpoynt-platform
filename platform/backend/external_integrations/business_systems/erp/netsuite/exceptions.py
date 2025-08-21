@@ -3,7 +3,7 @@ NetSuite ERP Connector - Custom Exceptions
 Exception classes for NetSuite ERP integration and error handling.
 """
 
-from ....connector_framework import ERPConnectionError, ERPAuthenticationError, ERPDataError
+from external_integrations.connector_framework import ERPConnectionError, ERPAuthenticationError, ERPDataError
 
 
 class NetSuiteConnectionError(ERPConnectionError):

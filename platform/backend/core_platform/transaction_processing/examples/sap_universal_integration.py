@@ -36,7 +36,7 @@ from datetime import datetime, timedelta
 
 from ..adapters.erp_connector_adapter import ERPConnectorAdapter, create_erp_adapter
 from ..connector_configs.connector_types import ConnectorType
-from ....external_integrations.business_systems.erp.sap.connector import SAPConnector
+from external_integrations.business_systems.erp.sap.connector import SAPConnector
 
 logger = logging.getLogger(__name__)
 

@@ -10,14 +10,14 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-from ....framework.models.pos_models import (
+from external_integrations.connector_framework.models.pos_models import (
     CustomerInfo,
     POSLineItem,
     POSTransaction,
     PaymentInfo,
     TaxInfo
 )
-from ....shared.models.invoice_models import (
+from external_integrations.shared.models.invoice_models import (
     InvoiceAddress,
     InvoiceCustomer,
     InvoiceHeader,
@@ -26,9 +26,9 @@ from ....shared.models.invoice_models import (
     InvoiceTax,
     UBLInvoice
 )
-from ....shared.services.tax_calculator import NigerianTaxCalculator
-from ....shared.utils.currency_converter import CurrencyConverter
-from ....shared.utils.validation_utils import ValidationUtils
+from external_integrations.shared.services.tax_calculator import NigerianTaxCalculator
+from external_integrations.shared.utils.currency_converter import CurrencyConverter
+from external_integrations.shared.utils.validation_utils import ValidationUtils
 
 logger = logging.getLogger(__name__)
 

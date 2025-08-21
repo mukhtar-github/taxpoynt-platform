@@ -14,7 +14,7 @@ from .pipedrive import PipedriveConnector, create_pipedrive_connector
 from .microsoft_dynamics import MicrosoftDynamicsConnector, create_microsoft_dynamics_connector
 
 # Import base connector for type hints
-from ...framework.crm.base_connector import BaseCRMConnector
+from external_integrations.connector_framework.crm.base_connector import BaseCRMConnector
 
 
 logger = logging.getLogger(__name__)

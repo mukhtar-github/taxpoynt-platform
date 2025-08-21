@@ -30,7 +30,7 @@ from typing import Dict, List, Optional, Any
 
 from ..adapters.crm_connector_adapter import create_crm_adapter
 from ..connector_configs.connector_types import ConnectorType
-from ...external_integrations.business_systems.crm.salesforce.connector import SalesforceCRMConnector
+from external_integrations.business_systems.crm.salesforce.connector import SalesforceCRMConnector
 
 logger = logging.getLogger(__name__)
 

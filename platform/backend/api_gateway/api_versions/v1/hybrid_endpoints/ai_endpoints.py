@@ -12,9 +12,9 @@ from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from pydantic import BaseModel, Field
 from uuid import UUID
 
-from .....core_platform.ai import AIService, get_ai_service, AIConfig, AICapability
-from .....core_platform.authentication.role_manager import PlatformRole, RoleScope
-from ....role_routing.permission_guard import APIPermissionGuard
+from core_platform.ai import AIService, get_ai_service, AIConfig, AICapability
+from core_platform.authentication.role_manager import PlatformRole, RoleScope
+from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel, V1ErrorModel
 
 logger = logging.getLogger(__name__)

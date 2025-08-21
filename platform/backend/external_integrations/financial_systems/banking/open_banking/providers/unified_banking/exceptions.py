@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
 
-from .....shared.exceptions import IntegrationError
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class ErrorSeverity(Enum):

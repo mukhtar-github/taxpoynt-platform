@@ -25,8 +25,8 @@ import hashlib
 import uuid
 from collections import defaultdict, deque
 
-from ....shared.logging import get_logger
-from ....shared.exceptions import IntegrationError
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class ThreatLevel(Enum):

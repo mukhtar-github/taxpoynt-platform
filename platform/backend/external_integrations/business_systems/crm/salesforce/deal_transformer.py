@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Union
 
-from ....connector_framework import CRMDataError
+from external_integrations.connector_framework import CRMDataError
 from .exceptions import SalesforceDataError
 
 logger = logging.getLogger(__name__)

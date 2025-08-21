@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.datastructures import MutableHeaders
 
-from ...core_platform.authentication.role_manager import PlatformRole
+from core_platform.authentication.role_manager import PlatformRole
 from ..role_routing.models import HTTPRoutingContext, HTTPMethod
 
 logger = logging.getLogger(__name__)

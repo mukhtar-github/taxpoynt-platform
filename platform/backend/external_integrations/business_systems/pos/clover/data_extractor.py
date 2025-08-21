@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
 
-from ....connector_framework.base_pos_connector import (
+from external_integrations.connector_framework.base_pos_connector import (
     POSTransaction, POSLocation, POSPaymentMethod, POSInventoryItem
 )
 from .rest_client import CloverRESTClient

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 from app.schemas.integration import IntegrationTestResult
-from ....connector_framework import BaseERPConnector
+from external_integrations.connector_framework import BaseERPConnector
 from .auth import NetSuiteAuthenticator
 from .rest_client import NetSuiteRESTClient
 from .data_extractor import NetSuiteDataExtractor

@@ -15,7 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, ValidationError, validator
 from email_validator import validate_email, EmailNotValidError
 
-from ...core_platform.authentication.role_manager import PlatformRole, RoleScope
+from core_platform.authentication.role_manager import PlatformRole, RoleScope
 from ..role_routing.models import HTTPRoutingContext, HTTPMethod, RouteType
 
 logger = logging.getLogger(__name__)

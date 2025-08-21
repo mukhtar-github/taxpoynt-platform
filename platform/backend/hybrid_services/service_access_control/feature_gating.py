@@ -23,12 +23,12 @@ from functools import wraps
 import inspect
 
 # Import existing platform services
-from ...configuration_management.feature_flag_manager import (
+from hybrid_services.configuration_management.feature_flag_manager import (
     FeatureFlagManager, FlagType, FlagStatus, RolloutStrategy
 )
-from ...billing_orchestration.tier_manager import TierManager, FeatureCategory
-from ....core_platform.monitoring import MetricsCollector
-from ....core_platform.data_management.cache_manager import CacheManager
+from hybrid_services.billing_orchestration.tier_manager import TierManager, FeatureCategory
+from core_platform.monitoring import MetricsCollector
+from core_platform.data_management.cache_manager import CacheManager
 
 logger = logging.getLogger(__name__)
 

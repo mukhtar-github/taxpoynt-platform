@@ -23,12 +23,12 @@ import logging
 import uuid
 
 # Import existing APP services
-from .....app_services.transmission import (
+from app_services.transmission import (
     SecureTransmitter, BatchTransmitter, TransmissionRequest, 
     BatchRequest, BatchItem, TransmissionStatus
 )
-from .....app_services.firs_communication import FIRSAPIClient
-from .....app_services.validation import FIRSValidator
+from app_services.firs_communication import FIRSAPIClient
+from app_services.validation import FIRSValidator
 
 # Import banking integration components
 from .auto_invoice_generator import AutoInvoiceGenerator, InvoiceGenerationResult
@@ -41,7 +41,7 @@ from ..transaction_processing.processed_transaction import ProcessedTransaction
 from ..transaction_processing.transaction_processor import TransactionProcessor
 
 # Import core models
-from .....core_platform.data_management import DatabaseAbstraction
+from core_platform.data_management import DatabaseAbstraction
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from .rest_client import SageRestClient
 from .exceptions import SageDataError, SageValidationError
-from ....connector_framework.base_accounting_connector import (
+from external_integrations.connector_framework.base_accounting_connector import (
     AccountingTransaction,
     AccountingContact,
     AccountingAccount,

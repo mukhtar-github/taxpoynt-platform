@@ -15,7 +15,7 @@ from enum import Enum
 from decimal import Decimal
 from datetime import datetime
 
-from ....connector_framework.base_banking_connector import BankTransaction
+from external_integrations.connector_framework.base_banking_connector import BankTransaction
 from .transaction_validator import ValidationResult
 from .duplicate_detector import DuplicateResult
 

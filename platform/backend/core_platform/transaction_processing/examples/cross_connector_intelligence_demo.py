@@ -42,9 +42,9 @@ from ..intelligence.customer_matching_engine import (
 )
 
 # Import example connectors (these would be real connectors in production)
-from ...external_integrations.business_systems.erp.sap.connector import SAPERPConnector
-from ...external_integrations.business_systems.pos.square.connector import SquarePOSConnector
-from ...external_integrations.business_systems.crm.salesforce.connector import SalesforceCRMConnector
+from external_integrations.business_systems.erp.sap.connector import SAPERPConnector
+from external_integrations.business_systems.pos.square.connector import SquarePOSConnector
+from external_integrations.business_systems.crm.salesforce.connector import SalesforceCRMConnector
 
 logger = logging.getLogger(__name__)
 

@@ -13,8 +13,8 @@ import re
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from ...core_platform.authentication.role_manager import PlatformRole, RoleScope
-from ...core_platform.messaging.message_router import ServiceRole, MessageRouter
+from core_platform.authentication.role_manager import PlatformRole, RoleScope
+from core_platform.messaging.message_router import ServiceRole, MessageRouter
 
 logger = logging.getLogger(__name__)
 

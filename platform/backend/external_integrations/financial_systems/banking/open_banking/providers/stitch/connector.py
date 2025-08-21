@@ -33,10 +33,10 @@ from .models import (
     StitchAccountHierarchy, StitchComplianceReport
 )
 
-from ....base import BaseBankingConnector
-from .......shared.logging import get_logger
-from .......shared.exceptions import IntegrationError
-from .......shared.config import BaseConfig
+from external_integrations.financial_systems.banking.open_banking.base import BaseBankingConnector
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
+from external_integrations.shared.config import BaseConfig
 
 
 class StitchBankingConnector(BaseBankingConnector):

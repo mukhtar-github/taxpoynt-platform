@@ -15,7 +15,7 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
-from ....connector_framework.base_pos_connector import (
+from external_integrations.connector_framework.base_pos_connector import (
     BasePOSConnector, POSTransaction, POSWebhookEvent, POSLocation, 
     POSPaymentMethod, POSInventoryItem, POSRefund
 )

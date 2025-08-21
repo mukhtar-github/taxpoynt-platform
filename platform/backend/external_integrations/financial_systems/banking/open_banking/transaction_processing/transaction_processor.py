@@ -20,7 +20,7 @@ from datetime import datetime
 import asyncio
 import logging
 
-from ....connector_framework.base_banking_connector import BankTransaction
+from external_integrations.connector_framework.base_banking_connector import BankTransaction
 from .transaction_validator import TransactionValidator, ValidationResult
 from .duplicate_detector import DuplicateDetector, DuplicateResult
 from .amount_validator import AmountValidator, AmountValidationResult

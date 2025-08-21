@@ -3,7 +3,7 @@ HubSpot CRM Connector - Custom Exceptions
 Exception classes for HubSpot CRM integration and error handling.
 """
 
-from ....connector_framework import CRMConnectionError, CRMAuthenticationError, CRMDataError
+from external_integrations.connector_framework import CRMConnectionError, CRMAuthenticationError, CRMDataError
 
 
 class HubSpotConnectionError(CRMConnectionError):

@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from datetime import datetime, date
 
-from ....connector_framework.base_pos_connector import POSTransaction
+from external_integrations.connector_framework.base_pos_connector import POSTransaction
 
 logger = logging.getLogger(__name__)
 

@@ -27,9 +27,9 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Request, HTTPException, Header, status
 from fastapi.responses import JSONResponse
 
-from .....core_platform.messaging.message_router import MessageRouter, ServiceRole
-from .....si_services.banking_integration.mono_integration_service import MonoIntegrationService
-from ...version_models import V1ResponseModel
+from core_platform.messaging.message_router import MessageRouter, ServiceRole
+from si_services.banking_integration.mono_integration_service import MonoIntegrationService
+from api_gateway.api_versions.models import V1ResponseModel
 
 logger = logging.getLogger(__name__)
 

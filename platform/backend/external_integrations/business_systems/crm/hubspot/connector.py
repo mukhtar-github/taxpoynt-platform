@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 # from app.schemas.integration import IntegrationTestResult  # TODO: Replace with taxpoynt_platform schema
-from ....connector_framework import BaseCRMConnector
+from external_integrations.connector_framework import BaseCRMConnector
 from .auth import HubSpotAuthenticator
 from .rest_client import HubSpotRESTClient
 from .data_extractor import HubSpotDataExtractor

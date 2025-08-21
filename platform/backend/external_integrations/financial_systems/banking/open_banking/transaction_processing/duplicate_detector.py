@@ -22,9 +22,9 @@ import json
 import logging
 from collections import defaultdict
 
-from ....connector_framework.base_banking_connector import BankTransaction
-from .....core_platform.data_management import DatabaseAbstraction
-from .....core_platform.messaging import CacheManager
+from external_integrations.connector_framework.base_banking_connector import BankTransaction
+from core_platform.data_management import DatabaseAbstraction
+from core_platform.messaging import CacheManager
 
 logger = logging.getLogger(__name__)
 

@@ -162,7 +162,7 @@ class TransactionProcessingService:
             
             # Import Nigerian Classifier (optional)
             try:
-                from ...external_integrations.connector_framework.classification_engine.nigerian_classifier import (
+                from external_integrations.connector_framework.classification_engine.nigerian_classifier import (
                     NigerianTransactionClassifier
                 )
                 nigerian_classifier = NigerianTransactionClassifier()

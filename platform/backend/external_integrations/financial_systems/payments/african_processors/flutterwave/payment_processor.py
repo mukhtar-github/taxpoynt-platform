@@ -29,11 +29,11 @@ from .models import (
     MobileMoneyProvider, AFRICAN_COUNTRY_CURRENCIES, MOBILE_MONEY_COUNTRIES
 )
 from .auth import FlutterwaveAuthManager, FlutterwaveCredentials
-from ....connector_framework.classification_engine.nigerian_classifier import (
+from external_integrations.connector_framework.classification_engine.nigerian_classifier import (
     NigerianTransactionClassifier, TransactionClassificationRequest,
     UserContext, NigerianBusinessContext, PrivacyLevel
 )
-from ....connector_framework.classification_engine.privacy_protection import (
+from external_integrations.connector_framework.classification_engine.privacy_protection import (
     APIPrivacyProtection, PIIRedactor
 )
 

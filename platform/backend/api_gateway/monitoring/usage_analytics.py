@@ -19,7 +19,7 @@ import math
 from ..role_routing.models import HTTPRoutingContext, PlatformRole, RouteType, HTTPMethod
 from .role_metrics import TimeWindow, RoleMetricsCollector, RoleMetricPoint
 from .performance_tracker import PerformanceTracker
-from ...core_platform.authentication.role_manager import ServiceRole
+from core_platform.authentication.role_manager import ServiceRole
 
 logger = logging.getLogger(__name__)
 

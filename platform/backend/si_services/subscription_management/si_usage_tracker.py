@@ -15,9 +15,9 @@ from enum import Enum
 from decimal import Decimal
 
 from .si_tier_manager import SIUsageType, SITierManager
-from ...hybrid_services.billing_orchestration.usage_tracker import UsageTracker
-from ...core_platform.monitoring import MetricsCollector
-from ...core_platform.data_management.cache_manager import CacheManager
+from hybrid_services.billing_orchestration.usage_tracker import UsageTracker
+from core_platform.monitoring import MetricsCollector
+from core_platform.data_management.cache_manager import CacheManager
 
 logger = logging.getLogger(__name__)
 

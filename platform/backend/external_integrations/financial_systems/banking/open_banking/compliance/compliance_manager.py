@@ -32,8 +32,8 @@ from .exceptions import (
     ComplianceViolationError, AuditTrailError, ConfigurationError
 )
 
-from .....shared.logging import get_logger
-from .....shared.exceptions import IntegrationError
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class ComplianceLevel(Enum):

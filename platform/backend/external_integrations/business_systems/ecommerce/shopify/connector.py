@@ -10,16 +10,16 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-from ....connector_framework.base_ecommerce_connector import (
+from external_integrations.connector_framework.base_ecommerce_connector import (
     BaseEcommerceConnector,
     EcommerceOrder,
     EcommerceSyncResult,
     EcommerceHealthStatus,
     EcommerceWebhookPayload
 )
-from ....framework.models.base_models import ConnectionConfig
-from ....shared.models.invoice_models import UBLInvoice
-from ....shared.exceptions.integration_exceptions import (
+from external_integrations.connector_framework.models.base_models import ConnectionConfig
+from external_integrations.shared.models.invoice_models import UBLInvoice
+from external_integrations.shared.exceptions.integration_exceptions import (
     ConnectionError,
     AuthenticationError,
     DataSyncError,

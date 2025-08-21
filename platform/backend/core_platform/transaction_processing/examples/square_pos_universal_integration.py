@@ -30,7 +30,7 @@ from typing import Dict, List, Optional, Any
 
 from ..adapters.pos_connector_adapter import create_pos_adapter
 from ..connector_configs.connector_types import ConnectorType
-from ...external_integrations.business_systems.pos.square.connector import SquarePOSConnector
+from external_integrations.business_systems.pos.square.connector import SquarePOSConnector
 
 logger = logging.getLogger(__name__)
 

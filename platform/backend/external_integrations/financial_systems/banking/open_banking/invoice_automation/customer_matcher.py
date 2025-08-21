@@ -21,10 +21,10 @@ import logging
 from decimal import Decimal
 from datetime import datetime
 
-from .....core.models.customer import CustomerInfo
-from .....core.models.transaction import BankTransaction
-from .....core.utils.text_matching import fuzzy_match, normalize_text
-from .....core.cache.redis_cache import RedisCache
+from core.models.customer import CustomerInfo
+from core.models.transaction import BankTransaction
+from core.utils.text_matching import fuzzy_match, normalize_text
+from core.cache.redis_cache import RedisCache
 
 logger = logging.getLogger(__name__)
 

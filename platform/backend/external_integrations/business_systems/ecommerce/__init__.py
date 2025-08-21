@@ -14,7 +14,7 @@ from .bigcommerce import BigCommerceConnector, create_bigcommerce_connector
 from .jumia import JumiaConnector, create_jumia_connector
 
 # Import base connector for type hints
-from ...framework.ecommerce.base_connector import BaseECommerceConnector
+from external_integrations.connector_framework.ecommerce.base_connector import BaseECommerceConnector
 
 
 logger = logging.getLogger(__name__)

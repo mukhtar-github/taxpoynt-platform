@@ -6,7 +6,7 @@ Handles transformation of Zoho CRM deal data to invoice formats for FIRS complia
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
-from ....connector_framework import CRMDataError
+from external_integrations.connector_framework import CRMDataError
 
 
 class ZohoCRMDealTransformer:

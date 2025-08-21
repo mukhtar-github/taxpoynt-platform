@@ -4,7 +4,7 @@ Custom exceptions for QuickBooks accounting platform integration errors.
 """
 from typing import Optional, Dict, Any
 
-from ....connector_framework.base_accounting_connector import (
+from external_integrations.connector_framework.base_accounting_connector import (
     AccountingConnectionError,
     AccountingAuthenticationError,
     AccountingDataError,

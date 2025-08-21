@@ -22,7 +22,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 import time
 
-from ...base import BaseBankingConnector
+from external_integrations.financial_systems.banking.open_banking.base import BaseBankingConnector
 from .models import (
     BankingProviderType, ProviderStatus, FailoverPolicy,
     CircuitBreakerState, FailoverEvent, RecoveryAttempt
@@ -32,8 +32,8 @@ from .exceptions import (
     FailoverTimeoutError, MaxRetriesExceededError
 )
 
-from .....shared.logging import get_logger
-from .....shared.exceptions import IntegrationError
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class FailoverStrategy(Enum):

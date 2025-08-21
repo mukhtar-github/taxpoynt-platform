@@ -36,7 +36,7 @@ except ImportError:
     logger.warning("Unleashed connector not available")
 
 # Import base connector for type hints
-from ...connector_framework.base_inventory_connector import BaseInventoryConnector
+from external_integrations.connector_framework.base_inventory_connector import BaseInventoryConnector
 
 
 logger = logging.getLogger(__name__)

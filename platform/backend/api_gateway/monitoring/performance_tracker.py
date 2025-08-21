@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..role_routing.models import HTTPRoutingContext, PlatformRole, RouteType, HTTPMethod
 from .role_metrics import TimeWindow, RoleMetricsCollector
-from ...core_platform.authentication.role_manager import ServiceRole
+from core_platform.authentication.role_manager import ServiceRole
 
 logger = logging.getLogger(__name__)
 

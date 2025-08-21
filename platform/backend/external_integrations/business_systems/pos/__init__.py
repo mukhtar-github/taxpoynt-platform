@@ -17,7 +17,7 @@ from .palmpay import PalmPayConnector, create_palmpay_connector
 from .moniepoint import MoniepointConnector, create_moniepoint_connector
 
 # Import base connector for type hints
-from ...framework.pos.base_connector import BasePOSConnector
+from external_integrations.connector_framework.pos.base_connector import BasePOSConnector
 
 
 logger = logging.getLogger(__name__)

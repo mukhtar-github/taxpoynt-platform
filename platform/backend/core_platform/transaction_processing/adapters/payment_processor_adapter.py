@@ -35,7 +35,7 @@ from ..universal_processed_transaction import (
 )
 
 # Import our payment connector framework
-from ...external_integrations.connector_framework.base_payment_connector import (
+from external_integrations.connector_framework.base_payment_connector import (
     BasePaymentConnector, PaymentTransaction, PaymentWebhookEvent,
     PaymentStatus, PaymentMethod, TransactionType
 )

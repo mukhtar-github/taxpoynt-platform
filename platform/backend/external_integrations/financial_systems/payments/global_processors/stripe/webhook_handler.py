@@ -25,8 +25,8 @@ from dataclasses import dataclass
 from .models import StripeWebhookEvent, StripeTransaction, StripeCountry
 from .auth import StripeAuthManager
 from .payment_processor import StripePaymentProcessor
-from ....connector_framework.classification_engine.nigerian_classifier import NigerianTransactionClassifier
-from ....connector_framework.classification_engine.privacy_protection import APIPrivacyProtection
+from external_integrations.connector_framework.classification_engine.nigerian_classifier import NigerianTransactionClassifier
+from external_integrations.connector_framework.classification_engine.privacy_protection import APIPrivacyProtection
 
 
 @dataclass

@@ -10,8 +10,8 @@ from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from uuid import uuid4
 
-from ....connector_framework.base_ecommerce_connector import EcommerceOrder
-from ....shared.models.invoice_models import (
+from external_integrations.connector_framework.base_ecommerce_connector import EcommerceOrder
+from external_integrations.shared.models.invoice_models import (
     UBLInvoice,
     InvoiceHeader,
     InvoiceParty,
@@ -23,7 +23,7 @@ from ....shared.models.invoice_models import (
     Address,
     Contact
 )
-from ....shared.utils.ubl_generator import UBLGenerator
+from external_integrations.shared.utils.ubl_generator import UBLGenerator
 from .exceptions import WooCommerceTransformationError
 
 logger = logging.getLogger(__name__)

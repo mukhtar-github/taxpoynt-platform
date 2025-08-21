@@ -30,11 +30,11 @@ from .models import (
     StripePaymentStatus, STRIPE_COUNTRY_CURRENCIES
 )
 from .auth import StripeAuthManager, StripeCredentials
-from ....connector_framework.classification_engine.nigerian_classifier import (
+from external_integrations.connector_framework.classification_engine.nigerian_classifier import (
     NigerianTransactionClassifier, TransactionClassificationRequest,
     UserContext, NigerianBusinessContext, PrivacyLevel
 )
-from ....connector_framework.classification_engine.privacy_protection import (
+from external_integrations.connector_framework.classification_engine.privacy_protection import (
     APIPrivacyProtection, PIIRedactor
 )
 

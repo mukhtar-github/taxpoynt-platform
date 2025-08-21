@@ -14,9 +14,9 @@ import hmac
 import json
 from urllib.parse import urlencode
 
-from ....framework.models.pos_models import ConnectionConfig
-from ....shared.utils.encryption_utils import EncryptionUtils
-from ....shared.utils.cache_utils import CacheUtils
+from external_integrations.connector_framework.models.pos_models import ConnectionConfig
+from external_integrations.shared.utils.encryption_utils import EncryptionUtils
+from external_integrations.shared.utils.cache_utils import CacheUtils
 from .exceptions import PalmPayAuthenticationError, PalmPayAPIError
 
 logger = logging.getLogger(__name__)

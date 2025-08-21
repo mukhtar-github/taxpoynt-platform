@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from decimal import Decimal
 
-from ....framework.models.pos_models import POSTransaction, TransactionLineItem, PaymentInfo
-from ....shared.exceptions.integration_exceptions import DataExtractionError
+from external_integrations.connector_framework.models.pos_models import POSTransaction, TransactionLineItem, PaymentInfo
+from external_integrations.shared.exceptions.integration_exceptions import DataExtractionError
 from .rest_client import PalmPayRestClient
 from .exceptions import (
     PalmPayDataExtractionError,

@@ -22,10 +22,10 @@ import uuid
 import base64
 import logging
 
-from .....core.models.invoice import Invoice, InvoiceItem
-from .....core.exceptions import FormattingError, ValidationError
-from .....core.utils.qr_generator import QRCodeGenerator
-from .....core.utils.digital_signature import DigitalSigner
+from core.models.invoice import Invoice, InvoiceItem
+from core.exceptions import FormattingError, ValidationError
+from core.utils.qr_generator import QRCodeGenerator
+from core.utils.digital_signature import DigitalSigner
 
 logger = logging.getLogger(__name__)
 

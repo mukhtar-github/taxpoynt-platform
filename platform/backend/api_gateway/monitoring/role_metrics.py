@@ -18,7 +18,7 @@ import time
 from ..role_routing.models import (
     HTTPRoutingContext, PlatformRole, RouteType, HTTPMethod, RouteMetrics
 )
-from ...core_platform.authentication.role_manager import RoleScope, ServiceRole
+from core_platform.authentication.role_manager import RoleScope, ServiceRole
 
 logger = logging.getLogger(__name__)
 

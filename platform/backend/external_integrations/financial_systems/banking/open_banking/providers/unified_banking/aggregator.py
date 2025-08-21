@@ -35,9 +35,9 @@ from .exceptions import (
     NoProvidersAvailableError, DataConsistencyError
 )
 
-from .....shared.logging import get_logger
-from .....shared.exceptions import IntegrationError
-from .....shared.config import BaseConfig
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
+from external_integrations.shared.config import BaseConfig
 
 
 class ProviderPriority(Enum):

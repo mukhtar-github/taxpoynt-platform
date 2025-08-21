@@ -15,8 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode, parse_qs, urlparse, quote
 import aiohttp
 
-from ....framework.models.base_models import ConnectionConfig
-from ....shared.exceptions.integration_exceptions import AuthenticationError
+from external_integrations.connector_framework.models.base_models import ConnectionConfig
+from external_integrations.shared.exceptions.integration_exceptions import AuthenticationError
 from .exceptions import (
     MagentoAuthenticationError,
     MagentoConfigurationError,

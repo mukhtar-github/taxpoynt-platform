@@ -5,7 +5,7 @@ providing detailed error handling for TaxPoynt eInvoice System Integrator functi
 """
 
 from typing import Any, Dict, Optional
-from ....shared.exceptions.integration_exceptions import (
+from external_integrations.shared.exceptions.integration_exceptions import (
     ConnectionError,
     AuthenticationError,
     APIError,

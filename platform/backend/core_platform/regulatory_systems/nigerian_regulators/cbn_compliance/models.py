@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional, Union
 from enum import Enum
 from pydantic import BaseModel, Field, validator
 
-from ...compliance_engine.orchestrator.models import ComplianceStatus, RiskLevel
+from core_platform.compliance_engine.orchestrator.models import ComplianceStatus, RiskLevel
 
 
 class CBNComplianceStatus(Enum):

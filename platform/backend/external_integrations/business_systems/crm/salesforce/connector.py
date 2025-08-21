@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 from app.schemas.integration import IntegrationTestResult
-from ....connector_framework import BaseCRMConnector
+from external_integrations.connector_framework import BaseCRMConnector
 from .auth import SalesforceAuthenticator
 from .rest_client import SalesforceRESTClient
 from .data_extractor import SalesforceDataExtractor

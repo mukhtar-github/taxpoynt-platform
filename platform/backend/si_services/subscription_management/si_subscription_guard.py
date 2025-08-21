@@ -16,8 +16,8 @@ from enum import Enum
 from .si_tier_manager import SITierManager, SITierConfig
 from .si_tier_validator import SITierValidator, SIValidationResult
 from .si_usage_tracker import SIUsageTracker, SIUsageType
-from ...hybrid_services.service_access_control.subscription_guard import SubscriptionGuard
-from ...core_platform.monitoring import MetricsCollector
+from hybrid_services.service_access_control.subscription_guard import SubscriptionGuard
+from core_platform.monitoring import MetricsCollector
 
 logger = logging.getLogger(__name__)
 

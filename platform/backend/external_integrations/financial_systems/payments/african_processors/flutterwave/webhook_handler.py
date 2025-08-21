@@ -27,8 +27,8 @@ import hmac
 from .models import FlutterwaveWebhookEvent, FlutterwaveTransaction, FlutterwaveCountry
 from .auth import FlutterwaveAuthManager
 from .payment_processor import FlutterwavePaymentProcessor
-from ....connector_framework.classification_engine.nigerian_classifier import NigerianTransactionClassifier
-from ....connector_framework.classification_engine.privacy_protection import APIPrivacyProtection
+from external_integrations.connector_framework.classification_engine.nigerian_classifier import NigerianTransactionClassifier
+from external_integrations.connector_framework.classification_engine.privacy_protection import APIPrivacyProtection
 
 
 @dataclass

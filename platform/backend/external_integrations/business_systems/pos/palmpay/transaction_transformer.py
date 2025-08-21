@@ -10,8 +10,8 @@ from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from uuid import uuid4
 
-from ....framework.models.pos_models import POSTransaction
-from ....shared.models.invoice_models import (
+from external_integrations.connector_framework.models.pos_models import POSTransaction
+from external_integrations.shared.models.invoice_models import (
     UBLInvoice,
     InvoiceHeader,
     InvoiceParty,
@@ -23,7 +23,7 @@ from ....shared.models.invoice_models import (
     Address,
     Contact
 )
-from ....shared.utils.ubl_generator import UBLGenerator
+from external_integrations.shared.utils.ubl_generator import UBLGenerator
 from .exceptions import PalmPayTransformationError
 
 logger = logging.getLogger(__name__)

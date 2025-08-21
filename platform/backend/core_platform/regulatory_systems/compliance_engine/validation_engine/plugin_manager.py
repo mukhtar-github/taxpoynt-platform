@@ -87,7 +87,7 @@ class FIRSValidationPlugin(BaseValidationPlugin):
         
         try:
             # Import FIRS validator
-            from ...nigerian_regulators.firs_compliance.firs_validator import FIRSValidator
+            from core_platform.regulatory_systems.nigerian_regulators.firs_compliance.firs_validator import FIRSValidator
             
             validator = FIRSValidator()
             firs_result = validator.validate_invoice_compliance(data)
@@ -172,7 +172,7 @@ class CACValidationPlugin(BaseValidationPlugin):
         
         try:
             # Import CAC validator
-            from ...nigerian_regulators.cac_compliance.cac_validator import CACValidator
+            from core_platform.regulatory_systems.nigerian_regulators.cac_compliance.cac_validator import CACValidator
             
             validator = CACValidator()
             

@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 import asyncio
 
-from ....connector_framework import BaseCRMConnector, CRMConnectionError, CRMDataError
+from external_integrations.connector_framework import BaseCRMConnector, CRMConnectionError, CRMDataError
 from .auth import ZohoCRMAuthenticator
 from .rest_client import ZohoCRMRestClient
 from .data_extractor import ZohoCRMDataExtractor

@@ -9,8 +9,8 @@ from decimal import Decimal
 import uuid
 
 from .exceptions import SageTransformationError
-from ....connector_framework.base_accounting_connector import AccountingTransaction, AccountingContact
-from .....core.invoice_processing.ubl_models import (
+from external_integrations.connector_framework.base_accounting_connector import AccountingTransaction, AccountingContact
+from core.invoice_processing.ubl_models import (
     UBLInvoice,
     UBLDocumentReference,
     UBLParty,

@@ -20,7 +20,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 import random
 
-from ...base import BaseBankingConnector
+from external_integrations.financial_systems.banking.open_banking.base import BaseBankingConnector
 from .models import (
     BankingProviderType, ProviderStatus, ProviderMetrics,
     SelectionCriteria, RoutingRule, ProviderScore
@@ -30,8 +30,8 @@ from .exceptions import (
     InsufficientProviderError
 )
 
-from .....shared.logging import get_logger
-from .....shared.exceptions import IntegrationError
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class SelectionStrategy(Enum):

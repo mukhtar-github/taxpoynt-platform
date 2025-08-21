@@ -33,21 +33,21 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from dataclasses import dataclass
 
-from ....connector_framework.base_payment_connector import (
+from external_integrations.connector_framework.base_payment_connector import (
     BasePaymentConnector, PaymentTransaction, PaymentCustomer, 
     PaymentRefund, PaymentStatus, PaymentMethod, TransactionType
 )
-from ....connector_framework.classification_engine.nigerian_classifier import (
+from external_integrations.connector_framework.classification_engine.nigerian_classifier import (
     NigerianTransactionClassifier, TransactionClassificationRequest, UserContext, 
     NigerianBusinessContext, ClassificationTier, PrivacyLevel
 )
-from ....connector_framework.classification_engine.privacy_protection import (
+from external_integrations.connector_framework.classification_engine.privacy_protection import (
     APIPrivacyProtection, PIIRedactor
 )
-from ...banking.open_banking.compliance.consent_manager import (
+from external_integrations.financial_systems.banking.open_banking.compliance.consent_manager import (
     ConsentManager, ConsentType, ConsentPurpose, ConsentStatus
 )
-from ...banking.open_banking.compliance.audit_logger import ComplianceAuditLogger
+from external_integrations.financial_systems.banking.open_banking.compliance.audit_logger import ComplianceAuditLogger
 
 from .auth import MoniepointAuthManager
 from .payment_processor import MoniepointPaymentProcessor

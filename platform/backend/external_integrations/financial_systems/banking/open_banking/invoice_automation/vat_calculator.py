@@ -20,7 +20,7 @@ from enum import Enum
 import logging
 from datetime import datetime
 
-from .....core.exceptions import VATCalculationError, ValidationError
+from core.exceptions import VATCalculationError, ValidationError
 
 logger = logging.getLogger(__name__)
 

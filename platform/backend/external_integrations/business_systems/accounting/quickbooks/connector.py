@@ -17,7 +17,7 @@ from .exceptions import (
     QuickBooksDataError,
     QuickBooksValidationError
 )
-from ....connector_framework.base_accounting_connector import (
+from external_integrations.connector_framework.base_accounting_connector import (
     BaseAccountingConnector,
     AccountingTransaction,
     AccountingContact,
@@ -26,7 +26,7 @@ from ....connector_framework.base_accounting_connector import (
     AccountingTransactionType,
     AccountingDocumentStatus
 )
-from .....core.invoice_processing.ubl_models import UBLInvoice
+from core.invoice_processing.ubl_models import UBLInvoice
 
 
 class QuickBooksConnector(BaseAccountingConnector):

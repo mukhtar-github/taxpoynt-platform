@@ -24,7 +24,7 @@ import random
 import hashlib
 import time
 
-from ...base import BaseBankingConnector
+from external_integrations.financial_systems.banking.open_banking.base import BaseBankingConnector
 from .models import (
     BankingProviderType, ProviderStatus, LoadBalancingMetrics,
     LoadDistributionStats, ProviderLoad, WeightedProvider
@@ -34,8 +34,8 @@ from .exceptions import (
     LoadBalancerConfigError
 )
 
-from .....shared.logging import get_logger
-from .....shared.exceptions import IntegrationError
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class LoadBalancingAlgorithm(Enum):

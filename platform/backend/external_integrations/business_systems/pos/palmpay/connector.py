@@ -10,16 +10,16 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-from ....framework.base.base_pos_connector import BasePOSConnector
-from ....framework.models.pos_models import (
+from external_integrations.connector_framework.base.base_pos_connector import BasePOSConnector
+from external_integrations.connector_framework.models.pos_models import (
     ConnectionConfig,
     POSTransaction,
     SyncResult,
     HealthStatus,
     WebhookPayload
 )
-from ....shared.models.invoice_models import UBLInvoice
-from ....shared.exceptions.integration_exceptions import (
+from external_integrations.shared.models.invoice_models import UBLInvoice
+from external_integrations.shared.exceptions.integration_exceptions import (
     ConnectionError,
     AuthenticationError,
     DataSyncError,

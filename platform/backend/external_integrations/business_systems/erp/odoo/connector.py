@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 from app.schemas.integration import OdooConfig, IntegrationTestResult
-from ....connector_framework import BaseERPConnector
+from external_integrations.connector_framework import BaseERPConnector
 from .auth import OdooAuthenticator
 from .data_extractor import OdooDataExtractor  
 from .firs_transformer import OdooFIRSTransformer

@@ -21,7 +21,7 @@ import re
 import logging
 from datetime import datetime
 
-from ....connector_framework.base_banking_connector import BankTransaction
+from external_integrations.connector_framework.base_banking_connector import BankTransaction
 
 logger = logging.getLogger(__name__)
 

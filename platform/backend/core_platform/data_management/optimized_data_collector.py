@@ -26,68 +26,68 @@ from .repository_base import BaseRepository, FilterCriteria, FilterOperator, Pag
 from ..transaction_processing.universal_transaction_processor import UniversalTransactionProcessor
 
 # Import comprehensive connector framework
-from ...external_integrations.connector_framework.connector_factory import ConnectorFactory
-from ...external_integrations.connector_framework.base_connector import (
+from external_integrations.connector_framework.connector_factory import ConnectorFactory
+from external_integrations.connector_framework.base_connector import (
     BaseConnector, ConnectorType, ConnectionStatus, list_active_connectors, get_connector
 )
 
 # Import all business system connectors
 # ERP Systems
-from ...external_integrations.business_systems.erp.sap.connector import SAPConnector
-from ...external_integrations.business_systems.erp.oracle.connector import OracleConnector
-from ...external_integrations.business_systems.erp.dynamics.connector import DynamicsConnector
-from ...external_integrations.business_systems.erp.netsuite.connector import NetSuiteConnector
-from ...external_integrations.business_systems.erp.odoo.connector import OdooConnector
+from external_integrations.business_systems.erp.sap.connector import SAPConnector
+from external_integrations.business_systems.erp.oracle.connector import OracleConnector
+from external_integrations.business_systems.erp.dynamics.connector import DynamicsConnector
+from external_integrations.business_systems.erp.netsuite.connector import NetSuiteConnector
+from external_integrations.business_systems.erp.odoo.connector import OdooConnector
 
 # CRM Systems
-from ...external_integrations.business_systems.crm.salesforce.connector import SalesforceConnector
-from ...external_integrations.business_systems.crm.hubspot.connector import HubSpotConnector
-from ...external_integrations.business_systems.crm.microsoft_dynamics_crm.connector import MicrosoftDynamicsCRMConnector
-from ...external_integrations.business_systems.crm.zoho.connector import ZohoConnector
-from ...external_integrations.business_systems.crm.pipedrive.connector import PipedriveConnector
+from external_integrations.business_systems.crm.salesforce.connector import SalesforceConnector
+from external_integrations.business_systems.crm.hubspot.connector import HubSpotConnector
+from external_integrations.business_systems.crm.microsoft_dynamics_crm.connector import MicrosoftDynamicsCRMConnector
+from external_integrations.business_systems.crm.zoho.connector import ZohoConnector
+from external_integrations.business_systems.crm.pipedrive.connector import PipedriveConnector
 
 # POS Systems
-from ...external_integrations.business_systems.pos.square.connector import SquareConnector
-from ...external_integrations.business_systems.pos.shopify_pos.connector import ShopifyPOSConnector
-from ...external_integrations.business_systems.pos.lightspeed.connector import LightspeedConnector
-from ...external_integrations.business_systems.pos.clover.connector import CloverConnector
-from ...external_integrations.business_systems.pos.toast.connector import ToastConnector
+from external_integrations.business_systems.pos.square.connector import SquareConnector
+from external_integrations.business_systems.pos.shopify_pos.connector import ShopifyPOSConnector
+from external_integrations.business_systems.pos.lightspeed.connector import LightspeedConnector
+from external_integrations.business_systems.pos.clover.connector import CloverConnector
+from external_integrations.business_systems.pos.toast.connector import ToastConnector
 
 # E-commerce Systems
-from ...external_integrations.business_systems.ecommerce.shopify.connector import ShopifyConnector
-from ...external_integrations.business_systems.ecommerce.woocommerce.connector import WooCommerceConnector
-from ...external_integrations.business_systems.ecommerce.magento.connector import MagentoConnector
-from ...external_integrations.business_systems.ecommerce.bigcommerce.connector import BigCommerceConnector
-from ...external_integrations.business_systems.ecommerce.jumia.connector import JumiaConnector
+from external_integrations.business_systems.ecommerce.shopify.connector import ShopifyConnector
+from external_integrations.business_systems.ecommerce.woocommerce.connector import WooCommerceConnector
+from external_integrations.business_systems.ecommerce.magento.connector import MagentoConnector
+from external_integrations.business_systems.ecommerce.bigcommerce.connector import BigCommerceConnector
+from external_integrations.business_systems.ecommerce.jumia.connector import JumiaConnector
 
 # Accounting Systems
-from ...external_integrations.business_systems.accounting.quickbooks.connector import QuickBooksConnector
-from ...external_integrations.business_systems.accounting.xero.connector import XeroConnector
-from ...external_integrations.business_systems.accounting.sage.connector import SageConnector
-from ...external_integrations.business_systems.accounting.wave.connector import WaveConnector
-from ...external_integrations.business_systems.accounting.freshbooks.connector import FreshBooksConnector
+from external_integrations.business_systems.accounting.quickbooks.connector import QuickBooksConnector
+from external_integrations.business_systems.accounting.xero.connector import XeroConnector
+from external_integrations.business_systems.accounting.sage.connector import SageConnector
+from external_integrations.business_systems.accounting.wave.connector import WaveConnector
+from external_integrations.business_systems.accounting.freshbooks.connector import FreshBooksConnector
 
 # Inventory Systems
-from ...external_integrations.business_systems.inventory.fishbowl.connector import FishbowlConnector
-from ...external_integrations.business_systems.inventory.cin7.connector import CIN7Connector
+from external_integrations.business_systems.inventory.fishbowl.connector import FishbowlConnector
+from external_integrations.business_systems.inventory.cin7.connector import CIN7Connector
 
 # Open Banking Systems
-from ...external_integrations.financial_systems.banking.open_banking.providers.mono.connector import MonoConnector
-from ...external_integrations.financial_systems.banking.open_banking.providers.stitch.connector import StitchConnector
+from external_integrations.financial_systems.banking.open_banking.providers.mono.connector import MonoConnector
+from external_integrations.financial_systems.banking.open_banking.providers.stitch.connector import StitchConnector
 
 # Payment Processors (comprehensive coverage)
 # Nigerian Processors
-from ...external_integrations.financial_systems.payments.nigerian_processors.paystack.payment_processor import PaystackPaymentProcessor
-from ...external_integrations.financial_systems.payments.nigerian_processors.moniepoint.payment_processor import MoniepointPaymentProcessor
-from ...external_integrations.financial_systems.payments.nigerian_processors.opay.payment_processor import OPayPaymentProcessor
-from ...external_integrations.financial_systems.payments.nigerian_processors.palmpay.payment_processor import PalmPayPaymentProcessor
-from ...external_integrations.financial_systems.payments.nigerian_processors.interswitch.payment_processor import InterswitchPaymentProcessor
+from external_integrations.financial_systems.payments.nigerian_processors.paystack.payment_processor import PaystackPaymentProcessor
+from external_integrations.financial_systems.payments.nigerian_processors.moniepoint.payment_processor import MoniepointPaymentProcessor
+from external_integrations.financial_systems.payments.nigerian_processors.opay.payment_processor import OPayPaymentProcessor
+from external_integrations.financial_systems.payments.nigerian_processors.palmpay.payment_processor import PalmPayPaymentProcessor
+from external_integrations.financial_systems.payments.nigerian_processors.interswitch.payment_processor import InterswitchPaymentProcessor
 
 # African Regional Processors
-from ...external_integrations.financial_systems.payments.african_processors.flutterwave.payment_processor import FlutterwavePaymentProcessor
+from external_integrations.financial_systems.payments.african_processors.flutterwave.payment_processor import FlutterwavePaymentProcessor
 
 # Global Processors
-from ...external_integrations.financial_systems.payments.global_processors.stripe.payment_processor import StripePaymentProcessor
+from external_integrations.financial_systems.payments.global_processors.stripe.payment_processor import StripePaymentProcessor
 
 logger = logging.getLogger(__name__)
 

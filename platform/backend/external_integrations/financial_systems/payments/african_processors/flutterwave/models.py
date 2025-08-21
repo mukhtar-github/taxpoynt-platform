@@ -18,7 +18,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Dict, List, Optional, Any
 
-from .....connector_framework.base_payment_connector import (
+from external_integrations.connector_framework.base_payment_connector import (
     PaymentTransaction, PaymentStatus, PaymentChannel, PaymentType
 )
 

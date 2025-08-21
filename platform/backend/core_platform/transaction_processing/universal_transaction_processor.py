@@ -45,7 +45,7 @@ from ..detection.universal_duplicate_detector import UniversalDuplicateDetector,
 from ..validation.universal_amount_validator import UniversalAmountValidator, AmountValidationResult
 from ..rules.universal_business_rule_engine import UniversalBusinessRuleEngine, BusinessRuleEngineResult
 from ..matching.universal_pattern_matcher import UniversalPatternMatcher, PatternResult
-from ...external_integrations.connector_framework.classification_engine.nigerian_classifier import (
+from external_integrations.connector_framework.classification_engine.nigerian_classifier import (
     NigerianTransactionClassifier, TransactionClassificationRequest, TransactionClassificationResult
 )
 

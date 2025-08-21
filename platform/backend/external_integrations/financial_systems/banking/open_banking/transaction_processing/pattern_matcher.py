@@ -24,7 +24,7 @@ from collections import defaultdict, Counter
 from datetime import datetime, timedelta
 import statistics
 
-from ....connector_framework.base_banking_connector import BankTransaction
+from external_integrations.connector_framework.base_banking_connector import BankTransaction
 
 logger = logging.getLogger(__name__)
 

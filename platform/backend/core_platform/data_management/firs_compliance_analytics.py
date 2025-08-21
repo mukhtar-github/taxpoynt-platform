@@ -28,7 +28,7 @@ from sqlalchemy import and_, or_, desc
 from .production_database_manager import ProductionDatabaseManager
 from .cache_manager import CacheManager
 from ..transaction_processing.universal_transaction_processor import UniversalTransactionProcessor
-from ...external_integrations.financial_systems.payments.nigerian_processors.paystack.payment_processor import PaystackPaymentProcessor
+from external_integrations.financial_systems.payments.nigerian_processors.paystack.payment_processor import PaystackPaymentProcessor
 
 logger = logging.getLogger(__name__)
 

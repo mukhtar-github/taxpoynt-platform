@@ -21,9 +21,9 @@ from enum import Enum
 import uuid
 import logging
 
-from .....core.models.invoice import Invoice, InvoiceItem, CustomerInfo
-from .....core.exceptions import InvoiceGenerationError, ValidationError
-from .....core.utils.validation import validate_tin, validate_amount
+from core.models.invoice import Invoice, InvoiceItem, CustomerInfo
+from core.exceptions import InvoiceGenerationError, ValidationError
+from core.utils.validation import validate_tin, validate_amount
 from .customer_matcher import CustomerMatcher
 from .vat_calculator import VATCalculator
 from .firs_formatter import FIRSFormatter

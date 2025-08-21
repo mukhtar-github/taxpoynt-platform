@@ -23,8 +23,8 @@ from dataclasses import dataclass, field
 import uuid
 import json
 
-from ...shared.logging import get_logger
-from ...shared.exceptions import IntegrationError
+from external_integrations.shared.logging import get_logger
+from external_integrations.shared.exceptions import IntegrationError
 
 
 class KYCLevel(Enum):

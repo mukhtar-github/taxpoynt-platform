@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from decimal import Decimal
 
-from ....connector_framework.base_payment_connector import (
+from external_integrations.connector_framework.base_payment_connector import (
     PaymentTransaction, PaymentCustomer, PaymentRefund, 
     PaymentStatus, PaymentMethod, TransactionType
 )

@@ -3,7 +3,7 @@ Sage Accounting Exception Classes
 Custom exceptions for Sage Business Cloud Accounting integration errors.
 """
 from typing import Optional, Dict, Any
-from ....connector_framework.base_accounting_connector import (
+from external_integrations.connector_framework.base_accounting_connector import (
     AccountingConnectionError,
     AccountingAuthenticationError,
     AccountingDataError,

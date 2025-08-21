@@ -22,13 +22,13 @@ from uuid import UUID, uuid4
 from decimal import Decimal
 
 # Import existing platform services
-from ...billing_orchestration.usage_tracker import (
+from hybrid_services.billing_orchestration.usage_tracker import (
     UsageTracker, UsageMetric, UsageAlertType, UsageEnforcementAction
 )
-from ...billing_orchestration.tier_manager import TierManager, QuotaType
-from ....core_platform.monitoring import MetricsCollector
-from ....core_platform.data_management.cache_manager import CacheManager
-from ....core_platform.notifications import NotificationService
+from hybrid_services.billing_orchestration.tier_manager import TierManager, QuotaType
+from core_platform.monitoring import MetricsCollector
+from core_platform.data_management.cache_manager import CacheManager
+from core_platform.notifications import NotificationService
 
 logger = logging.getLogger(__name__)
 
