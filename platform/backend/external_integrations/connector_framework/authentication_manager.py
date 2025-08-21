@@ -23,6 +23,38 @@ from .base_connector import AuthenticationType
 
 logger = logging.getLogger(__name__)
 
+# Create AuthType alias for compatibility
+AuthType = AuthenticationType
+
+@dataclass
+class AuthConfig:
+    """Configuration for authentication"""
+    auth_type: AuthenticationType
+    provider_id: Optional[str] = None
+    base_url: Optional[str] = None
+    token_url: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    api_key: Optional[str] = None
+    jwt_token: Optional[str] = None
+    scope: Optional[str] = None
+    grant_type: Optional[str] = None
+    header: Optional[str] = None
+    query_param: Optional[str] = None
+    location: Optional[str] = None
+    token: Optional[str] = None
+    prefix: Optional[str] = None
+    secret: Optional[str] = None
+    algorithm: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
+    saml_assertion: Optional[str] = None
+    refresh_token: Optional[str] = None
+    code: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
 class TokenType(Enum):
     ACCESS_TOKEN = "access_token"
     REFRESH_TOKEN = "refresh_token"
