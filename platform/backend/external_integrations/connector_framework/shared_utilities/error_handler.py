@@ -74,31 +74,23 @@ class ErrorContext:
 class ErrorInfo:
     """Comprehensive error information"""
     
-    # Basic error info
+    # Required fields (no defaults) must come first
     error_type: str
     error_message: str
-    error_code: Optional[str] = None
-    
-    # Classification
     category: ErrorCategory
     severity: ErrorSeverity
-    
-    # Context
     context: ErrorContext
+    recovery_strategy: RecoveryStrategy
     
-    # Technical details
+    # Optional fields (with defaults) must come last
+    error_code: Optional[str] = None
     stack_trace: Optional[str] = None
     inner_error: Optional['ErrorInfo'] = None
-    
-    # Recovery
-    recovery_strategy: RecoveryStrategy
     retry_count: int = 0
     max_retries: int = 3
-    
-    # Timestamps
+    occurrence_count: int = 1
     first_occurrence: datetime = field(default_factory=datetime.utcnow)
     last_occurrence: datetime = field(default_factory=datetime.utcnow)
-    occurrence_count: int = 1
     
     # Resolution
     resolved: bool = False
