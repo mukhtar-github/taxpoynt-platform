@@ -227,7 +227,10 @@ class IntegrationHealthMonitor:
                 self._record_health_metrics(integration_id, result)
                 
                 # Check thresholds and trigger alerts
-                await self._check_health_thresholds(integration_id, result)
+                try:
+                    asyncio.run(self._check_health_thresholds(integration_id, result))
+                except Exception as e:
+                    logger.warning(f"Error checking health thresholds: {e}")
                 
                 # Sleep until next check
                 time.sleep(interval_minutes * 60)
