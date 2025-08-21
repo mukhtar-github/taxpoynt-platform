@@ -15,7 +15,8 @@ Key API Endpoints:
 Architecture consistent with existing TaxPoynt patterns.
 """
 
-from datetime import datetime, date
+from datetime import datetime
+from datetime import date as Date
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Union
 from pydantic import BaseModel, Field, validator
@@ -118,7 +119,7 @@ class MonoTransaction(BaseModel):
     """Mono transaction record"""
     id: str = Field(..., description="Transaction identifier")
     amount: int = Field(..., description="Transaction amount in kobo")
-    date: date = Field(..., description="Transaction date")
+    date: Date = Field(..., description="Transaction date")
     narration: str = Field(..., description="Transaction description")
     type: MonoTransactionType = Field(..., description="Transaction type (credit/debit)")
     category: str = Field(..., description="Transaction category")
