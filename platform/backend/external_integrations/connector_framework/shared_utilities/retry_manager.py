@@ -571,6 +571,26 @@ class RetryManager:
         self.circuit_breaker.last_failure_time = None
         
         self.logger.info("Circuit breaker manually reset")
+    
+    def retry_async(self, 
+                   operation_name: Optional[str] = None,
+                   context: Optional[Dict[str, Any]] = None):
+        """
+        Decorator method for async retry functionality
+        
+        Usage:
+        @retry_manager.retry_async(operation_name="my_operation")
+        async def my_function():
+            # function code
+            pass
+        """
+        def decorator(func):
+            @wraps(func)
+            async def wrapper(*args, **kwargs):
+                op_name = operation_name or func.__name__
+                return await self.execute_with_retry(func, op_name, *args, **kwargs)
+            return wrapper
+        return decorator
 
 def retry(config: Optional[RetryConfig] = None,
          max_attempts: int = 3,
