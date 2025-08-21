@@ -625,6 +625,106 @@ async def initialize_connector_factory():
         logger.error(f"Failed to initialize connector factory: {e}")
         return False
 
+
+class ConnectorRegistry:
+    """
+    Object-oriented wrapper for the global connector registry functionality.
+    Provides centralized management of active connectors while maintaining
+    compatibility with existing function-based API from base_connector.py.
+    """
+    
+    @staticmethod
+    def register(connector) -> bool:
+        """Register a connector in the registry"""
+        try:
+            from .base_connector import register_connector
+            register_connector(connector)
+            logger.info(f"Registered connector: {connector.config.connector_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to register connector {connector.config.connector_id}: {e}")
+            return False
+    
+    @staticmethod
+    def unregister(connector_id: str) -> bool:
+        """Unregister a connector from the registry"""
+        try:
+            from .base_connector import unregister_connector, _active_connectors
+            if connector_id in _active_connectors:
+                unregister_connector(connector_id)
+                logger.info(f"Unregistered connector: {connector_id}")
+                return True
+            else:
+                logger.warning(f"Connector {connector_id} not found in registry")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to unregister connector {connector_id}: {e}")
+            return False
+    
+    @staticmethod
+    def get(connector_id: str):
+        """Get a connector from the registry"""
+        from .base_connector import get_connector
+        return get_connector(connector_id)
+    
+    @staticmethod
+    def list_active():
+        """List all active connectors"""
+        from .base_connector import list_active_connectors
+        return list_active_connectors()
+    
+    @staticmethod
+    def get_count() -> int:
+        """Get total number of registered connectors"""
+        from .base_connector import _active_connectors
+        return len(_active_connectors)
+    
+    @staticmethod
+    def get_by_type(connector_type):
+        """Get all connectors of a specific type"""
+        from .base_connector import _active_connectors
+        return [
+            connector for connector in _active_connectors.values()
+            if connector.config.connector_type == connector_type
+        ]
+    
+    @staticmethod
+    def is_registered(connector_id: str) -> bool:
+        """Check if a connector is registered"""
+        from .base_connector import _active_connectors
+        return connector_id in _active_connectors
+    
+    @staticmethod
+    async def get_all_health_statuses():
+        """Get health status for all registered connectors"""
+        from .base_connector import get_all_health_statuses
+        return await get_all_health_statuses()
+    
+    @staticmethod
+    async def get_all_metrics():
+        """Get metrics for all registered connectors"""
+        from .base_connector import get_all_metrics
+        return await get_all_metrics()
+    
+    @staticmethod
+    def get_registry_info() -> Dict[str, Any]:
+        """Get comprehensive registry information"""
+        from .base_connector import list_active_connectors
+        connectors = list_active_connectors()
+        
+        type_counts = {}
+        for connector in connectors:
+            conn_type = connector.config.connector_type.value
+            type_counts[conn_type] = type_counts.get(conn_type, 0) + 1
+        
+        return {
+            "total_connectors": len(connectors),
+            "connectors_by_type": type_counts,
+            "active_connector_ids": [c.config.connector_id for c in connectors],
+            "registry_status": "active"
+        }
+
+
 if __name__ == "__main__":
     async def main():
         await initialize_connector_factory()

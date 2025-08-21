@@ -532,3 +532,4 @@ async def get_all_metrics() -> List[ConnectorMetrics]:
         metric = await connector.get_metrics()
         metrics.append(metric)
     return metrics
+
