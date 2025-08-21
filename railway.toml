@@ -2,8 +2,8 @@
 # Enterprise FastAPI deployment optimized for Hobby Plan (8GB RAM / 8 vCPU)
 
 [build]
-# Build optimization
-buildCommand = "echo 'Build complete - using pre-built platform structure'"
+# Build optimization with comprehensive resilience strategies
+buildCommand = "./build.sh"
 
 [deploy]
 # Use root-level main.py for Railway Python detection
