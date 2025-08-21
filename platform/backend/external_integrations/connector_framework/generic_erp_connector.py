@@ -240,10 +240,10 @@ class GenericERPConnector(BaseERPConnector):
             return await self.adapter.test_connection()
         except Exception as e:
             return {
-                success=False,
-                message=f"Connection test failed: {str(e)}",
-                details={"error": str(e), "adapter": self.adapter.__class__.__name__}
-            )
+                "success": False,
+                "message": f"Connection test failed: {str(e)}",
+                "details": {"error": str(e), "adapter": self.adapter.__class__.__name__}
+            }
     
     async def authenticate(self) -> bool:
         """Authenticate using the configured adapter"""
@@ -513,10 +513,10 @@ class RESTAPIAdapter(BaseIntegrationAdapter):
         """Test REST API connection"""
         # Implementation would be client-specific based on their API endpoints
         return {
-            success=True,
-            message="REST API adapter ready for configuration",
-            details={"adapter_type": "REST API", "ready_for_client_config": True}
-        )
+            "success": True,
+            "message": "REST API adapter ready for configuration",
+            "details": {"adapter_type": "REST API", "ready_for_client_config": True}
+        }
     
     async def authenticate(self) -> bool:
         """Authenticate with REST API"""
@@ -575,10 +575,10 @@ class SOAPAdapter(BaseIntegrationAdapter):
     
     async def test_connection(self) -> Dict[str, Any]:
         return {
-            success=True,
-            message="SOAP adapter ready for configuration",
-            details={"adapter_type": "SOAP/Web Service", "ready_for_client_config": True}
-        )
+            "success": True,
+            "message": "SOAP adapter ready for configuration",
+            "details": {"adapter_type": "SOAP/Web Service", "ready_for_client_config": True}
+        }
     
     async def authenticate(self) -> bool:
         return True
@@ -624,10 +624,10 @@ class DatabaseAdapter(BaseIntegrationAdapter):
     
     async def test_connection(self) -> Dict[str, Any]:
         return {
-            success=True,
-            message="Database adapter ready for configuration",
-            details={"adapter_type": "Database Direct", "ready_for_client_config": True}
-        )
+            "success": True,
+            "message": "Database adapter ready for configuration",
+            "details": {"adapter_type": "Database Direct", "ready_for_client_config": True}
+        }
     
     async def authenticate(self) -> bool:
         return True
@@ -673,10 +673,10 @@ class FileBasedAdapter(BaseIntegrationAdapter):
     
     async def test_connection(self) -> Dict[str, Any]:
         return {
-            success=True,
-            message="File-based adapter ready for configuration",
-            details={"adapter_type": "File-based", "ready_for_client_config": True}
-        )
+            "success": True,
+            "message": "File-based adapter ready for configuration",
+            "details": {"adapter_type": "File-based", "ready_for_client_config": True}
+        }
     
     async def authenticate(self) -> bool:
         return True
@@ -723,10 +723,10 @@ class MiddlewareAdapter(BaseIntegrationAdapter):
     
     async def test_connection(self) -> Dict[str, Any]:
         return {
-            success=True,
-            message="Middleware adapter ready for configuration",
-            details={"adapter_type": "Middleware", "ready_for_client_config": True}
-        )
+            "success": True,
+            "message": "Middleware adapter ready for configuration",
+            "details": {"adapter_type": "Middleware", "ready_for_client_config": True}
+        }
     
     async def authenticate(self) -> bool:
         return True
