@@ -111,34 +111,24 @@ class DataContext:
 class AuditEvent:
     """Comprehensive audit event"""
     
-    # Event identification
+    # Required fields (no defaults) must come first
     event_id: str
     event_type: AuditEventType
     timestamp: datetime
+    description: str
     
-    # Context
+    # Optional fields (with defaults) must come last
     user_context: Optional[UserContext] = None
     system_context: Optional[SystemContext] = None
     data_context: Optional[DataContext] = None
-    
-    # Event details
-    description: str
     outcome: str = "success"  # success, failure, warning
-    
-    # Compliance
     compliance_frameworks: List[ComplianceFramework] = field(default_factory=list)
     retention_period_days: int = 2555  # 7 years default
-    
-    # Technical details
     request_payload: Optional[Dict[str, Any]] = None
     response_payload: Optional[Dict[str, Any]] = None
     error_details: Optional[Dict[str, Any]] = None
-    
-    # Security
     risk_score: int = 0  # 0-100
     security_flags: List[str] = field(default_factory=list)
-    
-    # Additional metadata
     tags: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     
