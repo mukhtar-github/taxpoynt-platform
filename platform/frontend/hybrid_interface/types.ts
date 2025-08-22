@@ -35,6 +35,7 @@ import type {
 
 // Hybrid Base Types
 export type HybridRole = 'si_user' | 'app_user' | 'hybrid_user' | 'platform_admin';
+export type DashboardView = 'si' | 'app' | 'combined';
 export type ProcessStage = 'data_extraction' | 'validation' | 'transformation' | 'transmission' | 'acknowledgment' | 'completed' | 'failed';
 export type WorkflowStatus = 'draft' | 'active' | 'paused' | 'completed' | 'failed' | 'archived';
 export type AnalyticsGranularity = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
@@ -601,4 +602,48 @@ export const canAccessInterface = (userRole: HybridRole, interfaceType: 'si' | '
   };
   
   return accessMatrix[userRole]?.includes(interfaceType) ?? false;
+};
+
+// Dashboard View Utilities
+export const getContextualRoleForView = (view: DashboardView, userRole: HybridRole): HybridRole => {
+  // For role switching context, map view to most appropriate role context
+  switch (view) {
+    case 'si':
+      return userRole === 'app_user' ? 'app_user' : userRole; // App users can't access SI view
+    case 'app':
+      return userRole === 'si_user' ? 'si_user' : userRole; // SI users can't access APP view  
+    case 'combined':
+      return userRole; // Combined view uses actual user role
+    default:
+      return userRole;
+  }
+};
+
+export const getAvailableViewsForRole = (userRole: HybridRole): DashboardView[] => {
+  const viewMatrix: Record<HybridRole, DashboardView[]> = {
+    'si_user': ['si', 'combined'],
+    'app_user': ['app', 'combined'],
+    'hybrid_user': ['si', 'app', 'combined'],
+    'platform_admin': ['si', 'app', 'combined']
+  };
+  
+  return viewMatrix[userRole] ?? ['combined'];
+};
+
+export const getAvailableRolesForView = (view: DashboardView, userRole: HybridRole): HybridRole[] => {
+  // Return available role contexts within a view
+  switch (view) {
+    case 'si':
+      return ['si_user', 'hybrid_user', 'platform_admin'].filter(role => 
+        canAccessInterface(userRole, 'si') && [userRole, 'hybrid_user', 'platform_admin'].includes(role as HybridRole)
+      ) as HybridRole[];
+    case 'app':
+      return ['app_user', 'hybrid_user', 'platform_admin'].filter(role =>
+        canAccessInterface(userRole, 'app') && [userRole, 'hybrid_user', 'platform_admin'].includes(role as HybridRole)  
+      ) as HybridRole[];
+    case 'combined':
+      return [userRole]; // Combined view shows user's actual role
+    default:
+      return [userRole];
+  }
 };

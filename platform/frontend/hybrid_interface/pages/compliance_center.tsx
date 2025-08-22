@@ -48,7 +48,6 @@ import {
   FileTextOutlined,
   SettingOutlined,
   AuditOutlined,
-  SafetyCertificateOutlined,
   ApiOutlined,
   AlertOutlined
 } from '@ant-design/icons';

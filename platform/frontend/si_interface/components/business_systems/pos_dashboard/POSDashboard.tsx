@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '../../../design_system/components/Button';
+import { Button } from '../../../../design_system/components/Button';
 
 interface POSSystem {
   id: string;

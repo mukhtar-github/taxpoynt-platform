@@ -17,7 +17,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Layout, Row, Col, Card, Switch, Alert, Button, Space } from 'antd';
+import { Layout, Row, Col, Card, Switch, Alert, Button, Space, Select } from 'antd';
 import {
   DashboardOutlined,
   SwapOutlined,
@@ -25,6 +25,17 @@ import {
   SettingOutlined,
   BellOutlined
 } from '@ant-design/icons';
+
+// Import types and utilities
+import type { 
+  HybridRole, 
+  DashboardView
+} from '../types';
+import { 
+  getContextualRoleForView, 
+  getAvailableRolesForView,
+  getAvailableViewsForRole
+} from '../types';
 
 // Import hybrid interface components
 import { UnifiedDashboard } from '../components/unified_dashboard/UnifiedDashboard';
@@ -36,7 +47,7 @@ import { PlatformComplianceDashboard } from '../components/compliance_overview/P
 const { Header, Content, Sider } = Layout;
 
 interface UnifiedDashboardPageProps {
-  userRole: 'si' | 'app' | 'hybrid' | 'admin';
+  userRole: HybridRole;
   organizationId: string;
 }
 
@@ -44,12 +55,19 @@ export const UnifiedDashboardPage: React.FC<UnifiedDashboardPageProps> = ({
   userRole,
   organizationId
 }) => {
-  const [currentView, setCurrentView] = useState<'si' | 'app' | 'combined'>('combined');
+  const [currentView, setCurrentView] = useState<DashboardView>('combined');
   const [showNotifications, setShowNotifications] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
 
+  // Get available views for this user role
+  const availableViews = getAvailableViewsForRole(userRole);
+  
+  // Get contextual role for current view
+  const contextualRole = getContextualRoleForView(currentView, userRole);
+  const availableRoles = getAvailableRolesForView(currentView, userRole);
+
   // Check if user has admin privileges for platform compliance
-  const hasAdminAccess = userRole === 'admin' || userRole === 'hybrid';
+  const hasAdminAccess = userRole === 'platform_admin' || userRole === 'hybrid_user';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -61,10 +79,61 @@ export const UnifiedDashboardPage: React.FC<UnifiedDashboardPageProps> = ({
         </div>
         
         <Space>
+          {/* Professional View Switcher */}
+          <Select
+            value={currentView}
+            onChange={setCurrentView}
+            style={{ width: 150 }}
+            placeholder="Select View"
+            options={availableViews.map(view => ({
+              value: view,
+              label: {
+                'si': 'SI Interface',
+                'app': 'APP Interface', 
+                'combined': 'Unified View'
+              }[view]
+            }))}
+          />
+          
+          {/* Proper RoleSwitcher with type mapping */}
           <RoleSwitcher 
-            currentRole={currentView} 
-            onRoleChange={setCurrentView}
-            availableRoles={['si', 'app', 'combined']}
+            currentRole={contextualRole}
+            availableRoles={availableRoles}
+            userSession={{
+              user_id: 'current-user',
+              session_id: 'session-id',
+              active_role: contextualRole,
+              available_roles: availableRoles,
+              permissions: [],
+              session_started: new Date(),
+              last_activity: new Date(),
+              context: {
+                current_interface: currentView === 'combined' ? 'hybrid' : currentView,
+                active_workspaces: [],
+                recent_activities: [],
+                preferences: {
+                  default_interface: 'hybrid',
+                  dashboard_layout: 'unified',
+                  notification_settings: {
+                    email_notifications: true,
+                    browser_notifications: true,
+                    sms_notifications: false,
+                    notification_types: []
+                  },
+                  theme: 'light',
+                  timezone: 'Africa/Lagos',
+                  language: 'en'
+                }
+              }
+            }}
+            onRoleSwitch={(newRole) => {
+              console.log('Role switched to:', newRole);
+            }}
+            onInterfaceSwitch={(interfaceType) => {
+              if (interfaceType !== 'hybrid') {
+                setCurrentView(interfaceType as DashboardView);
+              }
+            }}
           />
           <Button icon={<BellOutlined />} onClick={() => setShowNotifications(!showNotifications)}>
             Notifications

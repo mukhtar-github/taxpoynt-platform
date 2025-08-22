@@ -181,11 +181,15 @@ const onboardingSteps: OnboardingStep[] = [
 interface ERPOnboardingProps {
   organizationId?: string;
   onComplete?: (organizationId: string) => void;
+  onSkip?: () => void;
+  isLoading?: boolean;
 }
 
 export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   organizationId,
-  onComplete
+  onComplete,
+  onSkip,
+  isLoading = false
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<OnboardingStep[]>(onboardingSteps);

@@ -37,7 +37,8 @@ import {
   Tabs,
   Space,
   Tooltip,
-  Dropdown
+  Dropdown,
+  Statistic
 } from 'antd';
 import {
   PlayCircleOutlined,

@@ -127,15 +127,21 @@ const registrationSteps: RegistrationStep[] = [
 ];
 
 interface ConsentIntegratedRegistrationProps {
-  onRegistrationComplete: (registrationData: any) => void;
-  onCancel: () => void;
+  onRegistrationComplete?: (registrationData: any) => void;
+  onCompleteRegistration?: (registrationData: any) => Promise<void>;
+  onCancel?: () => void;
   showBankingIntegration?: boolean;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 export const ConsentIntegratedRegistration: React.FC<ConsentIntegratedRegistrationProps> = ({
   onRegistrationComplete,
+  onCompleteRegistration,
   onCancel,
-  showBankingIntegration = true
+  showBankingIntegration = true,
+  isLoading = false,
+  error = null
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<any>({});
@@ -192,7 +198,13 @@ export const ConsentIntegratedRegistration: React.FC<ConsentIntegratedRegistrati
       };
       
       await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing
-      onRegistrationComplete(registrationData);
+      
+      // Support both callback patterns
+      if (onCompleteRegistration) {
+        await onCompleteRegistration(registrationData);
+      } else if (onRegistrationComplete) {
+        onRegistrationComplete(registrationData);
+      }
     } catch (error) {
       console.error('Registration failed:', error);
     } finally {
