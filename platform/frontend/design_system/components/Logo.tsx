@@ -108,7 +108,7 @@ export const Logo: React.FC<LogoProps> = ({
           className={`font-body leading-tight ${config.tagline}`}
           style={{ color: colors_config.tagline }}
         >
-          E-Invoice Platform
+          Send Invoices to FIRS
         </span>
       )}
     </div>

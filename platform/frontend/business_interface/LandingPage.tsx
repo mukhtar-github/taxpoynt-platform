@@ -71,22 +71,21 @@ export const LandingPage: React.FC = () => {
 
           {/* Headline with Prominent Tagline */}
           <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
-              Nigeria's Premier Intelligent Universal E-Invoicing Platform
+            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
+              Stop wasting time on government paperwork
             </div>
             <h1 className="text-hero font-heading text-shadow-sm text-gray-900 mb-8">
-              Connect Every System.
+              Send invoices to FIRS in 
               <br />
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Automate Every Transaction.
+              <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                seconds, not hours
               </span>
             </h1>
           </div>
 
           {/* Subtitle */}
           <p className="text-body-lg text-gray-600 mb-16 max-w-3xl mx-auto font-body">
-            Advanced technology that understands Nigerian business reality. Universal connectivity from SAP to Paystack. 
-            From Lagos to Kano, from Computer Village to Alaba Market - built for how Nigeria actually works.
+            Stop wasting hours on FIRS paperwork. TaxPoynt connects your business software directly to FIRS—one click and your invoices are submitted correctly, every time.
           </p>
 
           {/* CTAs */}
@@ -114,20 +113,20 @@ export const LandingPage: React.FC = () => {
           {/* Trust Indicators */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-2xl font-bold text-blue-600 mb-1">85%+</div>
-              <div className="text-gray-600 text-sm">Transaction Classification Accuracy</div>
+              <div className="text-2xl font-bold text-green-600 mb-1">Zero</div>
+              <div className="text-gray-600 text-sm">Classification errors</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-600 mb-1">2 min</div>
-              <div className="text-gray-600 text-sm">ERP to FIRS Submission</div>
+              <div className="text-2xl font-bold text-blue-600 mb-1">2 min</div>
+              <div className="text-gray-600 text-sm">From sale to FIRS submission</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-purple-600 mb-1">8+</div>
-              <div className="text-gray-600 text-sm">Global Compliance Standards</div>
+              <div className="text-2xl font-bold text-green-600 mb-1">Always</div>
+              <div className="text-gray-600 text-sm">Stay compliant automatically</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-orange-600 mb-1">360°</div>
-              <div className="text-gray-600 text-sm">Customer Intelligence</div>
+              <div className="text-2xl font-bold text-blue-600 mb-1">Any</div>
+              <div className="text-gray-600 text-sm">Software you already use</div>
             </div>
           </div>
         </div>
@@ -362,10 +361,9 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-blue-700 transition-colors">
                 <Brain className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
-              <h3 className="text-subheading font-heading text-gray-900 mb-4">Nigerian Business Intelligence</h3>
+              <h3 className="text-subheading font-heading text-gray-900 mb-4">Built for Nigerian Business</h3>
               <p className="text-body text-gray-700 font-body">
-                System trained on Nigerian patterns. Knows the difference between family support and business payment. 
-                Understands Alaba Market operates differently from Victoria Island.
+                Never worry about classification errors again. We understand how Nigerian businesses actually work - from small shops to big corporations.
               </p>
             </div>
             
@@ -373,10 +371,9 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-green-700 transition-colors">
                 <Link className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-3">Universal Connectivity</h3>
+              <h3 className="font-bold text-gray-900 mb-3">Works with Your Software</h3>
               <p className="text-gray-700 text-sm">
-                Single platform connects SAP, Salesforce, Paystack, Moniepoint, and 40+ other systems. 
-                One integration handles everything.
+                Connect once and we handle everything. Works with Paystack, Mono, QuickBooks, and all the software you already use.
               </p>
             </div>
             
@@ -384,10 +381,10 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-purple-700 transition-colors">
                 <Zap className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-3">End-to-End Automation</h3>
+              <h3 className="font-bold text-gray-900 mb-3">Completely Automatic</h3>
               <p className="text-gray-700 text-sm">
-                From ERP sale to FIRS submission in under 2 minutes. 
-                Zero manual intervention, complete workflow orchestration.
+                From sale to FIRS submission in under 2 minutes. 
+                No paperwork, no manual work, no stress.
               </p>
             </div>
             
@@ -395,9 +392,9 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-orange-700 transition-colors">
                 <Target className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-3">360° Customer Intelligence</h3>
+              <h3 className="font-bold text-gray-900 mb-3">Complete Customer View</h3>
               <p className="text-gray-700 text-sm">
-                Matches customers across all systems. Know when your SAP customer John is the same person paying via Paystack.
+                See all your customer transactions in one place. Know exactly who bought what, when, and how they paid.
               </p>
             </div>
             
@@ -405,10 +402,9 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-cyan-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-cyan-700 transition-colors">
                 <Globe className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-3">Global Compliance Standards</h3>
+              <h3 className="font-bold text-gray-900 mb-3">Stay Compliant Automatically</h3>
               <p className="text-gray-700 text-sm">
-                FIRS-ready AND PEPPOL-certified simultaneously. 
-                8+ international frameworks in one compliance engine.
+                Never worry about compliance again. We handle all Nigerian tax requirements automatically.
               </p>
             </div>
             
@@ -416,10 +412,9 @@ export const LandingPage: React.FC = () => {
               <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-red-700 transition-colors">
                 <Code className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-3">Developer-First SDKs</h3>
+              <h3 className="font-bold text-gray-900 mb-3">Easy for Developers</h3>
               <p className="text-gray-700 text-sm">
-                Python, JavaScript, PHP, Java, C#, Go SDKs. 
-                Auto-generated from OpenAPI specs with full type safety.
+                Your technical team will love us. Simple integration that works with any programming language.
               </p>
             </div>
           </div>

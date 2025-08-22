@@ -179,7 +179,7 @@ export const HomePage: React.FC<HomePageProps> = ({ user, stats }) => {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">TaxPoynt</h1>
-                  <p className="text-sm text-gray-500">E-Invoice Platform</p>
+                  <p className="text-sm text-gray-500">Send Invoices to FIRS</p>
                 </div>
               </div>
               

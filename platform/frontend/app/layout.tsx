@@ -2,8 +2,8 @@ import React from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'TaxPoynt Platform - Nigerian E-Invoice Solution',
-  description: 'Nigeria\'s Premier Intelligent Universal E-Invoicing Platform - Connect Every System, Automate Every Transaction',
+  title: 'TaxPoynt - Send Invoices to FIRS in Seconds',
+  description: 'Stop wasting hours on FIRS compliance. TaxPoynt sends your invoices directly to FIRS - one click and you\'re compliant, every time.',
 };
 
 export default function RootLayout({
