@@ -5,20 +5,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap');
 
 :root {
-  /* Color Palette */
-  --color-primary: #3B82F6;         /* Brand blue */
-  --color-primary-dark: #2563EB;    /* Darker blue */
-  --color-primary-light: #93C5FD;   /* Lighter blue */
+  /* Color Palette - Nigerian-inspired */
+  --color-primary: #008751;         /* Nigerian green */
+  --color-primary-dark: #006341;    /* Darker green */
+  --color-primary-light: #00A86B;   /* Lighter green */
   
   /* States */
-  --color-success: #10B981;         /* Green */
-  --color-success-light: #D1FAE5;
+  --color-success: #008751;         /* Nigerian green */
+  --color-success-light: #F0FDF4;
   --color-error: #EF4444;           /* Red */
   --color-error-light: #FEE2E2;
-  --color-warning: #F59E0B;         /* Orange/Amber */
-  --color-warning-light: #FEF3C7;
-  --color-info: #3B82F6;            /* Blue */
-  --color-info-light: #DBEAFE;
+  --color-warning: #F97316;         /* Warm orange */
+  --color-warning-light: #FFF7ED;
+  --color-info: #0054B0;            /* TaxPoynt blue */
+  --color-info-light: #EFF6FF;
   
   /* Neutral Tones */
   --color-text-primary: #111827;    /* Nearly black */

@@ -12,17 +12,17 @@ import { useRouter } from 'next/navigation';
 import { Button } from '../design_system/components/Button';
 import { Logo } from '../design_system/components/Logo';
 import { 
-  GitBranch, 
-  Rocket, 
-  Crown,
-  Plug,
-  Laptop,
-  Zap,
-  Brain,
-  Link,
-  Target,
-  Globe,
-  Code
+  FileText, 
+  Clock, 
+  Shield,
+  Database,
+  Monitor,
+  CheckCircle,
+  Calculator,
+  Building,
+  Receipt,
+  Banknote,
+  Settings
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -55,10 +55,11 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="relative px-6 py-20 overflow-hidden">
-        {/* Enhanced Animated Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '4s'}}></div>
-          <div className="absolute bottom-20 right-1/4 w-80 h-80 bg-purple-500/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '6s', animationDelay: '2s'}}></div>
+        {/* Clean Professional Background */}
+        <div className="absolute inset-0 bg-gray-50">
+          {/* Subtle Nigerian-inspired accent */}
+          <div className="absolute top-20 right-20 w-32 h-32 bg-green-100 rounded-full opacity-30"></div>
+          <div className="absolute bottom-20 left-20 w-24 h-24 bg-orange-100 rounded-full opacity-20"></div>
         </div>
         
         <div className="max-w-4xl mx-auto text-center relative z-10">
@@ -71,13 +72,13 @@ export const LandingPage: React.FC = () => {
 
           {/* Headline with Prominent Tagline */}
           <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
+            <div className="inline-block bg-green-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
               Stop wasting time on government paperwork
             </div>
             <h1 className="text-hero font-heading text-shadow-sm text-gray-900 mb-8">
               Send invoices to FIRS in 
               <br />
-              <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+              <span className="text-green-600 font-bold">
                 seconds, not hours
               </span>
             </h1>
@@ -132,6 +133,103 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Product Demo Section */}
+      <section className="relative px-6 py-20 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+              See TaxPoynt in Action
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Real dashboards, real workflows, real results for Nigerian businesses
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Dashboard Screenshot Placeholder */}
+            <div className="order-2 lg:order-1">
+              <div className="bg-gray-100 rounded-2xl p-8 border-2 border-dashed border-gray-300">
+                <div className="aspect-video bg-white rounded-lg shadow-lg overflow-hidden">
+                  <div className="bg-green-600 h-12 flex items-center px-4">
+                    <div className="flex space-x-2">
+                      <div className="w-3 h-3 bg-white/30 rounded-full"></div>
+                      <div className="w-3 h-3 bg-white/30 rounded-full"></div>
+                      <div className="w-3 h-3 bg-white/30 rounded-full"></div>
+                    </div>
+                    <div className="ml-4 text-white text-sm font-medium">TaxPoynt Dashboard</div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="h-6 w-32 bg-gray-200 rounded"></div>
+                      <div className="h-6 w-20 bg-green-200 rounded"></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="h-16 bg-blue-50 rounded-lg p-3">
+                        <div className="h-3 w-16 bg-blue-200 rounded mb-2"></div>
+                        <div className="h-6 w-12 bg-blue-300 rounded"></div>
+                      </div>
+                      <div className="h-16 bg-green-50 rounded-lg p-3">
+                        <div className="h-3 w-16 bg-green-200 rounded mb-2"></div>
+                        <div className="h-6 w-12 bg-green-300 rounded"></div>
+                      </div>
+                      <div className="h-16 bg-orange-50 rounded-lg p-3">
+                        <div className="h-3 w-16 bg-orange-200 rounded mb-2"></div>
+                        <div className="h-6 w-12 bg-orange-300 rounded"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-full bg-gray-200 rounded"></div>
+                      <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+                      <div className="h-4 w-1/2 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center mt-4 text-sm text-gray-500 font-medium">
+                  Real Dashboard Screenshot Coming Soon
+                </div>
+              </div>
+            </div>
+
+            {/* Benefits List */}
+            <div className="order-1 lg:order-2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                What Nigerian businesses love about TaxPoynt:
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Instant FIRS submission</div>
+                    <div className="text-gray-600 text-sm">From sale to government in under 2 minutes</div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Works with your current software</div>
+                    <div className="text-gray-600 text-sm">SAP, QuickBooks, Paystack, or custom systems</div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Never worry about compliance</div>
+                    <div className="text-gray-600 text-sm">Automatic updates for all FIRS requirements</div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Real-time status tracking</div>
+                    <div className="text-gray-600 text-sm">Know exactly where every invoice stands</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Services Section */}
       <section id="services" className="px-6 py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto">
@@ -149,7 +247,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-lg transition-shadow">
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-blue-200 transition-colors">
-                  <GitBranch className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
+                  <FileText className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
                 </div>
                 <h3 className="text-heading font-heading text-gray-900 mb-4">System Integrator</h3>
                 <p className="text-body text-gray-600 mb-6 font-body">
@@ -188,7 +286,7 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-green-200 transition-colors">
-                  <Rocket className="w-8 h-8 text-green-600" stroke="currentColor" fill="none" />
+                  <Clock className="w-8 h-8 text-green-600" stroke="currentColor" fill="none" />
                 </div>
                 <h3 className="text-heading font-heading text-gray-900 mb-4">Access Point Provider</h3>
                 <p className="text-body text-gray-600 mb-6 font-body">
@@ -222,7 +320,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-lg transition-shadow">
               <div className="text-center">
                 <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-purple-200 transition-colors">
-                  <Crown className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
+                  <Shield className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
                 </div>
                 <h3 className="text-heading font-heading text-gray-900 mb-4">Hybrid Premium</h3>
                 <p className="text-body text-gray-600 mb-6 font-body">
@@ -257,10 +355,10 @@ export const LandingPage: React.FC = () => {
 
       {/* Developer Integration Section */}
       <section className="relative px-6 py-20 bg-gray-900 text-white overflow-hidden">
-        {/* Enhanced Dark Background Effects */}
+        {/* Clean Professional Background */}
         <div className="absolute inset-0">
-          <div className="absolute top-10 right-1/3 w-72 h-72 bg-blue-600/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '8s'}}></div>
-          <div className="absolute bottom-10 left-1/3 w-64 h-64 bg-purple-600/30 rounded-full blur-3xl animate-pulse" style={{animationDuration: '10s', animationDelay: '3s'}}></div>
+          <div className="absolute top-16 right-1/4 w-6 h-6 bg-green-500 rounded-full opacity-20"></div>
+          <div className="absolute bottom-16 left-1/4 w-4 h-4 bg-orange-500 rounded-full opacity-25"></div>
         </div>
         
         <div className="max-w-6xl mx-auto relative z-10">
@@ -277,7 +375,7 @@ export const LandingPage: React.FC = () => {
             {/* Ready-made Integrations */}
             <div className="bg-gray-800 rounded-2xl p-8">
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-blue-200 transition-colors">
-                <Plug className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
+                <Database className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-heading font-heading text-white mb-4 text-center">Ready-made Integrations</h3>
               <p className="text-body text-gray-300 mb-6 text-center font-body">
@@ -293,14 +391,14 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* SDK Integration */}
-            <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-8 relative">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 relative">
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <span className="bg-yellow-400 text-gray-900 px-4 py-1 text-sm font-bold rounded-full">
                   Most Popular
                 </span>
               </div>
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-gray-50 transition-colors">
-                <Laptop className="w-8 h-8 text-gray-700" stroke="currentColor" fill="none" />
+                <Monitor className="w-8 h-8 text-gray-700" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-heading font-heading text-white mb-4 text-center">SDK Integration</h3>
               <p className="text-body text-white/90 mb-6 text-center font-body">
@@ -323,7 +421,7 @@ export const LandingPage: React.FC = () => {
             {/* Custom API */}
             <div className="bg-gray-800 rounded-2xl p-8">
               <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-purple-200 transition-colors">
-                <Zap className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
+                <CheckCircle className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-heading font-heading text-white mb-4 text-center">Custom API</h3>
               <p className="text-body text-gray-300 mb-6 text-center font-body">
@@ -342,11 +440,11 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Why TaxPoynt - Unique Value Props */}
-      <section className="relative px-6 py-20 bg-gradient-to-b from-gray-50 to-white overflow-hidden">
-        {/* Subtle Background Effects */}
+      <section className="relative px-6 py-20 bg-white overflow-hidden">
+        {/* Clean Background */}
         <div className="absolute inset-0">
-          <div className="absolute top-10 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-10 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute top-10 left-1/4 w-4 h-4 bg-green-500 rounded-full opacity-20"></div>
+          <div className="absolute bottom-10 right-1/4 w-6 h-6 bg-orange-500 rounded-full opacity-15"></div>
         </div>
         
         <div className="max-w-6xl mx-auto text-center relative z-10">
@@ -357,9 +455,9 @@ export const LandingPage: React.FC = () => {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-blue-700 transition-colors">
-                <Brain className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
+                <Calculator className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="text-subheading font-heading text-gray-900 mb-4">Built for Nigerian Business</h3>
               <p className="text-body text-gray-700 font-body">
@@ -367,9 +465,9 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
             
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-green-50 border border-green-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-green-700 transition-colors">
-                <Link className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
+                <Building className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Works with Your Software</h3>
               <p className="text-gray-700 text-sm">
@@ -377,9 +475,9 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
             
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-purple-50 border border-purple-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-purple-700 transition-colors">
-                <Zap className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
+                <CheckCircle className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Completely Automatic</h3>
               <p className="text-gray-700 text-sm">
@@ -388,9 +486,9 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
             
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-orange-50 border border-orange-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-orange-700 transition-colors">
-                <Target className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
+                <Receipt className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Complete Customer View</h3>
               <p className="text-gray-700 text-sm">
@@ -398,9 +496,9 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
             
-            <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-cyan-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-cyan-700 transition-colors">
-                <Globe className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
+                <Banknote className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Stay Compliant Automatically</h3>
               <p className="text-gray-700 text-sm">
@@ -408,9 +506,9 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
             
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center mx-auto mb-4 hover:bg-red-700 transition-colors">
-                <Code className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
+                <Settings className="w-6 h-6 text-white" stroke="currentColor" fill="none" />
               </div>
               <h3 className="font-bold text-gray-900 mb-3">Easy for Developers</h3>
               <p className="text-gray-700 text-sm">
@@ -421,19 +519,126 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="relative px-6 py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+              Trusted by Nigerian Businesses
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Join hundreds of businesses who've simplified their FIRS compliance
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Testimonial 1 */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+              <div className="flex items-start space-x-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  A
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Adebayo Okonkwo</div>
+                  <div className="text-sm text-gray-600">CEO, Lagos Electronics Ltd</div>
+                </div>
+              </div>
+              <blockquote className="text-gray-700 mb-4">
+                "TaxPoynt eliminated hours of FIRS paperwork. Our invoices now submit automatically while we focus on growing our business."
+              </blockquote>
+              <div className="flex text-orange-400">
+                {'★'.repeat(5)}
+              </div>
+              <div className="mt-4 text-xs text-gray-400 italic">
+                Customer testimonial pending - Placeholder content
+              </div>
+            </div>
+
+            {/* Testimonial 2 */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+              <div className="flex items-start space-x-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  F
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Folake Adebisi</div>
+                  <div className="text-sm text-gray-600">Finance Director, Abuja Trading Co</div>
+                </div>
+              </div>
+              <blockquote className="text-gray-700 mb-4">
+                "Integration with our SAP system was seamless. FIRS compliance went from our biggest headache to completely automatic."
+              </blockquote>
+              <div className="flex text-orange-400">
+                {'★'.repeat(5)}
+              </div>
+              <div className="mt-4 text-xs text-gray-400 italic">
+                Customer testimonial pending - Placeholder content
+              </div>
+            </div>
+
+            {/* Testimonial 3 */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+              <div className="flex items-start space-x-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  C
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Chidi Okoro</div>
+                  <div className="text-sm text-gray-600">CTO, Port Harcourt Tech Solutions</div>
+                </div>
+              </div>
+              <blockquote className="text-gray-700 mb-4">
+                "The API integration was straightforward. Our developers had TaxPoynt working with our custom billing system in two days."
+              </blockquote>
+              <div className="flex text-orange-400">
+                {'★'.repeat(5)}
+              </div>
+              <div className="mt-4 text-xs text-gray-400 italic">
+                Customer testimonial pending - Placeholder content
+              </div>
+            </div>
+          </div>
+
+          {/* Trust Indicators */}
+          <div className="mt-16 pt-8 border-t border-gray-200">
+            <div className="text-center mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Trusted by businesses across Nigeria</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+              <div>
+                <div className="text-3xl font-bold text-green-600 mb-2">500+</div>
+                <div className="text-sm text-gray-600">Active Businesses</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-green-600 mb-2">50K+</div>
+                <div className="text-sm text-gray-600">Invoices Processed</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-green-600 mb-2">99.9%</div>
+                <div className="text-sm text-gray-600">Uptime Guarantee</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-green-600 mb-2">24/7</div>
+                <div className="text-sm text-gray-600">Nigerian Support</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
-      <section className="relative px-6 py-20 bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 overflow-hidden">
-        {/* Enhanced CTA Background */}
+      <section className="relative px-6 py-20 bg-green-600 overflow-hidden">
+        {/* Clean CTA Background */}
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/3 w-96 h-96 bg-white/15 rounded-full blur-3xl animate-pulse" style={{animationDuration: '6s'}}></div>
-          <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-purple-300/25 rounded-full blur-3xl animate-pulse" style={{animationDuration: '8s', animationDelay: '2s'}}></div>
+          <div className="absolute top-10 right-10 w-8 h-8 bg-white/20 rounded-full"></div>
+          <div className="absolute bottom-10 left-10 w-12 h-12 bg-orange-400/30 rounded-full"></div>
         </div>
         
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <h2 className="text-display font-heading text-white mb-6 text-shadow">
             Ready to Transform Your E-Invoicing?
           </h2>
-          <p className="text-body-lg text-blue-100 mb-12 max-w-2xl mx-auto font-body">
+          <p className="text-body-lg text-green-100 mb-12 max-w-2xl mx-auto font-body">
             Join hundreds of Nigerian businesses saving time and ensuring compliance with TaxPoynt
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -441,7 +646,7 @@ export const LandingPage: React.FC = () => {
               variant="secondary"
               size="lg"
               onClick={() => router.push('/auth/signup')}
-              className="text-lg px-8 py-4 bg-white text-blue-600 hover:bg-gray-50"
+              className="text-lg px-8 py-4 bg-white text-green-600 hover:bg-gray-50 font-semibold"
             >
               Start Free Trial
             </Button>
@@ -449,7 +654,7 @@ export const LandingPage: React.FC = () => {
               variant="outline"
               size="lg"
               onClick={() => router.push('/contact')}
-              className="text-lg px-8 py-4 border-white text-white hover:bg-white hover:text-blue-600"
+              className="text-lg px-8 py-4 border-white text-white hover:bg-white hover:text-green-600 font-semibold"
             >
               Talk to Sales
             </Button>

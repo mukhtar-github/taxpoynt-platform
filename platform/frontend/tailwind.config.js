@@ -11,19 +11,21 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // TaxPoynt Brand Colors
+        // TaxPoynt Brand Colors - Updated with Nigerian warmth
         brand: {
-          primary: '#0054B0',
-          secondary: '#003875',
-          accent: '#0066CC',
-          light: '#E6F2FF',
+          primary: '#008751',     // Nigerian green as primary
+          secondary: '#0054B0',   // Blue as secondary
+          accent: '#F97316',      // Warm orange accent
+          light: '#F0FDF4',       // Light green background
         },
         
         // Nigerian Colors (for compliance/FIRS theming)
         nigeria: {
-          green: '#008751',
-          emerald: '#00A86B',
-          forest: '#006341',
+          green: '#008751',       // Primary Nigerian green
+          emerald: '#00A86B',     // Lighter green
+          forest: '#006341',      // Darker green
+          orange: '#F97316',      // Warm Nigerian orange
+          amber: '#FCD34D',       // Light orange/amber
         },
         
         // Role-Based Colors
