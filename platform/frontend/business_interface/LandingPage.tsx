@@ -125,13 +125,22 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Professional Section Separator */}
+      <div className="h-16 bg-gradient-to-b from-gray-200 via-gray-100 to-white"></div>
+
       {/* Section 2: Trust Indicators */}
       <section className="py-16 bg-white">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-green-600 mb-3" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+              <div className="text-5xl md:text-6xl font-black text-green-600 mb-3" 
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     fontWeight: '900',
+                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
+                   }}>
                 Zero
               </div>
               <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-green-600 transition-colors" 
@@ -140,8 +149,14 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-blue-600 mb-3" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+              <div className="text-5xl md:text-6xl font-black text-blue-600 mb-3" 
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     fontWeight: '900',
+                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                     WebkitTextStroke: '1px rgba(37, 99, 235, 0.3)'
+                   }}>
                 2 min
               </div>
               <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-blue-600 transition-colors" 
@@ -150,8 +165,14 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-green-600 mb-3" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+              <div className="text-5xl md:text-6xl font-black text-green-600 mb-3" 
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     fontWeight: '900',
+                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
+                   }}>
                 100%
               </div>
               <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-green-600 transition-colors" 
@@ -160,8 +181,14 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-blue-600 mb-3" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+              <div className="text-5xl md:text-6xl font-black text-blue-600 mb-3" 
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     fontWeight: '900',
+                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                     WebkitTextStroke: '1px rgba(37, 99, 235, 0.3)'
+                   }}>
                 Any
               </div>
               <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-blue-600 transition-colors" 
