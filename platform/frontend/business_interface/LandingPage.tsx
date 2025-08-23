@@ -47,23 +47,27 @@ export const LandingPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900" style={{ fontFeatureSettings: '"kern" 1, "liga" 1', textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
       
       {/* Navigation */}
-      <nav className="px-6 py-4 border-b border-gray-700">
+      <nav className="px-6 py-4 border-b border-gray-700" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Logo size="lg" variant="full" showTagline={true} />
+          <div style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
+            <Logo size="lg" variant="full" showTagline={true} />
+          </div>
           
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/auth/signin')}
-              className="text-gray-300 hover:text-white font-medium"
+              className="text-gray-100 hover:text-white font-semibold"
+              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
             >
               Sign In
             </button>
             <Button
               variant="primary"
               onClick={() => router.push('/auth/signup')}
+              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
             >
               Get Started
             </Button>
@@ -105,9 +109,9 @@ export const LandingPage: React.FC = () => {
         
         <div className="max-w-5xl mx-auto text-center relative z-10">
           
-          {/* Enhanced Badge */}
-          <div className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm border border-green-200 text-green-800 rounded-full text-sm font-medium mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300">
-            <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
+          {/* Enhanced Badge - Improved Contrast */}
+          <div className="inline-flex items-center px-6 py-3 bg-white border-2 border-green-200 text-green-900 rounded-full text-sm font-bold mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+            <span className="w-2 h-2 bg-green-600 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
           </div>
 
@@ -116,17 +120,17 @@ export const LandingPage: React.FC = () => {
             <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-8 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
               Stop wasting time on government paperwork
             </div>
-            <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight">
+            <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
               Send invoices to FIRS in 
               <br />
-              <span className="bg-gradient-to-r from-green-600 via-blue-600 to-green-600 bg-clip-text text-transparent">
+              <span className="text-green-400 font-black" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
                 seconds, not hours
               </span>
             </h1>
           </div>
 
           {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-gray-200 mb-20 max-w-4xl mx-auto font-light leading-relaxed">
+          <p className="text-xl md:text-2xl text-gray-100 mb-20 max-w-4xl mx-auto font-normal leading-relaxed" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             Stop wasting hours on FIRS paperwork. TaxPoynt connects your business software directly to FIRS—one click and your invoices are submitted correctly, every time.
           </p>
 
@@ -156,19 +160,19 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">Zero</div>
-              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">FIRS submission errors</div>
+              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>FIRS submission errors</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">2 min</div>
-              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">From sale to FIRS submission</div>
+              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>From sale to FIRS submission</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">100%</div>
-              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">Nigerian compliance coverage</div>
+              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>Nigerian compliance coverage</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">Any</div>
-              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">Software you already use</div>
+              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>Software you already use</div>
             </div>
           </div>
         </div>

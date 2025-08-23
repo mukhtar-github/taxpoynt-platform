@@ -99,14 +99,26 @@ export const Logo: React.FC<LogoProps> = ({
     <div className="flex flex-col">
       <span 
         className={`font-heading font-bold leading-tight ${config.text}`}
-        style={{ color: colors_config.text }}
+        style={{ 
+          color: colors_config.text,
+          textRendering: 'optimizeLegibility',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+          fontFeatureSettings: '"kern" 1, "liga" 1'
+        }}
       >
         TaxPoynt
       </span>
       {showTagline && (
         <span 
           className={`font-body leading-tight ${config.tagline}`}
-          style={{ color: colors_config.tagline }}
+          style={{ 
+            color: colors_config.tagline,
+            textRendering: 'optimizeLegibility',
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+            fontFeatureSettings: '"kern" 1, "liga" 1'
+          }}
         >
           Send Invoices to FIRS
         </span>
