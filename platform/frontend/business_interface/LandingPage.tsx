@@ -60,7 +60,7 @@ export const LandingPage: React.FC = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative px-6 py-24 overflow-hidden bg-gradient-to-br from-gray-800 via-gray-700 to-gray-600 min-h-screen flex items-center">
+      <section className="relative px-6 py-24 overflow-hidden bg-gradient-to-br from-gray-400 via-gray-300 to-gray-200 min-h-screen flex items-center">
         
         {/* Animated Background Patterns */}
         <div className="absolute inset-0 opacity-20">
@@ -121,48 +121,52 @@ export const LandingPage: React.FC = () => {
             </Button>
           </div>
 
-          {/* Trust Indicators - Fixed Grid Layout */}
-          <div className="w-full max-w-5xl mx-auto">
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div className="group hover:scale-110 transition-all duration-300">
-                <div className="text-3xl md:text-4xl font-black text-green-400 mb-1" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                  Zero
-                </div>
-                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                  E-invoice submission errors
-                </div>
+          {/* Removed trust indicators - moved to dedicated section */}
+        </div>
+      </section>
+
+      {/* Section 2: Trust Indicators */}
+      <section className="py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl md:text-5xl font-black text-green-600 mb-3" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                Zero
               </div>
-              <div className="group hover:scale-110 transition-all duration-300">
-                <div className="text-3xl md:text-4xl font-black text-blue-400 mb-1" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                  2 min
-                </div>
-                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                  From sale to compliance submission
-                </div>
+              <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-green-600 transition-colors" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                E-invoice submission errors
               </div>
-              <div className="group hover:scale-110 transition-all duration-300">
-                <div className="text-3xl md:text-4xl font-black text-green-400 mb-1" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                  100%
-                </div>
-                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                  Nigerian compliance coverage
-                </div>
+            </div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl md:text-5xl font-black text-blue-600 mb-3" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                2 min
               </div>
-              <div className="group hover:scale-110 transition-all duration-300">
-                <div className="text-3xl md:text-4xl font-black text-blue-400 mb-1" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                  Any
-                </div>
-                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
-                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                  Software you already use
-                </div>
+              <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-blue-600 transition-colors" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                From sale to compliance submission
+              </div>
+            </div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl md:text-5xl font-black text-green-600 mb-3" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                100%
+              </div>
+              <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-green-600 transition-colors" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                Nigerian compliance coverage
+              </div>
+            </div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl md:text-5xl font-black text-blue-600 mb-3" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                Any
+              </div>
+              <div className="text-gray-700 text-sm md:text-base font-semibold group-hover:text-blue-600 transition-colors" 
+                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                Software you already use
               </div>
             </div>
           </div>
