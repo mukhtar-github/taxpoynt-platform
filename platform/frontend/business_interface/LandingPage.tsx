@@ -53,7 +53,7 @@ export const LandingPage: React.FC = () => {
       <nav className="px-6 py-4 border-b border-gray-700" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
-            <Logo size="lg" variant="full" showTagline={true} />
+            <Logo size="lg" variant="full" showTagline={true} color="white" />
           </div>
           
           <div className="flex items-center space-x-4">
@@ -109,9 +109,9 @@ export const LandingPage: React.FC = () => {
         
         <div className="max-w-5xl mx-auto text-center relative z-10">
           
-          {/* Enhanced Badge - Improved Contrast */}
-          <div className="inline-flex items-center px-6 py-3 bg-white border-2 border-green-200 text-green-900 rounded-full text-sm font-bold mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-            <span className="w-2 h-2 bg-green-600 rounded-full mr-3 animate-pulse"></span>
+          {/* Enhanced Badge */}
+          <div className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm border border-green-200 text-green-800 rounded-full text-sm font-medium mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+            <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
           </div>
 
@@ -156,22 +156,22 @@ export const LandingPage: React.FC = () => {
             </Button>
           </div>
 
-          {/* Enhanced Trust Indicators */}
+          {/* Enhanced Trust Indicators - Sharp Text */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">Zero</div>
+              <div className="text-4xl font-black text-green-400 mb-2" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Zero</div>
               <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>FIRS submission errors</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">2 min</div>
+              <div className="text-4xl font-black text-blue-400 mb-2" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>2 min</div>
               <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>From sale to FIRS submission</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">100%</div>
+              <div className="text-4xl font-black text-green-400 mb-2" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>100%</div>
               <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>Nigerian compliance coverage</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">Any</div>
+              <div className="text-4xl font-black text-blue-400 mb-2" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Any</div>
               <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>Software you already use</div>
             </div>
           </div>
