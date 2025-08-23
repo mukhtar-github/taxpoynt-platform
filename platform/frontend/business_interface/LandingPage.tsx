@@ -79,11 +79,11 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Enhanced Headline */}
-          <div className="mb-12">
-            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-8 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
+          <div className="mb-8">
+            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-6 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
               Stop wasting time on compliance paperwork
             </div>
-            <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight" 
+            <h1 className="text-5xl md:text-7xl font-black text-white mb-6 leading-tight" 
                 style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
               Submit compliant e-invoices in 
               <br />
@@ -94,13 +94,13 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-gray-100 mb-20 max-w-4xl mx-auto font-normal leading-relaxed" 
+          <p className="text-xl md:text-2xl text-gray-100 mb-12 max-w-4xl mx-auto font-normal leading-relaxed" 
              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             Stop wasting hours on compliance paperwork. TaxPoynt connects your business software directly to government systems—one click and your e-invoices are submitted correctly, every time.
           </p>
 
           {/* Enhanced CTAs */}
-          <div className="flex flex-col sm:flex-row gap-6 justify-center mb-20">
+          <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
             <Button
               variant="primary"
               size="lg"
@@ -121,46 +121,48 @@ export const LandingPage: React.FC = () => {
             </Button>
           </div>
 
-          {/* Trust Indicators - Properly Visible Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto text-center">
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-green-400 mb-2" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                Zero
+          {/* Trust Indicators - Fixed Grid Layout */}
+          <div className="w-full max-w-5xl mx-auto">
+            <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="group hover:scale-110 transition-all duration-300">
+                <div className="text-3xl md:text-4xl font-black text-green-400 mb-1" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  Zero
+                </div>
+                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  E-invoice submission errors
+                </div>
               </div>
-              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                E-invoice submission errors
+              <div className="group hover:scale-110 transition-all duration-300">
+                <div className="text-3xl md:text-4xl font-black text-blue-400 mb-1" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  2 min
+                </div>
+                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  From sale to compliance submission
+                </div>
               </div>
-            </div>
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-blue-400 mb-2" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                2 min
+              <div className="group hover:scale-110 transition-all duration-300">
+                <div className="text-3xl md:text-4xl font-black text-green-400 mb-1" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  100%
+                </div>
+                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  Nigerian compliance coverage
+                </div>
               </div>
-              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                From sale to compliance submission
-              </div>
-            </div>
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-green-400 mb-2" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                100%
-              </div>
-              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                Nigerian compliance coverage
-              </div>
-            </div>
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl md:text-5xl font-black text-blue-400 mb-2" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                Any
-              </div>
-              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                Software you already use
+              <div className="group hover:scale-110 transition-all duration-300">
+                <div className="text-3xl md:text-4xl font-black text-blue-400 mb-1" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  Any
+                </div>
+                <div className="text-gray-100 text-xs md:text-sm font-semibold group-hover:text-white transition-colors" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  Software you already use
+                </div>
               </div>
             </div>
           </div>
