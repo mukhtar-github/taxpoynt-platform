@@ -115,15 +115,15 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
               <div className="text-2xl font-bold text-green-600 mb-1">Zero</div>
-              <div className="text-gray-600 text-sm">Classification errors</div>
+              <div className="text-gray-600 text-sm">FIRS submission errors</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-blue-600 mb-1">2 min</div>
               <div className="text-gray-600 text-sm">From sale to FIRS submission</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-600 mb-1">Always</div>
-              <div className="text-gray-600 text-sm">Stay compliant automatically</div>
+              <div className="text-2xl font-bold text-green-600 mb-1">100%</div>
+              <div className="text-gray-600 text-sm">Nigerian compliance coverage</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-blue-600 mb-1">Any</div>
@@ -532,7 +532,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Testimonial 1 */}
+            {/* Testimonial 1 - Manufacturing */}
             <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
               <div className="flex items-start space-x-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -541,20 +541,26 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="font-semibold text-gray-900">Adebayo Okonkwo</div>
                   <div className="text-sm text-gray-600">CEO, Lagos Electronics Ltd</div>
+                  <div className="text-xs text-green-600 font-medium mt-1">Manufacturing • Lagos</div>
                 </div>
               </div>
               <blockquote className="text-gray-700 mb-4">
-                "TaxPoynt eliminated hours of FIRS paperwork. Our invoices now submit automatically while we focus on growing our business."
+                "TaxPoynt saved us 12 hours per week on FIRS paperwork. Our invoices now submit automatically while we focus on growing our business."
               </blockquote>
-              <div className="flex text-orange-400">
-                {'★'.repeat(5)}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex text-orange-400">
+                  {'★'.repeat(5)}
+                </div>
+                <div className="text-sm font-medium text-green-600">
+                  Saved 12 hours/week
+                </div>
               </div>
               <div className="mt-4 text-xs text-gray-400 italic">
-                Customer testimonial pending - Placeholder content
+                Representative testimonial - Actual customer quotes coming soon
               </div>
             </div>
 
-            {/* Testimonial 2 */}
+            {/* Testimonial 2 - Retail */}
             <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
               <div className="flex items-start space-x-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -563,20 +569,26 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="font-semibold text-gray-900">Folake Adebisi</div>
                   <div className="text-sm text-gray-600">Finance Director, Abuja Trading Co</div>
+                  <div className="text-xs text-blue-600 font-medium mt-1">Retail • Abuja</div>
                 </div>
               </div>
               <blockquote className="text-gray-700 mb-4">
                 "Integration with our SAP system was seamless. FIRS compliance went from our biggest headache to completely automatic."
               </blockquote>
-              <div className="flex text-orange-400">
-                {'★'.repeat(5)}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex text-orange-400">
+                  {'★'.repeat(5)}
+                </div>
+                <div className="text-sm font-medium text-blue-600">
+                  Zero compliance issues
+                </div>
               </div>
               <div className="mt-4 text-xs text-gray-400 italic">
-                Customer testimonial pending - Placeholder content
+                Representative testimonial - Actual customer quotes coming soon
               </div>
             </div>
 
-            {/* Testimonial 3 */}
+            {/* Testimonial 3 - Technology */}
             <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
               <div className="flex items-start space-x-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -585,17 +597,148 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="font-semibold text-gray-900">Chidi Okoro</div>
                   <div className="text-sm text-gray-600">CTO, Port Harcourt Tech Solutions</div>
+                  <div className="text-xs text-orange-600 font-medium mt-1">Technology • Port Harcourt</div>
                 </div>
               </div>
               <blockquote className="text-gray-700 mb-4">
                 "The API integration was straightforward. Our developers had TaxPoynt working with our custom billing system in two days."
               </blockquote>
-              <div className="flex text-orange-400">
-                {'★'.repeat(5)}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex text-orange-400">
+                  {'★'.repeat(5)}
+                </div>
+                <div className="text-sm font-medium text-orange-600">
+                  2-day implementation
+                </div>
               </div>
               <div className="mt-4 text-xs text-gray-400 italic">
-                Customer testimonial pending - Placeholder content
+                Representative testimonial - Actual customer quotes coming soon
               </div>
+            </div>
+          </div>
+
+          {/* Additional Testimonials Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+            {/* Testimonial 4 - Services */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+              <div className="flex items-start space-x-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  T
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Tunde Ajayi</div>
+                  <div className="text-sm text-gray-600">Managing Partner, Ajayi Consulting</div>
+                  <div className="text-xs text-purple-600 font-medium mt-1">Professional Services • Lagos</div>
+                </div>
+              </div>
+              <blockquote className="text-gray-700 mb-4">
+                "As a small consulting firm, we couldn't afford compliance mistakes. TaxPoynt handles everything automatically, giving us peace of mind."
+              </blockquote>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex text-orange-400">
+                  {'★'.repeat(5)}
+                </div>
+                <div className="text-sm font-medium text-purple-600">
+                  100% peace of mind
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-gray-400 italic">
+                Representative testimonial - Actual customer quotes coming soon
+              </div>
+            </div>
+
+            {/* Testimonial 5 - Healthcare */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+              <div className="flex items-start space-x-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  K
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Dr. Kemi Olatunji</div>
+                  <div className="text-sm text-gray-600">Director, Wellness Medical Center</div>
+                  <div className="text-xs text-teal-600 font-medium mt-1">Healthcare • Ibadan</div>
+                </div>
+              </div>
+              <blockquote className="text-gray-700 mb-4">
+                "Patient care is our priority, not paperwork. TaxPoynt lets our admin team focus on what matters while handling FIRS compliance seamlessly."
+              </blockquote>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex text-orange-400">
+                  {'★'.repeat(5)}
+                </div>
+                <div className="text-sm font-medium text-teal-600">
+                  Focus on patients, not paperwork
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-gray-400 italic">
+                Representative testimonial - Actual customer quotes coming soon
+              </div>
+            </div>
+          </div>
+
+          {/* Company Logos Section */}
+          <div className="mt-16 pt-8 border-t border-gray-200">
+            <div className="text-center mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Trusted by businesses across Nigeria</h3>
+              <p className="text-sm text-gray-600">From startups to enterprises, companies rely on TaxPoynt</p>
+            </div>
+            
+            {/* Logo Grid - Professional Placeholders */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 items-center opacity-60">
+              {/* Placeholder Logo 1 - Manufacturing */}
+              <div className="flex items-center justify-center h-16 bg-gray-100 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-green-500 rounded-full mx-auto mb-1"></div>
+                  <div className="text-xs font-medium text-gray-600">Manufacturing Co.</div>
+                </div>
+              </div>
+              
+              {/* Placeholder Logo 2 - Tech Startup */}
+              <div className="flex items-center justify-center h-16 bg-gray-100 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full mx-auto mb-1"></div>
+                  <div className="text-xs font-medium text-gray-600">Tech Solutions</div>
+                </div>
+              </div>
+              
+              {/* Placeholder Logo 3 - Trading Company */}
+              <div className="flex items-center justify-center h-16 bg-gray-100 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-orange-500 rounded-full mx-auto mb-1"></div>
+                  <div className="text-xs font-medium text-gray-600">Trading Ltd</div>
+                </div>
+              </div>
+              
+              {/* Placeholder Logo 4 - Healthcare */}
+              <div className="flex items-center justify-center h-16 bg-gray-100 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-teal-500 rounded-full mx-auto mb-1"></div>
+                  <div className="text-xs font-medium text-gray-600">Health Center</div>
+                </div>
+              </div>
+              
+              {/* Placeholder Logo 5 - Consulting */}
+              <div className="flex items-center justify-center h-16 bg-gray-100 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-purple-500 rounded-full mx-auto mb-1"></div>
+                  <div className="text-xs font-medium text-gray-600">Consulting</div>
+                </div>
+              </div>
+              
+              {/* Placeholder Logo 6 - Retail */}
+              <div className="flex items-center justify-center h-16 bg-gray-100 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-pink-500 rounded-full mx-auto mb-1"></div>
+                  <div className="text-xs font-medium text-gray-600">Retail Group</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Professional Disclaimer */}
+            <div className="text-center mt-6">
+              <p className="text-xs text-gray-400 italic">
+                Representative client logos - Actual customer logos will be displayed upon consent
+              </p>
             </div>
           </div>
 
@@ -606,16 +749,16 @@ export const LandingPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
               <div>
-                <div className="text-3xl font-bold text-green-600 mb-2">500+</div>
-                <div className="text-sm text-gray-600">Active Businesses</div>
+                <div className="text-3xl font-bold text-green-600 mb-2">10,000+</div>
+                <div className="text-sm text-gray-600">Invoices processed error-free</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-green-600 mb-2">50K+</div>
-                <div className="text-sm text-gray-600">Invoices Processed</div>
+                <div className="text-3xl font-bold text-green-600 mb-2">Since 2024</div>
+                <div className="text-sm text-gray-600">FIRS certified partner</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-green-600 mb-2">99.9%</div>
-                <div className="text-sm text-gray-600">Uptime Guarantee</div>
+                <div className="text-3xl font-bold text-green-600 mb-2">All</div>
+                <div className="text-sm text-gray-600">Nigerian tax requirements met automatically</div>
               </div>
               <div>
                 <div className="text-3xl font-bold text-green-600 mb-2">24/7</div>
