@@ -232,7 +232,7 @@ export const LandingPage: React.FC = () => {
 
           {/* Emotional Impact */}
           <div className="mt-16 text-center bg-white rounded-2xl p-8 shadow-lg border border-red-100">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">You Started Your Business to Serve Customers, Not Fight Paperwork</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">You Started Your Business to Serve Customers, Not Handle Paperwork</h3>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
               Every hour spent on FIRS compliance is an hour not spent growing your business, serving customers, or focusing on what you do best.
             </p>
