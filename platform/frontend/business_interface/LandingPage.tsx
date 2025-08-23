@@ -22,7 +22,8 @@ import {
   Building,
   Receipt,
   Banknote,
-  Settings
+  Settings,
+  AlertTriangle
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
