@@ -122,7 +122,7 @@ export const Logo: React.FC<LogoProps> = ({
             fontFeatureSettings: '"kern" 1, "liga" 1'
           }}
         >
-          Send Invoices to FIRS
+          Secure E-invoicing Solution
         </span>
       )}
     </div>

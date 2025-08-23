@@ -13,7 +13,7 @@ export const LandingPage: React.FC = () => {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-white" style={{ 
+    <div className="min-h-screen bg-gray-900" style={{ 
       fontFeatureSettings: '"kern" 1, "liga" 1', 
       textRendering: 'optimizeLegibility', 
       WebkitFontSmoothing: 'antialiased', 
@@ -21,7 +21,7 @@ export const LandingPage: React.FC = () => {
     }}>
       
       {/* Navigation */}
-      <nav className="px-6 py-4 border-b border-gray-200">
+      <nav className="px-6 py-4 border-b border-gray-700">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="relative group">
             {/* Sparkling Effect */}
@@ -44,7 +44,7 @@ export const LandingPage: React.FC = () => {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/auth/signin')}
-              className="text-gray-600 hover:text-gray-900 font-medium"
+              className="text-gray-300 hover:text-white font-medium"
               style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
             >
               Sign In
@@ -81,11 +81,11 @@ export const LandingPage: React.FC = () => {
           {/* Enhanced Headline */}
           <div className="mb-12">
             <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-8 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
-              Stop wasting time on government paperwork
+              Stop wasting time on compliance paperwork
             </div>
             <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight" 
                 style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-              Send invoices to FIRS in 
+              Submit compliant e-invoices in 
               <br />
               <span className="text-green-400 font-black" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
                 seconds, not hours
@@ -96,7 +96,7 @@ export const LandingPage: React.FC = () => {
           {/* Enhanced Subtitle */}
           <p className="text-xl md:text-2xl text-gray-100 mb-20 max-w-4xl mx-auto font-normal leading-relaxed" 
              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-            Stop wasting hours on FIRS paperwork. TaxPoynt connects your business software directly to FIRS—one click and your invoices are submitted correctly, every time.
+            Stop wasting hours on compliance paperwork. TaxPoynt connects your business software directly to government systems—one click and your e-invoices are submitted correctly, every time.
           </p>
 
           {/* Enhanced CTAs */}
@@ -121,44 +121,44 @@ export const LandingPage: React.FC = () => {
             </Button>
           </div>
 
-          {/* Trust Indicators - Fixed Layout */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          {/* Trust Indicators - Properly Visible Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto text-center">
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-green-400 mb-2" 
+              <div className="text-4xl md:text-5xl font-black text-green-400 mb-2" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
                 Zero
               </div>
-              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" 
+              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                FIRS submission errors
+                E-invoice submission errors
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-blue-400 mb-2" 
+              <div className="text-4xl md:text-5xl font-black text-blue-400 mb-2" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
                 2 min
               </div>
-              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" 
+              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                From sale to FIRS submission
+                From sale to compliance submission
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-green-400 mb-2" 
+              <div className="text-4xl md:text-5xl font-black text-green-400 mb-2" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
                 100%
               </div>
-              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" 
+              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                 Nigerian compliance coverage
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-4xl font-black text-blue-400 mb-2" 
+              <div className="text-4xl md:text-5xl font-black text-blue-400 mb-2" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
                 Any
               </div>
-              <div className="text-gray-100 text-sm font-semibold group-hover:text-white transition-colors" 
+              <div className="text-gray-100 text-sm md:text-base font-semibold group-hover:text-white transition-colors" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                 Software you already use
               </div>
