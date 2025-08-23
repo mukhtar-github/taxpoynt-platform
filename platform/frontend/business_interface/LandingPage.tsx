@@ -47,17 +47,17 @@ export const LandingPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-900">
       
       {/* Navigation */}
-      <nav className="px-6 py-4 border-b border-gray-200">
+      <nav className="px-6 py-4 border-b border-gray-700">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo size="lg" variant="full" showTagline={true} />
           
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/auth/signin')}
-              className="text-gray-600 hover:text-gray-900 font-medium"
+              className="text-gray-300 hover:text-white font-medium"
             >
               Sign In
             </button>
