@@ -214,4 +214,94 @@
   .space-y-comfortable > * + * {
     margin-top: 1.25rem;
   }
+
+  /* Warm, Approachable Typography Styles */
+  .text-friendly {
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-relaxed);
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
+  }
+
+  .heading-warm {
+    color: #1F2937;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.025em;
+    font-family: var(--font-family-heading);
+  }
+
+  /* Nigerian Personality Color Classes */
+  .text-lagos {
+    color: #FF6B35;
+  }
+
+  .text-abuja {
+    color: #2ECC71;
+  }
+
+  .text-kano {
+    color: #E67E22;
+  }
+
+  .bg-lagos {
+    background-color: #FF6B35;
+  }
+
+  .bg-abuja {
+    background-color: #2ECC71;
+  }
+
+  .bg-kano {
+    background-color: #E67E22;
+  }
+
+  /* Warm Color Classes */
+  .text-warm-orange {
+    color: #F97316;
+  }
+
+  .text-warm-amber {
+    color: #F59E0B;
+  }
+
+  .text-warm-emerald {
+    color: #10B981;
+  }
+
+  .bg-warm-orange {
+    background-color: #F97316;
+  }
+
+  .bg-warm-amber {
+    background-color: #F59E0B;
+  }
+
+  .bg-warm-emerald {
+    background-color: #10B981;
+  }
+
+  /* Light variants for backgrounds */
+  .bg-warm-orange-light {
+    background-color: rgba(249, 115, 22, 0.1);
+  }
+
+  .bg-warm-amber-light {
+    background-color: rgba(245, 158, 11, 0.1);
+  }
+
+  .bg-warm-emerald-light {
+    background-color: rgba(16, 185, 129, 0.1);
+  }
+
+  .bg-lagos-light {
+    background-color: rgba(255, 107, 53, 0.1);
+  }
+
+  .bg-abuja-light {
+    background-color: rgba(46, 204, 113, 0.1);
+  }
+
+  .bg-kano-light {
+    background-color: rgba(230, 126, 34, 0.1);
+  }
 }

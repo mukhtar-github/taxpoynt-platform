@@ -73,8 +73,8 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="relative px-6 py-24 overflow-hidden min-h-screen flex items-center">
-        {/* Sophisticated Grey Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-white">
+        {/* Sophisticated Dark Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-600">
           {/* Animated Background Patterns */}
           <div className="absolute inset-0 opacity-30">
             <div 
@@ -100,23 +100,13 @@ export const LandingPage: React.FC = () => {
             ></div>
           </div>
           
-          {/* Geometric Pattern Overlay */}
-          <div className="absolute inset-0 opacity-10">
-            <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <defs>
-                <pattern id="hero-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5"/>
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#hero-grid)" />
-            </svg>
-          </div>
+          {/* Removed grid overlay for clean design */}
         </div>
         
         <div className="max-w-5xl mx-auto text-center relative z-10">
           
           {/* Enhanced Badge */}
-          <div className="inline-flex items-center px-6 py-3 bg-white/80 backdrop-blur-sm border border-green-200 text-green-800 rounded-full text-sm font-medium mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300">
+          <div className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm border border-green-200 text-green-800 rounded-full text-sm font-medium mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300">
             <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
           </div>
@@ -126,7 +116,7 @@ export const LandingPage: React.FC = () => {
             <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-8 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
               Stop wasting time on government paperwork
             </div>
-            <h1 className="text-5xl md:text-7xl font-black text-gray-900 mb-8 leading-tight">
+            <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight">
               Send invoices to FIRS in 
               <br />
               <span className="bg-gradient-to-r from-green-600 via-blue-600 to-green-600 bg-clip-text text-transparent">
@@ -136,7 +126,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-gray-700 mb-20 max-w-4xl mx-auto font-light leading-relaxed">
+          <p className="text-xl md:text-2xl text-gray-200 mb-20 max-w-4xl mx-auto font-light leading-relaxed">
             Stop wasting hours on FIRS paperwork. TaxPoynt connects your business software directly to FIRS—one click and your invoices are submitted correctly, every time.
           </p>
 
@@ -156,7 +146,7 @@ export const LandingPage: React.FC = () => {
               onClick={() => {
                 document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="text-xl px-12 py-5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 backdrop-blur-sm font-semibold rounded-2xl shadow-xl hover:shadow-gray-500/25 transition-all duration-300 hover:scale-105 transform"
+              className="text-xl px-12 py-5 border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm font-semibold rounded-2xl shadow-xl hover:shadow-white/25 transition-all duration-300 hover:scale-105 transform"
             >
               Learn More
             </Button>
@@ -166,19 +156,19 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">Zero</div>
-              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">FIRS submission errors</div>
+              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">FIRS submission errors</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">2 min</div>
-              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">From sale to FIRS submission</div>
+              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">From sale to FIRS submission</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">100%</div>
-              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">Nigerian compliance coverage</div>
+              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">Nigerian compliance coverage</div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
               <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">Any</div>
-              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">Software you already use</div>
+              <div className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">Software you already use</div>
             </div>
           </div>
         </div>

@@ -49,6 +49,20 @@ export const colors = {
     app: '#008751',          // Access Point Provider (Nigerian green)
     hybrid: '#6366F1',       // Hybrid users (indigo)
     admin: '#7C3AED',        // Admin interface (purple)
+  },
+
+  // New warm palette for approachable design
+  warm: {
+    orange: '#F97316',       // Friendly orange
+    amber: '#F59E0B',        // Warm amber
+    emerald: '#10B981',      // Success green
+  },
+
+  // Nigerian personality colors
+  personality: {
+    lagos: '#FF6B35',        // Lagos energy orange
+    abuja: '#2ECC71',        // Government green  
+    kano: '#E67E22',         // Northern warmth
   }
 } as const;
 
