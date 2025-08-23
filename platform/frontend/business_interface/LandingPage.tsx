@@ -133,6 +133,276 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Problems Section - Show Current Pain Points */}
+      <section className="px-6 py-20 bg-red-50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+              FIRS Compliance is Killing Your Business Productivity
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Nigerian businesses waste countless hours on e-invoicing paperwork, making costly mistakes, and struggling with complex compliance requirements.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Problem 1: Time Waste */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-100">
+              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Clock className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Hours of Manual Work</h3>
+              <div className="space-y-3 text-gray-700">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>15+ hours per week on FIRS paperwork</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Manual invoice formatting and classification</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Manual copying of transaction data from bank statements</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Back-and-forth with accountants and staff</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Time away from growing your business</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Problem 2: Costly Errors */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-100">
+              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Expensive Mistakes</h3>
+              <div className="space-y-3 text-gray-700">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Classification errors lead to penalties</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Invoice rejections cause delays</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Compliance issues risk your business</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Lost revenue from processing delays</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Problem 3: Technical Complexity */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-100">
+              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Settings className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Complex Integration</h3>
+              <div className="space-y-3 text-gray-700">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>E-invoicing compliance rules are complex and constantly changing</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Your current software doesn't connect</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Need expensive developers for integration</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                  <span>Constant updates and maintenance required</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Emotional Impact */}
+          <div className="mt-16 text-center bg-white rounded-2xl p-8 shadow-lg border border-red-100">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">You Started Your Business to Serve Customers, Not Fight Paperwork</h3>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Every hour spent on FIRS compliance is an hour not spent growing your business, serving customers, or focusing on what you do best.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Solution Section - How TaxPoynt Solves Each Problem */}
+      <section className="px-6 py-20 bg-green-50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+              TaxPoynt Eliminates Every FIRS Compliance Headache
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              We handle all the complexity so you can focus on your business. Here's exactly how we solve each problem:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Solution 1: Automate Manual Work */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-green-100">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Complete Automation</h3>
+              <div className="space-y-3 text-gray-700 mb-6">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Financial data flows seamlessly into invoice processing</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Invoices submit to FIRS automatically</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>No manual formatting or classification needed</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Works with your existing workflow</span>
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 mb-1">Save 12+ Hours/Week</div>
+                <div className="text-sm text-green-700">Focus on growing your business instead</div>
+              </div>
+            </div>
+
+            {/* Solution 2: Zero Errors */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-green-100">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Shield className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Perfect Compliance</h3>
+              <div className="space-y-3 text-gray-700 mb-6">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Intelligence-powered classification prevents errors</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Real-time validation before submission</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Automatic compliance updates</span>
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 mb-1">Zero Errors</div>
+                <div className="text-sm text-green-700">No more penalties or rejections</div>
+              </div>
+            </div>
+
+            {/* Solution 3: Simple Integration */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-green-100">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Monitor className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">One-Click Integration</h3>
+              <div className="space-y-3 text-gray-700 mb-6">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Works with 40+ popular business software</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>Secure transaction data automation technology</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>No developers or technical knowledge needed</span>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <span>We handle all updates and maintenance</span>
+                </div>
+              </div>
+              
+              {/* Security Badge */}
+              <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-blue-800">Enterprise Security</div>
+                    <div className="text-xs text-blue-600">Regulated • Encrypted • Read-only access</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 mb-1">2-Minute Setup</div>
+                <div className="text-sm text-green-700">Start processing invoices today</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Before vs After */}
+          <div className="mt-16">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-red-50 rounded-2xl p-8 border border-red-200">
+                <h3 className="text-xl font-bold text-red-800 mb-4 text-center">Before TaxPoynt</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-red-500">❌</div>
+                    <span className="text-gray-700">15+ hours/week on FIRS paperwork</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-red-500">❌</div>
+                    <span className="text-gray-700">Constant fear of classification errors</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-red-500">❌</div>
+                    <span className="text-gray-700">Expensive developers for integration</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-red-500">❌</div>
+                    <span className="text-gray-700">Invoice rejections and delays</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-green-50 rounded-2xl p-8 border border-green-200">
+                <h3 className="text-xl font-bold text-green-800 mb-4 text-center">After TaxPoynt</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-green-500">✅</div>
+                    <span className="text-gray-700">2-minute automated submission</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-green-500">✅</div>
+                    <span className="text-gray-700">100% compliance guaranteed</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-green-500">✅</div>
+                    <span className="text-gray-700">No technical knowledge required</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-green-500">✅</div>
+                    <span className="text-gray-700">Focus on growing your business</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Product Demo Section */}
       <section className="relative px-6 py-20 bg-white">
         <div className="max-w-6xl mx-auto">
@@ -230,124 +500,121 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section id="services" className="px-6 py-20 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
+      {/* Simple Service Section - Progressive Disclosure */}
+      <section id="services" className="px-6 py-20 bg-white">
+        <div className="max-w-4xl mx-auto text-center">
           
-          <div className="text-center mb-16">
-            <h2 className="text-display font-heading text-gray-900 mb-6">Choose Your Service</h2>
-            <p className="text-body-lg text-gray-600 max-w-2xl mx-auto font-body">
-              Select the perfect solution for your e-invoicing needs
+          <div className="mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Complete E-invoicing Solution</h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+              Everything you need for FIRS compliance in one simple platform. No confusing options, no complex choices.
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
-            {/* System Integrator */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-lg transition-shadow">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-blue-200 transition-colors">
-                  <FileText className="w-8 h-8 text-blue-600" stroke="currentColor" fill="none" />
-                </div>
-                <h3 className="text-heading font-heading text-gray-900 mb-4">System Integrator</h3>
-                <p className="text-body text-gray-600 mb-6 font-body">
-                  Connect 40+ business and financial systems for automated e-invoicing workflows
-                </p>
-                <ul className="text-left space-y-2 mb-8">
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    40+ Ready-made Integrations
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    Multi-language SDKs (Python, JS, PHP)
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    Custom API Development
-                  </li>
-                </ul>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => router.push('/auth/signup?role=si')}
-                >
-                  Choose SI Service
-                </Button>
+            {/* Single Unified Service */}
+            <div className="bg-green-50 rounded-3xl p-12 border-2 border-green-200 max-w-2xl mx-auto">
+              <div className="w-20 h-20 bg-green-100 rounded-3xl flex items-center justify-center mx-auto mb-8">
+                <CheckCircle className="w-10 h-10 text-green-600" />
               </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">TaxPoynt E-invoicing Platform</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left mb-8">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-700">Automatic FIRS submission</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-700">40+ software integrations</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-700">Secure transaction automation</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-700">100% compliance guaranteed</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-700">Enterprise security</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-700">24/7 Nigerian support</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 mb-8 border border-green-200">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-600 mb-1">2 min</div>
+                    <div className="text-xs text-gray-600">Setup time</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-600 mb-1">Zero</div>
+                    <div className="text-xs text-gray-600">Errors</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-600 mb-1">12+</div>
+                    <div className="text-xs text-gray-600">Hours saved/week</div>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => router.push('/auth/signup')}
+                className="text-lg px-12 py-4 mb-4"
+              >
+                Start Free Trial
+              </Button>
+              
+              <p className="text-sm text-gray-500">
+                No credit card required • 7-day free trial • Cancel anytime
+              </p>
             </div>
 
-            {/* Access Point Provider */}
-            <div className="bg-white rounded-2xl border-2 border-green-500 p-8 relative hover:shadow-lg transition-shadow">
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <span className="bg-green-500 text-white px-4 py-1 text-sm font-medium rounded-full">
-                  Recommended
-                </span>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-green-200 transition-colors">
-                  <Clock className="w-8 h-8 text-green-600" stroke="currentColor" fill="none" />
+            {/* Progressive Disclosure - Technical Options */}
+            <div className="mt-12">
+              <details className="group">
+                <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium text-sm">
+                  Advanced integration options for developers →
+                </summary>
+                <div className="mt-6 bg-gray-50 rounded-2xl p-8 text-left">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">API Integration</h4>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div>• Developer-friendly API integration</div>
+                        <div>• Multi-language SDKs</div>
+                        <div>• Real-time webhook notifications</div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">ERP Connectors</h4>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div>• SAP, Oracle, Dynamics</div>
+                        <div>• QuickBooks, Xero, Sage</div>
+                        <div>• Advanced financial data sync</div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">Enterprise Features</h4>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div>• Bulk processing capabilities</div>
+                        <div>• Advanced compliance reporting</div>
+                        <div>• Dedicated account manager</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-heading font-heading text-gray-900 mb-4">Access Point Provider</h3>
-                <p className="text-body text-gray-600 mb-6 font-body">
-                  Secure invoice transmission via TaxPoynt's certified APP service
-                </p>
-                <ul className="text-left space-y-2 mb-8">
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    FIRS Transmission
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    Invoice Generation
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    Secure Processing
-                  </li>
-                </ul>
-                <Button
-                  variant="success"
-                  className="w-full"
-                  onClick={() => router.push('/auth/signup?role=app')}
-                >
-                  Choose APP Service
-                </Button>
-              </div>
-            </div>
-
-            {/* Hybrid Premium */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-lg transition-shadow">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:bg-purple-200 transition-colors">
-                  <Shield className="w-8 h-8 text-purple-600" stroke="currentColor" fill="none" />
-                </div>
-                <h3 className="text-heading font-heading text-gray-900 mb-4">Hybrid Premium</h3>
-                <p className="text-body text-gray-600 mb-6 font-body">
-                  Combined SI + APP with advanced features and premium support
-                </p>
-                <ul className="text-left space-y-2 mb-8">
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    All SI Features
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    All APP Features
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <span className="text-green-500 mr-2">✓</span>
-                    Premium Support
-                  </li>
-                </ul>
-                <Button
-                  variant="outline"
-                  className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
-                  onClick={() => router.push('/auth/signup?role=hybrid')}
-                >
-                  Choose Hybrid Service
-                </Button>
-              </div>
+              </details>
             </div>
           </div>
         </div>
@@ -765,6 +1032,114 @@ export const LandingPage: React.FC = () => {
                 <div className="text-sm text-gray-600">Nigerian Support</div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section - Address Common Concerns */}
+      <section className="px-6 py-20 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+              Common Questions About TaxPoynt
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Get answers to the questions Nigerian business owners ask most
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* FAQ 1 - Security Concerns */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                Is my financial data safe with TaxPoynt?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>Yes, absolutely. We use enterprise-grade security with read-only access to your financial data. We can see your transactions to generate invoices, but we cannot move money or access your accounts. All data is encrypted and stored securely in Nigerian data centers.</p>
+              </div>
+            </details>
+
+            {/* FAQ 2 - Integration Complexity */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                How difficult is it to integrate with my existing software?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>Most integrations take under 10 minutes. If you use popular software like QuickBooks or SAP, it's usually just a simple connection process. For custom systems, our team handles the technical setup for you at no extra cost.</p>
+              </div>
+            </details>
+
+            {/* FAQ 3 - Compliance Concerns */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                What if FIRS changes their requirements?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>We handle all compliance updates automatically. As a FIRS-certified Access Point Provider, we're notified of changes before they take effect. Your invoices will always meet current requirements without any action needed from you.</p>
+              </div>
+            </details>
+
+            {/* FAQ 4 - Cost/ROI Concerns */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                Is TaxPoynt worth the cost for a small business?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>Most small businesses save 12+ hours per week on FIRS paperwork. Even at minimum wage, that's ₦36,000+ in time savings weekly. Plus, avoiding just one compliance penalty pays for months of TaxPoynt service.</p>
+              </div>
+            </details>
+
+            {/* FAQ 5 - Technical Support */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                What if I need help or something goes wrong?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>We provide 24/7 support by Nigerian customer service representatives who understand your business context. Most issues are resolved within minutes, and our team proactively monitors for any submission problems.</p>
+              </div>
+            </details>
+
+            {/* FAQ 6 - Trial/Commitment */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                Can I try TaxPoynt before committing?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>Yes! We offer a 7-day free trial with no credit card required. You can process real invoices, test all features, and see the time savings firsthand. Cancel anytime during the trial with no charges.</p>
+              </div>
+            </details>
+
+            {/* FAQ 7 - Business Size */}
+            <details className="group bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <summary className="cursor-pointer font-semibold text-lg text-gray-900 flex items-center justify-between">
+                Does TaxPoynt work for my type of business?
+                <span className="ml-4 text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-4 text-gray-700">
+                <p>TaxPoynt works for any business that needs to submit invoices to FIRS - from small shops to large corporations. We handle retail, manufacturing, services, healthcare, technology, and every other industry. If you sell anything in Nigeria, we can help.</p>
+              </div>
+            </details>
+          </div>
+
+          {/* Still Have Questions CTA */}
+          <div className="mt-16 text-center bg-blue-50 rounded-2xl p-8">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Still have questions?</h3>
+            <p className="text-gray-600 mb-6">
+              Our Nigerian customer success team is here to help you understand how TaxPoynt fits your specific business needs.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/contact')}
+              className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+            >
+              Talk to Our Team
+            </Button>
           </div>
         </div>
       </section>
