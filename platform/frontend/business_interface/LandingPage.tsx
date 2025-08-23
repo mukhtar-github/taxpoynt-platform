@@ -49,25 +49,38 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900" style={{ fontFeatureSettings: '"kern" 1, "liga" 1', textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
       
-      {/* Navigation */}
-      <nav className="px-6 py-4 border-b border-gray-700" style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
+      {/* Navigation - Professional */}
+      <nav className="px-6 py-4 border-b border-gray-200">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
-            <Logo size="lg" variant="full" showTagline={true} color="white" />
+          <div className="relative group">
+            {/* Sparkling Effect */}
+            <div className="absolute -inset-2 opacity-75 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute top-0 left-1/4 w-1 h-1 bg-blue-400 rounded-full animate-ping" style={{ animationDelay: '0s', animationDuration: '2s' }}></div>
+              <div className="absolute top-2 right-1/4 w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" style={{ animationDelay: '0.5s', animationDuration: '2.5s' }}></div>
+              <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" style={{ animationDelay: '1s', animationDuration: '3s' }}></div>
+              <div className="absolute top-1/2 right-0 w-0.5 h-0.5 bg-green-500 rounded-full animate-ping" style={{ animationDelay: '1.5s', animationDuration: '2s' }}></div>
+            </div>
+            <div style={{ 
+              color: '#3B82F6', 
+              textShadow: '0 0 10px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.1)',
+              textRendering: 'optimizeLegibility', 
+              WebkitFontSmoothing: 'antialiased' 
+            }}>
+              <Logo size="lg" variant="full" showTagline={true} />
+            </div>
           </div>
           
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/auth/signin')}
-              className="text-gray-100 hover:text-white font-semibold"
-              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
+              className="text-gray-600 hover:text-gray-900 font-medium"
+              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
             >
               Sign In
             </button>
             <Button
               variant="primary"
               onClick={() => router.push('/auth/signup')}
-              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
             >
               Get Started
             </Button>
