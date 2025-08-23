@@ -29,6 +29,23 @@ import {
 export const LandingPage: React.FC = () => {
   const router = useRouter();
 
+  // Add floating animation styles
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes float {
+        0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+        33% { transform: translate(30px, -30px) rotate(120deg); }
+        66% { transform: translate(-20px, 20px) rotate(240deg); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       
@@ -55,48 +72,81 @@ export const LandingPage: React.FC = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative px-6 py-20 overflow-hidden">
-        {/* Clean Professional Background */}
-        <div className="absolute inset-0 bg-gray-50">
-          {/* Subtle Nigerian-inspired accent */}
-          <div className="absolute top-20 right-20 w-32 h-32 bg-green-100 rounded-full opacity-30"></div>
-          <div className="absolute bottom-20 left-20 w-24 h-24 bg-orange-100 rounded-full opacity-20"></div>
+      <section className="relative px-6 py-24 overflow-hidden min-h-screen flex items-center">
+        {/* Sophisticated Grey Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-white">
+          {/* Animated Background Patterns */}
+          <div className="absolute inset-0 opacity-30">
+            <div 
+              className="absolute top-1/4 right-1/4 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"
+              style={{
+                animation: 'float 8s ease-in-out infinite',
+                animationDelay: '0s'
+              }}
+            ></div>
+            <div 
+              className="absolute top-1/3 left-1/4 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"
+              style={{
+                animation: 'float 10s ease-in-out infinite reverse',
+                animationDelay: '2s'
+              }}
+            ></div>
+            <div 
+              className="absolute bottom-1/4 left-1/2 w-72 h-72 bg-orange-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"
+              style={{
+                animation: 'float 12s ease-in-out infinite',
+                animationDelay: '4s'
+              }}
+            ></div>
+          </div>
+          
+          {/* Geometric Pattern Overlay */}
+          <div className="absolute inset-0 opacity-10">
+            <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <defs>
+                <pattern id="hero-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#hero-grid)" />
+            </svg>
+          </div>
         </div>
         
-        <div className="max-w-4xl mx-auto text-center relative z-10">
+        <div className="max-w-5xl mx-auto text-center relative z-10">
           
-          {/* Badge */}
-          <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium mb-8">
-            <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+          {/* Enhanced Badge */}
+          <div className="inline-flex items-center px-6 py-3 bg-white/80 backdrop-blur-sm border border-green-200 text-green-800 rounded-full text-sm font-medium mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300">
+            <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
           </div>
 
-          {/* Headline with Prominent Tagline */}
-          <div className="mb-8">
-            <div className="inline-block bg-green-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-6">
+          {/* Enhanced Headline with Animation */}
+          <div className="mb-12">
+            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-8 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
               Stop wasting time on government paperwork
             </div>
-            <h1 className="text-hero font-heading text-shadow-sm text-gray-900 mb-8">
+            <h1 className="text-5xl md:text-7xl font-black text-gray-900 mb-8 leading-tight">
               Send invoices to FIRS in 
               <br />
-              <span className="text-green-600 font-bold">
+              <span className="bg-gradient-to-r from-green-600 via-blue-600 to-green-600 bg-clip-text text-transparent">
                 seconds, not hours
               </span>
             </h1>
           </div>
 
-          {/* Subtitle */}
-          <p className="text-body-lg text-gray-600 mb-16 max-w-3xl mx-auto font-body">
+          {/* Enhanced Subtitle */}
+          <p className="text-xl md:text-2xl text-gray-700 mb-20 max-w-4xl mx-auto font-light leading-relaxed">
             Stop wasting hours on FIRS paperwork. TaxPoynt connects your business software directly to FIRS—one click and your invoices are submitted correctly, every time.
           </p>
 
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+          {/* Enhanced CTAs */}
+          <div className="flex flex-col sm:flex-row gap-6 justify-center mb-20">
             <Button
               variant="primary"
               size="lg"
               onClick={() => router.push('/auth/signup')}
-              className="text-lg px-8 py-4"
+              className="text-xl px-12 py-5 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105 transform"
             >
               Start Free Trial
             </Button>
@@ -106,53 +156,74 @@ export const LandingPage: React.FC = () => {
               onClick={() => {
                 document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="text-lg px-8 py-4"
+              className="text-xl px-12 py-5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 backdrop-blur-sm font-semibold rounded-2xl shadow-xl hover:shadow-gray-500/25 transition-all duration-300 hover:scale-105 transform"
             >
               Learn More
             </Button>
           </div>
 
-          {/* Trust Indicators */}
+          {/* Enhanced Trust Indicators */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-2xl font-bold text-green-600 mb-1">Zero</div>
-              <div className="text-gray-600 text-sm">FIRS submission errors</div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">Zero</div>
+              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">FIRS submission errors</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-blue-600 mb-1">2 min</div>
-              <div className="text-gray-600 text-sm">From sale to FIRS submission</div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">2 min</div>
+              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">From sale to FIRS submission</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-green-600 mb-1">100%</div>
-              <div className="text-gray-600 text-sm">Nigerian compliance coverage</div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text mb-2">100%</div>
+              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">Nigerian compliance coverage</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-blue-600 mb-1">Any</div>
-              <div className="text-gray-600 text-sm">Software you already use</div>
+            <div className="group hover:scale-110 transition-all duration-300">
+              <div className="text-4xl font-black text-transparent bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text mb-2">Any</div>
+              <div className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">Software you already use</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Problems Section - Show Current Pain Points */}
-      <section className="px-6 py-20 bg-red-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+      <section className="relative px-6 py-24 overflow-hidden">
+        {/* Sophisticated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-orange-25 to-yellow-50">
+          {/* Floating Problem Indicators */}
+          <div className="absolute inset-0 opacity-20">
+            <div 
+              className="absolute top-1/4 left-1/4 w-64 h-64 bg-red-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 10s ease-in-out infinite',
+                animationDelay: '1s'
+              }}
+            ></div>
+            <div 
+              className="absolute bottom-1/3 right-1/4 w-48 h-48 bg-orange-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 12s ease-in-out infinite reverse',
+                animationDelay: '3s'
+              }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-8 leading-tight">
               E-invoicing Paperwork is Taking Your Business Time
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-2xl text-gray-700 max-w-4xl mx-auto font-light leading-relaxed">
               Nigerian businesses waste countless hours on e-invoicing paperwork, making costly mistakes, and struggling with complex compliance requirements.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {/* Problem 1: Time Waste */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-100">
-              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Clock className="w-8 h-8 text-red-600" />
+            <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-red-100 hover:shadow-red-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300">
+                <Clock className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Hours of Manual Work</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-6 text-center">Hours of Manual Work</h3>
               <div className="space-y-3 text-gray-700">
                 <div className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
@@ -178,11 +249,11 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Problem 2: Costly Errors */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-100">
-              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <AlertTriangle className="w-8 h-8 text-red-600" />
+            <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-red-100 hover:shadow-red-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-20 h-20 bg-gradient-to-br from-red-600 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300">
+                <AlertTriangle className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Expensive Mistakes</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-6 text-center">Expensive Mistakes</h3>
               <div className="space-y-3 text-gray-700">
                 <div className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
@@ -204,11 +275,11 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Problem 3: Technical Complexity */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-100">
-              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Settings className="w-8 h-8 text-red-600" />
+            <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-red-100 hover:shadow-red-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300">
+                <Settings className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Complex Integration</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-6 text-center">Complex Integration</h3>
               <div className="space-y-3 text-gray-700">
                 <div className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
@@ -230,10 +301,10 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Emotional Impact */}
-          <div className="mt-16 text-center bg-white rounded-2xl p-8 shadow-lg border border-red-100">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">You Started Your Business to Serve Customers, Not Handle Paperwork</h3>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+          {/* Enhanced Emotional Impact */}
+          <div className="mt-20 text-center bg-white/90 backdrop-blur-sm rounded-3xl p-12 shadow-2xl border border-red-200 hover:shadow-red-500/25 transition-all duration-500">
+            <h3 className="text-3xl md:text-4xl font-black text-gray-900 mb-6 leading-tight">You Started Your Business to Serve Customers, Not Handle Paperwork</h3>
+            <p className="text-xl text-gray-700 max-w-4xl mx-auto font-light leading-relaxed">
               Every hour spent on FIRS compliance is an hour not spent growing your business, serving customers, or focusing on what you do best.
             </p>
           </div>
@@ -241,24 +312,45 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Solution Section - How TaxPoynt Solves Each Problem */}
-      <section className="px-6 py-20 bg-green-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+      <section className="relative px-6 py-24 overflow-hidden">
+        {/* Sophisticated Green Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-blue-25 to-emerald-50">
+          {/* Floating Solution Indicators */}
+          <div className="absolute inset-0 opacity-20">
+            <div 
+              className="absolute top-1/4 right-1/4 w-72 h-72 bg-green-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 14s ease-in-out infinite',
+                animationDelay: '2s'
+              }}
+            ></div>
+            <div 
+              className="absolute bottom-1/3 left-1/4 w-56 h-56 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 16s ease-in-out infinite reverse',
+                animationDelay: '5s'
+              }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-8 leading-tight">
               TaxPoynt Simplifies Every E-invoicing Challenge
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-2xl text-gray-700 max-w-4xl mx-auto font-light leading-relaxed">
               We handle all the complexity so you can focus on your business. Here's exactly how we solve each problem:
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {/* Solution 1: Automate Manual Work */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-green-100">
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+            <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-green-100 hover:shadow-green-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300">
+                <CheckCircle className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Complete Automation</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-6 text-center">Complete Automation</h3>
               <div className="space-y-3 text-gray-700 mb-6">
                 <div className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
@@ -284,11 +376,11 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Solution 2: Zero Errors */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-green-100">
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-8 h-8 text-green-600" />
+            <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-green-100 hover:shadow-green-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-green-600 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300">
+                <Shield className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Perfect Compliance</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-6 text-center">Perfect Compliance</h3>
               <div className="space-y-3 text-gray-700 mb-6">
                 <div className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
@@ -310,11 +402,11 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Solution 3: Simple Integration */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-green-100">
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Monitor className="w-8 h-8 text-green-600" />
+            <div className="group bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-green-100 hover:shadow-green-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300">
+                <Monitor className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">One-Click Integration</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-6 text-center">One-Click Integration</h3>
               <div className="space-y-3 text-gray-700 mb-6">
                 <div className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
@@ -501,23 +593,44 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Simple Service Section - Progressive Disclosure */}
-      <section id="services" className="px-6 py-20 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
+      {/* Enhanced Service Section - Progressive Disclosure */}
+      <section id="services" className="relative px-6 py-24 overflow-hidden">
+        {/* Sophisticated Service Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-green-25 to-blue-25">
+          {/* Floating Service Elements */}
+          <div className="absolute inset-0 opacity-10">
+            <div 
+              className="absolute top-1/3 left-1/3 w-96 h-96 bg-green-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 22s ease-in-out infinite',
+                animationDelay: '4s'
+              }}
+            ></div>
+            <div 
+              className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 24s ease-in-out infinite reverse',
+                animationDelay: '8s'
+              }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto text-center relative z-10">
           
-          <div className="mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Complete E-invoicing Solution</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+          <div className="mb-20">
+            <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-8 leading-tight">Complete E-invoicing Solution</h2>
+            <p className="text-2xl text-gray-700 max-w-4xl mx-auto mb-12 font-light leading-relaxed">
               Everything you need for FIRS compliance in one simple platform. No confusing options, no complex choices.
             </p>
             
-            {/* Single Unified Service */}
-            <div className="bg-green-50 rounded-3xl p-12 border-2 border-green-200 max-w-2xl mx-auto">
-              <div className="w-20 h-20 bg-green-100 rounded-3xl flex items-center justify-center mx-auto mb-8">
-                <CheckCircle className="w-10 h-10 text-green-600" />
+            {/* Enhanced Single Unified Service */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-4xl p-16 border border-green-200 max-w-4xl mx-auto shadow-2xl hover:shadow-green-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-blue-600 rounded-4xl flex items-center justify-center mx-auto mb-10 shadow-2xl hover:scale-110 transition-transform duration-300">
+                <CheckCircle className="w-12 h-12 text-white" />
               </div>
               
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">TaxPoynt E-invoicing Platform</h3>
+              <h3 className="text-3xl md:text-4xl font-black text-gray-900 mb-8">TaxPoynt E-invoicing Platform</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left mb-8">
                 <div className="space-y-3">
@@ -703,28 +816,49 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="relative px-6 py-20 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+      <section className="relative px-6 py-24 overflow-hidden">
+        {/* Sophisticated Testimonial Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-25 to-green-50">
+          {/* Floating Trust Indicators */}
+          <div className="absolute inset-0 opacity-15">
+            <div 
+              className="absolute top-1/4 left-1/4 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 18s ease-in-out infinite',
+                animationDelay: '3s'
+              }}
+            ></div>
+            <div 
+              className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl"
+              style={{
+                animation: 'float 20s ease-in-out infinite reverse',
+                animationDelay: '7s'
+              }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-8 leading-tight">
               Trusted by Nigerian Businesses
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-2xl text-gray-700 max-w-4xl mx-auto font-light leading-relaxed">
               Join hundreds of businesses who've simplified their FIRS compliance
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {/* Testimonial 1 - Manufacturing */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-              <div className="flex items-start space-x-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <div className="group bg-white/90 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-gray-100 hover:shadow-blue-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="flex items-start space-x-5 mb-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center text-white font-black text-xl group-hover:scale-110 transition-transform duration-300">
                   A
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">Adebayo Okonkwo</div>
-                  <div className="text-sm text-gray-600">CEO, Lagos Electronics Ltd</div>
-                  <div className="text-xs text-green-600 font-medium mt-1">Manufacturing • Lagos</div>
+                  <div className="text-lg font-bold text-gray-900">Adebayo Okonkwo</div>
+                  <div className="text-base text-gray-600">CEO, Lagos Electronics Ltd</div>
+                  <div className="text-sm text-green-600 font-semibold mt-2">Manufacturing • Lagos</div>
                 </div>
               </div>
               <blockquote className="text-gray-700 mb-4">
@@ -744,15 +878,15 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Testimonial 2 - Retail */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-              <div className="flex items-start space-x-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <div className="group bg-white/90 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-gray-100 hover:shadow-blue-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="flex items-start space-x-5 mb-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-black text-xl group-hover:scale-110 transition-transform duration-300">
                   F
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">Folake Adebisi</div>
-                  <div className="text-sm text-gray-600">Finance Director, Abuja Trading Co</div>
-                  <div className="text-xs text-blue-600 font-medium mt-1">Retail • Abuja</div>
+                  <div className="text-lg font-bold text-gray-900">Folake Adebisi</div>
+                  <div className="text-base text-gray-600">Finance Director, Abuja Trading Co</div>
+                  <div className="text-sm text-blue-600 font-semibold mt-2">Retail • Abuja</div>
                 </div>
               </div>
               <blockquote className="text-gray-700 mb-4">
@@ -772,15 +906,15 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Testimonial 3 - Technology */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-              <div className="flex items-start space-x-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <div className="group bg-white/90 backdrop-blur-sm rounded-3xl p-10 shadow-2xl border border-gray-100 hover:shadow-blue-500/20 transition-all duration-500 hover:scale-105 transform">
+              <div className="flex items-start space-x-5 mb-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full flex items-center justify-center text-white font-black text-xl group-hover:scale-110 transition-transform duration-300">
                   C
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">Chidi Okoro</div>
-                  <div className="text-sm text-gray-600">CTO, Port Harcourt Tech Solutions</div>
-                  <div className="text-xs text-orange-600 font-medium mt-1">Technology • Port Harcourt</div>
+                  <div className="text-lg font-bold text-gray-900">Chidi Okoro</div>
+                  <div className="text-base text-gray-600">CTO, Port Harcourt Tech Solutions</div>
+                  <div className="text-sm text-orange-600 font-semibold mt-2">Technology • Port Harcourt</div>
                 </div>
               </div>
               <blockquote className="text-gray-700 mb-4">
