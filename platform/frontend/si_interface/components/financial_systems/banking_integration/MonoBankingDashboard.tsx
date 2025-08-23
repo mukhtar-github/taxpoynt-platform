@@ -16,7 +16,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useRoleDetector } from '../../../role_management';
+import { useRoleDetector } from '../../../../role_management';
 
 // Types based on backend Mono integration
 interface MonoAccount {

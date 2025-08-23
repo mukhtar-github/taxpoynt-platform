@@ -21,7 +21,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Card, 
+  Card as AntCard, 
   Row, 
   Col, 
   Button, 
@@ -631,17 +631,17 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
 
   if (loading || externalLoading) {
     return (
-      <Card className={className} {...props}>
+      <AntCard className={className}>
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <ReloadOutlined spin style={{ fontSize: 24, marginBottom: 16 }} />
           <p>Loading workflow orchestrator...</p>
         </div>
-      </Card>
+      </AntCard>
     );
   }
 
   return (
-    <div className={`workflow-orchestrator ${className || ''}`} {...props}>
+    <div className={`workflow-orchestrator ${className || ''}`}>
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <Row justify="space-between" align="middle">
@@ -677,7 +677,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
       </div>
 
       {/* Main Content */}
-      <Card>
+      <AntCard>
         <Tabs activeKey={activeTab} onChange={setActiveTab}>
           <TabPane
             tab={
@@ -727,7 +727,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
             <Row gutter={[16, 16]}>
               {templates.map(template => (
                 <Col xs={24} md={12} lg={8} key={template.id}>
-                  <Card
+                  <AntCard
                     size="small"
                     title={template.name}
                     extra={
@@ -754,13 +754,13 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
                       <div>Est. Duration: {template.estimated_duration}min</div>
                       <div>Used: {template.usage_count} times</div>
                     </div>
-                  </Card>
+                  </AntCard>
                 </Col>
               ))}
             </Row>
           </TabPane>
         </Tabs>
-      </Card>
+      </AntCard>
 
       {/* Workflow Modal */}
       <Modal

@@ -5,7 +5,20 @@
  * and authentication management for production reliability.
  */
 
-import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+
+// Extend Axios config to include metadata
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  metadata?: { startTime: Date };
+}
+
+// Type for API error response data
+interface APIErrorResponseData {
+  detail?: string;
+  message?: string;
+  code?: string;
+  [key: string]: any;
+}
 
 // API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-ea5ad.up.railway.app/api/v1';
@@ -91,7 +104,7 @@ class TaxPoyntAPIClient {
         }
 
         // Add request timestamp for monitoring
-        config.metadata = { startTime: new Date() };
+        (config as ExtendedAxiosRequestConfig).metadata = { startTime: new Date() };
         
         return config;
       },
@@ -106,7 +119,7 @@ class TaxPoyntAPIClient {
       (response: AxiosResponse) => {
         // Log response time for monitoring
         const endTime = new Date();
-        const startTime = response.config.metadata?.startTime;
+        const startTime = (response.config as ExtendedAxiosRequestConfig).metadata?.startTime;
         if (startTime) {
           const duration = endTime.getTime() - startTime.getTime();
           console.debug(`API Request to ${response.config.url} took ${duration}ms`);
@@ -192,10 +205,11 @@ class TaxPoyntAPIClient {
     
     if (error.response) {
       // Server responded with error status
+      const errorData = error.response.data as APIErrorResponseData;
       return {
-        message: error.response.data?.detail || error.response.data?.message || 'Server error occurred',
+        message: errorData?.detail || errorData?.message || 'Server error occurred',
         status: error.response.status,
-        code: error.response.data?.code,
+        code: errorData?.code,
         details: error.response.data,
         timestamp,
       };

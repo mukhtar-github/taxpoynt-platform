@@ -546,7 +546,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                         <p className="text-xs text-gray-600 mb-1">Supported Features:</p>
                         <div className="flex flex-wrap gap-1">
                           {provider.features.map(feature => (
-                            <Badge key={feature} variant="secondary" className="text-xs">
+                            <Badge key={feature} variant="default" className="text-xs">
                               {feature}
                             </Badge>
                           ))}
@@ -602,7 +602,7 @@ export const PaymentProcessorDashboard: React.FC = () => {
                         <p className="text-xs text-gray-600 mb-1">Supported Currencies:</p>
                         <div className="flex flex-wrap gap-1">
                           {provider.currencies.map(currency => (
-                            <Badge key={currency} variant="secondary" className="text-xs">
+                            <Badge key={currency} variant="default" className="text-xs">
                               {currency}
                             </Badge>
                           ))}
@@ -629,18 +629,18 @@ export const PaymentProcessorDashboard: React.FC = () => {
                     className="max-w-sm"
                   />
                 </div>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="successful">Successful</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Select 
+                  options={[
+                    {value: 'all', label: 'All Status'},
+                    {value: 'successful', label: 'Successful'},
+                    {value: 'pending', label: 'Pending'},
+                    {value: 'failed', label: 'Failed'},
+                    {value: 'cancelled', label: 'Cancelled'}
+                  ]}
+                  value={filterStatus} 
+                  onChange={(value) => setFilterStatus(value as string)}
+                  className="w-40"
+                />
               </div>
             </CardHeader>
             <CardContent>
@@ -773,17 +773,16 @@ export const PaymentProcessorDashboard: React.FC = () => {
             <CardContent className="space-y-6">
               <div>
                 <h4 className="font-medium mb-3">Default Currency</h4>
-                <Select defaultValue="NGN">
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
-                    <SelectItem value="USD">US Dollar (USD)</SelectItem>
-                    <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                    <SelectItem value="GBP">British Pound (GBP)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Select 
+                  options={[
+                    {value: 'NGN', label: 'Nigerian Naira (NGN)'},
+                    {value: 'USD', label: 'US Dollar (USD)'},
+                    {value: 'EUR', label: 'Euro (EUR)'},
+                    {value: 'GBP', label: 'British Pound (GBP)'}
+                  ]}
+                  defaultValue="NGN"
+                  className="w-40"
+                />
               </div>
 
               <div>

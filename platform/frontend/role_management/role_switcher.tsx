@@ -20,7 +20,7 @@ import { useRoleDetector, PlatformRole } from './role_detector';
 import { usePermissions } from './permission_provider';
 
 // Role metadata for UI display
-interface RoleMetadata {
+export interface RoleMetadata {
   role: PlatformRole;
   displayName: string;
   description: string;

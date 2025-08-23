@@ -15,12 +15,12 @@ import NDPRCompliancePage from './pages/NDPRCompliancePage';
 import SecurityBankingFAQPage from './pages/SecurityBankingFAQPage';
 
 // Business Interface Pages
-import HomePage from '../business_interface/HomePage';
-import LandingPage from '../business_interface/LandingPage';
-import SignInPage from '../business_interface/auth/SignInPage';
-import SignUpPage from '../business_interface/auth/SignUpPage';
-import BillingPage from '../business_interface/billing_management/BillingPage';
-import ConsentIntegratedRegistration from '../business_interface/onboarding_flows/ConsentIntegratedRegistration';
+import { HomePage } from '../business_interface/HomePage';
+import { LandingPage } from '../business_interface/LandingPage';
+import { SignInPage } from '../business_interface/auth/SignInPage';
+import { SignUpPage } from '../business_interface/auth/SignUpPage';
+import { BillingPage } from '../business_interface/billing_management/BillingPage';
+import { ConsentIntegratedRegistration } from '../business_interface/onboarding_flows/ConsentIntegratedRegistration';
 
 // SI Interface Pages (example imports - adjust as needed)
 // import SIDashboard from '../si_interface/pages/SIDashboard';
@@ -30,32 +30,32 @@ import ConsentIntegratedRegistration from '../business_interface/onboarding_flow
 // import APPDashboard from '../app_interface/pages/APPDashboard';
 
 // Role Management
-import { RoleDetector } from '../role_management/role_detector';
+import { RoleDetectorProvider, PlatformRole } from '../role_management/role_detector';
 import { AccessGuard } from '../role_management/access_guard';
 
 const AppRouter: React.FC = () => {
   return (
     <Router>
-      <RoleDetector>
+      <RoleDetectorProvider>
         <Routes>
           {/* Root Route - Redirect to Landing */}
           <Route path="/" element={<Navigate to="/landing" replace />} />
           
           {/* Landing and Home */}
           <Route path="/landing" element={<LandingPage />} />
-          <Route path="/home" element={<AccessGuard requiredRole="business"><HomePage /></AccessGuard>} />
+          <Route path="/home" element={<AccessGuard requiredRoles={[PlatformRole.USER]}><HomePage user={{name: 'User', company: 'Company', role: 'hybrid'}} stats={{invoicesThisMonth: 0, successfulTransmissions: 0, integrations: 0}} /></AccessGuard>} />
           
           {/* Authentication Routes */}
-          <Route path="/auth/signin" element={<SignInPage />} />
-          <Route path="/auth/signup" element={<SignUpPage />} />
+          <Route path="/auth/signin" element={<SignInPage onSignIn={async () => {}} />} />
+          <Route path="/auth/signup" element={<SignUpPage onContinueToRegistration={() => {}} />} />
           <Route path="/auth/onboarding" element={<ConsentIntegratedRegistration />} />
           
           {/* Business Interface Routes */}
           <Route path="/business/*" element={
-            <AccessGuard requiredRole="business">
+            <AccessGuard requiredRoles={[PlatformRole.USER]}>
               <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/billing" element={<BillingPage />} />
+                <Route path="/" element={<HomePage user={{name: 'User', company: 'Company', role: 'hybrid'}} stats={{invoicesThisMonth: 0, successfulTransmissions: 0, integrations: 0}} />} />
+                <Route path="/billing" element={<BillingPage selectedPackage={{id: 'basic', name: 'Basic Plan', price: {monthly: 29, annual: 290}, features: ['Basic features']}} currentRole='hybrid' userProfile={{companyName: 'Company', email: 'user@example.com', phone: '+1234567890'}} onPaymentComplete={() => {}} onCancel={() => {}} />} />
                 <Route path="/onboarding" element={<ConsentIntegratedRegistration />} />
                 {/* Add more business routes as needed */}
               </Routes>
@@ -64,7 +64,7 @@ const AppRouter: React.FC = () => {
           
           {/* System Integrator Interface Routes */}
           <Route path="/si/*" element={
-            <AccessGuard requiredRole="si">
+            <AccessGuard requiredRoles={[PlatformRole.SYSTEM_INTEGRATOR]}>
               <Routes>
                 <Route path="/" element={<div>SI Dashboard - Coming Soon</div>} />
                 {/* <Route path="/dashboard" element={<SIDashboard />} /> */}
@@ -76,7 +76,7 @@ const AppRouter: React.FC = () => {
           
           {/* Access Point Provider Interface Routes */}
           <Route path="/app/*" element={
-            <AccessGuard requiredRole="app">
+            <AccessGuard requiredRoles={[PlatformRole.ACCESS_POINT_PROVIDER]}>
               <Routes>
                 <Route path="/" element={<div>APP Dashboard - Coming Soon</div>} />
                 {/* <Route path="/dashboard" element={<APPDashboard />} /> */}
@@ -123,7 +123,7 @@ const AppRouter: React.FC = () => {
             </div>
           } />
         </Routes>
-      </RoleDetector>
+      </RoleDetectorProvider>
     </Router>
   );
 };

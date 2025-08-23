@@ -710,19 +710,19 @@ export const FinancialValidator: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Nigerian Financial Validation Rules</span>
-                <Select value={selectedRuleCategory} onValueChange={setSelectedRuleCategory}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="transaction">Transaction</SelectItem>
-                    <SelectItem value="account">Account</SelectItem>
-                    <SelectItem value="identity">Identity</SelectItem>
-                    <SelectItem value="compliance">Compliance</SelectItem>
-                    <SelectItem value="aml">AML</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Select 
+                  options={[
+                    {value: 'all', label: 'All Categories'},
+                    {value: 'transaction', label: 'Transaction'},
+                    {value: 'account', label: 'Account'},
+                    {value: 'identity', label: 'Identity'},
+                    {value: 'compliance', label: 'Compliance'},
+                    {value: 'aml', label: 'AML'}
+                  ]}
+                  value={selectedRuleCategory} 
+                  onChange={(value) => setSelectedRuleCategory(value as string)}
+                  className="w-48"
+                />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -750,7 +750,7 @@ export const FinancialValidator: React.FC = () => {
                         </div>
                         <p className="text-sm text-gray-600 mb-2">{rule.description}</p>
                         <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="default" className="text-xs">
                             {rule.regulation}
                           </Badge>
                         </div>
@@ -821,16 +821,15 @@ export const FinancialValidator: React.FC = () => {
             <CardContent className="space-y-6">
               <div>
                 <h4 className="font-medium mb-3">Validation Strictness</h4>
-                <Select defaultValue="standard">
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="strict">Strict (All rules)</SelectItem>
-                    <SelectItem value="standard">Standard (Critical + High)</SelectItem>
-                    <SelectItem value="relaxed">Relaxed (Critical only)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Select 
+                  options={[
+                    {value: 'strict', label: 'Strict (All rules)'},
+                    {value: 'standard', label: 'Standard (Critical + High)'},
+                    {value: 'relaxed', label: 'Relaxed (Critical only)'}
+                  ]}
+                  defaultValue="standard"
+                  className="w-48"
+                />
               </div>
 
               <div>

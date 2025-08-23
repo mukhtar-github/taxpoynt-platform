@@ -151,7 +151,7 @@ class PermissionManager {
   /**
    * Core permission definitions based on TaxPoynt roles
    */
-  private getDefaultPermissions(): Permission[] {
+  public getDefaultPermissions(): Permission[] {
     return [
       // System Integrator (SI) Permissions
       {

@@ -18,12 +18,7 @@ export { DataTable, SimpleTable };
 
 // Export component types and interfaces
 export type {
-  DataTableProps,
-  DataTableColumn,
-  SortConfig,
-  FilterConfig,
-  PaginationConfig,
-  SelectionConfig
+  DataTableProps
 } from './DataTable';
 
 export type {

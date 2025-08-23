@@ -222,6 +222,9 @@ export const UnifiedDashboardPage: React.FC<UnifiedDashboardPageProps> = ({
                     <PlatformComplianceDashboard 
                       showDetails={true}
                       className="platform-compliance-section"
+                      currentView="combined"
+                      organizationId="default"
+                      userRole="platform_admin"
                     />
                   </Card>
                 </Col>

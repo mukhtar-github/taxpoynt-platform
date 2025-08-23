@@ -565,6 +565,9 @@ export interface BaseComponentProps {
 }
 
 export interface DashboardComponentProps extends BaseComponentProps {
+  currentView: DashboardView;
+  organizationId: string;
+  userRole: HybridRole;
   refreshInterval?: number;
   autoRefresh?: boolean;
   onRefresh?: () => void;
@@ -580,11 +583,11 @@ export interface WorkflowComponentProps extends BaseComponentProps {
   onExecutionUpdate?: (execution: WorkflowExecution) => void;
 }
 
-export interface AnalyticsComponentProps extends BaseComponentProps {
+export interface AnalyticsComponentProps extends DashboardComponentProps {
   reportType?: AnalyticsReportType;
   granularity?: AnalyticsGranularity;
-  dateRange?: DateRange;
   dataSourceFilters?: Record<string, any>;
+  showComparison?: boolean;
   onReportGenerated?: (report: CrossRoleAnalytics) => void;
 }
 

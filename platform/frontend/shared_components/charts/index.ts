@@ -9,7 +9,9 @@
  * @version 1.0.0
  */
 
-// Chart Components
+// Chart Components - Import types for local usage first
+import type { ChartDataPoint, ChartSeries } from './BaseChart';
+
 export { BaseChart } from './BaseChart';
 export type { BaseChartProps, ChartDataPoint, ChartSeries } from './BaseChart';
 

@@ -173,7 +173,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
 
       {/* Hover effects for interactive sections */}
       {collapsible && (
-        <style jsx>{`
+        <style>{`
           button:hover {
             border-color: ${roleColor};
             background-color: ${roleColor}10;

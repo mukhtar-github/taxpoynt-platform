@@ -6,7 +6,11 @@ import { UnifiedDashboard } from '../../../hybrid_interface/components/unified_d
 export default function HybridDashboard() {
   return (
     <div className="hybrid-dashboard-wrapper">
-      <UnifiedDashboard userRole="platform_admin" />
+      <UnifiedDashboard 
+        userRole="platform_admin" 
+        currentView="combined"
+        organizationId="default"
+      />
     </div>
   );
 }

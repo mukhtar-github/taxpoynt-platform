@@ -318,14 +318,16 @@ export const WorkflowDesignerPage: React.FC<WorkflowDesignerPageProps> = ({
             <Card style={{ height: '100%' }}>
               {isPreviewMode ? (
                 <WorkflowOrchestrator 
-                  workflow={currentWorkflow}
-                  onComplete={() => setIsPreviewMode(false)}
-                  organizationId={organizationId}
+                  workflowId={currentWorkflow?.id}
+                  onWorkflowChange={(workflow) => {
+                    setCurrentWorkflow(workflow);
+                    setIsPreviewMode(false);
+                  }}
                 />
               ) : (
                 <WorkflowDesigner
                   workflow={currentWorkflow}
-                  onChange={setCurrentWorkflow}
+                  onWorkflowChange={setCurrentWorkflow}
                   availableServices={['ERP Connector', 'FIRS Submitter', 'Data Validator']}
                   userRole={userRole}
                 />

@@ -36,7 +36,7 @@ import {
 import type { UnifiedDashboardMetrics, DashboardComponentProps } from '../../types';
 
 interface CombinedMetricsGridProps extends DashboardComponentProps {
-  metrics: UnifiedDashboardMetrics | null;
+  metrics?: UnifiedDashboardMetrics | null;
   showTrends?: boolean;
   compactView?: boolean;
   onMetricClick?: (metricKey: string, source: 'si' | 'app' | 'hybrid') => void;

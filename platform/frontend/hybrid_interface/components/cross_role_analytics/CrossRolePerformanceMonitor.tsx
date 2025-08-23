@@ -41,7 +41,9 @@ import type {
 } from '../../types';
 
 interface CrossRolePerformanceMonitorProps extends DashboardComponentProps {
+  scope?: string;
   showDetails?: boolean;
+  showTrends?: boolean;
   alertThresholds?: {
     handoffSuccessRate: number;
     processingTime: number;

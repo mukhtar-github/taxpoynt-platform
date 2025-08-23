@@ -337,7 +337,7 @@ export const BarChart: React.FC<BarChartProps> = ({
       
       {/* Animation keyframes */}
       {animated && (
-        <style jsx>{`
+        <style>{`
           @keyframes slideInUp {
             from {
               transform: translateY(20px);

@@ -149,9 +149,9 @@ export const DataTable = <T extends Record<string, any>>({
     transition: animations.transition.fast,
   });
 
-  const bodyCellStyles = (align?: string) => ({
+  const bodyCellStyles = (align?: 'left' | 'center' | 'right') => ({
     padding: sizeConfig.padding,
-    textAlign: align || 'left' as const,
+    textAlign: align || 'left',
     borderRight: bordered ? `${borders.width[1]} solid ${colors.neutral[200]}` : 'none',
     borderBottom: `${borders.width[1]} solid ${colors.neutral[100]}`,
     verticalAlign: 'middle' as const,
@@ -162,7 +162,7 @@ export const DataTable = <T extends Record<string, any>>({
       isSelected 
         ? `${roleColor}10`
         : striped && index % 2 === 1 
-          ? colors.neutral[25] 
+          ? colors.neutral[50] 
           : 'transparent',
     transition: animations.transition.fast,
   });
@@ -300,7 +300,7 @@ export const DataTable = <T extends Record<string, any>>({
           }} />
           Loading data...
         </div>
-        <style jsx>{`
+        <style>{`
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -412,7 +412,7 @@ export const DataTable = <T extends Record<string, any>>({
                 onMouseLeave={hoverable ? (e) => {
                   if (!isSelected) {
                     (e.currentTarget as HTMLElement).style.backgroundColor = 
-                      striped && rowIndex % 2 === 1 ? colors.neutral[25] : 'transparent';
+                      striped && rowIndex % 2 === 1 ? colors.neutral[50] : 'transparent';
                   }
                 } : undefined}
               >

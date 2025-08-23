@@ -330,6 +330,9 @@ export const ComplianceCenter: React.FC<ComplianceCenterProps> = ({
             <PlatformComplianceDashboard 
               showDetails={true}
               className="compliance-center-dashboard"
+              currentView="combined"
+              organizationId="default"
+              userRole="platform_admin"
             />
           </TabPane>
 

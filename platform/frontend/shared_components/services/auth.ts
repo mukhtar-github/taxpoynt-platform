@@ -14,8 +14,8 @@ export interface User {
   last_name: string;
   phone?: string;
   role: string;
-  service_package: string;
-  is_email_verified: boolean;
+  service_package?: string;
+  is_email_verified?: boolean;
   organization?: Organization;
   permissions?: string[];
 }
@@ -59,7 +59,7 @@ export interface LoginRequest {
 export interface AuthResponse {
   access_token: string;
   token_type: string;
-  expires_in: number;
+  expires_in?: number;
   user: User;
 }
 
@@ -219,4 +219,4 @@ class AuthService {
 }
 
 export const authService = new AuthService();
-export type { AuthResponse, RegisterRequest, LoginRequest, User, Organization };
+// Types already exported above

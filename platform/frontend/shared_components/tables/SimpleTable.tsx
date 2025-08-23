@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { TaxPoyntDesignSystem } from '../../../design_system/core/TaxPoyntDesignSystem';
+import { colors, spacing, typography } from '../../design_system/tokens';
 
 // Simple table column definition
 export interface SimpleTableColumn<T = any> {
@@ -47,30 +47,30 @@ const SimpleTable = <T extends Record<string, any>>({
   emptyText = 'No data available',
   onRowClick
 }: SimpleTableProps<T>) => {
-  const { colors, spacing, typography, shadows } = TaxPoyntDesignSystem;
+  // Design tokens are imported directly
 
   const tableStyles: React.CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
-    backgroundColor: colors.neutral.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: '8px',
     overflow: 'hidden',
-    boxShadow: shadows.sm,
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     fontSize: typography.sizes.sm,
     ...(!bordered && { border: 'none' })
   };
 
   const headerStyles: React.CSSProperties = {
-    backgroundColor: colors.neutral.gray[50],
-    borderBottom: `1px solid ${colors.neutral.gray[200]}`,
+    backgroundColor: colors.neutral[50],
+    borderBottom: `1px solid ${colors.neutral[200]}`,
     fontWeight: typography.weights.semibold,
     textAlign: 'left',
-    color: colors.neutral.gray[700]
+    color: colors.neutral[700]
   };
 
   const cellStyles: React.CSSProperties = {
-    padding: compact ? spacing.sm : spacing.md,
-    borderBottom: `1px solid ${colors.neutral.gray[100]}`,
+    padding: compact ? spacing[2] : spacing[4],
+    borderBottom: `1px solid ${colors.neutral[100]}`,
     verticalAlign: 'middle'
   };
 
@@ -82,11 +82,11 @@ const SimpleTable = <T extends Record<string, any>>({
   };
 
   const stripedRowStyles: React.CSSProperties = {
-    backgroundColor: colors.neutral.gray[25]
+    backgroundColor: colors.neutral[50]
   };
 
   const hoverStyles: React.CSSProperties = {
-    backgroundColor: colors.primary.blue[25]
+    backgroundColor: colors.brand.light
   };
 
   const loadingOverlayStyles: React.CSSProperties = {
@@ -100,11 +100,11 @@ const SimpleTable = <T extends Record<string, any>>({
     transform: 'translate(-50%, -50%)',
     zIndex: 1000,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: spacing.lg,
+    padding: spacing[6],
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm
+    gap: spacing[2]
   };
 
   const getCellValue = (record: T, column: SimpleTableColumn<T>) => {
@@ -126,8 +126,8 @@ const SimpleTable = <T extends Record<string, any>>({
             style={{
               width: '20px',
               height: '20px',
-              border: `2px solid ${colors.neutral.gray[200]}`,
-              borderTop: `2px solid ${colors.primary.blue[500]}`,
+              border: `2px solid ${colors.neutral[200]}`,
+              borderTop: `2px solid ${colors.brand.primary}`,
               borderRadius: '50%',
               animation: 'spin 1s linear infinite'
             }}
@@ -162,9 +162,9 @@ const SimpleTable = <T extends Record<string, any>>({
                 style={{
                   ...cellStyles,
                   textAlign: 'center',
-                  color: colors.neutral.gray[500],
+                  color: colors.neutral[500],
                   fontStyle: 'italic',
-                  padding: spacing.xl
+                  padding: spacing[8]
                 }}
               >
                 {emptyText}
@@ -188,8 +188,8 @@ const SimpleTable = <T extends Record<string, any>>({
                   if (hover) {
                     e.currentTarget.style.backgroundColor = 
                       striped && rowIndex % 2 === 1 
-                        ? colors.neutral.gray[25] 
-                        : colors.neutral.white;
+                        ? colors.neutral[50] 
+                        : '#FFFFFF';
                   }
                 }}
               >

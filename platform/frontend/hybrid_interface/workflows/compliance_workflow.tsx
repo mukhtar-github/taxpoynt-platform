@@ -48,7 +48,6 @@ import {
 import {
   SafetyCertificateOutlined,
   AuditOutlined,
-  SafetyCertificateOutlined,
   ClockCircleOutlined,
   PlayCircleOutlined,
   PauseCircleOutlined,

@@ -537,28 +537,18 @@ export const SchemaValidator: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium mb-2">Schema</label>
                   <Select
+                    options={NIGERIAN_SCHEMAS.map(schema => ({
+                      value: schema.id,
+                      label: `${schema.name} v${schema.version}`,
+                      description: schema.type.toUpperCase()
+                    }))}
                     value={selectedSchema?.id || ''}
-                    onValueChange={(value) => {
+                    onChange={(value) => {
                       const schema = NIGERIAN_SCHEMAS.find(s => s.id === value);
                       setSelectedSchema(schema || null);
                     }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select validation schema" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {NIGERIAN_SCHEMAS.map(schema => (
-                        <SelectItem key={schema.id} value={schema.id}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="info" className="text-xs">
-                              {schema.type.toUpperCase()}
-                            </Badge>
-                            {schema.name} v{schema.version}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select validation schema"
+                  />
                 </div>
 
                 {selectedSchema && (
@@ -567,7 +557,7 @@ export const SchemaValidator: React.FC = () => {
                     <p className="text-xs text-gray-600 mb-2">{selectedSchema.description}</p>
                     <div className="flex flex-wrap gap-1">
                       {selectedSchema.compliance.map(comp => (
-                        <Badge key={comp} variant="secondary" className="text-xs">
+                        <Badge key={comp} variant="default" className="text-xs">
                           {comp}
                         </Badge>
                       ))}
@@ -654,18 +644,18 @@ export const SchemaValidator: React.FC = () => {
                           className="text-sm"
                         />
                       </div>
-                      <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All</SelectItem>
-                          <SelectItem value="critical">Critical</SelectItem>
-                          <SelectItem value="error">Error</SelectItem>
-                          <SelectItem value="warning">Warning</SelectItem>
-                          <SelectItem value="info">Info</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Select 
+                        options={[
+                          {value: 'all', label: 'All'},
+                          {value: 'critical', label: 'Critical'},
+                          {value: 'error', label: 'Error'},
+                          {value: 'warning', label: 'Warning'},
+                          {value: 'info', label: 'Info'}
+                        ]}
+                        value={filterSeverity} 
+                        onChange={(value) => setFilterSeverity(value as string)}
+                        className="w-32"
+                      />
                     </div>
 
                     {/* Results List */}
@@ -736,7 +726,7 @@ export const SchemaValidator: React.FC = () => {
                       <span className="text-xs text-gray-500 block mb-1">Compliance:</span>
                       <div className="flex flex-wrap gap-1">
                         {schema.compliance.map(comp => (
-                          <Badge key={comp} variant="secondary" className="text-xs">
+                          <Badge key={comp} variant="default" className="text-xs">
                             {comp}
                           </Badge>
                         ))}

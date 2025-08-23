@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { TaxPoyntDesignSystem } from '../../../design_system/core/TaxPoyntDesignSystem';
+import { colors, spacing, typography } from '../../design_system/tokens';
 
 // Pagination props
 export interface PaginationProps {
@@ -44,7 +44,7 @@ const Pagination: React.FC<PaginationProps> = ({
   onChange,
   onShowSizeChange
 }) => {
-  const { colors, spacing, typography, borderRadius } = TaxPoyntDesignSystem;
+  // Design tokens are imported directly
 
   const totalPages = Math.ceil(total / pageSize);
   const startRecord = (current - 1) * pageSize + 1;
@@ -55,21 +55,21 @@ const Pagination: React.FC<PaginationProps> = ({
       case 'small':
         return {
           fontSize: typography.sizes.xs,
-          padding: `${spacing.xs} ${spacing.sm}`,
+          padding: `${spacing[1]} ${spacing[2]}`,
           minWidth: '32px',
           height: '32px'
         };
       case 'large':
         return {
           fontSize: typography.sizes.base,
-          padding: `${spacing.sm} ${spacing.md}`,
+          padding: `${spacing[2]} ${spacing[4]}`,
           minWidth: '44px',
           height: '44px'
         };
       default:
         return {
           fontSize: typography.sizes.sm,
-          padding: `${spacing.sm} ${spacing.sm}`,
+          padding: `${spacing[2]} ${spacing[2]}`,
           minWidth: '36px',
           height: '36px'
         };
@@ -81,17 +81,17 @@ const Pagination: React.FC<PaginationProps> = ({
   const containerStyles: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
     flexWrap: 'wrap'
   };
 
   const buttonStyles: React.CSSProperties = {
     ...sizeStyles,
-    border: `1px solid ${colors.neutral.gray[300]}`,
-    backgroundColor: colors.neutral.white,
-    color: colors.neutral.gray[700],
+    border: `1px solid ${colors.neutral[300]}`,
+    backgroundColor: '#FFFFFF',
+    color: colors.neutral[700],
     cursor: disabled ? 'not-allowed' : 'pointer',
-    borderRadius: borderRadius.sm,
+    borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -102,9 +102,9 @@ const Pagination: React.FC<PaginationProps> = ({
 
   const activeButtonStyles: React.CSSProperties = {
     ...buttonStyles,
-    backgroundColor: colors.primary.blue[500],
-    borderColor: colors.primary.blue[500],
-    color: colors.neutral.white,
+    backgroundColor: colors.brand.primary,
+    borderColor: colors.brand.primary,
+    color: '#FFFFFF',
     fontWeight: typography.weights.medium
   };
 
@@ -116,25 +116,25 @@ const Pagination: React.FC<PaginationProps> = ({
 
   const selectStyles: React.CSSProperties = {
     ...sizeStyles,
-    border: `1px solid ${colors.neutral.gray[300]}`,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.neutral.white,
+    border: `1px solid ${colors.neutral[300]}`,
+    borderRadius: '4px',
+    backgroundColor: '#FFFFFF',
     cursor: disabled ? 'not-allowed' : 'pointer',
     minWidth: '80px'
   };
 
   const inputStyles: React.CSSProperties = {
     ...sizeStyles,
-    border: `1px solid ${colors.neutral.gray[300]}`,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.neutral.white,
+    border: `1px solid ${colors.neutral[300]}`,
+    borderRadius: '4px',
+    backgroundColor: '#FFFFFF',
     width: '60px',
     textAlign: 'center'
   };
 
   const textStyles: React.CSSProperties = {
     fontSize: sizeStyles.fontSize,
-    color: colors.neutral.gray[600]
+    color: colors.neutral[600]
   };
 
   const handlePageChange = (page: number) => {
@@ -202,12 +202,12 @@ const Pagination: React.FC<PaginationProps> = ({
           disabled={current <= 1 || disabled}
           onMouseEnter={(e) => {
             if (current > 1 && !disabled) {
-              e.currentTarget.style.backgroundColor = colors.neutral.gray[50];
+              e.currentTarget.style.backgroundColor = colors.neutral[50];
             }
           }}
           onMouseLeave={(e) => {
             if (current > 1 && !disabled) {
-              e.currentTarget.style.backgroundColor = colors.neutral.white;
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
             }
           }}
         >
@@ -224,12 +224,12 @@ const Pagination: React.FC<PaginationProps> = ({
           disabled={current >= totalPages || disabled}
           onMouseEnter={(e) => {
             if (current < totalPages && !disabled) {
-              e.currentTarget.style.backgroundColor = colors.neutral.gray[50];
+              e.currentTarget.style.backgroundColor = colors.neutral[50];
             }
           }}
           onMouseLeave={(e) => {
             if (current < totalPages && !disabled) {
-              e.currentTarget.style.backgroundColor = colors.neutral.white;
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
             }
           }}
         >
@@ -274,12 +274,12 @@ const Pagination: React.FC<PaginationProps> = ({
         disabled={current <= 1 || disabled}
         onMouseEnter={(e) => {
           if (current > 1 && !disabled) {
-            e.currentTarget.style.backgroundColor = colors.neutral.gray[50];
+            e.currentTarget.style.backgroundColor = colors.neutral[50];
           }
         }}
         onMouseLeave={(e) => {
           if (current > 1 && !disabled) {
-            e.currentTarget.style.backgroundColor = colors.neutral.white;
+            e.currentTarget.style.backgroundColor = '#FFFFFF';
           }
         }}
       >
@@ -298,12 +298,12 @@ const Pagination: React.FC<PaginationProps> = ({
               disabled={disabled}
               onMouseEnter={(e) => {
                 if (page !== current && !disabled) {
-                  e.currentTarget.style.backgroundColor = colors.neutral.gray[50];
+                  e.currentTarget.style.backgroundColor = colors.neutral[50];
                 }
               }}
               onMouseLeave={(e) => {
                 if (page !== current && !disabled) {
-                  e.currentTarget.style.backgroundColor = colors.neutral.white;
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
                 }
               }}
             >
@@ -320,12 +320,12 @@ const Pagination: React.FC<PaginationProps> = ({
         disabled={current >= totalPages || disabled}
         onMouseEnter={(e) => {
           if (current < totalPages && !disabled) {
-            e.currentTarget.style.backgroundColor = colors.neutral.gray[50];
+            e.currentTarget.style.backgroundColor = colors.neutral[50];
           }
         }}
         onMouseLeave={(e) => {
           if (current < totalPages && !disabled) {
-            e.currentTarget.style.backgroundColor = colors.neutral.white;
+            e.currentTarget.style.backgroundColor = '#FFFFFF';
           }
         }}
       >

@@ -88,10 +88,14 @@ interface PerformanceMetric {
 }
 
 export const AnalyticsAggregator: React.FC<AnalyticsComponentProps> = ({
+  currentView,
+  organizationId,
+  userRole,
   reportType = 'performance_overview',
   granularity = 'daily',
   dateRange: externalDateRange,
   dataSourceFilters,
+  showComparison = false,
   onReportGenerated,
   className,
   loading: externalLoading = false,

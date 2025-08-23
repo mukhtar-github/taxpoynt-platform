@@ -45,12 +45,15 @@ import {
 import { AnalyticsAggregator } from '../components/cross_role_analytics/AnalyticsAggregator';
 import { CrossRolePerformanceMonitor } from '../components/cross_role_analytics/CrossRolePerformanceMonitor';
 
+// Import types
+import type { HybridRole } from '../types';
+
 const { TabPane } = Tabs;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 interface AnalyticsCenterProps {
-  userRole: 'si' | 'app' | 'hybrid' | 'admin';
+  userRole: HybridRole;
   organizationId: string;
 }
 
@@ -268,9 +271,15 @@ export const AnalyticsCenter: React.FC<AnalyticsCenterProps> = ({
               
               <Col xs={24} lg={12}>
                 <CrossRolePerformanceMonitor
-                  scope={filters.scope}
+                  currentView={filters.scope}
                   organizationId={organizationId}
-                  dateRange={filters.dateRange}
+                  userRole={userRole}
+                  scope={filters.scope}
+                  dateRange={filters.dateRange ? { 
+                    start_date: new Date(filters.dateRange[0]), 
+                    end_date: new Date(filters.dateRange[1]),
+                    timezone: 'Africa/Lagos'
+                  } : undefined}
                 />
               </Col>
             </Row>
@@ -287,9 +296,15 @@ export const AnalyticsCenter: React.FC<AnalyticsCenterProps> = ({
           >
             <Card title="Performance Trends Analysis">
               <CrossRolePerformanceMonitor
-                scope={filters.scope}
+                currentView={filters.scope}
                 organizationId={organizationId}
-                dateRange={filters.dateRange}
+                userRole={userRole}
+                scope={filters.scope}
+                dateRange={filters.dateRange ? { 
+                  start_date: new Date(filters.dateRange[0]), 
+                  end_date: new Date(filters.dateRange[1]),
+                  timezone: 'Africa/Lagos'
+                } : undefined}
                 showTrends={true}
               />
             </Card>

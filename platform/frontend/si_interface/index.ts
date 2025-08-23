@@ -17,7 +17,7 @@
 
 // Pages
 export { default as IntegrationSetup } from './pages/integration_setup';
-export { default as DataMapping } from './pages/data_mapping';
+export { default as DataMappingPage } from './pages/data_mapping';
 export { default as ProcessingMonitor } from './pages/processing_monitor';
 export { default as ComplianceDashboard } from './pages/compliance_dashboard';
 

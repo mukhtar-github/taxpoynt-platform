@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { TaxPoyntDesignSystem } from '../../../design_system/core/TaxPoyntDesignSystem';
+import { colors, spacing, typography } from '../../design_system/tokens';
 
 // Tab item interface
 export interface TabItem {
@@ -52,7 +52,7 @@ const Tabs: React.FC<TabsProps> = ({
   onEdit,
   children
 }) => {
-  const { colors, spacing, typography, borderRadius, shadows } = TaxPoyntDesignSystem;
+  // Design tokens are imported directly
   
   const [internalActiveKey, setInternalActiveKey] = useState(
     activeKey || defaultActiveKey || (items.length > 0 ? items[0].key : '')
@@ -71,19 +71,19 @@ const Tabs: React.FC<TabsProps> = ({
       case 'small':
         return {
           fontSize: typography.sizes.sm,
-          padding: `${spacing.sm} ${spacing.md}`,
+          padding: `${spacing[2]} ${spacing[4]}`,
           minHeight: '32px'
         };
       case 'large':
         return {
           fontSize: typography.sizes.lg,
-          padding: `${spacing.md} ${spacing.lg}`,
+          padding: `${spacing[4]} ${spacing[6]}`,
           minHeight: '48px'
         };
       default:
         return {
           fontSize: typography.sizes.base,
-          padding: `${spacing.sm} ${spacing.lg}`,
+          padding: `${spacing[2]} ${spacing[6]}`,
           minHeight: '40px'
         };
     }
@@ -100,11 +100,11 @@ const Tabs: React.FC<TabsProps> = ({
   const tabListStyles: React.CSSProperties = {
     display: 'flex',
     flexDirection: position === 'left' || position === 'right' ? 'column' : 'row',
-    gap: type === 'card' ? spacing.xs : 0,
-    borderBottom: position === 'top' && type === 'line' ? `2px solid ${colors.neutral.gray[200]}` : 'none',
-    borderTop: position === 'bottom' && type === 'line' ? `2px solid ${colors.neutral.gray[200]}` : 'none',
-    borderRight: position === 'left' && type === 'line' ? `2px solid ${colors.neutral.gray[200]}` : 'none',
-    borderLeft: position === 'right' && type === 'line' ? `2px solid ${colors.neutral.gray[200]}` : 'none',
+    gap: type === 'card' ? spacing[1] : 0,
+    borderBottom: position === 'top' && type === 'line' ? `2px solid ${colors.neutral[200]}` : 'none',
+    borderTop: position === 'bottom' && type === 'line' ? `2px solid ${colors.neutral[200]}` : 'none',
+    borderRight: position === 'left' && type === 'line' ? `2px solid ${colors.neutral[200]}` : 'none',
+    borderLeft: position === 'right' && type === 'line' ? `2px solid ${colors.neutral[200]}` : 'none',
     justifyContent: centered ? 'center' : 'flex-start',
     order: position === 'bottom' || position === 'right' ? 2 : 1
   };
@@ -117,7 +117,7 @@ const Tabs: React.FC<TabsProps> = ({
       cursor: item.disabled ? 'not-allowed' : 'pointer',
       display: 'flex',
       alignItems: 'center',
-      gap: spacing.xs,
+      gap: spacing[1],
       position: 'relative',
       transition: 'all 0.2s ease',
       opacity: item.disabled ? 0.5 : 1,
@@ -130,29 +130,29 @@ const Tabs: React.FC<TabsProps> = ({
       case 'card':
         return {
           ...baseStyles,
-          backgroundColor: isActive ? colors.neutral.white : colors.neutral.gray[100],
-          border: `1px solid ${colors.neutral.gray[300]}`,
-          borderRadius: `${borderRadius.md} ${borderRadius.md} 0 0`,
-          borderBottom: isActive ? `1px solid ${colors.neutral.white}` : `1px solid ${colors.neutral.gray[300]}`,
+          backgroundColor: isActive ? '#FFFFFF' : colors.neutral[100],
+          border: `1px solid ${colors.neutral[300]}`,
+          borderRadius: `${'8px'} ${'8px'} 0 0`,
+          borderBottom: isActive ? `1px solid ${'#FFFFFF'}` : `1px solid ${colors.neutral[300]}`,
           marginBottom: '-1px',
-          color: isActive ? colors.primary.blue[600] : colors.neutral.gray[600]
+          color: isActive ? colors.brand.primary : colors.neutral[600]
         };
       case 'pill':
         return {
           ...baseStyles,
-          backgroundColor: isActive ? colors.primary.blue[500] : colors.neutral.gray[100],
-          borderRadius: borderRadius.full,
-          color: isActive ? colors.neutral.white : colors.neutral.gray[600],
-          margin: `0 ${spacing.xs}`
+          backgroundColor: isActive ? colors.brand.primary : colors.neutral[100],
+          borderRadius: '50px',
+          color: isActive ? '#FFFFFF' : colors.neutral[600],
+          margin: `0 ${spacing[1]}`
         };
       default: // line
         return {
           ...baseStyles,
-          color: isActive ? colors.primary.blue[600] : colors.neutral.gray[600],
-          borderBottom: position === 'top' && isActive ? `2px solid ${colors.primary.blue[500]}` : 'none',
-          borderTop: position === 'bottom' && isActive ? `2px solid ${colors.primary.blue[500]}` : 'none',
-          borderRight: position === 'left' && isActive ? `2px solid ${colors.primary.blue[500]}` : 'none',
-          borderLeft: position === 'right' && isActive ? `2px solid ${colors.primary.blue[500]}` : 'none',
+          color: isActive ? colors.brand.primary : colors.neutral[600],
+          borderBottom: position === 'top' && isActive ? `2px solid ${colors.brand.primary}` : 'none',
+          borderTop: position === 'bottom' && isActive ? `2px solid ${colors.brand.primary}` : 'none',
+          borderRight: position === 'left' && isActive ? `2px solid ${colors.brand.primary}` : 'none',
+          borderLeft: position === 'right' && isActive ? `2px solid ${colors.brand.primary}` : 'none',
           marginBottom: position === 'top' ? '-2px' : 0,
           marginTop: position === 'bottom' ? '-2px' : 0,
           marginRight: position === 'left' ? '-2px' : 0,
@@ -163,14 +163,14 @@ const Tabs: React.FC<TabsProps> = ({
 
   const contentStyles: React.CSSProperties = {
     flex: 1,
-    padding: spacing.lg,
-    backgroundColor: type === 'card' ? colors.neutral.white : 'transparent',
-    border: type === 'card' ? `1px solid ${colors.neutral.gray[300]}` : 'none',
+    padding: spacing[6],
+    backgroundColor: type === 'card' ? '#FFFFFF' : 'transparent',
+    border: type === 'card' ? `1px solid ${colors.neutral[300]}` : 'none',
     borderTop: type === 'card' && position === 'top' ? 'none' : undefined,
     borderBottom: type === 'card' && position === 'bottom' ? 'none' : undefined,
     borderRight: type === 'card' && position === 'left' ? 'none' : undefined,
     borderLeft: type === 'card' && position === 'right' ? 'none' : undefined,
-    borderRadius: type === 'card' ? `0 ${borderRadius.md} ${borderRadius.md} ${borderRadius.md}` : 0,
+    borderRadius: type === 'card' ? `0 ${'8px'} ${'8px'} ${'8px'}` : 0,
     order: position === 'bottom' || position === 'right' ? 1 : 2,
     transition: animated ? 'opacity 0.3s ease' : 'none'
   };
@@ -219,12 +219,12 @@ const Tabs: React.FC<TabsProps> = ({
               aria-controls={`tabpanel-${item.key}`}
               onMouseEnter={(e) => {
                 if (!item.disabled && !isActive && type !== 'pill') {
-                  e.currentTarget.style.color = colors.primary.blue[500];
+                  e.currentTarget.style.color = colors.brand.primary;
                 }
               }}
               onMouseLeave={(e) => {
                 if (!item.disabled && !isActive && type !== 'pill') {
-                  e.currentTarget.style.color = colors.neutral.gray[600];
+                  e.currentTarget.style.color = colors.neutral[600];
                 }
               }}
             >
@@ -234,7 +234,7 @@ const Tabs: React.FC<TabsProps> = ({
                 <span
                   onClick={(e) => handleClose(e, item)}
                   style={{
-                    marginLeft: spacing.xs,
+                    marginLeft: spacing[1],
                     padding: '2px',
                     borderRadius: '2px',
                     cursor: 'pointer'

@@ -86,6 +86,8 @@ interface DashboardAlert {
 }
 
 export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
+  currentView,
+  organizationId,
   userRole,
   onRoleSwitch,
   onNavigateToInterface,

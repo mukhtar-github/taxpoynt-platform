@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { TaxPoyntDesignSystem } from '../../../design_system/core/TaxPoyntDesignSystem';
+import { colors, spacing, typography } from '../../design_system/tokens';
 
 // Breadcrumb item interface
 export interface BreadcrumbItem {
@@ -39,14 +39,14 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
   maxItems,
   onItemClick
 }) => {
-  const { colors, spacing, typography } = TaxPoyntDesignSystem;
+  // Design tokens are imported directly
 
   const breadcrumbStyles: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing[2],
     fontSize: typography.sizes.sm,
-    color: colors.neutral.gray[600],
+    color: colors.neutral[600],
     listStyle: 'none',
     margin: 0,
     padding: 0
@@ -55,28 +55,28 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
   const itemStyles: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.xs
+    gap: spacing[1]
   };
 
   const linkStyles: React.CSSProperties = {
-    color: colors.primary.blue[600],
+    color: colors.brand.primary,
     textDecoration: 'none',
     cursor: 'pointer',
     transition: 'color 0.2s ease',
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.xs
+    gap: spacing[1]
   };
 
   const activeLinkStyles: React.CSSProperties = {
-    color: colors.neutral.gray[800],
+    color: colors.neutral[800],
     cursor: 'default',
     fontWeight: typography.weights.medium
   };
 
   const separatorStyles: React.CSSProperties = {
-    color: colors.neutral.gray[400],
-    margin: `0 ${spacing.xs}`,
+    color: colors.neutral[400],
+    margin: `0 ${spacing[1]}`,
     userSelect: 'none'
   };
 
@@ -87,7 +87,7 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
   };
 
   const ellipsisStyles: React.CSSProperties = {
-    color: colors.neutral.gray[400],
+    color: colors.neutral[400],
     cursor: 'default',
     userSelect: 'none'
   };
@@ -148,12 +148,12 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
                   onClick={() => !item.active && handleItemClick(item, index)}
                   onMouseEnter={(e) => {
                     if (!item.active) {
-                      e.currentTarget.style.color = colors.primary.blue[700];
+                      e.currentTarget.style.color = colors.brand.secondary;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!item.active) {
-                      e.currentTarget.style.color = colors.primary.blue[600];
+                      e.currentTarget.style.color = colors.brand.primary;
                     }
                   }}
                   aria-current={item.active ? 'page' : undefined}

@@ -489,7 +489,7 @@ export const AccessGuard: React.FC<AccessGuardProps> = ({
     default:
       return (
         <div className={className}>
-          <DefaultAccessDeniedMessage message={fallbackMessage} result={accessResult} />
+          <DefaultAccessDeniedMessage message={fallbackMessage} result={accessResult || undefined} />
         </div>
       );
   }

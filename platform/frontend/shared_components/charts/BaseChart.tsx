@@ -44,6 +44,7 @@ export interface BaseChartProps {
   className?: string;
   onDataPointClick?: (dataPoint: ChartDataPoint, seriesIndex?: number) => void;
   'data-testid'?: string;
+  children?: React.ReactNode;
 }
 
 export const BaseChart: React.FC<BaseChartProps> = ({
@@ -235,7 +236,7 @@ export const BaseChart: React.FC<BaseChartProps> = ({
           </div>
         </div>
         
-        <style jsx>{`
+        <style>{`
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }

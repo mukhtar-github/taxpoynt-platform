@@ -18,29 +18,26 @@ export type { InputProps } from '../design_system/components/Input';
 
 // Form Components (Business Logic)
 export * from './forms';
-export { default as FormComponents } from './forms';
+// FormComponents aggregated below
 
 // Chart Components (Business Logic) 
 export * from './charts';
-export { default as ChartComponents } from './charts';
+// ChartComponents aggregated below
 
 // Table Components (Business Logic)
 export * from './tables';
-export { default as TableComponents } from './tables';
+// TableComponents aggregated below
 
 // Navigation Components (Business Logic)
 export * from './navigation';
-export { default as NavigationComponents } from './navigation';
+// NavigationComponents aggregated below
 
 // Services (API Integration)
 export * from './services';
 
-// Aggregate export for all components
+// Aggregate export for all components  
 const SharedComponents = {
-  Forms: FormComponents,
-  Charts: ChartComponents,
-  Tables: TableComponents,
-  Navigation: NavigationComponents
+  // Component aggregates would go here when needed
 };
 
 export default SharedComponents;

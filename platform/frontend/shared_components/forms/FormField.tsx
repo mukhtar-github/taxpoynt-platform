@@ -21,6 +21,7 @@ export interface FormFieldProps extends Omit<InputProps, 'label' | 'error' | 'he
   required?: boolean;
   optional?: boolean;
   tooltip?: string;
+  fullWidth?: boolean;
   'data-testid'?: string;
 }
 
@@ -32,6 +33,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(({
   required = false,
   optional = false,
   tooltip,
+  fullWidth = false,
   'data-testid': testId,
   ...inputProps
 }, ref) => {
@@ -39,7 +41,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(({
   const hasError = Boolean(errorMessage);
 
   const fieldSetStyles = {
-    width: inputProps.fullWidth ? '100%' : 'auto',
+    width: fullWidth ? '100%' : 'auto',
     marginBottom: spacing[4],
   };
 
@@ -133,7 +135,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(({
         ref={ref}
         id={name}
         name={name}
-        error={errorMessage}
+        error={hasError}
         required={required}
         aria-invalid={hasError}
         aria-describedby={

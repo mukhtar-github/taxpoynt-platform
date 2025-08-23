@@ -251,7 +251,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
       return `${internalValue.length} selected`;
     }
     
-    if (internalValue !== null && internalValue !== undefined) {
+    if (internalValue !== null && internalValue !== undefined && !Array.isArray(internalValue)) {
       return getSelectedOption(internalValue)?.label;
     }
     
@@ -394,7 +394,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }

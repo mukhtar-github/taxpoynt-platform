@@ -38,7 +38,14 @@
 
 import React from 'react';
 
-// Core role detection
+// Core role detection - Import first for local usage
+import { 
+  PlatformRole,
+  RoleScope,
+  RoleStatus 
+} from './role_detector';
+
+// Re-export for external usage
 export {
   RoleDetectorProvider,
   useRoleDetector,
@@ -80,7 +87,15 @@ export type {
   RoleMetadata
 } from './role_switcher';
 
-// Access guards
+// Access guards - Import first for local HOC usage
+import {
+  AccessGuard,
+  RoleGuard,
+  PermissionGuard,
+  FeatureGuard
+} from './access_guard';
+
+// Re-export access guards for external usage
 export {
   AccessGuard,
   RoleGuard,
@@ -202,7 +217,7 @@ export const COMMON_FEATURES = {
 } as const;
 
 // Utility functions
-export const getRoleDisplayName = (role: PlatformRole): string => {
+export const getRoleDisplayName = (role: typeof PlatformRole[keyof typeof PlatformRole]): string => {
   const names = {
     [PlatformRole.SYSTEM_INTEGRATOR]: 'System Integrator',
     [PlatformRole.ACCESS_POINT_PROVIDER]: 'Access Point Provider',
@@ -283,12 +298,12 @@ export const withFeatureGate = (
   fallback?: React.ReactNode
 ) => {
   return (props: any) => (
-    <FeatureGate 
-      feature={requiredFeature} 
-      fallback={fallback}
+    <FeatureGuard 
+      requiredFeatures={[requiredFeature]} 
+      fallbackComponent={fallback}
     >
       <Component {...props} />
-    </FeatureGate>
+    </FeatureGuard>
   );
 };
 

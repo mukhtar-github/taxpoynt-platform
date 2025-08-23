@@ -66,6 +66,8 @@ interface WorkflowDesignerProps extends WorkflowComponentProps {
   onTest?: (workflow: CrossRoleWorkflow) => void;
   onExport?: (workflow: CrossRoleWorkflow) => void;
   templates?: WorkflowStage[];
+  availableServices?: string[];
+  userRole?: string;
 }
 
 interface StagePosition {
@@ -150,6 +152,8 @@ export const WorkflowDesigner: React.FC<WorkflowDesignerProps> = ({
   onTest,
   onExport,
   templates = STAGE_TEMPLATES,
+  availableServices = [],
+  userRole,
   className,
   onError,
   ...props

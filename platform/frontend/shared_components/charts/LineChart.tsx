@@ -367,7 +367,7 @@ export const LineChart: React.FC<LineChartProps> = ({
       
       {/* Animation keyframes */}
       {animated && (
-        <style jsx>{`
+        <style>{`
           @keyframes drawLine {
             to {
               stroke-dashoffset: 0;
