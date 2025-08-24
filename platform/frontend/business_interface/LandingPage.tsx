@@ -94,7 +94,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-gray-100 mb-12 max-w-4xl mx-auto font-normal leading-relaxed" 
+          <p className="text-xl md:text-2xl text-gray-100 mb-8 max-w-4xl mx-auto font-normal leading-relaxed" 
              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             Stop wasting hours on compliance paperwork. TaxPoynt connects your business software directly to government systems—one click and your e-invoices are submitted correctly, every time.
           </p>
