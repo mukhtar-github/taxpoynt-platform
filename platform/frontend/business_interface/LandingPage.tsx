@@ -19,7 +19,7 @@ export const LandingPage: React.FC = () => {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gray-900" style={{ 
+    <div className="min-h-screen bg-gray-50" style={{ 
       fontFeatureSettings: '"kern" 1, "liga" 1', 
       textRendering: 'optimizeLegibility', 
       WebkitFontSmoothing: 'antialiased', 
@@ -27,7 +27,7 @@ export const LandingPage: React.FC = () => {
     }}>
       
       {/* Navigation */}
-      <nav className="px-6 py-4 border-b border-gray-700">
+      <nav className="px-6 py-4 border-b border-gray-200">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <img 
@@ -36,15 +36,15 @@ export const LandingPage: React.FC = () => {
               className="h-8 w-auto"
             />
             <div>
-              <div className="text-xl font-bold text-blue-400">TaxPoynt</div>
-              <div className="text-sm text-blue-300">Secure E-invoicing Solution</div>
+              <div className="text-xl font-bold text-blue-600">TaxPoynt</div>
+              <div className="text-sm text-blue-500">Secure E-invoicing Solution</div>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/auth/signin')}
-              className="text-gray-300 hover:text-white font-medium"
+              className="text-gray-600 hover:text-gray-900 font-medium"
               style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
             >
               Sign In
@@ -60,19 +60,19 @@ export const LandingPage: React.FC = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative px-6 py-24 overflow-hidden bg-gradient-to-br from-gray-400 via-gray-300 to-gray-200 min-h-screen flex items-center">
+      <section className="relative px-6 py-24 overflow-hidden bg-gradient-to-br from-gray-100 via-gray-50 to-white min-h-screen flex items-center">
         
-        {/* Animated Background Patterns */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
-          <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 left-1/2 w-72 h-72 bg-orange-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
+        {/* Subtle Background Patterns */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-blue-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '4s' }}></div>
+          <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-green-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '5s' }}></div>
+          <div className="absolute bottom-1/4 left-1/2 w-72 h-72 bg-indigo-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '6s' }}></div>
         </div>
         
         <div className="max-w-5xl mx-auto text-center relative z-10">
           
           {/* Enhanced Badge */}
-          <div className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm border border-green-200 text-green-800 rounded-full text-sm font-medium mb-8 shadow-2xl hover:shadow-green-500/25 transition-all duration-300" 
+          <div className="inline-flex items-center px-6 py-3 bg-green-50 border border-green-300 text-green-800 rounded-full text-sm font-medium mb-8 shadow-lg hover:shadow-green-200 transition-all duration-300" 
                style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
@@ -80,21 +80,21 @@ export const LandingPage: React.FC = () => {
 
           {/* Enhanced Headline */}
           <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-700 text-white px-8 py-3 rounded-full text-base font-bold mb-6 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105">
+            <div className="inline-block bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-3 rounded-full text-base font-bold mb-6 shadow-xl hover:shadow-green-300 transition-all duration-300 hover:scale-105">
               Stop wasting time on compliance paperwork
             </div>
-            <h1 className="text-5xl md:text-7xl font-black text-white mb-6 leading-tight" 
-                style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+            <h1 className="text-5xl md:text-7xl font-black text-gray-900 mb-6 leading-tight" 
+                style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
               Submit compliant e-invoices in 
               <br />
-              <span className="text-green-400 font-black" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
+              <span className="text-green-600 font-black">
                 seconds, not hours
               </span>
             </h1>
           </div>
 
           {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-gray-100 mb-8 max-w-4xl mx-auto font-normal leading-relaxed" 
+          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto font-normal leading-relaxed" 
              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             Stop wasting hours on compliance paperwork. TaxPoynt connects your business software directly to government systems—one click and your e-invoices are submitted correctly, every time.
           </p>
@@ -103,7 +103,7 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
             <HeroCTAButton
               onClick={() => router.push('/auth/signup')}
-              className="text-xl px-12 py-5 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105 transform"
+              className="text-xl px-12 py-5 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white font-bold rounded-2xl shadow-xl hover:shadow-blue-300 transition-all duration-300 hover:scale-105 transform"
             >
               Start Free Trial
             </HeroCTAButton>
@@ -113,7 +113,7 @@ export const LandingPage: React.FC = () => {
               onClick={() => {
                 document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="text-xl px-12 py-5 border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm font-semibold rounded-2xl shadow-xl hover:shadow-white/25 transition-all duration-300 hover:scale-105 transform"
+              className="text-xl px-12 py-5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 font-semibold rounded-2xl shadow-lg hover:shadow-gray-300 transition-all duration-300 hover:scale-105 transform"
             >
               Learn More
             </TaxPoyntButton>
@@ -126,11 +126,11 @@ export const LandingPage: React.FC = () => {
       {/* Professional Section Transition */}
       <div className="relative">
         {/* Multi-layered Shadow Effect */}
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-400 via-gray-300 to-transparent h-8 opacity-20"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-transparent h-12 opacity-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-100 via-gray-50 to-transparent h-8 opacity-30"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-200 to-transparent h-12 opacity-20"></div>
         
         {/* Main Gradient Transition */}
-        <div className="h-20 bg-gradient-to-b from-gray-400 via-gray-200 via-gray-100 to-white relative">
+        <div className="h-20 bg-gradient-to-b from-gray-50 via-gray-25 to-white relative">
           {/* Subtle Geometric Element */}
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-green-500 to-blue-500 rounded-full opacity-30"></div>
         </div>
