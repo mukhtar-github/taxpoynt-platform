@@ -141,61 +141,87 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Professional Section Transition */}
-      <div className="relative">
-        {/* Multi-layered Shadow Effect */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-100/40 via-slate-50/30 to-transparent h-8"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-200/30 to-transparent h-12"></div>
+      {/* Enhanced Section Transition */}
+      <div className="relative h-32">
+        {/* Multi-layered Depth Effect */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-100/30 via-slate-50/20 to-transparent h-12"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-200/20 to-transparent h-16"></div>
         
         {/* Main Gradient Transition */}
-        <div className="h-24 bg-gradient-to-b from-slate-50/50 via-white/80 to-white relative">
-          {/* Premium Accent Element */}
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full opacity-40 shadow-lg"></div>
-          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-16 h-0.5 bg-gradient-to-r from-emerald-300 via-blue-300 to-purple-300 rounded-full opacity-60"></div>
+        <div className="h-full bg-gradient-to-b from-slate-50/40 via-white/60 to-white relative">
+          {/* Enhanced Divider Line */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-px bg-gradient-to-r from-transparent via-slate-300/60 to-transparent"></div>
+          
+          {/* Premium Accent Elements */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-40 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full opacity-30 shadow-lg blur-sm"></div>
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-24 h-0.5 bg-gradient-to-r from-emerald-400 via-blue-400 to-purple-400 rounded-full opacity-70"></div>
+          
+          {/* Subtle Pattern */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-slate-50/20"></div>
         </div>
         
         {/* Professional Drop Shadow */}
-        <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-b from-black/5 to-transparent"></div>
+        <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-b from-black/3 to-transparent"></div>
       </div>
 
-      {/* Section 2: Trust Indicators */}
-      <section className="py-16 bg-white relative" style={{ 
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 3px rgba(0,0,0,0.05)' 
+      {/* Section 2: Premium Trust Indicators */}
+      <section className="py-20 bg-gradient-to-br from-white via-slate-50/30 to-white relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(0,0,0,0.08)' 
       }}>
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
-                   style={{ 
-                     textRendering: 'optimizeLegibility', 
-                     WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900 !important',
-                     fontSize: '3.5rem !important',
-                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
-                   }}>
-                Zero
-              </div>
-              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-green-600 transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                E-invoice submission errors
+        {/* Subtle Background Patterns */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-green-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '8s' }}></div>
+          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '10s' }}></div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
+            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
+              {/* Premium Background Card */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
+              
+              <div className="relative z-10">
+                <div className="text-7xl md:text-8xl font-black text-green-600 mb-4 leading-none" 
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(34, 197, 94, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
+                       background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #15803d 100%)',
+                       WebkitBackgroundClip: 'text',
+                       WebkitTextFillColor: 'transparent',
+                       filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.2))'
+                     }}>
+                  Zero
+                </div>
+                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-green-700 transition-colors duration-300 leading-tight" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  E-invoice submission errors
+                </div>
               </div>
             </div>
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
-                   style={{ 
-                     textRendering: 'optimizeLegibility', 
-                     WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900 !important',
-                     fontSize: '3.5rem !important',
-                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
-                   }}>
-                2 min
-              </div>
-              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-green-600 transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                From sale to compliance submission
+            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
+              {/* Premium Background Card */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
+              
+              <div className="relative z-10">
+                <div className="text-7xl md:text-8xl font-black text-blue-600 mb-4 leading-none" 
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(59, 130, 246, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
+                       background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #1d4ed8 100%)',
+                       WebkitBackgroundClip: 'text',
+                       WebkitTextFillColor: 'transparent',
+                       filter: 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.2))'
+                     }}>
+                  2 min
+                </div>
+                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-blue-700 transition-colors duration-300 leading-tight" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  From sale to compliance submission
+                </div>
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
@@ -215,21 +241,28 @@ export const LandingPage: React.FC = () => {
                 Nigerian compliance coverage
               </div>
             </div>
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
-                   style={{ 
-                     textRendering: 'optimizeLegibility', 
-                     WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900 !important',
-                     fontSize: '3.5rem !important',
-                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
-                   }}>
-                Any
-              </div>
-              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-green-600 transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                Software you already use
+            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-purple-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
+              {/* Premium Background Card */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white via-purple-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
+              
+              <div className="relative z-10">
+                <div className="text-7xl md:text-8xl font-black text-purple-600 mb-4 leading-none" 
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(147, 51, 234, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
+                       background: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #6d28d9 100%)',
+                       WebkitBackgroundClip: 'text',
+                       WebkitTextFillColor: 'transparent',
+                       filter: 'drop-shadow(0 2px 4px rgba(147, 51, 234, 0.2))'
+                     }}>
+                  Any
+                </div>
+                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-purple-700 transition-colors duration-300 leading-tight" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  Software you already use
+                </div>
               </div>
             </div>
           </div>
