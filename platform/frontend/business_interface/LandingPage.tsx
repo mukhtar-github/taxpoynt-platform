@@ -29,24 +29,15 @@ export const LandingPage: React.FC = () => {
       {/* Navigation */}
       <nav className="px-6 py-4 border-b border-gray-700">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="relative group">
-            {/* Sparkling Effect */}
-            <div className="absolute -inset-2 opacity-75 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="absolute top-0 left-1/4 w-1 h-1 bg-blue-400 rounded-full animate-ping" style={{ animationDelay: '0s', animationDuration: '2s' }}></div>
-              <div className="absolute top-2 right-1/4 w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" style={{ animationDelay: '0.5s', animationDuration: '2.5s' }}></div>
-              <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" style={{ animationDelay: '1s', animationDuration: '3s' }}></div>
-              <div className="absolute top-1/2 right-0 w-0.5 h-0.5 bg-green-500 rounded-full animate-ping" style={{ animationDelay: '1.5s', animationDuration: '2s' }}></div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/logo.svg" 
-                alt="TaxPoynt Logo" 
-                className="h-8 w-auto"
-              />
-              <div>
-                <div className="text-xl font-bold text-blue-400">TaxPoynt</div>
-                <div className="text-sm text-blue-300">Nigerian E-invoice Leader</div>
-              </div>
+          <div className="flex items-center space-x-3">
+            <img 
+              src="/logo.svg" 
+              alt="TaxPoynt Logo" 
+              className="h-8 w-auto"
+            />
+            <div>
+              <div className="text-xl font-bold text-blue-400">TaxPoynt</div>
+              <div className="text-sm text-blue-300">Secure E-invoicing Solution</div>
             </div>
           </div>
           

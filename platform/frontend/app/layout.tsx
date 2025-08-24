@@ -15,28 +15,21 @@ export const metadata = {
     other: [
       {
         rel: 'icon',
-        url: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-      },
-      {
-        rel: 'icon', 
-        url: '/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
+        url: '/logo.svg',
+        type: 'image/svg+xml',
       }
     ]
   },
   openGraph: {
-    title: 'TaxPoynt - Nigerian E-invoice Leader',
+    title: 'TaxPoynt - Secure E-invoicing Solution',
     description: 'Submit compliant e-invoices in seconds, not hours',
     url: 'https://taxpoynt.com',
     siteName: 'TaxPoynt',
     images: [
       {
-        url: '/icon-512.png',
-        width: 512,
-        height: 512,
+        url: '/logo.svg',
+        width: 200,
+        height: 200,
         alt: 'TaxPoynt Logo',
       }
     ],
@@ -45,9 +38,9 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TaxPoynt - Nigerian E-invoice Leader',
+    title: 'TaxPoynt - Secure E-invoicing Solution',
     description: 'Submit compliant e-invoices in seconds, not hours',
-    images: ['/icon-512.png'],
+    images: ['/logo.svg'],
   }
 };
 
