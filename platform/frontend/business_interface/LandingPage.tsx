@@ -181,11 +181,12 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="text-7xl md:text-8xl font-black text-green-600 mb-4 leading-none" 
+                <div className="font-black text-green-600 mb-4 leading-none" 
                      style={{ 
+                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: 950,
+                       fontWeight: '950 !important',
                        textShadow: '0 4px 8px rgba(34, 197, 94, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
                        filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.2))'
                      }}>
@@ -202,11 +203,12 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="text-7xl md:text-8xl font-black text-blue-600 mb-4 leading-none" 
+                <div className="font-black text-blue-600 mb-4 leading-none" 
                      style={{ 
+                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: 950,
+                       fontWeight: '950 !important',
                        textShadow: '0 4px 8px rgba(59, 130, 246, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
                        filter: 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.2))'
                      }}>
@@ -218,21 +220,26 @@ export const LandingPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
-                   style={{ 
-                     textRendering: 'optimizeLegibility', 
-                     WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900 !important',
-                     fontSize: '3.5rem !important',
-                     textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
-                   }}>
-                100%
-              </div>
-              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-green-600 transition-colors" 
-                   style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                Nigerian compliance coverage
+            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-emerald-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
+              {/* Premium Background Card */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white via-emerald-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
+              
+              <div className="relative z-10">
+                <div className="font-black text-emerald-600 mb-4 leading-none" 
+                     style={{ 
+                       fontSize: '6rem !important',
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       fontWeight: '950 !important',
+                       textShadow: '0 4px 8px rgba(16, 185, 129, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
+                       filter: 'drop-shadow(0 2px 4px rgba(16, 185, 129, 0.2))'
+                     }}>
+                  100%
+                </div>
+                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-emerald-700 transition-colors duration-300 leading-tight" 
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                  Nigerian compliance coverage
+                </div>
               </div>
             </div>
             <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-purple-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
@@ -240,11 +247,12 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-purple-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="text-7xl md:text-8xl font-black text-purple-600 mb-4 leading-none" 
+                <div className="font-black text-purple-600 mb-4 leading-none" 
                      style={{ 
+                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: 950,
+                       fontWeight: '950 !important',
                        textShadow: '0 4px 8px rgba(147, 51, 234, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
                        filter: 'drop-shadow(0 2px 4px rgba(147, 51, 234, 0.2))'
                      }}>
