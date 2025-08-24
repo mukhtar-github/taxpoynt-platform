@@ -133,11 +133,12 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-6xl md:text-8xl font-black text-green-600 mb-4" 
+              <div className="!text-6xl md:!text-8xl !font-black text-green-600 mb-4" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900',
+                     fontWeight: '900 !important',
+                     fontSize: '4.5rem !important',
                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                      WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
                    }}>
@@ -149,11 +150,12 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-6xl md:text-8xl font-black text-blue-600 mb-4" 
+              <div className="!text-6xl md:!text-8xl !font-black text-blue-600 mb-4" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900',
+                     fontWeight: '900 !important',
+                     fontSize: '4.5rem !important',
                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                      WebkitTextStroke: '1px rgba(37, 99, 235, 0.3)'
                    }}>
@@ -165,11 +167,12 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-6xl md:text-8xl font-black text-green-600 mb-4" 
+              <div className="!text-6xl md:!text-8xl !font-black text-green-600 mb-4" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900',
+                     fontWeight: '900 !important',
+                     fontSize: '4.5rem !important',
                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                      WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
                    }}>
@@ -181,11 +184,12 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="text-6xl md:text-8xl font-black text-blue-600 mb-4" 
+              <div className="!text-6xl md:!text-8xl !font-black text-blue-600 mb-4" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
-                     fontWeight: '900',
+                     fontWeight: '900 !important',
+                     fontSize: '4.5rem !important',
                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                      WebkitTextStroke: '1px rgba(37, 99, 235, 0.3)'
                    }}>
