@@ -6,8 +6,15 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '../design_system/components/Button';
-import { Logo } from '../design_system/components/Logo';
+import { 
+  TaxPoyntButton, 
+  HeroCTAButton, 
+  ProblemCard,
+  LandingLogo,
+  PROBLEM_PATTERNS,
+  buildGridClasses,
+  TAXPOYNT_DESIGN_SYSTEM 
+} from '../design_system';
 
 export const LandingPage: React.FC = () => {
   const router = useRouter();
@@ -37,7 +44,12 @@ export const LandingPage: React.FC = () => {
               textRendering: 'optimizeLegibility', 
               WebkitFontSmoothing: 'antialiased' 
             }}>
-              <Logo size="lg" variant="full" showTagline={true} />
+              <LandingLogo 
+                size="lg" 
+                theme="glow" 
+                showTagline={true} 
+                sparkles={true}
+              />
             </div>
           </div>
           
@@ -49,12 +61,12 @@ export const LandingPage: React.FC = () => {
             >
               Sign In
             </button>
-            <Button
+            <TaxPoyntButton
               variant="primary"
               onClick={() => router.push('/auth/signup')}
             >
               Get Started
-            </Button>
+            </TaxPoyntButton>
           </div>
         </div>
       </nav>
@@ -101,16 +113,14 @@ export const LandingPage: React.FC = () => {
 
           {/* Enhanced CTAs */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
-            <Button
-              variant="primary"
-              size="lg"
+            <HeroCTAButton
               onClick={() => router.push('/auth/signup')}
               className="text-xl px-12 py-5 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-105 transform"
             >
               Start Free Trial
-            </Button>
-            <Button
-              variant="outline"
+            </HeroCTAButton>
+            <TaxPoyntButton
+              variant="secondary"
               size="lg"
               onClick={() => {
                 document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
@@ -118,7 +128,7 @@ export const LandingPage: React.FC = () => {
               className="text-xl px-12 py-5 border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm font-semibold rounded-2xl shadow-xl hover:shadow-white/25 transition-all duration-300 hover:scale-105 transform"
             >
               Learn More
-            </Button>
+            </TaxPoyntButton>
           </div>
 
           {/* Removed trust indicators - moved to dedicated section */}
@@ -246,69 +256,18 @@ export const LandingPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Problems Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            
-            {/* Problem 1: Time Waste */}
-            <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 border border-gray-200">
-              <div className="text-blue-500 text-4xl mb-4">⏰</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Hours Wasted Daily</h3>
-              <p className="text-gray-700 mb-4">
-                "I spend 3-4 hours every day just formatting invoices and submitting them manually to FIRS. That's time I should be growing my business."
-              </p>
-              <div className="text-blue-600 font-semibold text-sm">- Lagos Restaurant Owner</div>
-            </div>
-
-            {/* Problem 2: Constant Errors */}
-            <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 border border-gray-200">
-              <div className="text-blue-500 text-4xl mb-4">❌</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Constant Rejection Errors</h3>
-              <p className="text-gray-700 mb-4">
-                "My invoices get rejected 60% of the time. Wrong format, missing fields, validation errors. I never know what's wrong until it's too late."
-              </p>
-              <div className="text-blue-600 font-semibold text-sm">- Abuja Tech Company</div>
-            </div>
-
-            {/* Problem 3: Compliance Stress */}
-            <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 border border-gray-200">
-              <div className="text-blue-500 text-4xl mb-4">😰</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Compliance Anxiety</h3>
-              <p className="text-gray-700 mb-4">
-                "I'm always worried about penalties and fines. The rules keep changing and I can't keep up. Sleep is becoming a luxury."
-              </p>
-              <div className="text-blue-600 font-semibold text-sm">- Kano Manufacturing SME</div>
-            </div>
-
-            {/* Problem 4: Manual Data Entry */}
-            <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 border border-gray-200">
-              <div className="text-blue-500 text-4xl mb-4">📝</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Double Data Entry</h3>
-              <p className="text-gray-700 mb-4">
-                "I enter the same data in my accounting software, then manually re-type everything for FIRS compliance. It's exhausting and error-prone."
-              </p>
-              <div className="text-blue-600 font-semibold text-sm">- Port Harcourt Retailer</div>
-            </div>
-
-            {/* Problem 5: Missing Deadlines */}
-            <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 border border-gray-200">
-              <div className="text-blue-500 text-4xl mb-4">📅</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Missing Deadlines</h3>
-              <p className="text-gray-700 mb-4">
-                "Between running my business and compliance paperwork, I sometimes miss submission deadlines. The penalties are crushing my cash flow."
-              </p>
-              <div className="text-blue-600 font-semibold text-sm">- Ibadan Wholesaler</div>
-            </div>
-
-            {/* Problem 6: No Integration */}
-            <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 border border-gray-200">
-              <div className="text-blue-500 text-4xl mb-4">🔗</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Software Disconnect</h3>
-              <p className="text-gray-700 mb-4">
-                "My POS system, accounting software, and FIRS compliance are completely separate. Nothing talks to each other. It's chaos."
-              </p>
-              <div className="text-blue-600 font-semibold text-sm">- Enugu Service Provider</div>
-            </div>
-
+          {/* Problems Grid - Using Design System */}
+          <div className={buildGridClasses('problems')}>
+            {PROBLEM_PATTERNS.slice(0, 6).map((problem, index) => (
+              <ProblemCard
+                key={index}
+                emoji={problem.emoji}
+                title={problem.title}
+                description={problem.description}
+                source={problem.source}
+                colorScheme="problems"
+              />
+            ))}
           </div>
 
           {/* Bottom CTA - Enhanced Visibility */}

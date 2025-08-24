@@ -1,0 +1,269 @@
+/**
+ * TaxPoynt Complete Design Token System
+ * ====================================
+ * Comprehensive design tokens extracted from legacy + enhanced for full platform
+ * Covers: Landing Page + Auth + Dashboards + Business Interfaces + Mobile-First
+ */
+
+:root {
+  /* ========================================
+   * COMPLETE COLOR PALETTE SYSTEM
+   * ======================================== */
+  
+  /* Primary Brand Colors (from legacy Button.tsx) */
+  --tp-primary: #3B82F6;
+  --tp-primary-50: #EFF6FF;
+  --tp-primary-100: #DBEAFE;
+  --tp-primary-200: #BFDBFE;
+  --tp-primary-300: #93C5FD;
+  --tp-primary-400: #60A5FA;
+  --tp-primary-500: #3B82F6;  /* Main primary */
+  --tp-primary-600: #2563EB;  /* Primary dark */
+  --tp-primary-700: #1D4ED8;
+  --tp-primary-800: #1E40AF;
+  --tp-primary-900: #1E3A8A;
+
+  /* Semantic Colors (from legacy globals.css) */
+  --tp-success: #10B981;
+  --tp-success-50: #ECFDF5;
+  --tp-success-100: #D1FAE5;
+  --tp-success-200: #A7F3D0;
+  --tp-success-300: #6EE7B7;
+  --tp-success-400: #34D399;
+  --tp-success-500: #10B981;  /* Main success */
+  --tp-success-600: #059669;
+  --tp-success-700: #047857;
+  --tp-success-800: #065F46;
+  --tp-success-900: #064E3B;
+
+  --tp-error: #EF4444;
+  --tp-error-50: #FEF2F2;
+  --tp-error-100: #FEE2E2;
+  --tp-error-200: #FECACA;
+  --tp-error-300: #FCA5A5;
+  --tp-error-400: #F87171;
+  --tp-error-500: #EF4444;   /* Main error */
+  --tp-error-600: #DC2626;
+  --tp-error-700: #B91C1C;
+  --tp-error-800: #991B1B;
+  --tp-error-900: #7F1D1D;
+
+  --tp-warning: #F59E0B;
+  --tp-warning-50: #FFFBEB;
+  --tp-warning-100: #FEF3C7;
+  --tp-warning-200: #FDE68A;
+  --tp-warning-300: #FCD34D;
+  --tp-warning-400: #FBBF24;
+  --tp-warning-500: #F59E0B;  /* Main warning */
+  --tp-warning-600: #D97706;
+  --tp-warning-700: #B45309;
+  --tp-warning-800: #92400E;
+  --tp-warning-900: #78350F;
+
+  /* Nigerian-Inspired Colors (from legacy platform-components.css) */
+  --tp-nigerian-green: #008751;      /* Nigerian flag green */
+  --tp-nigerian-green-light: #00A86B;
+  --tp-nigerian-green-dark: #006341;
+  
+  /* Neutral Text Colors (from legacy globals.css) */
+  --tp-text-primary: #111827;    /* Nearly black - main headings */
+  --tp-text-secondary: #4B5563;  /* Dark grey - secondary text */
+  --tp-text-muted: #9CA3AF;      /* Medium grey - muted text */
+  --tp-text-light: #F9FAFB;      /* Light text on dark backgrounds */
+  
+  /* Background Colors */
+  --tp-background: #FFFFFF;       /* Main white background */
+  --tp-background-alt: #F9FAFB;   /* Off-white background */
+  --tp-background-secondary: #F3F4F6; /* Secondary background */
+  --tp-background-dark: #374151;  /* Dark backgrounds */
+  --tp-background-darker: #1F2937; /* Darker backgrounds */
+  
+  /* Border Colors */
+  --tp-border: #E5E7EB;          /* Main border color */
+  --tp-border-light: #F3F4F6;    /* Light borders */
+  --tp-border-dark: #D1D5DB;     /* Darker borders */
+
+  /* ========================================
+   * COMPLETE TYPOGRAPHY SYSTEM
+   * ======================================== */
+  
+  /* Font Families (from legacy globals.css) */
+  --tp-font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --tp-font-body: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --tp-font-mono: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+
+  /* Font Size Scale (Enhanced from legacy) */
+  --tp-text-xs: 0.75rem;     /* 12px */
+  --tp-text-sm: 0.875rem;    /* 14px */
+  --tp-text-base: 1rem;      /* 16px - Base size */
+  --tp-text-lg: 1.125rem;    /* 18px */
+  --tp-text-xl: 1.25rem;     /* 20px */
+  --tp-text-2xl: 1.5rem;     /* 24px */
+  --tp-text-3xl: 1.875rem;   /* 30px */
+  --tp-text-4xl: 2.25rem;    /* 36px */
+  --tp-text-5xl: 3rem;       /* 48px */
+  --tp-text-6xl: 3.75rem;    /* 60px */
+  --tp-text-7xl: 4.5rem;     /* 72px - Hero size */
+  --tp-text-8xl: 6rem;       /* 96px - Large hero */
+
+  /* Font Weights (from legacy) */
+  --tp-weight-light: 300;
+  --tp-weight-normal: 400;
+  --tp-weight-medium: 500;
+  --tp-weight-semibold: 600;
+  --tp-weight-bold: 700;
+  --tp-weight-extrabold: 800;
+  --tp-weight-black: 900;
+
+  /* Line Heights (Enhanced from legacy) */
+  --tp-leading-tight: 1.1;      /* For large headings */
+  --tp-leading-snug: 1.2;       /* For headings */
+  --tp-leading-normal: 1.5;     /* For body text */
+  --tp-leading-relaxed: 1.625;  /* For long-form content */
+  --tp-leading-loose: 2;        /* For extra spacing */
+
+  /* ========================================
+   * SPACING SYSTEM (8px Grid from legacy)
+   * ======================================== */
+  
+  --tp-space-0: 0;
+  --tp-space-px: 1px;
+  --tp-space-0_5: 0.125rem;  /* 2px */
+  --tp-space-1: 0.25rem;     /* 4px */
+  --tp-space-1_5: 0.375rem;  /* 6px */
+  --tp-space-2: 0.5rem;      /* 8px */
+  --tp-space-2_5: 0.625rem;  /* 10px */
+  --tp-space-3: 0.75rem;     /* 12px */
+  --tp-space-3_5: 0.875rem;  /* 14px */
+  --tp-space-4: 1rem;        /* 16px */
+  --tp-space-5: 1.25rem;     /* 20px */
+  --tp-space-6: 1.5rem;      /* 24px */
+  --tp-space-7: 1.75rem;     /* 28px */
+  --tp-space-8: 2rem;        /* 32px */
+  --tp-space-9: 2.25rem;     /* 36px */
+  --tp-space-10: 2.5rem;     /* 40px */
+  --tp-space-11: 2.75rem;    /* 44px - Mobile touch target */
+  --tp-space-12: 3rem;       /* 48px */
+  --tp-space-14: 3.5rem;     /* 56px */
+  --tp-space-16: 4rem;       /* 64px */
+  --tp-space-20: 5rem;       /* 80px */
+  --tp-space-24: 6rem;       /* 96px */
+
+  /* ========================================
+   * BORDER RADIUS SYSTEM (from legacy Card.tsx)
+   * ======================================== */
+  
+  --tp-radius-none: 0;
+  --tp-radius-sm: 0.125rem;   /* 2px */
+  --tp-radius-md: 0.25rem;    /* 4px */
+  --tp-radius-lg: 0.5rem;     /* 8px - LEGACY CARD STANDARD */
+  --tp-radius-xl: 0.75rem;    /* 12px */
+  --tp-radius-2xl: 1rem;      /* 16px */
+  --tp-radius-3xl: 1.5rem;    /* 24px */
+  --tp-radius-full: 9999px;   /* Fully rounded */
+
+  /* ========================================
+   * SHADOW SYSTEM (from legacy Card.tsx)
+   * ======================================== */
+  
+  /* Card Shadows */
+  --tp-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --tp-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);           /* Base card shadow - LEGACY STANDARD */
+  --tp-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),         /* Hover card shadow - LEGACY STANDARD */
+                  0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --tp-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),       /* Elevated shadow */
+                  0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --tp-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1),       /* Large shadow */
+                  0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --tp-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);    /* Extra large */
+
+  /* Inner Shadows */
+  --tp-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+
+  /* Text Shadows (from legacy utilities) */
+  --tp-text-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --tp-text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --tp-text-shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3);
+
+  /* ========================================
+   * ANIMATION & TRANSITION SYSTEM
+   * ======================================== */
+  
+  /* Timing (from legacy Button.tsx) */
+  --tp-duration-fast: 100ms;      /* Very quick interactions */
+  --tp-duration-normal: 200ms;    /* Standard transitions - LEGACY STANDARD */
+  --tp-duration-medium: 300ms;    /* Medium animations */
+  --tp-duration-slow: 500ms;      /* Slow animations */
+
+  /* Easing Functions */
+  --tp-ease-linear: linear;
+  --tp-ease-out: cubic-bezier(0, 0, 0.2, 1);      /* Default ease-out */
+  --tp-ease-in: cubic-bezier(0.4, 0, 1, 1);       /* Ease-in */
+  --tp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1); /* Ease-in-out */
+  --tp-ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55); /* Bounce effect */
+
+  /* ========================================
+   * MOBILE-FIRST NIGERIAN OPTIMIZATIONS
+   * ======================================== */
+  
+  /* Touch Targets (from legacy TouchOptimizedButton) */
+  --tp-touch-target: 44px;        /* iOS/Android minimum */
+  --tp-touch-target-lg: 48px;     /* Larger touch targets */
+  --tp-touch-target-xl: 52px;     /* Extra large touch targets */
+
+  /* Breakpoints (from legacy tailwind.config.js) */
+  --tp-screen-xs: 475px;
+  --tp-screen-sm: 640px;
+  --tp-screen-md: 768px;
+  --tp-screen-lg: 1024px;
+  --tp-screen-xl: 1280px;
+  --tp-screen-2xl: 1536px;
+
+  /* Nigerian Network Optimizations */
+  --tp-data-saver-opacity: 0.8;   /* Reduced opacity for data saver */
+  --tp-slow-network-delay: 300ms; /* Delay for slow networks */
+
+  /* ========================================
+   * COMPONENT-SPECIFIC TOKENS
+   * ======================================== */
+  
+  /* Button Heights (from legacy Button.tsx) */
+  --tp-button-height-sm: 32px;    /* 2rem */
+  --tp-button-height-md: 40px;    /* 2.5rem - Default */
+  --tp-button-height-lg: 48px;    /* 3rem */
+  --tp-button-height-xl: 56px;    /* 3.5rem */
+
+  /* Input Heights (from legacy Input.tsx) */
+  --tp-input-height-sm: 32px;
+  --tp-input-height-md: 40px;     /* Default */
+  --tp-input-height-lg: 48px;
+
+  /* Card Padding (from legacy Card.tsx) */
+  --tp-card-padding-compact: 12px;   /* 0.75rem */
+  --tp-card-padding-default: 16px;   /* 1rem */
+  --tp-card-padding-spacious: 24px;  /* 1.5rem */
+
+  /* Table Dimensions (from legacy Table.tsx) */
+  --tp-table-row-height: 48px;
+  --tp-table-header-height: 56px;
+  --tp-table-cell-padding-x: 16px;
+  --tp-table-cell-padding-y: 12px;
+
+  /* Navigation Heights (from legacy MainNav.tsx) */
+  --tp-nav-height-desktop: 64px;  /* 4rem */
+  --tp-nav-height-mobile: 56px;   /* 3.5rem */
+
+  /* ========================================
+   * Z-INDEX SCALE
+   * ======================================== */
+  
+  --tp-z-dropdown: 1000;
+  --tp-z-sticky: 1020;
+  --tp-z-fixed: 1030;
+  --tp-z-modal-backdrop: 1040;
+  --tp-z-modal: 1050;
+  --tp-z-popover: 1060;
+  --tp-z-tooltip: 1070;
+  --tp-z-toast: 1080;
+  --tp-z-maximum: 2147483647;
+}

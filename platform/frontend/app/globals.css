@@ -1,6 +1,9 @@
 @tailwind base;
-@tailwind components;
+@tailwind components;  
 @tailwind utilities;
+
+/* Import TaxPoynt Complete Design System */
+@import '../design_system/design-tokens.css';
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap');
 

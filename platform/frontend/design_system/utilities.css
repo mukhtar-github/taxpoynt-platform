@@ -1,0 +1,474 @@
+/**
+ * TaxPoynt Design System Utilities
+ * =================================
+ * Utility classes for consistent patterns across the platform
+ * Based on legacy patterns + Nigerian mobile optimizations
+ */
+
+@import './design-tokens.css';
+
+/* ========================================
+ * LAYOUT UTILITIES
+ * ======================================== */
+
+/* Container Classes */
+.tp-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.tp-container-fluid {
+  width: 100%;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Section Spacing */
+.tp-section-spacing {
+  padding-top: var(--tp-space-16);
+  padding-bottom: var(--tp-space-16);
+}
+
+.tp-section-spacing-sm {
+  padding-top: var(--tp-space-12);
+  padding-bottom: var(--tp-space-12);
+}
+
+.tp-section-spacing-lg {
+  padding-top: var(--tp-space-24);
+  padding-bottom: var(--tp-space-24);
+}
+
+/* ========================================
+ * CARD UTILITIES (from legacy Card.tsx patterns)
+ * ======================================== */
+
+/* Base Legacy Card */
+.tp-card {
+  background: white;
+  border: 1px solid var(--tp-border);
+  border-radius: var(--tp-radius-lg);
+  box-shadow: var(--tp-shadow-sm);
+  padding: var(--tp-space-4);
+  transition: all var(--tp-duration-normal) ease-out;
+}
+
+.tp-card:hover {
+  box-shadow: var(--tp-shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Card Variants */
+.tp-card-elevated {
+  box-shadow: var(--tp-shadow-lg);
+}
+
+.tp-card-interactive {
+  cursor: pointer;
+}
+
+.tp-card-interactive:hover {
+  box-shadow: var(--tp-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.tp-card-compact {
+  padding: var(--tp-space-3);
+}
+
+.tp-card-spacious {
+  padding: var(--tp-space-6);
+}
+
+/* Problem Card (for landing page) */
+.tp-problem-card {
+  background: white;
+  padding: var(--tp-space-6);
+  border-radius: var(--tp-radius-lg);
+  box-shadow: var(--tp-shadow-sm);
+  border: 1px solid var(--tp-border);
+  transition: all var(--tp-duration-normal) ease-out;
+}
+
+.tp-problem-card:hover {
+  box-shadow: var(--tp-shadow-md);
+  transform: translateY(-1px);
+}
+
+/* ========================================
+ * TYPOGRAPHY UTILITIES
+ * ======================================== */
+
+/* Typography Scale Classes */
+.tp-text-hero {
+  font-size: var(--tp-text-5xl);
+  font-weight: var(--tp-weight-black);
+  line-height: var(--tp-leading-tight);
+  letter-spacing: -0.02em;
+}
+
+.tp-text-display {
+  font-size: var(--tp-text-4xl);
+  font-weight: var(--tp-weight-bold);
+  line-height: var(--tp-leading-tight);
+  letter-spacing: -0.01em;
+}
+
+.tp-text-heading-lg {
+  font-size: var(--tp-text-3xl);
+  font-weight: var(--tp-weight-bold);
+  line-height: var(--tp-leading-snug);
+}
+
+.tp-text-heading {
+  font-size: var(--tp-text-2xl);
+  font-weight: var(--tp-weight-semibold);
+  line-height: var(--tp-leading-snug);
+}
+
+.tp-text-subheading {
+  font-size: var(--tp-text-xl);
+  font-weight: var(--tp-weight-medium);
+  line-height: var(--tp-leading-normal);
+}
+
+.tp-text-body-lg {
+  font-size: var(--tp-text-lg);
+  line-height: var(--tp-leading-relaxed);
+}
+
+.tp-text-body {
+  font-size: var(--tp-text-base);
+  line-height: var(--tp-leading-relaxed);
+}
+
+.tp-text-caption {
+  font-size: var(--tp-text-sm);
+  line-height: var(--tp-leading-normal);
+  color: var(--tp-text-secondary);
+}
+
+.tp-text-small {
+  font-size: var(--tp-text-xs);
+  line-height: var(--tp-leading-normal);
+  color: var(--tp-text-muted);
+}
+
+/* Font Families */
+.tp-font-heading {
+  font-family: var(--tp-font-heading);
+}
+
+.tp-font-body {
+  font-family: var(--tp-font-body);
+}
+
+.tp-font-mono {
+  font-family: var(--tp-font-mono);
+}
+
+/* Text Colors */
+.tp-text-primary {
+  color: var(--tp-text-primary);
+}
+
+.tp-text-secondary {
+  color: var(--tp-text-secondary);
+}
+
+.tp-text-muted {
+  color: var(--tp-text-muted);
+}
+
+.tp-text-light {
+  color: var(--tp-text-light);
+}
+
+/* Text Shadows (from legacy utilities) */
+.tp-text-shadow-sm {
+  text-shadow: var(--tp-text-shadow-sm);
+}
+
+.tp-text-shadow {
+  text-shadow: var(--tp-text-shadow);
+}
+
+.tp-text-shadow-lg {
+  text-shadow: var(--tp-text-shadow-lg);
+}
+
+/* ========================================
+ * BUTTON UTILITIES (complementing TaxPoyntButton)
+ * ======================================== */
+
+/* Button Groups */
+.tp-button-group {
+  display: inline-flex;
+  border-radius: var(--tp-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.tp-button-group > * {
+  border-radius: 0;
+  border-right: 1px solid var(--tp-border);
+}
+
+.tp-button-group > *:first-child {
+  border-top-left-radius: var(--tp-radius-lg);
+  border-bottom-left-radius: var(--tp-radius-lg);
+}
+
+.tp-button-group > *:last-child {
+  border-top-right-radius: var(--tp-radius-lg);
+  border-bottom-right-radius: var(--tp-radius-lg);
+  border-right: none;
+}
+
+/* ========================================
+ * GRID UTILITIES (from content-patterns.ts)
+ * ======================================== */
+
+/* Landing Page Grids */
+.tp-grid-problems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--tp-space-8);
+}
+
+.tp-grid-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: var(--tp-space-12);
+}
+
+.tp-grid-trust {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--tp-space-8);
+  text-align: center;
+}
+
+.tp-grid-testimonials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--tp-space-6);
+}
+
+/* Dashboard Grids */
+.tp-grid-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--tp-space-6);
+}
+
+.tp-grid-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--tp-space-4);
+}
+
+/* Mobile-First Responsive Breakpoints */
+@media (min-width: 640px) {
+  .tp-grid-trust {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .tp-grid-problems {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .tp-grid-testimonials {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .tp-grid-problems {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .tp-grid-testimonials {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ========================================
+ * ANIMATION UTILITIES (from legacy animations)
+ * ======================================== */
+
+/* Hover Effects */
+.tp-hover-lift {
+  transition: all var(--tp-duration-normal) ease-out;
+}
+
+.tp-hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--tp-shadow-md);
+}
+
+.tp-hover-lift-lg {
+  transition: all var(--tp-duration-normal) ease-out;
+}
+
+.tp-hover-lift-lg:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--tp-shadow-lg);
+}
+
+.tp-hover-scale {
+  transition: transform var(--tp-duration-medium) ease-out;
+}
+
+.tp-hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.tp-hover-scale-sm {
+  transition: transform var(--tp-duration-medium) ease-out;
+}
+
+.tp-hover-scale-sm:hover {
+  transform: scale(1.02);
+}
+
+/* Loading States */
+.tp-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tp-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* ========================================
+ * NIGERIAN MOBILE OPTIMIZATIONS
+ * ======================================== */
+
+/* Touch Targets */
+.tp-touch-target {
+  min-height: var(--tp-touch-target);
+  min-width: var(--tp-touch-target);
+}
+
+.tp-touch-target-lg {
+  min-height: var(--tp-touch-target-lg);
+  min-width: var(--tp-touch-target-lg);
+}
+
+/* Data Saver Mode */
+.tp-data-saver {
+  opacity: var(--tp-data-saver-opacity);
+}
+
+/* Network Status */
+.tp-slow-connection {
+  transition-delay: var(--tp-slow-network-delay);
+}
+
+/* Mobile-First Spacing */
+.tp-mobile-spacing {
+  padding: var(--tp-space-4);
+}
+
+@media (min-width: 640px) {
+  .tp-mobile-spacing {
+    padding: var(--tp-space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .tp-mobile-spacing {
+    padding: var(--tp-space-8);
+  }
+}
+
+/* ========================================
+ * STATUS & STATE UTILITIES
+ * ======================================== */
+
+/* Success State */
+.tp-status-success {
+  background-color: var(--tp-success-50);
+  border: 1px solid var(--tp-success-200);
+  color: var(--tp-success-800);
+  border-radius: var(--tp-radius-lg);
+  padding: var(--tp-space-3);
+}
+
+/* Error State */
+.tp-status-error {
+  background-color: var(--tp-error-50);
+  border: 1px solid var(--tp-error-200);
+  color: var(--tp-error-800);
+  border-radius: var(--tp-radius-lg);
+  padding: var(--tp-space-3);
+}
+
+/* Warning State */
+.tp-status-warning {
+  background-color: var(--tp-warning-50);
+  border: 1px solid var(--tp-warning-200);
+  color: var(--tp-warning-800);
+  border-radius: var(--tp-radius-lg);
+  padding: var(--tp-space-3);
+}
+
+/* Info State */
+.tp-status-info {
+  background-color: var(--tp-primary-50);
+  border: 1px solid var(--tp-primary-200);
+  color: var(--tp-primary-800);
+  border-radius: var(--tp-radius-lg);
+  padding: var(--tp-space-3);
+}
+
+/* ========================================
+ * FOCUS & ACCESSIBILITY
+ * ======================================== */
+
+/* Focus Utilities */
+.tp-focus {
+  outline: none;
+}
+
+.tp-focus:focus-visible {
+  outline: 2px solid var(--tp-primary);
+  outline-offset: 2px;
+}
+
+.tp-focus-ring {
+  transition: box-shadow var(--tp-duration-fast) ease-out;
+}
+
+.tp-focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-primary-200);
+}
+
+/* Screen Reader Only */
+.tp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
