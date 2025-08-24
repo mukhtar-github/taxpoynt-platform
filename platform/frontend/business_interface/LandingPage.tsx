@@ -75,7 +75,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-5xl mx-auto text-center relative z-10">
           
           {/* Enhanced Badge */}
-          <div className="inline-flex items-center px-8 py-4 bg-green-50/95 backdrop-blur-sm border border-green-300 text-green-800 rounded-full text-sm font-semibold mb-12 shadow-xl hover:shadow-green-200/50 transition-all duration-300 hover:scale-105" 
+          <div className="inline-flex items-center px-8 py-4 bg-green-50/95 backdrop-blur-sm border border-green-300 text-green-800 rounded-full text-sm font-semibold mb-8 shadow-xl hover:shadow-green-200/50 transition-all duration-300 hover:scale-105" 
                style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
@@ -83,7 +83,7 @@ export const LandingPage: React.FC = () => {
 
           {/* Enhanced Headline */}
           <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-blue-500 to-sky-500 text-white px-10 py-4 rounded-full text-lg font-bold mb-8 shadow-xl hover:shadow-blue-300/40 transition-all duration-300 hover:scale-105 border border-blue-200/30">
+            <div className="inline-block bg-gradient-to-r from-sky-100 to-blue-100 text-blue-700 px-10 py-4 rounded-full text-lg font-bold mb-8 shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105 border border-blue-300/40">
               Stop wasting time on compliance paperwork
             </div>
             <h1 className="text-6xl md:text-8xl font-black text-slate-900 mb-8 leading-[0.95] tracking-tight" 
@@ -95,7 +95,7 @@ export const LandingPage: React.FC = () => {
                 }}>
               Submit compliant e-invoices in 
               <br />
-              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-black" style={{ fontWeight: 950, textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)' }}>
+              <span className="text-green-600 font-black" style={{ fontWeight: 950, textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)' }}>
                 seconds, not hours
               </span>
             </h1>
