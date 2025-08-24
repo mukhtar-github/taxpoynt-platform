@@ -187,9 +187,6 @@ export const LandingPage: React.FC = () => {
                        WebkitFontSmoothing: 'antialiased',
                        fontWeight: 950,
                        textShadow: '0 4px 8px rgba(34, 197, 94, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #15803d 100%)',
-                       WebkitBackgroundClip: 'text',
-                       WebkitTextFillColor: 'transparent',
                        filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.2))'
                      }}>
                   Zero
@@ -211,9 +208,6 @@ export const LandingPage: React.FC = () => {
                        WebkitFontSmoothing: 'antialiased',
                        fontWeight: 950,
                        textShadow: '0 4px 8px rgba(59, 130, 246, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #1d4ed8 100%)',
-                       WebkitBackgroundClip: 'text',
-                       WebkitTextFillColor: 'transparent',
                        filter: 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.2))'
                      }}>
                   2 min
@@ -252,9 +246,6 @@ export const LandingPage: React.FC = () => {
                        WebkitFontSmoothing: 'antialiased',
                        fontWeight: 950,
                        textShadow: '0 4px 8px rgba(147, 51, 234, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       background: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #6d28d9 100%)',
-                       WebkitBackgroundClip: 'text',
-                       WebkitTextFillColor: 'transparent',
                        filter: 'drop-shadow(0 2px 4px rgba(147, 51, 234, 0.2))'
                      }}>
                   Any
