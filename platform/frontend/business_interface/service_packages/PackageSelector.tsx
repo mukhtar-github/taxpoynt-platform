@@ -10,7 +10,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '../../design_system/components/Button';
-import { colors, roleThemes } from '../../design_system/tokens';
+import { colors, roleThemes } from '../../design_system';
 
 // Service Package Definitions (from SI_UNIFIED_SUBSCRIPTION_ARCHITECTURE.md)
 export interface ServicePackage {

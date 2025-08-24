@@ -10,7 +10,7 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '../design_system/components/Button';
-import { colors, roleThemes } from '../design_system/tokens';
+import { TAXPOYNT_DESIGN_SYSTEM, TYPESCRIPT_TOKENS, roleThemes } from '../design_system';
 
 interface HomePageProps {
   user: {
@@ -31,7 +31,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ user, stats }) => {
   const router = useRouter();
-  const roleTheme = roleThemes[user.role];
+  const roleColor = roleThemes[user.role];
 
   // Role-specific welcome messages
   const getWelcomeMessage = () => {

@@ -11,7 +11,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { BaseChart, BaseChartProps, ChartDataPoint } from './BaseChart';
-import { colors, typography, spacing, animations } from '../../design_system/tokens';
+import { colors, typography, spacing, animations } from '../../design_system';
 
 export interface BarChartProps extends Omit<BaseChartProps, 'data'> {
   data: ChartDataPoint[];

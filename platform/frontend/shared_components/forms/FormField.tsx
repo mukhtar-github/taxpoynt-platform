@@ -11,7 +11,7 @@
 
 import React, { forwardRef } from 'react';
 import { Input, InputProps } from '../../design_system/components/Input';
-import { colors, typography, spacing } from '../../design_system/tokens';
+import { colors, typography, spacing } from '../../design_system';
 
 export interface FormFieldProps extends Omit<InputProps, 'label' | 'error' | 'helper'> {
   label: string;

@@ -92,6 +92,7 @@ export {
   NIGERIAN_CITIES,
   BUSINESS_TYPES,
   PROBLEM_PATTERNS,
+  PROBLEMS_DATA,
   SOLUTION_PATTERNS,
   COLOR_SCHEMES,
   TYPOGRAPHY_PATTERNS,
@@ -165,6 +166,15 @@ export const TAXPOYNT_DESIGN_SYSTEM = {
       bold: 700,
       extrabold: 800,
       black: 900,
+    },
+    
+    lineHeights: {
+      none: 1,
+      tight: 1.25,
+      snug: 1.375,
+      normal: 1.5,
+      relaxed: 1.625,
+      loose: 2,
     },
   },
   
@@ -433,6 +443,15 @@ export const TYPESCRIPT_TOKENS = {
       bold: '700',
       extrabold: '800',
     },
+    
+    lineHeights: {
+      none: '1',
+      tight: '1.25',
+      snug: '1.375',
+      normal: '1.5',
+      relaxed: '1.625',
+      loose: '2',
+    },
   },
   
   // Role-specific theme variations
@@ -474,3 +493,54 @@ export type NigerianCarrier = 'MTN' | 'Airtel' | 'Glo' | '9mobile';
 
 // Design system version
 export const DESIGN_SYSTEM_VERSION = '1.0.0' as const;
+
+// ========================================
+// BACKWARD COMPATIBILITY EXPORTS
+// ========================================
+
+// Export individual properties for backward compatibility with proper nested structure
+export const colors = {
+  ...TAXPOYNT_DESIGN_SYSTEM.colors,
+  // Add nested structures for legacy compatibility
+  brand: TYPESCRIPT_TOKENS.colors.brand,
+  neutral: TYPESCRIPT_TOKENS.colors.neutral,
+  semantic: TYPESCRIPT_TOKENS.colors.semantic,
+  roles: TYPESCRIPT_TOKENS.colors.roles,
+  nigeria: TYPESCRIPT_TOKENS.colors.nigeria,
+};
+
+export const typography = {
+  ...TAXPOYNT_DESIGN_SYSTEM.typography,
+  // Add nested structures for legacy compatibility
+  fonts: TYPESCRIPT_TOKENS.typography.fonts,
+  sizes: TYPESCRIPT_TOKENS.typography.sizes,
+  weights: TYPESCRIPT_TOKENS.typography.weights,
+  lineHeights: TYPESCRIPT_TOKENS.typography.lineHeights,
+};
+
+export const spacing = TAXPOYNT_DESIGN_SYSTEM.spacing;
+export const shadows = TAXPOYNT_DESIGN_SYSTEM.shadows;
+
+export const animations = {
+  ...TAXPOYNT_DESIGN_SYSTEM.animations,
+  // Add backward compatibility for transition property
+  transition: {
+    fast: '150ms ease-in-out',
+    base: '200ms ease-in-out',
+    slow: '300ms ease-in-out',
+  }
+};
+
+export const roleThemes = TYPESCRIPT_TOKENS.roleThemes;
+
+// Additional exports for legacy compatibility
+export const borders = {
+  radius: TAXPOYNT_DESIGN_SYSTEM.radius,
+  width: {
+    0: '0',
+    1: '1px',
+    2: '2px',
+    4: '4px',
+    8: '8px',
+  }
+};

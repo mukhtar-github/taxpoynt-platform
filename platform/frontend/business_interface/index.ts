@@ -34,7 +34,7 @@ export { AdminGrantDashboard } from './grant_dashboard/AdminGrantDashboard';
 
 // Design System Components
 export { Button } from '../design_system/components/Button';
-export { colors, typography, spacing, roleThemes } from '../design_system/tokens';
+export { TAXPOYNT_DESIGN_SYSTEM, TYPESCRIPT_TOKENS } from '../design_system';
 
 // Type Definitions
 export interface UserRole {

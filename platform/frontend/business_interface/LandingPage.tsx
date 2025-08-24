@@ -11,7 +11,7 @@ import {
   HeroCTAButton, 
   ProblemCard,
   LandingLogo,
-  PROBLEM_PATTERNS,
+  PROBLEMS_DATA,
   buildGridClasses,
   TAXPOYNT_DESIGN_SYSTEM 
 } from '../design_system';
@@ -45,10 +45,8 @@ export const LandingPage: React.FC = () => {
               WebkitFontSmoothing: 'antialiased' 
             }}>
               <LandingLogo 
-                size="lg" 
-                theme="glow" 
-                showTagline={true} 
-                sparkles={true}
+                size="lg"
+                showTagline={true}
               />
             </div>
           </div>
@@ -258,14 +256,13 @@ export const LandingPage: React.FC = () => {
 
           {/* Problems Grid - Using Design System */}
           <div className={buildGridClasses('problems')}>
-            {PROBLEM_PATTERNS.slice(0, 6).map((problem, index) => (
+            {PROBLEMS_DATA.slice(0, 6).map((problem, index) => (
               <ProblemCard
                 key={index}
                 emoji={problem.emoji}
                 title={problem.title}
-                description={problem.description}
-                source={problem.source}
-                colorScheme="problems"
+                quote={problem.quote}
+                attribution={problem.attribution}
               />
             ))}
           </div>

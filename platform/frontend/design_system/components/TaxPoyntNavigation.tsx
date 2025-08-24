@@ -7,7 +7,7 @@
 
 import React, { useState, forwardRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 // Navigation container variants
@@ -87,7 +87,7 @@ const TaxPoyntNavigation = forwardRef<HTMLElement, TaxPoyntNavigationProps>(
     className,
     ...props 
   }, ref) => {
-    const router = useRouter();
+    const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
@@ -101,7 +101,7 @@ const TaxPoyntNavigation = forwardRef<HTMLElement, TaxPoyntNavigationProps>(
     };
 
     const isActive = (href: string) => {
-      return router ? (router === href || router.startsWith(`${href}/`)) : false;
+      return pathname === href || pathname.startsWith(`${href}/`);
     };
 
     return (

@@ -9,7 +9,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '../../design_system/components/Button';
-import { colors } from '../../design_system/tokens';
+import { TAXPOYNT_DESIGN_SYSTEM } from '../../design_system';
 
 interface BillingPageProps {
   selectedPackage: {

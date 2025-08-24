@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { colors, typography, spacing, borders, shadows } from '../../design_system/tokens';
+import { colors, typography, spacing, borders, shadows } from '../../design_system';
 
 export interface ChartDataPoint {
   label: string;

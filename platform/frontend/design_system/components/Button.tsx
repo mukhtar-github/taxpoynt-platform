@@ -8,7 +8,7 @@
 import React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { clsx } from 'clsx';
-import { colors } from '../tokens';
+import { TAXPOYNT_DESIGN_SYSTEM } from '../index';
 
 const buttonVariants = cva(
   // Base styles - Strategic foundation

@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { colors, spacing, typography } from '../../design_system/tokens';
+import { colors, spacing, typography } from '../../design_system';
 
 // Tab item interface
 export interface TabItem {

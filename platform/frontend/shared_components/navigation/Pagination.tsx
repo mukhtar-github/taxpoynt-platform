@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { colors, spacing, typography } from '../../design_system/tokens';
+import { colors, spacing, typography } from '../../design_system';
 
 // Pagination props
 export interface PaginationProps {

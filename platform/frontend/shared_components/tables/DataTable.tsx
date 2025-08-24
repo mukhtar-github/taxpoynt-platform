@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { colors, typography, spacing, borders, shadows, animations } from '../../design_system/tokens';
+import { colors, typography, spacing, borders, shadows, animations } from '../../design_system';
 
 export interface Column<T = any> {
   key: string;

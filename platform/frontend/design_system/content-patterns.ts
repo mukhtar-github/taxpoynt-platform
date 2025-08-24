@@ -147,6 +147,49 @@ export const PROBLEM_PATTERNS = {
 } as const;
 
 // ========================================
+// PROBLEMS DATA - For ProblemCard component
+// ========================================
+
+export const PROBLEMS_DATA = [
+  {
+    emoji: EMOJIS.time,
+    title: "Hours Wasted Daily",
+    quote: "I spend 3-4 hours every day just formatting invoices and submitting them manually. That's time I should be growing my business.",
+    attribution: "Lagos Restaurant Owner"
+  },
+  {
+    emoji: EMOJIS.error,
+    title: "Constant Rejection Errors", 
+    quote: "My invoices get rejected 60% of the time. Wrong format, missing fields, validation errors. I never know what's wrong until it's too late.",
+    attribution: "Abuja Tech Company"
+  },
+  {
+    emoji: EMOJIS.stress,
+    title: "Compliance Anxiety",
+    quote: "I'm always worried about penalties and fines. The rules keep changing and I can't keep up. Sleep is becoming a luxury.",
+    attribution: "Kano Manufacturing SME"
+  },
+  {
+    emoji: EMOJIS.document,
+    title: "Double Data Entry",
+    quote: "I enter the same data in my accounting software, then manually re-type everything for compliance. It's exhausting and error-prone.",
+    attribution: "Port Harcourt Retailer"
+  },
+  {
+    emoji: EMOJIS.calendar,
+    title: "Missing Deadlines",
+    quote: "Between running my business and compliance paperwork, I sometimes miss submission deadlines. The penalties are crushing my cash flow.",
+    attribution: "Ibadan Wholesaler"
+  },
+  {
+    emoji: EMOJIS.connection,
+    title: "Software Disconnect", 
+    quote: "My POS system, accounting software, and compliance requirements are completely separate. Nothing talks to each other. It's chaos.",
+    attribution: "Enugu Service Provider"
+  }
+];
+
+// ========================================
 // SOLUTION PATTERNS (Positive Outcomes)
 // ========================================
 

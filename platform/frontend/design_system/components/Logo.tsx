@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { colors } from '../tokens';
+import { TAXPOYNT_DESIGN_SYSTEM } from '../index';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -45,9 +45,9 @@ const sizeConfig = {
 
 const colorConfig = {
   primary: {
-    icon: colors.brand.primary,
-    text: colors.brand.primary,
-    tagline: colors.neutral[600],
+    icon: TAXPOYNT_DESIGN_SYSTEM.colors.primary,
+    text: TAXPOYNT_DESIGN_SYSTEM.colors.primary,
+    tagline: TAXPOYNT_DESIGN_SYSTEM.colors.textSecondary,
   },
   white: {
     icon: '#FFFFFF',
@@ -55,9 +55,9 @@ const colorConfig = {
     tagline: '#E2E8F0',
   },
   dark: {
-    icon: colors.neutral[800],
-    text: colors.neutral[800],
-    tagline: colors.neutral[600],
+    icon: TAXPOYNT_DESIGN_SYSTEM.colors.textPrimary,
+    text: TAXPOYNT_DESIGN_SYSTEM.colors.textPrimary,
+    tagline: TAXPOYNT_DESIGN_SYSTEM.colors.textSecondary,
   },
 };
 
