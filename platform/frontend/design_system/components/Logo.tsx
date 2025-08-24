@@ -1,137 +1,92 @@
 /**
- * TaxPoynt Logo Component
- * ======================
- * Professional logo component using the actual TaxPoynt logo SVG.
- * Based on the legacy frontend design with consistent styling across all interfaces.
+ * Logo Component
+ * ==============
+ * TaxPoynt Logo with sparkling radiant effects
+ * Maintains the existing sparkling animation and glow effects
  */
 
 import React from 'react';
-import { TAXPOYNT_DESIGN_SYSTEM } from '../index';
 
-interface LogoProps {
+export interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'full' | 'icon' | 'text';
-  className?: string;
-  color?: 'primary' | 'white' | 'dark';
+  variant?: 'icon' | 'full';
   showTagline?: boolean;
+  color?: 'default' | 'white';
+  className?: string;
 }
-
-const sizeConfig = {
-  sm: {
-    icon: { width: 20, height: 18 },
-    text: 'text-lg',
-    tagline: 'text-xs',
-    container: 'gap-2',
-  },
-  md: {
-    icon: { width: 26, height: 24 },
-    text: 'text-xl',
-    tagline: 'text-xs',
-    container: 'gap-2',
-  },
-  lg: {
-    icon: { width: 32, height: 30 },
-    text: 'text-2xl',
-    tagline: 'text-sm',
-    container: 'gap-3',
-  },
-  xl: {
-    icon: { width: 42, height: 38 },
-    text: 'text-3xl',
-    tagline: 'text-base',
-    container: 'gap-4',
-  },
-};
-
-const colorConfig = {
-  primary: {
-    icon: TAXPOYNT_DESIGN_SYSTEM.colors.primary,
-    text: TAXPOYNT_DESIGN_SYSTEM.colors.primary,
-    tagline: TAXPOYNT_DESIGN_SYSTEM.colors.textSecondary,
-  },
-  white: {
-    icon: '#FFFFFF',
-    text: '#FFFFFF',
-    tagline: '#E2E8F0',
-  },
-  dark: {
-    icon: TAXPOYNT_DESIGN_SYSTEM.colors.textPrimary,
-    text: TAXPOYNT_DESIGN_SYSTEM.colors.textPrimary,
-    tagline: TAXPOYNT_DESIGN_SYSTEM.colors.textSecondary,
-  },
-};
 
 export const Logo: React.FC<LogoProps> = ({
   size = 'md',
   variant = 'full',
-  className = '',
-  color = 'primary',
-  showTagline = false,
+  showTagline = true,
+  color = 'default',
+  className = ''
 }) => {
-  const config = sizeConfig[size];
-  const colors_config = colorConfig[color];
+  const sizeClasses = {
+    sm: 'h-6',
+    md: 'h-8',
+    lg: 'h-10', 
+    xl: 'h-12'
+  };
 
-  const TaxPoyntIcon = () => (
-    <svg 
-      width={config.icon.width} 
-      height={config.icon.height} 
-      viewBox="0 0 26 24" 
-      fill="none" 
-      xmlns="http://www.w3.org/2000/svg"
-      className="transition-all duration-200"
-      style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
-    >
-      <path 
-        d="M18.3341 4.95158C18.3341 4.74947 17.1526 3.5621 15.6963 2.29894C14.2401 1.03579 12.9487 0 12.8388 0C12.7289 0 12.564 0.732632 12.4541 1.64211C12.0145 5.60842 9.7614 10.7116 6.84889 14.3242C5.96964 15.4105 4.01881 17.4063 2.53508 18.7453C1.05135 20.1095 -0.102659 21.2211 0.0072465 21.2211C0.474347 21.2211 5.42011 18.8211 7.20608 17.7347C9.81635 16.1432 13.4982 12.7074 15.3666 10.1053C17.0427 7.75579 18.3341 5.53263 18.3341 4.95158Z" 
-        fill="currentColor"
-      />
-      <path 
-        d="M23.0051 11.4189C23.0051 11.0147 21.4939 8.61474 20.175 6.87158C19.7079 6.29053 19.2683 5.81053 19.1858 5.81053C19.1034 5.81053 18.444 6.87158 17.7296 8.16C14.7346 13.5158 9.84383 17.7347 3.02966 20.7663C0.144629 22.0547 0.336963 21.9537 0.529298 22.1053C0.83154 22.4084 6.21693 21.4232 8.99205 20.5642C11.8221 19.7053 15.2292 18.0884 17.3724 16.5979C19.1034 15.4105 23.0051 11.7979 23.0051 11.4189Z" 
-        fill="currentColor"
-      />
-      <path 
-        d="M25.5054 17.1789C25.2032 16.2695 24.7086 14.88 24.3789 14.0968C23.8568 12.7832 23.2798 12 23.2798 12.5558C23.2798 12.9095 19.4606 16.2947 17.7845 17.4568C14.35 19.8063 9.01953 21.7011 3.27695 22.6358C1.73826 22.8884 0.556775 23.1663 0.666681 23.2674C1.07883 23.5958 5.17282 24 8.14028 24C11.41 24 14.7346 23.5453 17.5098 22.7368C19.4606 22.1558 24.4338 19.9832 25.3955 19.2505L26 18.8211L25.5054 17.1789Z" 
-        fill="currentColor"
-      />
-    </svg>
-  );
+  const textColor = color === 'white' ? 'text-white' : 'text-blue-400';
+  const taglineColor = color === 'white' ? 'text-gray-200' : 'text-blue-300';
 
-  const TaxPoyntText = () => (
-    <div className="flex flex-col">
-      <span 
-        className={`font-heading font-bold leading-tight ${config.text}`}
-        style={{ 
-          color: 'currentColor',
-          textRendering: 'optimizeLegibility',
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
-          fontFeatureSettings: '"kern" 1, "liga" 1'
-        }}
-      >
-        TaxPoynt
-      </span>
-      {showTagline && (
-        <span 
-          className={`font-body leading-tight ${config.tagline}`}
-          style={{ 
-            color: 'currentColor',
-            opacity: 0.8,
-            textRendering: 'optimizeLegibility',
-            WebkitFontSmoothing: 'antialiased',
-            MozOsxFontSmoothing: 'grayscale',
-            fontFeatureSettings: '"kern" 1, "liga" 1'
-          }}
-        >
-          Secure E-invoicing Solution
-        </span>
-      )}
-    </div>
-  );
+  if (variant === 'icon') {
+    return (
+      <div className={`relative group ${className}`}>
+        {/* Sparkling Effect */}
+        <div className="absolute -inset-2 opacity-75 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute top-0 left-1/4 w-1 h-1 bg-blue-400 rounded-full animate-ping" style={{ animationDelay: '0s', animationDuration: '2s' }}></div>
+          <div className="absolute top-2 right-1/4 w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" style={{ animationDelay: '0.5s', animationDuration: '2.5s' }}></div>
+          <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" style={{ animationDelay: '1s', animationDuration: '3s' }}></div>
+          <div className="absolute top-1/2 right-0 w-0.5 h-0.5 bg-green-500 rounded-full animate-ping" style={{ animationDelay: '1.5s', animationDuration: '2s' }}></div>
+        </div>
+        <img 
+          src="/logo.svg" 
+          alt="TaxPoynt Logo" 
+          className={`${sizeClasses[size]} w-auto relative z-10`}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex items-center ${config.container} ${className}`} style={{ color: 'inherit' }}>
-      {(variant === 'full' || variant === 'icon') && <TaxPoyntIcon />}
-      {(variant === 'full' || variant === 'text') && <TaxPoyntText />}
+    <div className={`relative group ${className}`}>
+      {/* Sparkling Effect */}
+      <div className="absolute -inset-2 opacity-75 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute top-0 left-1/4 w-1 h-1 bg-blue-400 rounded-full animate-ping" style={{ animationDelay: '0s', animationDuration: '2s' }}></div>
+        <div className="absolute top-2 right-1/4 w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" style={{ animationDelay: '0.5s', animationDuration: '2.5s' }}></div>
+        <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" style={{ animationDelay: '1s', animationDuration: '3s' }}></div>
+        <div className="absolute top-1/2 right-0 w-0.5 h-0.5 bg-green-500 rounded-full animate-ping" style={{ animationDelay: '1.5s', animationDuration: '2s' }}></div>
+      </div>
+      
+      <div className="flex items-center space-x-3 relative z-10" style={{ 
+        color: '#3B82F6', 
+        textShadow: '0 0 10px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.1)',
+        textRendering: 'optimizeLegibility', 
+        WebkitFontSmoothing: 'antialiased' 
+      }}>
+        <img 
+          src="/logo.svg" 
+          alt="TaxPoynt Logo" 
+          className={`${sizeClasses[size]} w-auto`}
+        />
+        <div>
+          <div className={`font-bold ${textColor} ${
+            size === 'xl' ? 'text-2xl' : 
+            size === 'lg' ? 'text-xl' : 
+            size === 'md' ? 'text-lg' : 'text-base'
+          }`}>
+            TaxPoynt
+          </div>
+          {showTagline && (
+            <div className={`text-sm ${taglineColor}`}>
+              Secure E-invoicing Solution
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

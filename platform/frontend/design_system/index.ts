@@ -72,16 +72,7 @@ export {
   type NavItem
 } from './components/TaxPoyntNavigation';
 
-// Logo
-export {
-  TaxPoyntLogo,
-  LandingLogo,
-  NavLogo,
-  AuthLogo,
-  FooterLogo,
-  taxPoyntLogoVariants,
-  type TaxPoyntLogoProps
-} from './components/TaxPoyntLogo';
+// Logo components removed - using real logo.svg directly
 
 // ========================================
 // CONTENT PATTERNS & CONSTANTS
