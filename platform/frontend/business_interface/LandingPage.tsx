@@ -148,7 +148,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black text-green-600 mb-2" 
+              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
@@ -165,24 +165,24 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black text-blue-600 mb-2" 
+              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
                      fontWeight: '900 !important',
                      fontSize: '3.5rem !important',
                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                     WebkitTextStroke: '1px rgba(37, 99, 235, 0.3)'
+                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
                    }}>
                 2 min
               </div>
-              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-blue-600 transition-colors" 
+              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-green-600 transition-colors" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                 From sale to compliance submission
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black text-green-600 mb-2" 
+              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
@@ -199,18 +199,18 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="group hover:scale-110 transition-all duration-300">
-              <div className="!text-5xl md:!text-6xl !font-black text-blue-600 mb-2" 
+              <div className="!text-5xl md:!text-6xl !font-black italic text-green-600 mb-1" 
                    style={{ 
                      textRendering: 'optimizeLegibility', 
                      WebkitFontSmoothing: 'antialiased',
                      fontWeight: '900 !important',
                      fontSize: '3.5rem !important',
                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                     WebkitTextStroke: '1px rgba(37, 99, 235, 0.3)'
+                     WebkitTextStroke: '1px rgba(34, 197, 94, 0.3)'
                    }}>
                 Any
               </div>
-              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-blue-600 transition-colors" 
+              <div className="text-gray-700 text-base md:text-lg font-semibold group-hover:text-green-600 transition-colors" 
                    style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                 Software you already use
               </div>
