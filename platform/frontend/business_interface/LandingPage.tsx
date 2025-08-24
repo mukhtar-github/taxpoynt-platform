@@ -36,15 +36,15 @@ export const LandingPage: React.FC = () => {
               className="h-8 w-auto"
             />
             <div>
-              <div className="text-xl font-bold text-slate-800">TaxPoynt</div>
-              <div className="text-sm text-slate-600 font-medium">Secure E-invoicing Solution</div>
+              <div className="text-xl font-bold text-blue-600" style={{ textShadow: '0 1px 2px rgba(37, 99, 235, 0.3)' }}>TaxPoynt</div>
+              <div className="text-sm text-blue-500 font-medium">Secure E-invoicing Solution</div>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/auth/signin')}
-              className="text-slate-600 hover:text-slate-900 font-semibold transition-colors duration-200"
+              className="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200"
               style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
             >
               Sign In
@@ -52,6 +52,7 @@ export const LandingPage: React.FC = () => {
             <TaxPoyntButton
               variant="primary"
               onClick={() => router.push('/auth/signup')}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
             >
               Get Started
             </TaxPoyntButton>
@@ -74,7 +75,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-5xl mx-auto text-center relative z-10">
           
           {/* Enhanced Badge */}
-          <div className="inline-flex items-center px-8 py-4 bg-white/90 backdrop-blur-sm border border-emerald-200 text-emerald-800 rounded-full text-sm font-semibold mb-12 shadow-xl hover:shadow-emerald-200/50 transition-all duration-300 hover:scale-105" 
+          <div className="inline-flex items-center px-8 py-4 bg-green-50/95 backdrop-blur-sm border border-green-300 text-green-800 rounded-full text-sm font-semibold mb-12 shadow-xl hover:shadow-green-200/50 transition-all duration-300 hover:scale-105" 
                style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             <span className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
             FIRS Certified Access Point Provider
@@ -82,7 +83,7 @@ export const LandingPage: React.FC = () => {
 
           {/* Enhanced Headline */}
           <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-slate-700 to-slate-600 text-white px-10 py-4 rounded-full text-lg font-bold mb-8 shadow-xl hover:shadow-slate-400/30 transition-all duration-300 hover:scale-105 border border-slate-200/20">
+            <div className="inline-block bg-gradient-to-r from-blue-500 to-sky-500 text-white px-10 py-4 rounded-full text-lg font-bold mb-8 shadow-xl hover:shadow-blue-300/40 transition-all duration-300 hover:scale-105 border border-blue-200/30">
               Stop wasting time on compliance paperwork
             </div>
             <h1 className="text-6xl md:text-8xl font-black text-slate-900 mb-8 leading-[0.95] tracking-tight" 
@@ -94,7 +95,7 @@ export const LandingPage: React.FC = () => {
                 }}>
               Submit compliant e-invoices in 
               <br />
-              <span className="bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent font-black" style={{ fontWeight: 950 }}>
+              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-black" style={{ fontWeight: 950, textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)' }}>
                 seconds, not hours
               </span>
             </h1>
