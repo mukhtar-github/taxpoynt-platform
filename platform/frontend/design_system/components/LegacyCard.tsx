@@ -188,9 +188,9 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
 }) => {
   return (
     <div className={`group relative p-8 bg-gradient-to-br from-white via-gray-50/50 to-white rounded-2xl 
-                    shadow-xl hover:shadow-xl hover:shadow-red-500/5 
-                    transition-all duration-300 hover:-translate-y-0.5 
-                    cursor-pointer border border-gray-200/50 hover:border-red-200/50 
+                    shadow-lg hover:shadow-xl hover:shadow-red-500/3 
+                    transition-all duration-200 
+                    cursor-pointer border border-gray-200/50 hover:border-red-200/30 
                     backdrop-blur-sm ${className}`}
          style={{
            background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 50%, #ffffff 100%)',

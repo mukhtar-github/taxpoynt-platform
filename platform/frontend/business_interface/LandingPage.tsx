@@ -271,7 +271,7 @@ export const LandingPage: React.FC = () => {
       </div>
 
       {/* Section 3: Problems - Pain Points */}
-      <section className="py-20 bg-gray-700">
+      <section className="py-20 bg-gradient-to-br from-slate-100 via-gray-50 to-white" style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #f8fafc 50%, #ffffff 100%)' }}>
         <div className="max-w-6xl mx-auto px-6">
           
           {/* Enhanced Section Header */}
@@ -347,8 +347,8 @@ export const LandingPage: React.FC = () => {
           {/* Premium Bottom CTA Section */}
           <div className="text-center mt-24 mb-12">
             {/* Empathy Hook */}
-            <div className="mb-12">
-              <p className="text-3xl md:text-4xl text-slate-600 mb-4 font-bold"
+            <div className="mb-8 mt-8">
+              <p className="text-3xl md:text-4xl text-slate-600 mb-6 font-bold"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
@@ -356,7 +356,7 @@ export const LandingPage: React.FC = () => {
                  }}>
                 Sound familiar?
               </p>
-              <p className="text-4xl md:text-5xl font-black text-slate-600"
+              <p className="text-4xl md:text-5xl font-black text-slate-600 mb-2"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
