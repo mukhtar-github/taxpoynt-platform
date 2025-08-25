@@ -293,31 +293,30 @@ export const LandingPage: React.FC = () => {
             
             {/* Dramatic Headline */}
             <div className="relative mb-8">
-              <h2 className="text-5xl md:text-7xl font-black text-slate-800 mb-4 leading-[0.9] tracking-tight"
+              <h2 className="text-5xl md:text-7xl font-black text-gray-900 mb-4 leading-[0.9] tracking-tight"
                   style={{ 
                     textRendering: 'optimizeLegibility', 
                     WebkitFontSmoothing: 'antialiased',
                     fontWeight: 950,
-                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                   }}>
-                <span className="text-slate-700">Nigerian businesses are</span>
+                <span className="text-gray-900">Nigerian businesses are</span>
                 <br />
                 <span className="relative inline-block">
-                  <span className="text-blue-400 italic font-black"
+                  <span className="text-blue-600 italic font-black"
                         style={{ 
                           fontWeight: 950,
-                          textShadow: '0 4px 8px rgba(96, 165, 250, 0.3), 0 2px 4px rgba(0,0,0,0.3)'
+                          textShadow: '0 2px 4px rgba(37, 99, 235, 0.3)'
                         }}>
                     drowning
                   </span>
                   {/* Dramatic underline effect */}
                   <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
                 </span>
-                <span className="block mt-2 text-slate-700">in compliance paperwork</span>
+                <span className="block mt-2 text-gray-900">in compliance paperwork</span>
               </h2>
               
-              {/* Subtle background glow */}
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-orange-500/10 to-red-500/10 blur-3xl -z-10 opacity-50"></div>
+              {/* Subtle background glow - removed for better text visibility */}
             </div>
             
             {/* Enhanced Subtitle */}
