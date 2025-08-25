@@ -279,19 +279,19 @@ export const LandingPage: React.FC = () => {
           
           {/* Enhanced Section Header */}
           <div className="text-center mb-20">
-            {/* Premium Badge */}
-            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-50/95 to-orange-50/95 backdrop-blur-sm 
-                            border-2 border-red-200/50 text-red-800 rounded-full text-base font-bold mb-8 
-                            shadow-xl hover:shadow-red-200/40 transition-all duration-300 hover:scale-105"
+            {/* Premium Badge - Blue/Green Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-50/95 to-green-50/95 backdrop-blur-sm 
+                            border-2 border-blue-200/50 text-blue-800 rounded-full text-base font-bold mb-8 
+                            shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
-                   background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(255, 247, 237, 0.95) 100%)',
+                   background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95) 0%, rgba(240, 253, 244, 0.95) 100%)',
                    backdropFilter: 'blur(10px)'
                  }}>
-              <span className="w-3 h-3 bg-red-500 rounded-full mr-3 animate-pulse"></span>
+              <span className="w-3 h-3 bg-blue-500 rounded-full mr-3 animate-pulse"></span>
               The Nigerian Business Reality
-              <span className="w-3 h-3 bg-orange-500 rounded-full ml-3 animate-pulse" style={{ animationDelay: '1s' }}></span>
+              <span className="w-3 h-3 bg-green-500 rounded-full ml-3 animate-pulse" style={{ animationDelay: '1s' }}></span>
             </div>
             
             {/* Dramatic Headline */}
@@ -449,17 +449,13 @@ export const LandingPage: React.FC = () => {
                       WebkitFontSmoothing: 'antialiased'
                     }}
                   >
-                    <span className="relative z-10 flex items-center justify-center gap-4">
-                      <span className="text-2xl">🚀</span>
-                      <span>Stop the struggle - Start your free trial</span>
-                      <svg className="w-6 h-6 transition-transform group-hover:translate-x-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                    <span className="relative z-10 flex items-center justify-center">
+                      <span>Start Your Free Trial Today</span>
                     </span>
                     <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </button>
                   
-                  <div className="inline-flex items-center text-lg text-green-600 font-semibold mt-6">
+                  <div className="inline-flex items-center text-lg text-gray-500 font-medium mt-6">
                     <span className="mr-3">✨</span>
                     <span>Join thousands who've already made the switch</span>
                     <span className="ml-3">✨</span>
