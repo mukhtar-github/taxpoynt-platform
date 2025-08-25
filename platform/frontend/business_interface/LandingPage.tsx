@@ -303,10 +303,10 @@ export const LandingPage: React.FC = () => {
                 <span className="text-gray-900">Nigerian businesses are</span>
                 <br />
                 <span className="relative inline-block">
-                  <span className="text-blue-600 italic font-black"
+                  <span className="text-green-600 italic font-black"
                         style={{ 
                           fontWeight: 950,
-                          textShadow: '0 2px 4px rgba(37, 99, 235, 0.3)'
+                          textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)'
                         }}>
                     drowning
                   </span>
@@ -355,12 +355,12 @@ export const LandingPage: React.FC = () => {
                  }}>
                 Sound familiar?
               </p>
-              <p className="text-4xl md:text-5xl font-black text-blue-400 mb-2"
+              <p className="text-4xl md:text-5xl font-black text-green-600 mb-2"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
                    fontWeight: 950,
-                   textShadow: '0 2px 4px rgba(96, 165, 250, 0.3)'
+                   textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)'
                  }}>
                 You're not alone.
               </p>
@@ -407,7 +407,7 @@ export const LandingPage: React.FC = () => {
                     <div className="w-full border-t-2 border-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-gradient-to-r from-white via-green-50 to-white px-8 py-2 text-lg text-gray-500 font-medium">●  ●  ●</span>
+                    <span className="px-8 py-2 text-lg text-gray-400 font-medium">●  ●  ●</span>
                   </div>
                 </div>
                 
