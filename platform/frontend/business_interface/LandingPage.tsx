@@ -333,7 +333,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Problems Grid - Using Design System */}
-          <div className={buildGridClasses('problems')}>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
             {PROBLEMS_DATA.slice(0, 6).map((problem, index) => (
               <ProblemCard
                 key={index}
