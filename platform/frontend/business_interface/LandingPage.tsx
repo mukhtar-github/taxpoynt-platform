@@ -290,7 +290,6 @@ export const LandingPage: React.FC = () => {
                  }}>
               <span className="w-3 h-3 bg-blue-500 rounded-full mr-3 animate-pulse"></span>
               The Nigerian Business Reality
-              <span className="w-3 h-3 bg-green-500 rounded-full ml-3 animate-pulse" style={{ animationDelay: '1s' }}></span>
             </div>
             
             {/* Dramatic Headline */}
@@ -483,7 +482,6 @@ export const LandingPage: React.FC = () => {
                  }}>
               <span className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></span>
               The TaxPoynt Solution
-              <span className="w-3 h-3 bg-emerald-500 rounded-full ml-3 animate-pulse" style={{ animationDelay: '1s' }}></span>
             </div>
             
             {/* Dramatic Headline */}
