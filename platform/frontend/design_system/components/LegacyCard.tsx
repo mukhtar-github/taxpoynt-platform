@@ -219,7 +219,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
         </div>
         
         {/* Enhanced Title */}
-        <h3 className="text-2xl md:text-3xl font-black text-slate-600 mb-6 leading-tight group-hover:text-slate-700 transition-colors duration-300"
+        <h3 className="text-2xl md:text-3xl font-black text-blue-900 mb-6 leading-tight group-hover:text-blue-700 transition-colors duration-300"
             style={{ 
               textRendering: 'optimizeLegibility', 
               WebkitFontSmoothing: 'antialiased',

@@ -300,7 +300,7 @@ export const LandingPage: React.FC = () => {
                     fontWeight: 950,
                     textShadow: '0 6px 12px rgba(0,0,0,0.5), 0 3px 6px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)'
                   }}>
-                Nigerian businesses are
+                <span className="text-slate-600">Nigerian businesses are</span>
                 <br />
                 <span className="relative inline-block">
                   <span className="text-blue-400 italic font-black"
@@ -313,7 +313,7 @@ export const LandingPage: React.FC = () => {
                   {/* Dramatic underline effect */}
                   <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
                 </span>
-                <span className="block mt-2">in compliance paperwork</span>
+                <span className="block mt-2 text-slate-600">in compliance paperwork</span>
               </h2>
               
               {/* Subtle background glow */}
@@ -321,13 +321,13 @@ export const LandingPage: React.FC = () => {
             </div>
             
             {/* Enhanced Subtitle */}
-            <p className="text-xl md:text-2xl text-slate-200 max-w-4xl mx-auto leading-relaxed font-medium"
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
                style={{ 
                  textRendering: 'optimizeLegibility', 
                  WebkitFontSmoothing: 'antialiased',
-                 textShadow: '0 3px 6px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)'
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
                }}>
-              Every day, <span className="text-green-300 font-semibold">thousands of Nigerian business owners</span> struggle with the same compliance nightmare that's stealing their time, money, and peace of mind.
+              Every day, <span className="text-green-300 font-semibold">thousands of Nigerian business owners</span> are transforming hours of paperwork into minutes of automated compliance.
             </p>
           </div>
 
@@ -348,28 +348,22 @@ export const LandingPage: React.FC = () => {
           <div className="text-center mt-24 mb-12">
             {/* Empathy Hook */}
             <div className="mb-12">
-              <p className="text-3xl md:text-4xl text-gray-100 mb-4 font-bold"
+              <p className="text-3xl md:text-4xl text-slate-600 mb-4 font-bold"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
-                   textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
                  }}>
                 Sound familiar?
               </p>
-              <p className="text-4xl md:text-5xl font-black"
+              <p className="text-4xl md:text-5xl font-black text-slate-600"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
-                   fontWeight: 950
+                   fontWeight: 950,
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
                  }}>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-400 to-green-500"
-                      style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #34d399 50%, #059669 100%)',
-                        WebkitBackgroundClip: 'text',
-                        textShadow: 'none'
-                      }}>
-                  You're not alone.
-                </span>
+                You're not alone.
               </p>
             </div>
             
@@ -391,13 +385,10 @@ export const LandingPage: React.FC = () => {
                 
                 {/* Dramatic Statistics */}
                 <div className="mb-8">
-                  <div className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r 
-                                  from-red-600 via-orange-600 to-red-700 mb-4 leading-none"
+                  <div className="text-6xl md:text-7xl font-black text-slate-600 mb-4 leading-none"
                        style={{
                          fontWeight: 950,
-                         background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #b91c1c 100%)',
-                         WebkitBackgroundClip: 'text',
-                         textShadow: 'none'
+                         textShadow: '0 4px 8px rgba(100, 116, 139, 0.3)'
                        }}>
                     2,000,000+
                   </div>
@@ -432,13 +423,13 @@ export const LandingPage: React.FC = () => {
                     But there's a better way...
                   </p>
                   
-                  {/* Enhanced Wide CTA Button */}
+                  {/* Clean Focused CTA Button */}
                   <button
                     onClick={() => router.push('/auth/signup')}
-                    className="group relative inline-flex flex-col items-center px-16 py-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 
+                    className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 
                               hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white font-bold rounded-2xl 
                               shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-105 transform 
-                              border border-blue-500/20 hover:border-blue-400/40 min-w-[400px]"
+                              border border-blue-500/20 hover:border-blue-400/40 min-w-[400px] mb-4"
                     style={{
                       background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #1d4ed8 100%)',
                       boxShadow: '0 20px 40px -12px rgba(37, 99, 235, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
@@ -446,12 +437,16 @@ export const LandingPage: React.FC = () => {
                       WebkitFontSmoothing: 'antialiased'
                     }}
                   >
-                    <span className="relative z-10 text-center">
-                      <span className="block text-2xl font-black mb-2">Start Your Free Trial Today</span>
-                      <span className="block text-base font-medium opacity-90">Join thousands who've already made the switch</span>
-                    </span>
+                    <span className="relative z-10 text-2xl font-black">Start Your Free Trial Today</span>
                     <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </button>
+                  
+                  {/* Supporting Text Below Button */}
+                  <div className="text-lg text-slate-600 font-medium">
+                    <span className="mr-2">✨</span>
+                    Join thousands who've already made the switch
+                    <span className="ml-2">✨</span>
+                  </div>
                 </div>
                 
                 {/* Subtle Pattern Overlay */}

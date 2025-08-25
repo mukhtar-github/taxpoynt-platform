@@ -165,9 +165,9 @@ export const PROBLEMS_DATA = [
   },
   {
     emoji: EMOJIS.stress,
-    title: "Compliance Anxiety",
-    quote: "I'm always worried about penalties and fines. The rules keep changing and I can't keep up. Sleep is becoming a luxury.",
-    attribution: "Kano Manufacturing SME"
+    title: "Systems Integration Challenges",
+    quote: "Our organization is constantly dealing with systems integration technicalities due to incompatibility of the systems. These technical challenges keep our entire finance department stressed and overworked.",
+    attribution: "Abuja Manufacturing Group"
   },
   {
     emoji: EMOJIS.document,
