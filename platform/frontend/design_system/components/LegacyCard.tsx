@@ -189,7 +189,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
   return (
     <div className={`group relative p-8 bg-gradient-to-br from-white via-gray-50/50 to-white rounded-2xl 
                     shadow-xl hover:shadow-2xl hover:shadow-red-500/10 
-                    transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] 
+                    transition-all duration-500 hover:-translate-y-1 hover:scale-[1.01] 
                     cursor-pointer border border-gray-200/50 hover:border-red-200/50 
                     backdrop-blur-sm ${className}`}
          style={{

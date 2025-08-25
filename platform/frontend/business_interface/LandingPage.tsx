@@ -296,29 +296,27 @@ export const LandingPage: React.FC = () => {
             
             {/* Dramatic Headline */}
             <div className="relative mb-8">
-              <h2 className="text-5xl md:text-7xl font-black text-white mb-4 leading-[0.9] tracking-tight"
+              <h2 className="text-5xl md:text-7xl font-black text-slate-100 mb-4 leading-[0.9] tracking-tight"
                   style={{ 
                     textRendering: 'optimizeLegibility', 
                     WebkitFontSmoothing: 'antialiased',
                     fontWeight: 950,
-                    textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2)'
+                    textShadow: '0 6px 12px rgba(0,0,0,0.5), 0 3px 6px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)'
                   }}>
-                E-invoicing compliance is
+                Nigerian businesses are
                 <br />
                 <span className="relative inline-block">
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-red-500 italic font-black"
+                  <span className="text-blue-400 italic font-black"
                         style={{ 
                           fontWeight: 950,
-                          background: 'linear-gradient(135deg, #f87171 0%, #fb923c 50%, #ef4444 100%)',
-                          WebkitBackgroundClip: 'text',
-                          textShadow: 'none'
+                          textShadow: '0 4px 8px rgba(96, 165, 250, 0.3), 0 2px 4px rgba(0,0,0,0.3)'
                         }}>
-                    crushing
+                    drowning
                   </span>
                   {/* Dramatic underline effect */}
-                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500 rounded-full opacity-80"></div>
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
                 </span>
-                <span className="block mt-2">Nigerian businesses</span>
+                <span className="block mt-2">in compliance paperwork</span>
               </h2>
               
               {/* Subtle background glow */}
@@ -326,13 +324,13 @@ export const LandingPage: React.FC = () => {
             </div>
             
             {/* Enhanced Subtitle */}
-            <p className="text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-medium"
+            <p className="text-xl md:text-2xl text-slate-200 max-w-4xl mx-auto leading-relaxed font-medium"
                style={{ 
                  textRendering: 'optimizeLegibility', 
                  WebkitFontSmoothing: 'antialiased',
-                 textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                 textShadow: '0 3px 6px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)'
                }}>
-              Every day, <span className="text-orange-300 font-semibold">thousands of Nigerian business owners</span> struggle with the same compliance nightmare that's stealing their time, money, and peace of mind.
+              Every day, <span className="text-green-300 font-semibold">thousands of Nigerian business owners</span> struggle with the same compliance nightmare that's stealing their time, money, and peace of mind.
             </p>
           </div>
 
@@ -426,9 +424,9 @@ export const LandingPage: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Hope Message */}
+                {/* Hope Message & CTA */}
                 <div className="text-center">
-                  <p className="text-2xl md:text-3xl font-bold text-green-700 mb-2"
+                  <p className="text-2xl md:text-3xl font-bold text-green-700 mb-6"
                      style={{ 
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
@@ -436,9 +434,34 @@ export const LandingPage: React.FC = () => {
                      }}>
                     But there's a better way...
                   </p>
-                  <div className="inline-flex items-center text-lg text-green-600 font-semibold mt-4">
+                  
+                  {/* Compelling CTA Button */}
+                  <button
+                    onClick={() => router.push('/auth/signup')}
+                    className="group relative inline-flex items-center px-12 py-6 bg-gradient-to-r from-green-600 via-blue-600 to-green-600 
+                              hover:from-green-700 hover:via-blue-700 hover:to-green-700 text-white font-bold text-xl rounded-2xl 
+                              shadow-2xl hover:shadow-green-500/40 transition-all duration-500 hover:scale-105 transform 
+                              border border-green-500/20 hover:border-green-400/40"
+                    style={{
+                      background: 'linear-gradient(135deg, #059669 0%, #2563eb 50%, #059669 100%)',
+                      boxShadow: '0 20px 40px -12px rgba(5, 150, 105, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      textRendering: 'optimizeLegibility',
+                      WebkitFontSmoothing: 'antialiased'
+                    }}
+                  >
+                    <span className="relative z-10 flex items-center justify-center gap-4">
+                      <span className="text-2xl">🚀</span>
+                      <span>Stop the struggle - Start your free trial</span>
+                      <svg className="w-6 h-6 transition-transform group-hover:translate-x-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </button>
+                  
+                  <div className="inline-flex items-center text-lg text-green-600 font-semibold mt-6">
                     <span className="mr-3">✨</span>
-                    <span>TaxPoynt makes compliance effortless</span>
+                    <span>Join thousands who've already made the switch</span>
                     <span className="ml-3">✨</span>
                   </div>
                 </div>

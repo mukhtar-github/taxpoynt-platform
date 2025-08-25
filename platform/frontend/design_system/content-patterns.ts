@@ -158,7 +158,7 @@ export const PROBLEMS_DATA = [
     attribution: "Lagos Restaurant Owner"
   },
   {
-    emoji: EMOJIS.error,
+    emoji: "⚠️",
     title: "Constant Rejection Errors", 
     quote: "My invoices get rejected 60% of the time. Wrong format, missing fields, validation errors. I never know what's wrong until it's too late.",
     attribution: "Abuja Tech Company"
