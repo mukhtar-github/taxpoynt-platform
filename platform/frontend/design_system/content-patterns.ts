@@ -152,40 +152,40 @@ export const PROBLEM_PATTERNS = {
 
 export const PROBLEMS_DATA = [
   {
-    emoji: EMOJIS.time,
-    title: "Hours Wasted Daily",
-    quote: "Our finance team spends 3-4 hours every day just formatting invoices and submitting them manually. That's time we should be focusing on growing our business operations.",
-    attribution: "Lagos Restaurant Group"
+    emoji: "🏢",
+    title: "Multi-System Chaos",
+    quote: "Our enterprise runs 5+ disconnected business systems - SAP ERP, Salesforce CRM, multiple POS systems, e-commerce platforms. Data silos cost us millions in operational inefficiency.",
+    attribution: "Lagos Financial Services Group"
   },
   {
-    emoji: "⚠️",
-    title: "Constant Rejection Errors", 
-    quote: "My invoices get rejected 60% of the time. Wrong format, missing fields, validation errors. I never know what's wrong until it's too late.",
-    attribution: "Abuja Tech Company"
+    emoji: "📊",
+    title: "Compliance at Scale", 
+    quote: "With thousands of invoices monthly across multiple subsidiaries, manual invoice compliance consumes 40% of our IT resources. We're maintaining compliance infrastructure instead of innovating.",
+    attribution: "Abuja Manufacturing Conglomerate"
   },
   {
-    emoji: EMOJIS.stress,
-    title: "Systems Integration Challenges",
-    quote: "Our organization is constantly dealing with systems integration technicalities due to incompatibility of the systems. These technical challenges keep our entire finance department stressed and overworked.",
-    attribution: "Abuja Manufacturing Group"
+    emoji: "🔄",
+    title: "Integration Infrastructure Nightmare",
+    quote: "Every new business system requires months of custom API development and ongoing maintenance. Simple changes become expensive IT projects that drain our technical resources.",
+    attribution: "Port Harcourt Oil & Gas Enterprise"
   },
   {
-    emoji: EMOJIS.document,
-    title: "Double Data Entry",
-    quote: "I enter the same data in my accounting software, then manually re-type everything for compliance. It's exhausting and error-prone.",
-    attribution: "Port Harcourt Retailer"
+    emoji: "📈",
+    title: "Scalability Bottlenecks",
+    quote: "Our current solutions break under enterprise volume - 1M+ transactions monthly, multiple business units, complex workflows. Growth is literally limited by our compliance infrastructure.",
+    attribution: "Kano Agricultural Corporation"
   },
   {
-    emoji: EMOJIS.calendar,
-    title: "Missing Deadlines",
-    quote: "Between running my business and compliance paperwork, I sometimes miss submission deadlines. The penalties are crushing my cash flow.",
-    attribution: "Ibadan Wholesaler"
+    emoji: "🎯",
+    title: "Strategic Resource Drain",
+    quote: "Instead of focusing on market expansion and innovation, our enterprise resources are trapped in compliance paperwork and system maintenance. We're losing competitive advantage.",
+    attribution: "Ibadan Technology Consortium"
   },
   {
-    emoji: EMOJIS.connection,
-    title: "Software Disconnect", 
-    quote: "My POS system, accounting software, and compliance requirements are completely separate. Nothing talks to each other. It's chaos.",
-    attribution: "Enugu Service Provider"
+    emoji: "⚡",
+    title: "Performance Under Pressure", 
+    quote: "Our fragmented compliance systems create bottlenecks during peak business periods. When we need speed most, manual processes slow us down and create operational risk.",
+    attribution: "Enugu Retail Empire"
   }
 ];
 
