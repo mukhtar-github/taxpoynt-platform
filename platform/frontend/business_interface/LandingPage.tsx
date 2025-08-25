@@ -313,7 +313,7 @@ export const LandingPage: React.FC = () => {
                   {/* Dramatic underline effect */}
                   <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
                 </span>
-                <span className="block mt-2 text-slate-600">in compliance paperwork</span>
+                <span className="block mt-2 text-slate-600">in system integration complexity</span>
               </h2>
               
               {/* Subtle background glow - removed for better text visibility */}
@@ -326,7 +326,7 @@ export const LandingPage: React.FC = () => {
                  WebkitFontSmoothing: 'antialiased',
                  textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
                }}>
-              Every day, <span className="text-green-300 font-semibold">thousands of Nigerian business owners</span> are transforming hours of paperwork into minutes of automated compliance.
+              But there's a better way - <span className="text-green-600 font-bold">unified automation</span> that transforms fragmented systems.
             </p>
           </div>
 
