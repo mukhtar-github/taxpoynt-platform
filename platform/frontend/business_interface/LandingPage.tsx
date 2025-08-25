@@ -86,14 +86,14 @@ export const LandingPage: React.FC = () => {
             <div className="inline-block bg-gradient-to-r from-sky-100 to-blue-100 text-blue-700 px-10 py-4 rounded-full text-lg font-bold mb-8 shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105 border border-blue-300/40">
               Stop wasting time on compliance paperwork
             </div>
-            <h1 className="text-6xl md:text-8xl font-black text-slate-900 mb-8 leading-[0.95] tracking-tight" 
+            <h1 className="text-6xl md:text-8xl font-black text-slate-600 mb-8 leading-[0.95] tracking-tight" 
                 style={{ 
                   textRendering: 'optimizeLegibility', 
                   WebkitFontSmoothing: 'antialiased',
                   textShadow: '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.03)',
                   fontWeight: 950
                 }}>
-              Submit compliant e-invoices in 
+<span className="text-slate-600">Submit compliant e-invoices in</span> 
               <br />
               <span className="text-green-600 font-black" style={{ fontWeight: 950, textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)' }}>
                 seconds, not hours
@@ -102,7 +102,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-slate-700 mb-12 max-w-4xl mx-auto font-medium leading-relaxed" 
+          <p className="text-xl md:text-2xl text-slate-600 mb-12 max-w-4xl mx-auto font-medium leading-relaxed" 
              style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
             Stop wasting hours on compliance paperwork. TaxPoynt connects your business software directly to government systems—one click and your e-invoices are submitted correctly, every time.
           </p>
@@ -117,11 +117,8 @@ export const LandingPage: React.FC = () => {
                 boxShadow: '0 20px 40px -12px rgba(79, 70, 229, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
               }}
             >
-              <span className="relative z-10 flex items-center justify-center gap-3">
+              <span className="relative z-10 flex items-center justify-center">
                 ✨ Start Free Trial
-                <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </HeroCTAButton>
@@ -438,13 +435,13 @@ export const LandingPage: React.FC = () => {
                   {/* Compelling CTA Button */}
                   <button
                     onClick={() => router.push('/auth/signup')}
-                    className="group relative inline-flex items-center px-12 py-6 bg-gradient-to-r from-green-600 via-blue-600 to-green-600 
-                              hover:from-green-700 hover:via-blue-700 hover:to-green-700 text-white font-bold text-xl rounded-2xl 
-                              shadow-2xl hover:shadow-green-500/40 transition-all duration-500 hover:scale-105 transform 
-                              border border-green-500/20 hover:border-green-400/40"
+                    className="group relative inline-flex items-center px-12 py-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 
+                              hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white font-bold text-xl rounded-2xl 
+                              shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-105 transform 
+                              border border-blue-500/20 hover:border-blue-400/40"
                     style={{
-                      background: 'linear-gradient(135deg, #059669 0%, #2563eb 50%, #059669 100%)',
-                      boxShadow: '0 20px 40px -12px rgba(5, 150, 105, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #1d4ed8 100%)',
+                      boxShadow: '0 20px 40px -12px rgba(37, 99, 235, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
                       textRendering: 'optimizeLegibility',
                       WebkitFontSmoothing: 'antialiased'
                     }}

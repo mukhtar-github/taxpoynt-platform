@@ -233,7 +233,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
         <div className="relative mb-8">
           {/* Quote decoration */}
           <div className="absolute -left-2 -top-2 text-6xl text-red-200/40 font-bold leading-none">"</div>
-          <p className="text-lg md:text-xl text-gray-700 leading-relaxed relative z-10 italic group-hover:text-gray-800 transition-colors duration-300"
+          <p className="text-lg md:text-xl text-slate-600 leading-relaxed relative z-10 italic group-hover:text-slate-700 transition-colors duration-300"
              style={{ 
                textRendering: 'optimizeLegibility', 
                WebkitFontSmoothing: 'antialiased',
