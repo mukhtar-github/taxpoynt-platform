@@ -404,11 +404,11 @@ export const LandingPage: React.FC = () => {
                        }}>
                     2,000,000+
                   </div>
-                  <p className="text-2xl md:text-3xl text-gray-800 font-bold leading-tight mb-2"
+                  <p className="text-2xl md:text-3xl text-blue-700 font-bold leading-tight mb-2"
                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                     Nigerian businesses struggle with these
                   </p>
-                  <p className="text-2xl md:text-3xl font-black text-red-700 leading-tight"
+                  <p className="text-2xl md:text-3xl font-black text-green-700 leading-tight"
                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', fontWeight: 900 }}>
                     exact same problems every single day.
                   </p>

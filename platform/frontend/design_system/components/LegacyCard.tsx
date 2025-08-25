@@ -188,8 +188,8 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
 }) => {
   return (
     <div className={`group relative p-8 bg-gradient-to-br from-white via-gray-50/50 to-white rounded-2xl 
-                    shadow-xl hover:shadow-2xl hover:shadow-red-500/10 
-                    transition-all duration-500 hover:-translate-y-1 hover:scale-[1.01] 
+                    shadow-xl hover:shadow-xl hover:shadow-red-500/5 
+                    transition-all duration-300 hover:-translate-y-0.5 
                     cursor-pointer border border-gray-200/50 hover:border-red-200/50 
                     backdrop-blur-sm ${className}`}
          style={{
@@ -219,7 +219,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
         </div>
         
         {/* Enhanced Title */}
-        <h3 className="text-2xl md:text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-red-700 transition-colors duration-300"
+        <h3 className="text-2xl md:text-3xl font-black text-blue-900 mb-6 leading-tight group-hover:text-blue-700 transition-colors duration-300"
             style={{ 
               textRendering: 'optimizeLegibility', 
               WebkitFontSmoothing: 'antialiased',
@@ -247,7 +247,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
         {/* Enhanced Attribution */}
         <div className="relative">
           <div className="h-px bg-gradient-to-r from-transparent via-red-200/50 to-transparent mb-4"></div>
-          <div className="text-red-600 font-bold text-base tracking-wide group-hover:text-red-700 transition-colors duration-300"
+          <div className="text-green-600 font-bold text-base tracking-wide group-hover:text-green-700 transition-colors duration-300"
                style={{ 
                  textRendering: 'optimizeLegibility', 
                  WebkitFontSmoothing: 'antialiased',
