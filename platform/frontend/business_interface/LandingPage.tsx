@@ -293,14 +293,14 @@ export const LandingPage: React.FC = () => {
             
             {/* Dramatic Headline */}
             <div className="relative mb-8">
-              <h2 className="text-5xl md:text-7xl font-black text-slate-100 mb-4 leading-[0.9] tracking-tight"
+              <h2 className="text-5xl md:text-7xl font-black text-slate-800 mb-4 leading-[0.9] tracking-tight"
                   style={{ 
                     textRendering: 'optimizeLegibility', 
                     WebkitFontSmoothing: 'antialiased',
                     fontWeight: 950,
-                    textShadow: '0 6px 12px rgba(0,0,0,0.5), 0 3px 6px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3)'
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}>
-                <span className="text-slate-600">Nigerian businesses are</span>
+                <span className="text-slate-700">Nigerian businesses are</span>
                 <br />
                 <span className="relative inline-block">
                   <span className="text-blue-400 italic font-black"
@@ -313,7 +313,7 @@ export const LandingPage: React.FC = () => {
                   {/* Dramatic underline effect */}
                   <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
                 </span>
-                <span className="block mt-2 text-slate-600">in compliance paperwork</span>
+                <span className="block mt-2 text-slate-700">in compliance paperwork</span>
               </h2>
               
               {/* Subtle background glow */}
@@ -356,12 +356,12 @@ export const LandingPage: React.FC = () => {
                  }}>
                 Sound familiar?
               </p>
-              <p className="text-4xl md:text-5xl font-black text-slate-600 mb-2"
+              <p className="text-4xl md:text-5xl font-black text-blue-400 mb-2"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
                    fontWeight: 950,
-                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                   textShadow: '0 2px 4px rgba(96, 165, 250, 0.3)'
                  }}>
                 You're not alone.
               </p>
