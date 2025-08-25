@@ -300,7 +300,7 @@ export const LandingPage: React.FC = () => {
                     fontWeight: 950,
                     textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                   }}>
-                <span className="text-gray-900">Nigerian businesses are</span>
+                <span className="text-slate-600">Nigerian businesses are</span>
                 <br />
                 <span className="relative inline-block">
                   <span className="text-green-600 italic font-black"
@@ -313,7 +313,7 @@ export const LandingPage: React.FC = () => {
                   {/* Dramatic underline effect */}
                   <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
                 </span>
-                <span className="block mt-2 text-gray-900">in compliance paperwork</span>
+                <span className="block mt-2 text-slate-600">in compliance paperwork</span>
               </h2>
               
               {/* Subtle background glow - removed for better text visibility */}

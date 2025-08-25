@@ -154,8 +154,8 @@ export const PROBLEMS_DATA = [
   {
     emoji: EMOJIS.time,
     title: "Hours Wasted Daily",
-    quote: "I spend 3-4 hours every day just formatting invoices and submitting them manually. That's time I should be growing my business.",
-    attribution: "Lagos Restaurant Owner"
+    quote: "Our finance team spends 3-4 hours every day just formatting invoices and submitting them manually. That's time we should be focusing on growing our business operations.",
+    attribution: "Lagos Restaurant Group"
   },
   {
     emoji: "⚠️",
