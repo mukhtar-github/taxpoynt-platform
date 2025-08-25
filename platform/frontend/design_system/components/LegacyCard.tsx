@@ -187,12 +187,80 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
   className = '',
 }) => {
   return (
-    <LegacyCard variant="problem" className={className}>
-      <div className="text-blue-500 text-4xl mb-4">{emoji}</div>
-      <h3 className="text-xl font-bold text-gray-900 mb-4">{title}</h3>
-      <p className="text-gray-700 mb-4">"{quote}"</p>
-      <div className="text-blue-600 font-semibold text-sm">{attribution}</div>
-    </LegacyCard>
+    <div className={`group relative p-8 bg-gradient-to-br from-white via-gray-50/50 to-white rounded-2xl 
+                    shadow-xl hover:shadow-2xl hover:shadow-red-500/10 
+                    transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] 
+                    cursor-pointer border border-gray-200/50 hover:border-red-200/50 
+                    backdrop-blur-sm ${className}`}
+         style={{
+           background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 50%, #ffffff 100%)',
+           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+         }}>
+      
+      {/* Premium Background Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-red-50/20 via-transparent to-orange-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      
+      {/* Subtle Pattern Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-gray-50/30 rounded-2xl"></div>
+      
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Enhanced Emoji */}
+        <div className="mb-6 transform group-hover:scale-110 transition-transform duration-300">
+          <div className="w-16 h-16 bg-gradient-to-br from-red-500/10 to-orange-500/10 rounded-2xl 
+                          flex items-center justify-center text-5xl group-hover:shadow-lg 
+                          transition-all duration-300 border border-red-100/50"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%)',
+                 backdropFilter: 'blur(10px)'
+               }}>
+            {emoji}
+          </div>
+        </div>
+        
+        {/* Enhanced Title */}
+        <h3 className="text-2xl md:text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-red-700 transition-colors duration-300"
+            style={{ 
+              textRendering: 'optimizeLegibility', 
+              WebkitFontSmoothing: 'antialiased',
+              fontWeight: 900,
+              textShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+          {title}
+        </h3>
+        
+        {/* Enhanced Quote */}
+        <div className="relative mb-8">
+          {/* Quote decoration */}
+          <div className="absolute -left-2 -top-2 text-6xl text-red-200/40 font-bold leading-none">"</div>
+          <p className="text-lg md:text-xl text-gray-700 leading-relaxed relative z-10 italic group-hover:text-gray-800 transition-colors duration-300"
+             style={{ 
+               textRendering: 'optimizeLegibility', 
+               WebkitFontSmoothing: 'antialiased',
+               lineHeight: '1.6'
+             }}>
+            {quote}
+          </p>
+          <div className="absolute -right-2 -bottom-2 text-6xl text-red-200/40 font-bold leading-none">"</div>
+        </div>
+        
+        {/* Enhanced Attribution */}
+        <div className="relative">
+          <div className="h-px bg-gradient-to-r from-transparent via-red-200/50 to-transparent mb-4"></div>
+          <div className="text-red-600 font-bold text-base tracking-wide group-hover:text-red-700 transition-colors duration-300"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 1px 2px rgba(220, 38, 38, 0.1)'
+               }}>
+            — {attribution}
+          </div>
+        </div>
+      </div>
+      
+      {/* Hover Glow Effect */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-red-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+    </div>
   );
 };
 

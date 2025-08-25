@@ -277,17 +277,62 @@ export const LandingPage: React.FC = () => {
       <section className="py-20 bg-gray-700">
         <div className="max-w-6xl mx-auto px-6">
           
-          {/* Section Header */}
-          <div className="text-center mb-16">
-            <div className="inline-block bg-blue-100 text-blue-800 px-6 py-2 rounded-full text-sm font-semibold mb-6">
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-50/95 to-orange-50/95 backdrop-blur-sm 
+                            border-2 border-red-200/50 text-red-800 rounded-full text-base font-bold mb-8 
+                            shadow-xl hover:shadow-red-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(255, 247, 237, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 bg-red-500 rounded-full mr-3 animate-pulse"></span>
               The Nigerian Business Reality
+              <span className="w-3 h-3 bg-orange-500 rounded-full ml-3 animate-pulse" style={{ animationDelay: '1s' }}></span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-6 leading-tight">
-              E-invoicing compliance is 
-              <span className="text-blue-400 italic"> crushing</span> Nigerian businesses
-            </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-              Every day, thousands of Nigerian business owners struggle with the same compliance nightmare
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-white mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2)'
+                  }}>
+                E-invoicing compliance is
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-red-500 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          background: 'linear-gradient(135deg, #f87171 0%, #fb923c 50%, #ef4444 100%)',
+                          WebkitBackgroundClip: 'text',
+                          textShadow: 'none'
+                        }}>
+                    crushing
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500 rounded-full opacity-80"></div>
+                </span>
+                <span className="block mt-2">Nigerian businesses</span>
+              </h2>
+              
+              {/* Subtle background glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-orange-500/10 to-red-500/10 blur-3xl -z-10 opacity-50"></div>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+               }}>
+              Every day, <span className="text-orange-300 font-semibold">thousands of Nigerian business owners</span> struggle with the same compliance nightmare that's stealing their time, money, and peace of mind.
             </p>
           </div>
 
@@ -304,17 +349,102 @@ export const LandingPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Bottom CTA - Enhanced Visibility */}
-          <div className="text-center mt-20 mb-8">
-            <p className="text-2xl text-gray-100 mb-8 font-semibold">
-              Sound familiar? <span className="text-blue-400 font-bold">You're not alone.</span>
-            </p>
-            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-8 max-w-3xl mx-auto shadow-md">
-              <p className="text-blue-900 text-xl font-semibold leading-relaxed">
-                Over 2 million Nigerian businesses struggle with these exact same problems every single day.
+          {/* Premium Bottom CTA Section */}
+          <div className="text-center mt-24 mb-12">
+            {/* Empathy Hook */}
+            <div className="mb-12">
+              <p className="text-3xl md:text-4xl text-gray-100 mb-4 font-bold"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                 }}>
+                Sound familiar?
               </p>
-              <div className="mt-4 text-blue-700 text-lg">
-                But there's a better way...
+              <p className="text-4xl md:text-5xl font-black"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   fontWeight: 950
+                 }}>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-400 to-green-500"
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #34d399 50%, #059669 100%)',
+                        WebkitBackgroundClip: 'text',
+                        textShadow: 'none'
+                      }}>
+                  You're not alone.
+                </span>
+              </p>
+            </div>
+            
+            {/* Statistics Card - Premium Design */}
+            <div className="relative max-w-5xl mx-auto">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 via-blue-500/10 to-emerald-500/20 rounded-3xl blur-xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-white/10 rounded-3xl"></div>
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-white/95 via-green-50/90 to-white/95 
+                              border-2 border-green-200/50 rounded-3xl p-8 md:p-12 
+                              shadow-2xl backdrop-blur-sm"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,253,244,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                     backdropFilter: 'blur(16px)',
+                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                   }}>
+                
+                {/* Dramatic Statistics */}
+                <div className="mb-8">
+                  <div className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r 
+                                  from-red-600 via-orange-600 to-red-700 mb-4 leading-none"
+                       style={{
+                         fontWeight: 950,
+                         background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #b91c1c 100%)',
+                         WebkitBackgroundClip: 'text',
+                         textShadow: 'none'
+                       }}>
+                    2,000,000+
+                  </div>
+                  <p className="text-2xl md:text-3xl text-gray-800 font-bold leading-tight mb-2"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                    Nigerian businesses struggle with these
+                  </p>
+                  <p className="text-2xl md:text-3xl font-black text-red-700 leading-tight"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', fontWeight: 900 }}>
+                    exact same problems every single day.
+                  </p>
+                </div>
+                
+                {/* Elegant Divider */}
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-gradient-to-r from-white via-green-50 to-white px-8 py-2 text-lg text-gray-500 font-medium">●  ●  ●</span>
+                  </div>
+                </div>
+                
+                {/* Hope Message */}
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-green-700 mb-2"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       textShadow: '0 2px 4px rgba(34, 197, 94, 0.1)'
+                     }}>
+                    But there's a better way...
+                  </p>
+                  <div className="inline-flex items-center text-lg text-green-600 font-semibold mt-4">
+                    <span className="mr-3">✨</span>
+                    <span>TaxPoynt makes compliance effortless</span>
+                    <span className="ml-3">✨</span>
+                  </div>
+                </div>
+                
+                {/* Subtle Pattern Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 via-transparent to-blue-50/20 rounded-3xl pointer-events-none"></div>
               </div>
             </div>
           </div>
