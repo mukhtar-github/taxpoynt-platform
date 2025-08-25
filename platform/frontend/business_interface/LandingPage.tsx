@@ -181,14 +181,13 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="font-black text-green-600 mb-4 leading-none" 
+                <div className="text-4xl md:text-5xl font-black text-green-600 mb-3 leading-none" 
                      style={{ 
-                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '950 !important',
-                       textShadow: '0 4px 8px rgba(34, 197, 94, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.2))'
+                       fontWeight: '900',
+                       textShadow: '0 2px 4px rgba(34, 197, 94, 0.15)',
+                       filter: 'drop-shadow(0 1px 2px rgba(34, 197, 94, 0.1))'
                      }}>
                   Zero
                 </div>
@@ -203,14 +202,13 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="font-black text-blue-600 mb-4 leading-none" 
+                <div className="text-4xl md:text-5xl font-black text-blue-600 mb-3 leading-none" 
                      style={{ 
-                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '950 !important',
-                       textShadow: '0 4px 8px rgba(59, 130, 246, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       filter: 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.2))'
+                       fontWeight: '900',
+                       textShadow: '0 2px 4px rgba(59, 130, 246, 0.15)',
+                       filter: 'drop-shadow(0 1px 2px rgba(59, 130, 246, 0.1))'
                      }}>
                   2 min
                 </div>
@@ -225,14 +223,13 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-emerald-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="font-black text-emerald-600 mb-4 leading-none" 
+                <div className="text-4xl md:text-5xl font-black text-emerald-600 mb-3 leading-none" 
                      style={{ 
-                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '950 !important',
-                       textShadow: '0 4px 8px rgba(16, 185, 129, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       filter: 'drop-shadow(0 2px 4px rgba(16, 185, 129, 0.2))'
+                       fontWeight: '900',
+                       textShadow: '0 2px 4px rgba(16, 185, 129, 0.15)',
+                       filter: 'drop-shadow(0 1px 2px rgba(16, 185, 129, 0.1))'
                      }}>
                   100%
                 </div>
@@ -247,14 +244,13 @@ export const LandingPage: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-white via-purple-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
               <div className="relative z-10">
-                <div className="font-black text-purple-600 mb-4 leading-none" 
+                <div className="text-4xl md:text-5xl font-black text-purple-600 mb-3 leading-none" 
                      style={{ 
-                       fontSize: '6rem !important',
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '950 !important',
-                       textShadow: '0 4px 8px rgba(147, 51, 234, 0.15), 0 2px 4px rgba(0,0,0,0.05)',
-                       filter: 'drop-shadow(0 2px 4px rgba(147, 51, 234, 0.2))'
+                       fontWeight: '900',
+                       textShadow: '0 2px 4px rgba(147, 51, 234, 0.15)',
+                       filter: 'drop-shadow(0 1px 2px rgba(147, 51, 234, 0.1))'
                      }}>
                   Any
                 </div>
