@@ -218,8 +218,15 @@ const ProblemCard: React.FC<ProblemCardProps> = ({
           </div>
         </div>
         
+        {/* Challenge Category Badge */}
+        <div className="mb-4">
+          <span className="inline-block px-3 py-1 bg-slate-100/80 text-slate-700 text-xs font-bold rounded-full border border-slate-200/50">
+            Enterprise Challenge
+          </span>
+        </div>
+        
         {/* Enhanced Title */}
-        <h3 className="text-2xl md:text-3xl font-black text-blue-900 mb-6 leading-tight group-hover:text-blue-700 transition-colors duration-300"
+        <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-6 leading-tight group-hover:text-slate-800 transition-colors duration-300"
             style={{ 
               textRendering: 'optimizeLegibility', 
               WebkitFontSmoothing: 'antialiased',
@@ -230,10 +237,10 @@ const ProblemCard: React.FC<ProblemCardProps> = ({
         </h3>
         
         {/* Enhanced Quote */}
-        <div className="relative mb-8">
+        <div className="relative mb-6">
           {/* Quote decoration */}
           <div className="absolute -left-2 -top-2 text-6xl text-slate-200/40 font-bold leading-none">"</div>
-          <p className="text-lg md:text-xl text-slate-600 leading-relaxed relative z-10 italic group-hover:text-slate-700 transition-colors duration-300"
+          <p className="text-lg md:text-xl text-slate-700 leading-relaxed relative z-10 italic group-hover:text-slate-800 transition-colors duration-300"
              style={{ 
                textRendering: 'optimizeLegibility', 
                WebkitFontSmoothing: 'antialiased',
@@ -242,6 +249,13 @@ const ProblemCard: React.FC<ProblemCardProps> = ({
             {quote}
           </p>
           <div className="absolute -right-2 -bottom-2 text-6xl text-slate-200/40 font-bold leading-none">"</div>
+        </div>
+        
+        {/* Problem Impact Badge */}
+        <div className="mb-6">
+          <div className="inline-block px-4 py-2 bg-gradient-to-r from-slate-500 to-gray-500 text-white rounded-full text-sm font-bold shadow-lg">
+            Critical Enterprise Pain Point
+          </div>
         </div>
         
         {/* Enhanced Attribution */}
