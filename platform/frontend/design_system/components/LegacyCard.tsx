@@ -188,9 +188,9 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
 }) => {
   return (
     <div className={`group relative p-8 bg-gradient-to-br from-white via-gray-50/50 to-white rounded-2xl 
-                    shadow-lg hover:shadow-xl hover:shadow-red-500/3 
-                    transition-all duration-200 
-                    cursor-pointer border border-gray-200/50 hover:border-red-200/30 
+                    shadow-xl hover:shadow-2xl hover:shadow-slate-500/10 
+                    transition-all duration-300 hover:-translate-y-1 
+                    cursor-pointer border border-gray-200/50 hover:border-slate-300/50 
                     backdrop-blur-sm ${className}`}
          style={{
            background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 50%, #ffffff 100%)',
@@ -198,7 +198,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
          }}>
       
       {/* Premium Background Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-red-50/20 via-transparent to-orange-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50/20 via-transparent to-gray-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       
       {/* Subtle Pattern Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-gray-50/30 rounded-2xl"></div>
@@ -206,12 +206,12 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
       {/* Content */}
       <div className="relative z-10">
         {/* Enhanced Emoji */}
-        <div className="mb-6 transform group-hover:scale-110 transition-transform duration-300">
-          <div className="w-16 h-16 bg-gradient-to-br from-red-500/10 to-orange-500/10 rounded-2xl 
+        <div className="mb-6 transform group-hover:scale-105 transition-transform duration-200">
+          <div className="w-16 h-16 bg-gradient-to-br from-slate-500/10 to-gray-500/10 rounded-2xl 
                           flex items-center justify-center text-5xl group-hover:shadow-lg 
-                          transition-all duration-300 border border-red-100/50"
+                          transition-all duration-300 border border-slate-100/50"
                style={{
-                 background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%)',
+                 background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(148, 163, 184, 0.1) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
             {emoji}
@@ -232,7 +232,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
         {/* Enhanced Quote */}
         <div className="relative mb-8">
           {/* Quote decoration */}
-          <div className="absolute -left-2 -top-2 text-6xl text-red-200/40 font-bold leading-none">"</div>
+          <div className="absolute -left-2 -top-2 text-6xl text-slate-200/40 font-bold leading-none">"</div>
           <p className="text-lg md:text-xl text-slate-600 leading-relaxed relative z-10 italic group-hover:text-slate-700 transition-colors duration-300"
              style={{ 
                textRendering: 'optimizeLegibility', 
@@ -241,17 +241,17 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
              }}>
             {quote}
           </p>
-          <div className="absolute -right-2 -bottom-2 text-6xl text-red-200/40 font-bold leading-none">"</div>
+          <div className="absolute -right-2 -bottom-2 text-6xl text-slate-200/40 font-bold leading-none">"</div>
         </div>
         
         {/* Enhanced Attribution */}
         <div className="relative">
-          <div className="h-px bg-gradient-to-r from-transparent via-red-200/50 to-transparent mb-4"></div>
+          <div className="h-px bg-gradient-to-r from-transparent via-slate-200/50 to-transparent mb-4"></div>
           <div className="text-green-600 font-bold text-base tracking-wide group-hover:text-green-700 transition-colors duration-300"
                style={{ 
                  textRendering: 'optimizeLegibility', 
                  WebkitFontSmoothing: 'antialiased',
-                 textShadow: '0 1px 2px rgba(220, 38, 38, 0.1)'
+                 textShadow: '0 1px 2px rgba(100, 116, 139, 0.1)'
                }}>
             — {attribution}
           </div>
@@ -259,7 +259,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
       </div>
       
       {/* Hover Glow Effect */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-red-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-slate-500/5 to-gray-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
     </div>
   );
 };

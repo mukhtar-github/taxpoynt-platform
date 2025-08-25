@@ -271,15 +271,15 @@ export const LandingPage: React.FC = () => {
       </div>
 
       {/* Section 3: Problems - Pain Points */}
-      <section className="py-20 bg-gradient-to-br from-slate-100 via-gray-50 to-white" style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #f8fafc 50%, #ffffff 100%)' }}>
+      <section className="py-20 bg-gradient-to-br from-white via-slate-50/30 to-white relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(0,0,0,0.08)' 
+      }}>
         <div className="max-w-6xl mx-auto px-6">
           
           {/* Enhanced Section Header */}
           <div className="text-center mb-20">
             {/* Premium Badge - Blue/Green Theme */}
-            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-50/95 to-green-50/95 backdrop-blur-sm 
-                            border-2 border-blue-200/50 text-blue-800 rounded-full text-base font-bold mb-8 
-                            shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105"
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-50/95 to-green-50/95 backdrop-blur-sm border-2 border-blue-200/50 text-blue-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105"
                  style={{ 
                    textRendering: 'optimizeLegibility', 
                    WebkitFontSmoothing: 'antialiased',
@@ -426,10 +426,7 @@ export const LandingPage: React.FC = () => {
                   {/* Clean Focused CTA Button */}
                   <button
                     onClick={() => router.push('/auth/signup')}
-                    className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 
-                              hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white font-bold rounded-2xl 
-                              shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-105 transform 
-                              border border-blue-500/20 hover:border-blue-400/40 min-w-[400px] mb-4"
+                    className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-105 transform border border-blue-500/20 hover:border-blue-400/40 min-w-[400px] mb-4"
                     style={{
                       background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #1d4ed8 100%)',
                       boxShadow: '0 20px 40px -12px rgba(37, 99, 235, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
