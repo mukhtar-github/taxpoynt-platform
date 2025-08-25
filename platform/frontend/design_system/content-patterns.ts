@@ -190,6 +190,61 @@ export const PROBLEMS_DATA = [
 ];
 
 // ========================================
+// ENTERPRISE SOLUTIONS DATA - Direct problem solutions
+// ========================================
+
+export const ENTERPRISE_SOLUTIONS_DATA = [
+  {
+    emoji: "⚡",
+    title: "Universal Integration Hub",
+    problem: "Multi-System Chaos",
+    quote: "TaxPoynt's 150+ API endpoints connect all our enterprise systems - SAP, Salesforce, Oracle, NetSuite - with real-time synchronization. One platform eliminated our data silos completely.",
+    attribution: "Lagos Financial Services Group - CTO",
+    metrics: "5+ systems → 1 unified platform"
+  },
+  {
+    emoji: "🚀", 
+    title: "Enterprise-Scale Automation",
+    problem: "Compliance at Scale",
+    quote: "We process 1M+ transactions monthly with <5 second response times and 99.9% uptime. Our IT teams now focus on innovation instead of compliance infrastructure maintenance.",
+    attribution: "Abuja Manufacturing Conglomerate - IT Director",
+    metrics: "40% IT resources → 100% innovation focus"
+  },
+  {
+    emoji: "🔄",
+    title: "Pre-Built API Ecosystem",
+    problem: "Integration Infrastructure Nightmare", 
+    quote: "No more custom API development. TaxPoynt's comprehensive integration library connects new systems in days, not months. Our technical resources are finally free for strategic projects.",
+    attribution: "Port Harcourt Oil & Gas Enterprise - Lead Developer",
+    metrics: "Months of development → Days of integration"
+  },
+  {
+    emoji: "📈",
+    title: "Unlimited Enterprise Capacity",
+    problem: "Scalability Bottlenecks",
+    quote: "Built for enterprise scale - 10M+ records monthly, horizontal scaling, load balancing. Our growth is no longer limited by compliance infrastructure constraints.",
+    attribution: "Kano Agricultural Corporation - Operations Manager",
+    metrics: "1M+ transactions → Unlimited capacity"
+  },
+  {
+    emoji: "🎯", 
+    title: "Strategic Resource Liberation",
+    problem: "Strategic Resource Drain",
+    quote: "TaxPoynt handles all compliance complexity while we focus on market expansion and innovation. It's transformed compliance from cost center to competitive advantage.",
+    attribution: "Ibadan Technology Consortium - CEO",
+    metrics: "Resource drain → Competitive advantage"
+  },
+  {
+    emoji: "⚡",
+    title: "Peak Performance Optimization",
+    problem: "Performance Under Pressure",
+    quote: "During peak business periods, TaxPoynt's unified platform maintains sub-5-second performance while our old fragmented systems would crash. Operational risk eliminated.",
+    attribution: "Enugu Retail Empire - Head of Operations", 
+    metrics: "System crashes → Peak performance"
+  }
+];
+
+// ========================================
 // SOLUTION PATTERNS (Positive Outcomes)
 // ========================================
 

@@ -10,7 +10,9 @@ import {
   TaxPoyntButton, 
   HeroCTAButton, 
   ProblemCard,
+  SolutionCard,
   PROBLEMS_DATA,
+  ENTERPRISE_SOLUTIONS_DATA,
   buildGridClasses,
   TAXPOYNT_DESIGN_SYSTEM 
 } from '../design_system';
@@ -447,6 +449,199 @@ export const LandingPage: React.FC = () => {
                 
                 {/* Subtle Pattern Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 via-transparent to-blue-50/20 rounded-3xl pointer-events-none"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Professional Transition to Solutions Section */}
+      <div className="relative">
+        {/* Smooth gradient transition */}
+        <div className="h-16 bg-gradient-to-b from-white via-green-100 to-green-50"></div>
+        
+        {/* Subtle shadow depth */}
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-green-200/20"></div>
+      </div>
+
+      {/* Section 4: Solutions - How TaxPoynt Solves Enterprise Problems */}
+      <section className="py-20 bg-gradient-to-br from-green-50 via-emerald-50/30 to-green-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(34, 197, 94, 0.08)' 
+      }}>
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge - Green Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-50/95 to-emerald-50/95 backdrop-blur-sm border-2 border-green-200/50 text-green-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-green-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(240, 253, 244, 0.95) 0%, rgba(236, 253, 245, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></span>
+              The TaxPoynt Solution
+              <span className="w-3 h-3 bg-emerald-500 rounded-full ml-3 animate-pulse" style={{ animationDelay: '1s' }}></span>
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-green-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-700">Enterprise problems meet</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-green-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)'
+                        }}>
+                    unified solutions
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 rounded-full opacity-90"></div>
+                </span>
+                <span className="block mt-2 text-slate-700">that transform your business</span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              See how TaxPoynt's <span className="text-green-600 font-bold">universal integration platform</span> directly solves each enterprise challenge with proven results.
+            </p>
+          </div>
+
+          {/* Solutions Grid - Using Design System */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
+            {ENTERPRISE_SOLUTIONS_DATA.map((solution, index) => (
+              <SolutionCard
+                key={index}
+                emoji={solution.emoji}
+                title={solution.title}
+                problem={solution.problem}
+                quote={solution.quote}
+                attribution={solution.attribution}
+                metrics={solution.metrics}
+              />
+            ))}
+          </div>
+
+          {/* Premium Bottom CTA Section */}
+          <div className="text-center mt-24 mb-12">
+            {/* Success Hook */}
+            <div className="mb-8 mt-8">
+              <p className="text-3xl md:text-4xl text-slate-600 mb-6 font-bold"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                 }}>
+                Ready to transform your enterprise?
+              </p>
+              <p className="text-4xl md:text-5xl font-black text-green-600 mb-2"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   fontWeight: 950,
+                   textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)'
+                 }}>
+                Join the unified automation revolution.
+              </p>
+            </div>
+            
+            {/* Success Statistics Card */}
+            <div className="relative max-w-5xl mx-auto">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 via-emerald-500/10 to-green-500/20 rounded-3xl blur-xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-white/10 rounded-3xl"></div>
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-white/95 via-green-50/90 to-white/95 
+                              border-2 border-green-200/50 rounded-3xl p-8 md:p-12 
+                              shadow-2xl backdrop-blur-sm"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,253,244,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                     backdropFilter: 'blur(16px)',
+                     boxShadow: '0 25px 50px -12px rgba(34, 197, 94, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                   }}>
+                
+                {/* Success Statistics */}
+                <div className="mb-8">
+                  <div className="text-6xl md:text-7xl font-black text-green-600 mb-4 leading-none"
+                       style={{
+                         fontWeight: 950,
+                         textShadow: '0 4px 8px rgba(34, 197, 94, 0.3)'
+                       }}>
+                    99.9%
+                  </div>
+                  <p className="text-2xl md:text-3xl text-slate-600 font-bold leading-tight mb-2"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                    Enterprise uptime with TaxPoynt's
+                  </p>
+                  <p className="text-2xl md:text-3xl font-black text-green-700 leading-tight"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', fontWeight: 900 }}>
+                    unified automation platform.
+                  </p>
+                </div>
+                
+                {/* Elegant Divider */}
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gradient-to-r from-transparent via-green-300 to-transparent"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-8 py-2 text-lg text-green-500 font-medium">●  ●  ●</span>
+                  </div>
+                </div>
+                
+                {/* Success Message & CTA */}
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-slate-600 mb-6"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       textShadow: '0 2px 4px rgba(100, 116, 139, 0.1)'
+                     }}>
+                    Your enterprise transformation starts here.
+                  </p>
+                  
+                  {/* Clean Focused CTA Button */}
+                  <button
+                    onClick={() => router.push('/auth/signup')}
+                    className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-green-600 via-emerald-600 to-green-700 hover:from-green-700 hover:via-emerald-700 hover:to-green-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-green-500/40 transition-all duration-500 hover:scale-105 transform border border-green-500/20 hover:border-green-400/40 min-w-[400px] mb-4"
+                    style={{
+                      background: 'linear-gradient(135deg, #16a34a 0%, #10b981 50%, #059669 100%)',
+                      boxShadow: '0 20px 40px -12px rgba(34, 197, 94, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      textRendering: 'optimizeLegibility',
+                      WebkitFontSmoothing: 'antialiased'
+                    }}
+                  >
+                    <span className="relative z-10 text-2xl font-black">Start Enterprise Transformation</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </button>
+                  
+                  {/* Supporting Text Below Button */}
+                  <div className="text-lg text-slate-600 font-medium">
+                    <span className="mr-2">🚀</span>
+                    Join enterprises already transforming with TaxPoynt
+                    <span className="ml-2">🚀</span>
+                  </div>
+                </div>
+                
+                {/* Subtle Pattern Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 via-transparent to-emerald-50/20 rounded-3xl pointer-events-none"></div>
               </div>
             </div>
           </div>

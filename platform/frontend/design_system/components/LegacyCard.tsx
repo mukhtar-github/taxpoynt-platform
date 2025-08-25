@@ -51,7 +51,7 @@ const legacyCardVariants = cva(
   }
 );
 
-export interface LegacyCardProps 
+interface LegacyCardProps 
   extends HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof legacyCardVariants> {
   loading?: boolean;
@@ -179,7 +179,7 @@ interface ProblemCardProps {
   className?: string;
 }
 
-export const ProblemCard: React.FC<ProblemCardProps> = ({
+const ProblemCard: React.FC<ProblemCardProps> = ({
   emoji,
   title,
   quote,
@@ -264,11 +264,126 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
   );
 };
 
+// Solution Card - specialized for our Solutions section
+interface SolutionCardProps {
+  emoji: string;
+  title: string;
+  problem: string;
+  quote: string;
+  attribution: string;
+  metrics: string;
+  className?: string;
+}
+
+const SolutionCard: React.FC<SolutionCardProps> = ({
+  emoji,
+  title,
+  problem,
+  quote,
+  attribution,
+  metrics,
+  className = '',
+}) => {
+  return (
+    <div className={`group relative p-8 bg-gradient-to-br from-green-50 via-white to-emerald-50/50 rounded-2xl 
+                    shadow-xl hover:shadow-2xl hover:shadow-green-500/10 
+                    transition-all duration-300 hover:-translate-y-1 
+                    cursor-pointer border border-green-200/50 hover:border-green-300/50 
+                    backdrop-blur-sm ${className}`}
+         style={{
+           background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #ecfdf5 100%)',
+           boxShadow: '0 10px 25px -5px rgba(34, 197, 94, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+         }}>
+      
+      {/* Premium Background Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 via-transparent to-emerald-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      
+      {/* Subtle Pattern Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-green-50/30 rounded-2xl"></div>
+      
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Enhanced Emoji */}
+        <div className="mb-6 transform group-hover:scale-105 transition-transform duration-200">
+          <div className="w-16 h-16 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-2xl 
+                          flex items-center justify-center text-5xl group-hover:shadow-lg 
+                          transition-all duration-300 border border-green-100/50"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                 backdropFilter: 'blur(10px)'
+               }}>
+            {emoji}
+          </div>
+        </div>
+        
+        {/* Problem Reference Badge */}
+        <div className="mb-4">
+          <span className="inline-block px-3 py-1 bg-green-100/80 text-green-700 text-xs font-bold rounded-full border border-green-200/50">
+            Solves: {problem}
+          </span>
+        </div>
+        
+        {/* Enhanced Title */}
+        <h3 className="text-2xl md:text-3xl font-black text-green-900 mb-6 leading-tight group-hover:text-green-800 transition-colors duration-300"
+            style={{ 
+              textRendering: 'optimizeLegibility', 
+              WebkitFontSmoothing: 'antialiased',
+              fontWeight: 900,
+              textShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+          {title}
+        </h3>
+        
+        {/* Enhanced Quote */}
+        <div className="relative mb-6">
+          {/* Quote decoration */}
+          <div className="absolute -left-2 -top-2 text-6xl text-green-200/40 font-bold leading-none">"</div>
+          <p className="text-lg md:text-xl text-slate-700 leading-relaxed relative z-10 italic group-hover:text-slate-800 transition-colors duration-300"
+             style={{ 
+               textRendering: 'optimizeLegibility', 
+               WebkitFontSmoothing: 'antialiased',
+               lineHeight: '1.6'
+             }}>
+            {quote}
+          </p>
+          <div className="absolute -right-2 -bottom-2 text-6xl text-green-200/40 font-bold leading-none">"</div>
+        </div>
+        
+        {/* Metrics Badge */}
+        <div className="mb-6">
+          <div className="inline-block px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full text-sm font-bold shadow-lg">
+            {metrics}
+          </div>
+        </div>
+        
+        {/* Enhanced Attribution */}
+        <div className="relative">
+          <div className="h-px bg-gradient-to-r from-transparent via-green-200/50 to-transparent mb-4"></div>
+          <div className="text-green-600 font-bold text-base tracking-wide group-hover:text-green-700 transition-colors duration-300"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 1px 2px rgba(34, 197, 94, 0.1)'
+               }}>
+            — {attribution}
+          </div>
+        </div>
+      </div>
+      
+      {/* Hover Glow Effect */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+    </div>
+  );
+};
+
 export { 
   LegacyCard, 
   LegacyCardHeader, 
   LegacyCardTitle, 
   LegacyCardDescription, 
   LegacyCardContent, 
-  LegacyCardFooter 
+  LegacyCardFooter,
+  ProblemCard,
+  SolutionCard,
+  type LegacyCardProps 
 };
