@@ -777,7 +777,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
       )}
       
       {/* Content - Flexible container */}
-      <div className="relative z-10 p-8 pt-20 pb-6 flex flex-col flex-grow">
+      <div className="relative z-10 p-8 pt-20 pb-8 flex flex-col flex-grow">
         {/* Header - Fixed height section */}
         <div className="text-center mb-6 h-24 flex flex-col justify-center">
           <h3 className={`text-xl md:text-2xl font-black ${theme.text} mb-1 leading-tight group-hover:opacity-90 transition-colors duration-300`}
@@ -887,7 +887,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
               Get Started with {name}
             </button>
             
-            <p className="text-xs text-slate-500 mt-3 mb-3">30-day money back guarantee</p>
+            <p className="text-xs text-slate-500 mt-3 mb-4">30-day money back guarantee</p>
           </div>
         </div>
       </div>
