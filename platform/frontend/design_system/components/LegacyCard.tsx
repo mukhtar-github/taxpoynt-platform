@@ -758,7 +758,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
                       badge === 'Most Popular' ? 'ring-2 ring-green-500 ring-opacity-50 scale-105' : ''
                     } ${
                       badge === 'Recommended' ? 'ring-2 ring-purple-500 ring-opacity-50' : ''
-                    }`}
+                    } min-h-[800px] flex flex-col`}
          style={{
            background: theme.background,
            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
@@ -776,8 +776,8 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </div>
       )}
       
-      {/* Content */}
-      <div className="relative z-10 p-8 pt-20">
+      {/* Content - Flexible container */}
+      <div className="relative z-10 p-8 pt-20 flex flex-col flex-grow">
         {/* Header */}
         <div className="text-center mb-6">
           <h3 className={`text-2xl md:text-3xl font-black ${theme.text} mb-2 leading-tight group-hover:opacity-90 transition-colors duration-300`}
@@ -817,11 +817,11 @@ const PricingCard: React.FC<PricingCardProps> = ({
           </div>
         </div>
         
-        {/* Features */}
-        <div className="mb-6">
+        {/* Features - Flexible section */}
+        <div className="flex-grow mb-6">
           <h4 className="font-bold text-slate-900 mb-3">What's included:</h4>
           <div className="space-y-2">
-            {features.map((feature, index) => (
+            {features.slice(0, 6).map((feature, index) => (
               <div key={index} className="flex items-start gap-3">
                 <span className="w-3 h-3 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: theme.dot }}></span>
                 <span className="text-slate-700 leading-relaxed text-sm"
@@ -833,54 +833,62 @@ const PricingCard: React.FC<PricingCardProps> = ({
                 </span>
               </div>
             ))}
+            {features.length > 6 && (
+              <div className="text-center mt-3">
+                <span className="text-xs text-slate-500 font-medium">+ {features.length - 6} more features</span>
+              </div>
+            )}
           </div>
         </div>
         
-        {/* Limits */}
-        <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-xl p-4 mb-6 border border-gray-100/50`}>
-          <h4 className="font-bold text-slate-900 mb-2 text-sm">Usage limits:</h4>
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-            <div>
-              <strong>{limits.invoicesPerMonth === 'unlimited' ? 'Unlimited' : `${limits.invoicesPerMonth}`}</strong>
-              <div>invoices/month</div>
-            </div>
-            <div>
-              <strong>{limits.integrations === 'unlimited' ? 'Unlimited' : limits.integrations}</strong>
-              <div>integrations</div>
-            </div>
-            <div>
-              <strong>{limits.users === 'unlimited' ? 'Unlimited' : limits.users}</strong>
-              <div>users</div>
-            </div>
-            <div>
-              <strong>{limits.storage}</strong>
-              <div>storage</div>
+        {/* Bottom section - stays at bottom */}
+        <div className="mt-auto">
+          {/* Limits */}
+          <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-xl p-3 mb-4 border border-gray-100/50`}>
+            <h4 className="font-bold text-slate-900 mb-2 text-sm">Usage limits:</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+              <div>
+                <strong>{limits.invoicesPerMonth === 'unlimited' ? 'Unlimited' : `${limits.invoicesPerMonth}`}</strong>
+                <div>invoices/month</div>
+              </div>
+              <div>
+                <strong>{limits.integrations === 'unlimited' ? 'Unlimited' : limits.integrations}</strong>
+                <div>integrations</div>
+              </div>
+              <div>
+                <strong>{limits.users === 'unlimited' ? 'Unlimited' : limits.users}</strong>
+                <div>users</div>
+              </div>
+              <div>
+                <strong>{limits.storage}</strong>
+                <div>storage</div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        {/* Ideal For */}
-        <div className="mb-6">
-          <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-3`}>
-            <h4 className="font-bold text-slate-900 mb-1 text-sm">Ideal for:</h4>
-            <p className="text-xs text-slate-600">{ideal}</p>
-          </div>
-        </div>
-        
-        {/* CTA Button */}
-        <div className="text-center">
-          <button
-            onClick={() => onSelectPackage(id)}
-            className={`w-full py-4 px-6 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform`}
-            style={{
-              textRendering: 'optimizeLegibility',
-              WebkitFontSmoothing: 'antialiased'
-            }}
-          >
-            Get Started with {name}
-          </button>
           
-          <p className="text-xs text-slate-500 mt-2">30-day money back guarantee</p>
+          {/* Ideal For */}
+          <div className="mb-4">
+            <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-3`}>
+              <h4 className="font-bold text-slate-900 mb-1 text-sm">Ideal for:</h4>
+              <p className="text-xs text-slate-600">{ideal}</p>
+            </div>
+          </div>
+          
+          {/* CTA Button */}
+          <div className="text-center">
+            <button
+              onClick={() => onSelectPackage(id)}
+              className={`w-full py-4 px-6 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform`}
+              style={{
+                textRendering: 'optimizeLegibility',
+                WebkitFontSmoothing: 'antialiased'
+              }}
+            >
+              Get Started with {name}
+            </button>
+            
+            <p className="text-xs text-slate-500 mt-2">30-day money back guarantee</p>
+          </div>
         </div>
       </div>
       
