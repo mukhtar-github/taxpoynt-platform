@@ -245,6 +245,115 @@ export const ENTERPRISE_SOLUTIONS_DATA = [
 ];
 
 // ========================================
+// ENTERPRISE FEATURES DATA - Detailed platform capabilities
+// ========================================
+
+export const ENTERPRISE_FEATURES_DATA = [
+  {
+    category: "Integration Ecosystem",
+    icon: "🔗",
+    title: "150+ Pre-Built API Integrations",
+    description: "Connect seamlessly with SAP, Oracle, QuickBooks, Xero, Salesforce, and 145+ other enterprise systems through our comprehensive API library.",
+    capabilities: [
+      "Real-time data synchronization across all business systems",
+      "Zero-code integration with drag-and-drop configuration",
+      "Automated data mapping and transformation",
+      "Built-in error handling and retry mechanisms"
+    ],
+    metrics: {
+      label: "Integration Speed",
+      value: "Hours, not months",
+      detail: "from custom development"
+    }
+  },
+  {
+    category: "Enterprise Scale",
+    icon: "🚀", 
+    title: "Unlimited Transaction Processing",
+    description: "Built for enterprise volume - handle millions of invoices monthly with <5 second response times and 99.9% guaranteed uptime.",
+    capabilities: [
+      "Horizontal scaling for unlimited growth",
+      "Load balancing across multiple data centers",
+      "Enterprise-grade disaster recovery",
+      "24/7/365 monitoring and support"
+    ],
+    metrics: {
+      label: "Performance",
+      value: "1M+ invoices/month",
+      detail: "with <5s response time"
+    }
+  },
+  {
+    category: "Compliance Automation",
+    icon: "🛡️",
+    title: "7-Standard Regulatory Framework",
+    description: "Comprehensive compliance with UBL, WCO HS Code, NITDA GDPR, ISO 20022, ISO 27001, LEI, and PEPPOL standards.",
+    capabilities: [
+      "Automated regulatory updates and notifications",
+      "Real-time compliance validation and reporting",
+      "Audit trail generation and management", 
+      "Multi-jurisdiction compliance support"
+    ],
+    metrics: {
+      label: "Compliance Rate",
+      value: "99.99% accuracy",
+      detail: "across all regulations"
+    }
+  },
+  {
+    category: "Business Intelligence", 
+    icon: "📊",
+    title: "Advanced Analytics & Reporting",
+    description: "Transform compliance data into strategic business insights with enterprise-grade analytics, forecasting, and custom reporting.",
+    capabilities: [
+      "Real-time dashboard with 50+ KPIs and metrics",
+      "Predictive analytics for cash flow and tax planning",
+      "Custom report builder with automated scheduling",
+      "Multi-dimensional data analysis and visualization"
+    ],
+    metrics: {
+      label: "Insight Generation", 
+      value: "Real-time analytics",
+      detail: "across 50+ business KPIs"
+    }
+  },
+  {
+    category: "Security Architecture",
+    icon: "🔐",
+    title: "Enterprise-Grade Security",
+    description: "Bank-level security with end-to-end encryption, SOC 2 compliance, and enterprise identity management integration.",
+    capabilities: [
+      "256-bit AES encryption for all data transmission",
+      "Multi-factor authentication and SSO integration", 
+      "Role-based access control and permissions",
+      "SOC 2 Type II certified infrastructure"
+    ],
+    metrics: {
+      label: "Security Standard",
+      value: "Bank-level encryption",
+      detail: "SOC 2 Type II certified"
+    }
+  },
+  {
+    category: "Developer Experience",
+    icon: "⚡",
+    title: "Enterprise API Gateway", 
+    description: "Complete developer toolkit with RESTful APIs, webhooks, SDKs, and comprehensive documentation for seamless integration.",
+    capabilities: [
+      "RESTful APIs with OpenAPI 3.0 specification",
+      "Real-time webhooks for instant notifications",
+      "SDKs for Python, Node.js, PHP, .NET, and Java",
+      "Interactive API documentation and testing tools"
+    ],
+    metrics: {
+      label: "Developer Tools",
+      value: "Complete SDK library", 
+      detail: "for 5 major languages"
+    }
+  }
+];
+
+// ========================================
 // SOLUTION PATTERNS (Positive Outcomes)
 // ========================================
 

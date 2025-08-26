@@ -11,8 +11,10 @@ import {
   HeroCTAButton, 
   ProblemCard,
   SolutionCard,
+  FeatureCard,
   PROBLEMS_DATA,
   ENTERPRISE_SOLUTIONS_DATA,
+  ENTERPRISE_FEATURES_DATA,
   buildGridClasses,
   TAXPOYNT_DESIGN_SYSTEM 
 } from '../design_system';
@@ -62,81 +64,168 @@ export const LandingPage: React.FC = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative px-6 py-24 overflow-hidden bg-gradient-to-br from-slate-100 via-gray-50 to-white min-h-screen flex items-center" style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #f8fafc 50%, #ffffff 100%)' }}>
+      {/* Hero Section - Premium Enterprise Crown Jewel */}
+      <section className="relative px-6 py-24 overflow-hidden bg-gradient-to-br from-indigo-50 via-blue-50/30 to-purple-50 min-h-screen flex items-center" 
+               style={{ 
+                 background: 'linear-gradient(135deg, #eef2ff 0%, #f0f9ff 30%, #faf5ff 70%, #ffffff 100%)',
+                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' 
+               }}>
         
         {/* Premium Background Patterns */}
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-indigo-400/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '8s' }}></div>
-          <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-gradient-to-br from-emerald-400/15 to-green-400/15 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '10s' }}></div>
-          <div className="absolute bottom-1/4 left-1/2 w-72 h-72 bg-gradient-to-br from-violet-400/10 to-purple-400/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '12s' }}></div>
+          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-br from-blue-400/15 to-indigo-400/15 rounded-full filter blur-3xl"></div>
+          <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-gradient-to-br from-emerald-400/10 to-green-400/10 rounded-full filter blur-3xl"></div>
+          <div className="absolute bottom-1/4 left-1/2 w-72 h-72 bg-gradient-to-br from-violet-400/8 to-purple-400/8 rounded-full filter blur-3xl"></div>
           {/* Subtle texture overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-slate-100/20"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-indigo-50/20"></div>
         </div>
         
-        <div className="max-w-5xl mx-auto text-center relative z-10">
+        <div className="max-w-6xl mx-auto text-center relative z-10">
           
-          {/* Enhanced Badge */}
-          <div className="inline-flex items-center px-8 py-4 bg-green-50/95 backdrop-blur-sm border border-green-300 text-green-800 rounded-full text-sm font-semibold mb-8 shadow-xl hover:shadow-green-200/50 transition-all duration-300 hover:scale-105" 
-               style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-            <span className="w-2 h-2 rounded-full mr-3" style={{ backgroundColor: '#166534' }}></span>
-            FIRS Certified Access Point Provider
-          </div>
-
-          {/* Enhanced Headline */}
-          <div className="mb-8">
-            <div className="inline-block bg-gradient-to-r from-sky-100 to-blue-100 text-blue-700 px-10 py-4 rounded-full text-lg font-bold mb-8 shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105 border border-blue-300/40">
-              Stop wasting time on compliance paperwork
+          {/* Enhanced Section Header */}
+          <div className="mb-16">
+            {/* Premium Badge - Indigo Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-indigo-50/95 to-blue-50/95 backdrop-blur-sm border-2 border-indigo-200/50 text-indigo-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-indigo-200/40 transition-all duration-300 hover:scale-105" 
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.95) 0%, rgba(239, 246, 255, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#4338ca' }}></span>
+              FIRS Certified Access Point Provider
             </div>
-            <h1 className="text-6xl md:text-8xl font-black text-slate-600 mb-8 leading-[0.95] tracking-tight" 
-                style={{ 
-                  textRendering: 'optimizeLegibility', 
-                  WebkitFontSmoothing: 'antialiased',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.03)',
-                  fontWeight: 950
-                }}>
-<span className="text-slate-600">Submit compliant e-invoices in</span> 
-              <br />
-              <span className="text-green-600 font-black" style={{ fontWeight: 950, textShadow: '0 2px 4px rgba(34, 197, 94, 0.3)' }}>
-                seconds, not hours
-              </span>
-            </h1>
+
+            {/* Enterprise Impact Statement */}
+            <div className="mb-8">
+              <div className="inline-block bg-gradient-to-r from-purple-100/90 to-indigo-100/90 text-purple-700 px-12 py-4 rounded-full text-xl font-bold mb-8 shadow-xl hover:shadow-purple-200/40 transition-all duration-300 hover:scale-105 border border-purple-300/40 backdrop-blur-sm"
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     background: 'linear-gradient(135deg, rgba(243, 232, 255, 0.9) 0%, rgba(238, 242, 255, 0.9) 100%)'
+                   }}>
+                Transform compliance from cost center to competitive advantage
+              </div>
+            </div>
+            
+            {/* Dramatic Enterprise Headline */}
+            <div className="relative mb-12">
+              <h1 className="text-6xl md:text-8xl font-black text-indigo-900 mb-8 leading-[0.9] tracking-tight" 
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-700">Submit compliant e-invoices in</span> 
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-green-600 italic font-black" style={{ 
+                    fontWeight: 950, 
+                    textShadow: '0 4px 8px rgba(34, 197, 94, 0.4)' 
+                  }}>
+                    seconds, not hours
+                  </span>
+                  {/* Premium underline effect */}
+                  <div className="absolute -bottom-3 left-0 right-0 h-2 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 rounded-full opacity-90"></div>
+                </span>
+              </h1>
+            </div>
+
+            {/* Enhanced Enterprise Subtitle */}
+            <p className="text-2xl md:text-3xl text-slate-600 mb-16 max-w-5xl mx-auto font-medium leading-relaxed" 
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.2)'
+               }}>
+              Stop wasting <span className="text-indigo-600 font-bold">enterprise resources</span> on compliance paperwork. TaxPoynt's <span className="text-green-600 font-bold">universal integration platform</span> connects your business software directly to government systems—transforming hours of manual work into seconds of automated compliance.
+            </p>
           </div>
 
-          {/* Enhanced Subtitle */}
-          <p className="text-xl md:text-2xl text-slate-600 mb-12 max-w-4xl mx-auto font-medium leading-relaxed" 
-             style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-            Stop wasting hours on compliance paperwork. TaxPoynt connects your business software directly to government systems—one click and your e-invoices are submitted correctly, every time.
-          </p>
+          {/* Premium Enterprise CTA Section */}
+          <div className="relative max-w-4xl mx-auto mb-20">
+            {/* Background Effects */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-blue-500/5 to-purple-500/10 rounded-3xl blur-xl"></div>
+            
+            {/* Main CTA Card */}
+            <div className="relative bg-gradient-to-br from-white/95 via-indigo-50/90 to-white/95 
+                            border-2 border-indigo-200/50 rounded-3xl p-8 md:p-12 
+                            shadow-2xl backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(238,242,255,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                   backdropFilter: 'blur(16px)',
+                   boxShadow: '0 25px 50px -12px rgba(79, 70, 229, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                 }}>
+              
+              {/* CTA Header */}
+              <div className="mb-8">
+                <p className="text-2xl md:text-3xl font-bold text-slate-600 mb-4"
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     textShadow: '0 2px 4px rgba(100, 116, 139, 0.1)'
+                   }}>
+                  Ready to transform your enterprise compliance?
+                </p>
+                <p className="text-3xl md:text-4xl font-black text-indigo-600"
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased',
+                     fontWeight: 950,
+                     textShadow: '0 2px 4px rgba(99, 102, 241, 0.3)'
+                   }}>
+                  Join thousands of enterprises already automated.
+                </p>
+              </div>
 
-          {/* Premium CTAs */}
-          <div className="flex flex-col sm:flex-row gap-8 justify-center mb-20">
-            <HeroCTAButton
-              onClick={() => router.push('/auth/signup')}
-              className="group relative text-xl px-16 py-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-bold rounded-2xl shadow-2xl hover:shadow-indigo-500/40 transition-all duration-500 hover:scale-110 transform border border-white/20"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #7c3aed 100%)',
-                boxShadow: '0 20px 40px -12px rgba(79, 70, 229, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-              }}
-            >
-              <span className="relative z-10 flex items-center justify-center">
-                ✨ Start Free Trial
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            </HeroCTAButton>
-            <TaxPoyntButton
-              variant="secondary"
-              size="lg"
-              onClick={() => {
-                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="text-xl px-12 py-6 border-2 border-slate-300 text-slate-700 hover:bg-white hover:border-slate-400 hover:text-slate-900 font-semibold rounded-2xl shadow-lg hover:shadow-slate-300/50 transition-all duration-300 hover:scale-105 transform bg-white/80 backdrop-blur-sm"
-            >
-              Learn More
-            </TaxPoyntButton>
+              {/* Premium CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-6 justify-center">
+                <HeroCTAButton
+                  onClick={() => router.push('/auth/signup')}
+                  className="group relative text-2xl px-20 py-7 bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-600 hover:from-indigo-700 hover:via-blue-700 hover:to-purple-700 text-white font-bold rounded-3xl shadow-2xl hover:shadow-indigo-500/50 transition-all duration-500 hover:scale-105 transform border border-white/20"
+                  style={{
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #7c3aed 100%)',
+                    boxShadow: '0 25px 50px -12px rgba(79, 70, 229, 0.4), 0 10px 20px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.2)',
+                    textRendering: 'optimizeLegibility',
+                    WebkitFontSmoothing: 'antialiased'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center">
+                    ✨ Start Enterprise Transformation
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </HeroCTAButton>
+                
+                <TaxPoyntButton
+                  variant="secondary"
+                  size="lg"
+                  onClick={() => {
+                    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="text-2xl px-16 py-7 border-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 hover:text-indigo-900 font-bold rounded-3xl shadow-xl hover:shadow-indigo-300/50 transition-all duration-300 hover:scale-105 transform bg-white/90 backdrop-blur-sm"
+                  style={{
+                    textRendering: 'optimizeLegibility',
+                    WebkitFontSmoothing: 'antialiased'
+                  }}
+                >
+                  See Platform Capabilities
+                </TaxPoyntButton>
+              </div>
+
+              {/* Supporting Text */}
+              <div className="mt-8 text-lg text-slate-600 font-medium">
+                <span className="mr-2">🚀</span>
+                No setup fees • 14-day free trial • Cancel anytime
+                <span className="ml-2">🚀</span>
+              </div>
+              
+              {/* Subtle Pattern Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-transparent to-purple-50/20 rounded-3xl pointer-events-none"></div>
+            </div>
           </div>
 
-          {/* Removed trust indicators - moved to dedicated section */}
+          {/* Removed basic trust indicators - moved to sophisticated dedicated section */}
         </div>
       </section>
 
@@ -803,6 +892,198 @@ export const LandingPage: React.FC = () => {
                 
                 {/* Subtle Pattern Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 via-transparent to-emerald-50/20 rounded-3xl pointer-events-none"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Professional Transition to Features Section */}
+      <div className="relative">
+        {/* Smooth gradient transition */}
+        <div className="h-16 bg-gradient-to-b from-green-50 via-slate-100 to-slate-50"></div>
+        
+        {/* Subtle shadow depth */}
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-slate-200/20"></div>
+      </div>
+
+      {/* Section 5: Features - Detailed Platform Capabilities */}
+      <section id="features" className="py-20 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(71, 85, 105, 0.08)' 
+      }}>
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge - Indigo Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-indigo-50/95 to-slate-50/95 backdrop-blur-sm border-2 border-indigo-200/50 text-indigo-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-indigo-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#4f46e5' }}></span>
+              Platform Capabilities
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-slate-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-600">Enterprise-grade platform</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-indigo-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(79, 70, 229, 0.3)'
+                        }}>
+                    built for scale
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-slate-500 to-indigo-500 rounded-full opacity-90"></div>
+                </span>
+                <span className="block mt-2 text-slate-600">with unlimited capabilities</span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              Deep dive into TaxPoynt's <span className="text-indigo-600 font-bold">comprehensive feature set</span> that powers enterprise transformation across 6 critical business domains.
+            </p>
+          </div>
+
+          {/* Features Grid - Using Design System */}
+          <div className="grid md:grid-cols-2 gap-12 mb-20">
+            {ENTERPRISE_FEATURES_DATA.map((feature, index) => (
+              <FeatureCard
+                key={index}
+                category={feature.category}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                capabilities={feature.capabilities}
+                metrics={feature.metrics}
+              />
+            ))}
+          </div>
+
+          {/* Premium Bottom CTA Section */}
+          <div className="text-center mt-24 mb-12">
+            {/* Feature Hook */}
+            <div className="mb-8 mt-8">
+              <p className="text-3xl md:text-4xl text-slate-600 mb-6 font-bold"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                 }}>
+                Impressive capabilities. Real results.
+              </p>
+              <p className="text-4xl md:text-5xl font-black text-indigo-600 mb-2"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   fontWeight: 950,
+                   textShadow: '0 2px 4px rgba(79, 70, 229, 0.3)'
+                 }}>
+                Experience enterprise excellence.
+              </p>
+            </div>
+            
+            {/* Platform Statistics Card */}
+            <div className="relative max-w-5xl mx-auto">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-slate-500/10 to-indigo-500/20 rounded-3xl blur-xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-white/10 rounded-3xl"></div>
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-white/95 via-indigo-50/90 to-white/95 
+                              border-2 border-indigo-200/50 rounded-3xl p-8 md:p-12 
+                              shadow-2xl backdrop-blur-sm"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(238,242,255,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                     backdropFilter: 'blur(16px)',
+                     boxShadow: '0 25px 50px -12px rgba(79, 70, 229, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                   }}>
+                
+                {/* Platform Statistics */}
+                <div className="mb-8">
+                  <div className="text-6xl md:text-7xl font-black text-indigo-600 mb-4 leading-none"
+                       style={{
+                         fontWeight: 950,
+                         textShadow: '0 4px 8px rgba(79, 70, 229, 0.3)'
+                       }}>
+                    150+
+                  </div>
+                  <p className="text-2xl md:text-3xl text-slate-600 font-bold leading-tight mb-2"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                    Pre-built API integrations ready for
+                  </p>
+                  <p className="text-2xl md:text-3xl font-black text-indigo-700 leading-tight"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', fontWeight: 900 }}>
+                     your enterprise transformation.
+                  </p>
+                </div>
+                
+                {/* Elegant Divider */}
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gradient-to-r from-transparent via-indigo-300 to-transparent"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-8 py-2 text-lg text-indigo-500 font-medium">●  ●  ●</span>
+                  </div>
+                </div>
+                
+                {/* Platform Message & CTA */}
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-slate-600 mb-6"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       textShadow: '0 2px 4px rgba(100, 116, 139, 0.1)'
+                     }}>
+                    See these features in action with your data.
+                  </p>
+                  
+                  {/* Clean Focused CTA Button */}
+                  <button
+                    onClick={() => router.push('/auth/signup')}
+                    className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-indigo-600 via-slate-600 to-indigo-700 hover:from-indigo-700 hover:via-slate-700 hover:to-indigo-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-indigo-500/40 transition-all duration-500 hover:scale-105 transform border border-indigo-500/20 hover:border-indigo-400/40 min-w-[400px] mb-4"
+                    style={{
+                      background: 'linear-gradient(135deg, #4f46e5 0%, #64748b 50%, #4338ca 100%)',
+                      boxShadow: '0 20px 40px -12px rgba(79, 70, 229, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      textRendering: 'optimizeLegibility',
+                      WebkitFontSmoothing: 'antialiased'
+                    }}
+                  >
+                    <span className="relative z-10 text-2xl font-black">Request Live Demo</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </button>
+                  
+                  {/* Supporting Text Below Button */}
+                  <div className="text-lg text-slate-600 font-medium">
+                    <span className="mr-2">🎯</span>
+                    See TaxPoynt features working with your business systems
+                    <span className="ml-2">🎯</span>
+                  </div>
+                </div>
+                
+                {/* Subtle Pattern Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-transparent to-slate-50/20 rounded-3xl pointer-events-none"></div>
               </div>
             </div>
           </div>

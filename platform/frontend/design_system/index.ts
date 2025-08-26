@@ -19,6 +19,7 @@ export {
   LegacyCardFooter,
   ProblemCard,
   SolutionCard,
+  FeatureCard,
   type LegacyCardProps 
 } from './components/LegacyCard';
 
@@ -86,6 +87,7 @@ export {
   PROBLEM_PATTERNS,
   PROBLEMS_DATA,
   ENTERPRISE_SOLUTIONS_DATA,
+  ENTERPRISE_FEATURES_DATA,
   SOLUTION_PATTERNS,
   COLOR_SCHEMES,
   TYPOGRAPHY_PATTERNS,

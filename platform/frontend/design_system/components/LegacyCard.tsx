@@ -390,6 +390,124 @@ const SolutionCard: React.FC<SolutionCardProps> = ({
   );
 };
 
+// Feature Card - specialized for our Features section
+interface FeatureCardProps {
+  category: string;
+  icon: string;
+  title: string;
+  description: string;
+  capabilities: string[];
+  metrics: {
+    label: string;
+    value: string;
+    detail: string;
+  };
+  className?: string;
+}
+
+const FeatureCard: React.FC<FeatureCardProps> = ({
+  category,
+  icon,
+  title,
+  description,
+  capabilities,
+  metrics,
+  className = '',
+}) => {
+  return (
+    <div className={`group relative p-8 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 rounded-2xl 
+                    shadow-xl hover:shadow-2xl hover:shadow-slate-500/10 
+                    transition-all duration-300 hover:-translate-y-1 
+                    cursor-pointer border border-slate-200/50 hover:border-indigo-300/50 
+                    backdrop-blur-sm overflow-hidden ${className}`}
+         style={{
+           background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #eef2ff 100%)',
+           boxShadow: '0 10px 25px -5px rgba(71, 85, 105, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+         }}>
+      
+      {/* Premium Background Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-transparent to-slate-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      
+      {/* Subtle Pattern Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-slate-50/30 rounded-2xl"></div>
+      
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Category Badge */}
+        <div className="mb-4">
+          <span className="inline-block px-3 py-1 bg-indigo-100/80 text-indigo-700 text-xs font-bold rounded-full border border-indigo-200/50">
+            {category}
+          </span>
+        </div>
+        
+        {/* Enhanced Icon */}
+        <div className="mb-6 transform group-hover:scale-105 transition-transform duration-200">
+          <div className="w-16 h-16 bg-gradient-to-br from-indigo-500/10 to-slate-500/10 rounded-2xl 
+                          flex items-center justify-center text-5xl group-hover:shadow-lg 
+                          transition-all duration-300 border border-indigo-100/50"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(71, 85, 105, 0.1) 100%)',
+                 backdropFilter: 'blur(10px)'
+               }}>
+            {icon}
+          </div>
+        </div>
+        
+        {/* Enhanced Title */}
+        <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-4 leading-tight group-hover:text-indigo-900 transition-colors duration-300"
+            style={{ 
+              textRendering: 'optimizeLegibility', 
+              WebkitFontSmoothing: 'antialiased',
+              fontWeight: 900,
+              textShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+          {title}
+        </h3>
+        
+        {/* Description */}
+        <p className="text-lg text-slate-600 leading-relaxed mb-6 group-hover:text-slate-700 transition-colors duration-300"
+           style={{ 
+             textRendering: 'optimizeLegibility', 
+             WebkitFontSmoothing: 'antialiased',
+             lineHeight: '1.6'
+           }}>
+          {description}
+        </p>
+        
+        {/* Capabilities List */}
+        <div className="mb-6">
+          <div className="space-y-3">
+            {capabilities.map((capability, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <span className="w-3 h-3 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: '#4f46e5' }}></span>
+                <span className="text-slate-700 leading-relaxed group-hover:text-slate-800 transition-colors duration-300"
+                      style={{ 
+                        textRendering: 'optimizeLegibility', 
+                        WebkitFontSmoothing: 'antialiased'
+                      }}>
+                  {capability}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Metrics Badge */}
+        <div className="mb-4">
+          <div className="bg-gradient-to-r from-indigo-50 to-slate-50 rounded-xl p-4 border border-indigo-100/50">
+            <div className="text-xs font-bold text-indigo-600 mb-1">{metrics.label}</div>
+            <div className="text-xl font-black text-indigo-900 mb-1">{metrics.value}</div>
+            <div className="text-sm text-slate-600">{metrics.detail}</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Hover Glow Effect */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500/5 to-slate-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+    </div>
+  );
+};
+
 export { 
   LegacyCard, 
   LegacyCardHeader, 
@@ -399,5 +517,6 @@ export {
   LegacyCardFooter,
   ProblemCard,
   SolutionCard,
+  FeatureCard,
   type LegacyCardProps 
 };
