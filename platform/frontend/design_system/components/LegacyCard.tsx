@@ -758,7 +758,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
                       badge === 'Most Popular' ? 'ring-2 ring-green-500 ring-opacity-50 scale-105' : ''
                     } ${
                       badge === 'Recommended' ? 'ring-2 ring-purple-500 ring-opacity-50' : ''
-                    } h-[850px] flex flex-col`}
+                    } h-[900px] flex flex-col`}
          style={{
            background: theme.background,
            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
@@ -777,7 +777,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
       )}
       
       {/* Content - Flexible container */}
-      <div className="relative z-10 p-8 pt-20 flex flex-col flex-grow">
+      <div className="relative z-10 p-8 pt-20 pb-6 flex flex-col flex-grow">
         {/* Header - Fixed height section */}
         <div className="text-center mb-4 h-24 flex flex-col justify-center">
           <h3 className={`text-xl md:text-2xl font-black ${theme.text} mb-1 leading-tight group-hover:opacity-90 transition-colors duration-300`}
@@ -842,11 +842,11 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </div>
         
         {/* Bottom section - stays at bottom */}
-        <div className="mt-auto h-[280px] flex flex-col justify-end">
+        <div className="mt-auto h-[320px] flex flex-col justify-end">
           {/* Limits */}
-          <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-lg p-2 mb-3 border border-gray-100/50`}>
-            <h4 className="font-bold text-slate-900 mb-1 text-xs">Usage limits:</h4>
-            <div className="grid grid-cols-2 gap-1 text-xs text-slate-600">
+          <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-lg p-3 mb-4 border border-gray-100/50`}>
+            <h4 className="font-bold text-slate-900 mb-2 text-xs">Usage limits:</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
               <div className="text-center">
                 <strong className="text-xs">{limits.invoicesPerMonth === 'unlimited' ? '∞' : `${limits.invoicesPerMonth}`}</strong>
                 <div className="text-xs">invoices/mo</div>
@@ -867,15 +867,15 @@ const PricingCard: React.FC<PricingCardProps> = ({
           </div>
           
           {/* Ideal For */}
-          <div className="mb-3">
-            <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-2`}>
+          <div className="mb-4">
+            <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-3`}>
               <h4 className="font-bold text-slate-900 mb-1 text-xs">Ideal for:</h4>
               <p className="text-xs text-slate-600 line-clamp-2">{ideal}</p>
             </div>
           </div>
           
           {/* CTA Button */}
-          <div className="text-center">
+          <div className="text-center mb-2">
             <button
               onClick={() => onSelectPackage(id)}
               className={`w-full py-3 px-4 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform text-sm`}
@@ -887,7 +887,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
               Get Started with {name}
             </button>
             
-            <p className="text-xs text-slate-500 mt-1">30-day money back guarantee</p>
+            <p className="text-xs text-slate-500 mt-2 mb-2">30-day money back guarantee</p>
           </div>
         </div>
       </div>
