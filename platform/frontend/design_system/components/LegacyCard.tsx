@@ -736,8 +736,9 @@ const PricingCard: React.FC<PricingCardProps> = ({
   };
 
   const theme = colorThemes[color];
-  const currentPrice = price[billingCycle];
-  const savings = billingCycle === 'annual' ? originalAnnual - price.annual : 0;
+  const primaryPrice = price.monthly;  // Always show monthly as primary
+  const secondaryPrice = price.annual;
+  const savings = originalAnnual - price.annual;
   const savingsPercentage = Math.round((savings / originalAnnual) * 100);
 
   const formatPrice = (amount: number) => {
@@ -768,15 +769,15 @@ const PricingCard: React.FC<PricingCardProps> = ({
       
       {/* Badge */}
       {badge && (
-        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-          <div className={`bg-gradient-to-r ${theme.badge} text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg`}>
+        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
+          <div className={`bg-gradient-to-r ${theme.badge} text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg`}>
             {badge}
           </div>
         </div>
       )}
       
       {/* Content */}
-      <div className="relative z-10 p-8">
+      <div className="relative z-10 p-8 pt-12">
         {/* Header */}
         <div className="text-center mb-6">
           <h3 className={`text-2xl md:text-3xl font-black ${theme.text} mb-2 leading-tight group-hover:opacity-90 transition-colors duration-300`}
@@ -794,24 +795,26 @@ const PricingCard: React.FC<PricingCardProps> = ({
         
         {/* Pricing */}
         <div className="text-center mb-6">
+          {/* Primary Price (Monthly) */}
           <div className="flex items-center justify-center mb-2">
             <span className={`text-4xl md:text-5xl font-black ${theme.text}`}
                   style={{ fontWeight: 950 }}>
-              {formatPrice(currentPrice)}
+              {formatPrice(primaryPrice)}
             </span>
           </div>
-          <div className="text-sm text-slate-600">
-            /{billingCycle === 'monthly' ? 'month' : 'year'}
+          <div className="text-sm text-slate-600 font-semibold mb-3">
+            /month
           </div>
           
-          {/* Savings Badge */}
-          {billingCycle === 'annual' && savings > 0 && (
-            <div className="mt-2">
-              <span className={`inline-block px-3 py-1 bg-gradient-to-r ${theme.badge} text-white text-xs font-bold rounded-full shadow-lg`}>
-                Save {formatPrice(savings)} ({savingsPercentage}%)
-              </span>
+          {/* Secondary Price (Annual) */}
+          <div className="text-center">
+            <div className="text-lg text-slate-500 mb-1">
+              or {formatPrice(secondaryPrice)}/year
             </div>
-          )}
+            <div className="inline-block px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
+              Save {formatPrice(savings)} ({savingsPercentage}%)
+            </div>
+          </div>
         </div>
         
         {/* Features */}

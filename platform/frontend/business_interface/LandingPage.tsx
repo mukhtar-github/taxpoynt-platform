@@ -28,8 +28,8 @@ export const LandingPage: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
 
   const handlePackageSelect = (packageId: string) => {
-    // Navigate to signup with selected package
-    router.push(`/auth/signup?package=${packageId}&billing=${billingCycle}`);
+    // Navigate to signup with selected package (default to monthly)
+    router.push(`/auth/signup?package=${packageId}&billing=monthly`);
   };
 
   return (
@@ -1388,7 +1388,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20 pt-6">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
@@ -1474,25 +1474,6 @@ export const LandingPage: React.FC = () => {
                   </div>
                   <div className="relative flex justify-center">
                     <span className="px-8 py-2 text-lg text-teal-500 font-medium">●  ●  ●</span>
-                  </div>
-                </div>
-                
-                {/* Payment Methods */}
-                <div className="text-center mb-6">
-                  <p className="text-lg text-slate-600 mb-4 font-semibold">Accepted Nigerian Payment Methods:</p>
-                  <div className="flex items-center justify-center space-x-8 text-sm text-slate-600">
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-2">💳</span>
-                      <span>Visa, Mastercard, Verve</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-2">🏦</span>
-                      <span>Bank Transfer</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-2">📱</span>
-                      <span>USSD Payment</span>
-                    </div>
                   </div>
                 </div>
                 
