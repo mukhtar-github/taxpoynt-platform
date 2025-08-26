@@ -1358,32 +1358,34 @@ export const LandingPage: React.FC = () => {
             </p>
             
             {/* Billing Cycle Toggle */}
-            <div className="flex items-center justify-center bg-white rounded-2xl p-4 shadow-lg border-2 border-slate-200 max-w-md mx-auto">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-6 py-3 rounded-xl font-bold text-lg transition-all duration-300 mr-2 ${
-                  billingCycle === 'monthly'
-                    ? 'bg-teal-600 text-white shadow-lg scale-105'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingCycle('annual')}
-                className={`px-6 py-3 rounded-xl font-bold text-lg transition-all duration-300 ml-2 relative ${
-                  billingCycle === 'annual'
-                    ? 'bg-teal-600 text-white shadow-lg scale-105'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Annual
-                {billingCycle === 'annual' && (
-                  <span className="absolute -top-2 -right-2 px-2 py-1 text-xs font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
-                    17% OFF
-                  </span>
-                )}
-              </button>
+            <div className="flex items-center justify-center">
+              <div className="bg-white rounded-2xl p-2 shadow-lg border-2 border-slate-200 flex items-center gap-2">
+                <button
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
+                    billingCycle === 'monthly'
+                      ? 'bg-teal-600 text-white shadow-lg'
+                      : 'bg-transparent text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle('annual')}
+                  className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 relative ${
+                    billingCycle === 'annual'
+                      ? 'bg-teal-600 text-white shadow-lg'
+                      : 'bg-transparent text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Annual
+                </button>
+              </div>
+              {billingCycle === 'annual' && (
+                <span className="ml-3 px-3 py-1 text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
+                  Save 17%
+                </span>
+              )}
             </div>
           </div>
 
@@ -1479,7 +1481,7 @@ export const LandingPage: React.FC = () => {
                 
                 {/* Final CTA */}
                 <div className="text-center">
-                  <p className="text-xl md:text-2xl font-bold text-slate-600 mb-6"
+                  <p className="text-xl md:text-2xl font-bold text-slate-600 mb-8"
                      style={{ 
                        textRendering: 'optimizeLegibility', 
                        WebkitFontSmoothing: 'antialiased',
@@ -1488,28 +1490,43 @@ export const LandingPage: React.FC = () => {
                     Questions? Speak with our Nigerian team.
                   </p>
                   
-                  {/* Contact Button */}
-                  <button
-                    onClick={() => router.push('/contact')}
-                    className="inline-flex items-center justify-center px-12 py-4 bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-700 hover:from-teal-700 hover:via-cyan-700 hover:to-teal-800 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform mr-4"
-                    style={{
-                      textRendering: 'optimizeLegibility',
-                      WebkitFontSmoothing: 'antialiased'
-                    }}
-                  >
-                    <span className="text-lg font-black">Contact Sales Team</span>
-                  </button>
+                  {/* CTA Buttons Container */}
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    {/* Primary CTA - Start Free Trial */}
+                    <button
+                      onClick={() => router.push('/auth/signup')}
+                      className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-700 hover:from-teal-700 hover:via-cyan-700 hover:to-teal-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-teal-500/40 transition-all duration-500 hover:scale-105 transform border border-teal-500/20 hover:border-teal-400/40 min-w-[280px]"
+                      style={{
+                        background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 50%, #0f766e 100%)',
+                        boxShadow: '0 20px 40px -12px rgba(13, 148, 136, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                        textRendering: 'optimizeLegibility',
+                        WebkitFontSmoothing: 'antialiased'
+                      }}
+                    >
+                      <span className="relative z-10 text-2xl font-black">Start Free Trial</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </button>
+                    
+                    {/* Secondary CTA - Contact Sales */}
+                    <button
+                      onClick={() => router.push('/contact')}
+                      className="group relative inline-flex items-center justify-center px-16 py-6 bg-white border-2 border-teal-600 text-teal-600 hover:bg-teal-50 hover:border-teal-700 font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 transform min-w-[280px]"
+                      style={{
+                        textRendering: 'optimizeLegibility',
+                        WebkitFontSmoothing: 'antialiased',
+                        boxShadow: '0 10px 25px -5px rgba(13, 148, 136, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                      }}
+                    >
+                      <span className="relative z-10 text-2xl font-black">Contact Sales Team</span>
+                    </button>
+                  </div>
                   
-                  <button
-                    onClick={() => router.push('/auth/signup')}
-                    className="inline-flex items-center justify-center px-12 py-4 bg-white border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform"
-                    style={{
-                      textRendering: 'optimizeLegibility',
-                      WebkitFontSmoothing: 'antialiased'
-                    }}
-                  >
-                    <span className="text-lg font-black">Start Free Trial</span>
-                  </button>
+                  {/* Supporting Text */}
+                  <div className="mt-6 text-lg text-slate-600 font-medium">
+                    <span className="mr-2">🇳🇬</span>
+                    Local Nigerian support team ready to help
+                    <span className="ml-2">📞</span>
+                  </div>
                 </div>
                 
                 {/* Subtle Pattern Overlay */}
