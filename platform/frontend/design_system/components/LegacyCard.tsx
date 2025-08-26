@@ -779,7 +779,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
       {/* Content - Flexible container */}
       <div className="relative z-10 p-8 pt-20 pb-6 flex flex-col flex-grow">
         {/* Header - Fixed height section */}
-        <div className="text-center mb-4 h-24 flex flex-col justify-center">
+        <div className="text-center mb-6 h-24 flex flex-col justify-center">
           <h3 className={`text-xl md:text-2xl font-black ${theme.text} mb-1 leading-tight group-hover:opacity-90 transition-colors duration-300`}
               style={{ 
                 textRendering: 'optimizeLegibility', 
@@ -794,7 +794,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </div>
         
         {/* Pricing - Fixed height section */}
-        <div className="text-center mb-4 h-28 flex flex-col justify-center">
+        <div className="text-center mb-6 h-28 flex flex-col justify-center">
           {/* Primary Price (Monthly) */}
           <div className="flex items-center justify-center mb-1">
             <span className={`text-3xl md:text-4xl font-black ${theme.text}`}
@@ -818,9 +818,9 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </div>
         
         {/* Features - Controlled flexible section */}
-        <div className="flex-grow mb-4 min-h-[200px] max-h-[250px] overflow-hidden">
-          <h4 className="font-bold text-slate-900 mb-2 text-sm">What's included:</h4>
-          <div className="space-y-1.5">
+        <div className="flex-grow mb-6 min-h-[200px] max-h-[250px] overflow-hidden">
+          <h4 className="font-bold text-slate-900 mb-3 text-sm">What's included:</h4>
+          <div className="space-y-2">
             {features.slice(0, 8).map((feature, index) => (
               <div key={index} className="flex items-start gap-2">
                 <span className="w-2 h-2 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: theme.dot }}></span>
@@ -875,7 +875,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
           </div>
           
           {/* CTA Button */}
-          <div className="text-center mb-2">
+          <div className="text-center mb-3">
             <button
               onClick={() => onSelectPackage(id)}
               className={`w-full py-3 px-4 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform text-sm`}
@@ -887,7 +887,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
               Get Started with {name}
             </button>
             
-            <p className="text-xs text-slate-500 mt-2 mb-2">30-day money back guarantee</p>
+            <p className="text-xs text-slate-500 mt-3 mb-3">30-day money back guarantee</p>
           </div>
         </div>
       </div>
