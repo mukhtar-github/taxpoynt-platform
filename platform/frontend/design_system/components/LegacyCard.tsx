@@ -654,6 +654,239 @@ const BeforeAfterCard: React.FC<BeforeAfterCardProps> = ({
   );
 };
 
+// Pricing Card - specialized for service packages
+interface PricingCardProps {
+  id: string;
+  name: string;
+  subtitle: string;
+  description: string;
+  price: {
+    monthly: number;
+    annual: number;
+  };
+  originalAnnual: number;
+  badge?: string | null;
+  features: string[];
+  limits: {
+    invoicesPerMonth: number | 'unlimited';
+    integrations: number | 'unlimited';
+    users: number | 'unlimited';
+    storage: string;
+  };
+  ideal: string;
+  color: 'blue' | 'green' | 'purple' | 'indigo';
+  billingCycle: 'monthly' | 'annual';
+  onSelectPackage: (packageId: string) => void;
+  className?: string;
+}
+
+const PricingCard: React.FC<PricingCardProps> = ({
+  id,
+  name,
+  subtitle,
+  description,
+  price,
+  originalAnnual,
+  badge,
+  features,
+  limits,
+  ideal,
+  color,
+  billingCycle,
+  onSelectPackage,
+  className = '',
+}) => {
+  const colorThemes = {
+    blue: {
+      gradient: 'from-blue-50 via-white to-indigo-50/30',
+      border: 'border-blue-200/50 hover:border-blue-300/50',
+      shadow: 'hover:shadow-blue-500/10',
+      badge: 'from-blue-500 to-indigo-500',
+      text: 'text-blue-900',
+      dot: '#1e40af',
+      background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)'
+    },
+    green: {
+      gradient: 'from-green-50 via-white to-emerald-50/30',
+      border: 'border-green-200/50 hover:border-green-300/50',
+      shadow: 'hover:shadow-green-500/10',
+      badge: 'from-green-500 to-emerald-500',
+      text: 'text-green-900',
+      dot: '#166534',
+      background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #ecfdf5 100%)'
+    },
+    purple: {
+      gradient: 'from-purple-50 via-white to-violet-50/30',
+      border: 'border-purple-200/50 hover:border-purple-300/50',
+      shadow: 'hover:shadow-purple-500/10',
+      badge: 'from-purple-500 to-violet-500',
+      text: 'text-purple-900',
+      dot: '#6b21a8',
+      background: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 50%, #f3e8ff 100%)'
+    },
+    indigo: {
+      gradient: 'from-indigo-50 via-white to-slate-50/30',
+      border: 'border-indigo-200/50 hover:border-indigo-300/50',
+      shadow: 'hover:shadow-indigo-500/10',
+      badge: 'from-indigo-500 to-slate-500',
+      text: 'text-indigo-900',
+      dot: '#3730a3',
+      background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 50%, #f8fafc 100%)'
+    }
+  };
+
+  const theme = colorThemes[color];
+  const currentPrice = price[billingCycle];
+  const savings = billingCycle === 'annual' ? originalAnnual - price.annual : 0;
+  const savingsPercentage = Math.round((savings / originalAnnual) * 100);
+
+  const formatPrice = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  return (
+    <div className={`group relative bg-gradient-to-br ${theme.gradient} rounded-2xl 
+                    shadow-xl hover:shadow-2xl ${theme.shadow} 
+                    transition-all duration-300 hover:-translate-y-1 
+                    cursor-pointer border ${theme.border} 
+                    backdrop-blur-sm overflow-hidden ${className} ${
+                      badge === 'Most Popular' ? 'ring-2 ring-green-500 ring-opacity-50 scale-105' : ''
+                    } ${
+                      badge === 'Recommended' ? 'ring-2 ring-purple-500 ring-opacity-50' : ''
+                    }`}
+         style={{
+           background: theme.background,
+           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+         }}>
+      
+      {/* Premium Background Overlay */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient.replace('via-white', 'via-transparent')} rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+      
+      {/* Badge */}
+      {badge && (
+        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+          <div className={`bg-gradient-to-r ${theme.badge} text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg`}>
+            {badge}
+          </div>
+        </div>
+      )}
+      
+      {/* Content */}
+      <div className="relative z-10 p-8">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h3 className={`text-2xl md:text-3xl font-black ${theme.text} mb-2 leading-tight group-hover:opacity-90 transition-colors duration-300`}
+              style={{ 
+                textRendering: 'optimizeLegibility', 
+                WebkitFontSmoothing: 'antialiased',
+                fontWeight: 900,
+                textShadow: '0 2px 4px rgba(0,0,0,0.05)'
+              }}>
+            {name}
+          </h3>
+          <p className="text-lg font-semibold text-slate-600 mb-2">{subtitle}</p>
+          <p className="text-sm text-slate-600 leading-relaxed">{description}</p>
+        </div>
+        
+        {/* Pricing */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center mb-2">
+            <span className={`text-4xl md:text-5xl font-black ${theme.text}`}
+                  style={{ fontWeight: 950 }}>
+              {formatPrice(currentPrice)}
+            </span>
+          </div>
+          <div className="text-sm text-slate-600">
+            /{billingCycle === 'monthly' ? 'month' : 'year'}
+          </div>
+          
+          {/* Savings Badge */}
+          {billingCycle === 'annual' && savings > 0 && (
+            <div className="mt-2">
+              <span className={`inline-block px-3 py-1 bg-gradient-to-r ${theme.badge} text-white text-xs font-bold rounded-full shadow-lg`}>
+                Save {formatPrice(savings)} ({savingsPercentage}%)
+              </span>
+            </div>
+          )}
+        </div>
+        
+        {/* Features */}
+        <div className="mb-6">
+          <h4 className="font-bold text-slate-900 mb-3">What's included:</h4>
+          <div className="space-y-2">
+            {features.map((feature, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <span className="w-3 h-3 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: theme.dot }}></span>
+                <span className="text-slate-700 leading-relaxed text-sm"
+                      style={{ 
+                        textRendering: 'optimizeLegibility', 
+                        WebkitFontSmoothing: 'antialiased'
+                      }}>
+                  {feature}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Limits */}
+        <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-xl p-4 mb-6 border border-gray-100/50`}>
+          <h4 className="font-bold text-slate-900 mb-2 text-sm">Usage limits:</h4>
+          <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div>
+              <strong>{limits.invoicesPerMonth === 'unlimited' ? 'Unlimited' : `${limits.invoicesPerMonth}`}</strong>
+              <div>invoices/month</div>
+            </div>
+            <div>
+              <strong>{limits.integrations === 'unlimited' ? 'Unlimited' : limits.integrations}</strong>
+              <div>integrations</div>
+            </div>
+            <div>
+              <strong>{limits.users === 'unlimited' ? 'Unlimited' : limits.users}</strong>
+              <div>users</div>
+            </div>
+            <div>
+              <strong>{limits.storage}</strong>
+              <div>storage</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Ideal For */}
+        <div className="mb-6">
+          <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-3`}>
+            <h4 className="font-bold text-slate-900 mb-1 text-sm">Ideal for:</h4>
+            <p className="text-xs text-slate-600">{ideal}</p>
+          </div>
+        </div>
+        
+        {/* CTA Button */}
+        <div className="text-center">
+          <button
+            onClick={() => onSelectPackage(id)}
+            className={`w-full py-4 px-6 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform`}
+            style={{
+              textRendering: 'optimizeLegibility',
+              WebkitFontSmoothing: 'antialiased'
+            }}
+          >
+            Get Started with {name}
+          </button>
+          
+          <p className="text-xs text-slate-500 mt-2">30-day money back guarantee</p>
+        </div>
+      </div>
+      
+      {/* Hover Glow Effect */}
+      <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${theme.gradient.replace('via-white', 'via-transparent')} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
+    </div>
+  );
+};
+
 export { 
   LegacyCard, 
   LegacyCardHeader, 
@@ -665,5 +898,6 @@ export {
   SolutionCard,
   FeatureCard,
   BeforeAfterCard,
+  PricingCard,
   type LegacyCardProps 
 };

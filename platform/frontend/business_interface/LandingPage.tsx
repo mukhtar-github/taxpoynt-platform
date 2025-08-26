@@ -4,7 +4,7 @@
  * Clean, professional landing page focused on conversion and clarity.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   TaxPoyntButton, 
@@ -13,16 +13,24 @@ import {
   SolutionCard,
   FeatureCard,
   BeforeAfterCard,
+  PricingCard,
   PROBLEMS_DATA,
   ENTERPRISE_SOLUTIONS_DATA,
   ENTERPRISE_FEATURES_DATA,
   BEFORE_AFTER_DATA,
+  SERVICE_PACKAGES_DATA,
   buildGridClasses,
   TAXPOYNT_DESIGN_SYSTEM 
 } from '../design_system';
 
 export const LandingPage: React.FC = () => {
   const router = useRouter();
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+
+  const handlePackageSelect = (packageId: string) => {
+    // Navigate to signup with selected package
+    router.push(`/auth/signup?package=${packageId}&billing=${billingCycle}`);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50" style={{ 
@@ -1277,6 +1285,254 @@ export const LandingPage: React.FC = () => {
                 
                 {/* Subtle Pattern Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 via-transparent to-violet-50/20 rounded-3xl pointer-events-none"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Professional Transition to Pricing Section */}
+      <div className="relative">
+        {/* Smooth gradient transition */}
+        <div className="h-16 bg-gradient-to-b from-purple-50 via-teal-100 to-teal-50"></div>
+        
+        {/* Subtle shadow depth */}
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-teal-200/20"></div>
+      </div>
+
+      {/* Section 7: Service Packages/Pricing - Real TaxPoynt Pricing */}
+      <section className="py-20 bg-gradient-to-br from-teal-50 via-cyan-50/30 to-teal-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(20, 184, 166, 0.08)' 
+      }}>
+        <div className="max-w-7xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-16">
+            {/* Premium Badge - Teal Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-teal-50/95 to-cyan-50/95 backdrop-blur-sm border-2 border-teal-200/50 text-teal-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-teal-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(240, 253, 250, 0.95) 0%, rgba(236, 254, 255, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#0f766e' }}></span>
+              Service Packages
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-teal-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-700">Choose the perfect plan</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-teal-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(20, 184, 166, 0.3)'
+                        }}>
+                    for your business
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-500 rounded-full opacity-90"></div>
+                </span>
+                <span className="block mt-2 text-slate-700">with transparent Nigerian pricing</span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium mb-8"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              <span className="text-teal-600 font-bold">Authentic Nigerian pricing</span> from TaxPoynt's real service packages. No hidden fees, transparent costs, local payment methods.
+            </p>
+            
+            {/* Billing Cycle Toggle */}
+            <div className="flex items-center justify-center">
+              <span className={`mr-4 text-lg font-semibold ${billingCycle === 'monthly' ? 'text-teal-900' : 'text-slate-500'}`}>
+                Monthly
+              </span>
+              <button
+                onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
+                className={`
+                  relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300
+                  ${billingCycle === 'annual' ? 'bg-teal-600' : 'bg-slate-200'}
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-6 w-6 transform rounded-full bg-white transition-transform duration-300
+                    ${billingCycle === 'annual' ? 'translate-x-8' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+              <span className={`ml-4 text-lg font-semibold ${billingCycle === 'annual' ? 'text-teal-900' : 'text-slate-500'}`}>
+                Annual
+              </span>
+              {billingCycle === 'annual' && (
+                <span className="ml-3 px-3 py-1 text-sm font-bold bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-full shadow-lg">
+                  Save up to 17%
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Pricing Cards Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+            {SERVICE_PACKAGES_DATA.map((pkg, index) => (
+              <PricingCard
+                key={pkg.id}
+                id={pkg.id}
+                name={pkg.name}
+                subtitle={pkg.subtitle}
+                description={pkg.description}
+                price={pkg.price}
+                originalAnnual={pkg.originalAnnual}
+                badge={pkg.badge}
+                features={pkg.features}
+                limits={pkg.limits}
+                ideal={pkg.ideal}
+                color={pkg.color}
+                billingCycle={billingCycle}
+                onSelectPackage={handlePackageSelect}
+              />
+            ))}
+          </div>
+
+          {/* Premium Bottom Section */}
+          <div className="text-center mt-24 mb-12">
+            {/* Pricing Hook */}
+            <div className="mb-8 mt-8">
+              <p className="text-3xl md:text-4xl text-slate-600 mb-6 font-bold"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                 }}>
+                Trusted by Nigerian businesses
+              </p>
+              <p className="text-4xl md:text-5xl font-black text-teal-600 mb-2"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   fontWeight: 950,
+                   textShadow: '0 2px 4px rgba(20, 184, 166, 0.3)'
+                 }}>
+                Start your subscription today.
+              </p>
+            </div>
+            
+            {/* Trust & Guarantee Card */}
+            <div className="relative max-w-5xl mx-auto">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-teal-500/20 rounded-3xl blur-xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-white/10 rounded-3xl"></div>
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-white/95 via-teal-50/90 to-white/95 
+                              border-2 border-teal-200/50 rounded-3xl p-8 md:p-12 
+                              shadow-2xl backdrop-blur-sm"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,253,250,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                     backdropFilter: 'blur(16px)',
+                     boxShadow: '0 25px 50px -12px rgba(20, 184, 166, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                   }}>
+                
+                {/* Trust Guarantees */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                  <div className="text-center">
+                    <div className="text-4xl mb-3">🛡️</div>
+                    <div className="text-2xl font-black text-teal-600 mb-2">30-Day</div>
+                    <div className="text-lg text-slate-600 font-semibold">Money Back Guarantee</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl mb-3">💳</div>
+                    <div className="text-2xl font-black text-teal-600 mb-2">Nigerian</div>
+                    <div className="text-lg text-slate-600 font-semibold">Payment Methods</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl mb-3">📞</div>
+                    <div className="text-2xl font-black text-teal-600 mb-2">24/7</div>
+                    <div className="text-lg text-slate-600 font-semibold">Nigerian Support</div>
+                  </div>
+                </div>
+                
+                {/* Elegant Divider */}
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gradient-to-r from-transparent via-teal-300 to-transparent"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-8 py-2 text-lg text-teal-500 font-medium">●  ●  ●</span>
+                  </div>
+                </div>
+                
+                {/* Payment Methods */}
+                <div className="text-center mb-6">
+                  <p className="text-lg text-slate-600 mb-4 font-semibold">Accepted Nigerian Payment Methods:</p>
+                  <div className="flex items-center justify-center space-x-8 text-sm text-slate-600">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">💳</span>
+                      <span>Visa, Mastercard, Verve</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">🏦</span>
+                      <span>Bank Transfer</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">📱</span>
+                      <span>USSD Payment</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Final CTA */}
+                <div className="text-center">
+                  <p className="text-xl md:text-2xl font-bold text-slate-600 mb-6"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       textShadow: '0 2px 4px rgba(100, 116, 139, 0.1)'
+                     }}>
+                    Questions? Speak with our Nigerian team.
+                  </p>
+                  
+                  {/* Contact Button */}
+                  <button
+                    onClick={() => router.push('/contact')}
+                    className="inline-flex items-center justify-center px-12 py-4 bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-700 hover:from-teal-700 hover:via-cyan-700 hover:to-teal-800 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform mr-4"
+                    style={{
+                      textRendering: 'optimizeLegibility',
+                      WebkitFontSmoothing: 'antialiased'
+                    }}
+                  >
+                    <span className="text-lg font-black">Contact Sales Team</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => router.push('/auth/signup')}
+                    className="inline-flex items-center justify-center px-12 py-4 bg-white border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform"
+                    style={{
+                      textRendering: 'optimizeLegibility',
+                      WebkitFontSmoothing: 'antialiased'
+                    }}
+                  >
+                    <span className="text-lg font-black">Start Free Trial</span>
+                  </button>
+                </div>
+                
+                {/* Subtle Pattern Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-teal-50/20 via-transparent to-cyan-50/20 rounded-3xl pointer-events-none"></div>
               </div>
             </div>
           </div>

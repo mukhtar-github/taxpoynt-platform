@@ -451,6 +451,131 @@ export const BEFORE_AFTER_DATA = [
 ];
 
 // ========================================
+// SERVICE PACKAGES/PRICING DATA - Real TaxPoynt pricing model
+// ========================================
+
+export const SERVICE_PACKAGES_DATA = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    subtitle: 'Perfect for small businesses',
+    description: 'Get started with essential e-invoicing and FIRS compliance',
+    price: { 
+      monthly: 15000, 
+      annual: 150000 
+    },
+    originalAnnual: 180000, // For showing savings
+    badge: null,
+    features: [
+      'Basic e-invoice generation',
+      'FIRS compliance validation', 
+      'Single ERP integration',
+      'Email notifications',
+      '24/7 support chat',
+      'Mobile app access'
+    ],
+    limits: {
+      invoicesPerMonth: 100,
+      integrations: 1,
+      users: 3,
+      storage: '1GB'
+    },
+    ideal: 'Small businesses, startups, solo entrepreneurs',
+    color: 'blue' as const
+  },
+  {
+    id: 'professional', 
+    name: 'Professional',
+    subtitle: 'Most popular choice',
+    description: 'Advanced features for growing businesses',
+    price: {
+      monthly: 45000,
+      annual: 450000
+    },
+    originalAnnual: 540000, // For showing savings
+    badge: 'Most Popular',
+    features: [
+      'Advanced invoice templates',
+      'Multiple ERP integrations',
+      'Real-time compliance monitoring',
+      'Custom reporting dashboard',
+      'API access & webhooks',
+      'Priority support',
+      'Bulk operations',
+      'Advanced analytics'
+    ],
+    limits: {
+      invoicesPerMonth: 500,
+      integrations: 3,
+      users: 10,
+      storage: '10GB'
+    },
+    ideal: 'Growing businesses, SMEs, multiple departments',
+    color: 'green' as const
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    subtitle: 'Complete solution',
+    description: 'Full-featured platform for large organizations',
+    price: {
+      monthly: 150000,
+      annual: 1500000
+    },
+    originalAnnual: 1800000, // For showing savings
+    badge: 'Recommended',
+    features: [
+      'Unlimited integrations',
+      'White-label solutions',
+      'Advanced analytics & BI',
+      'Custom compliance rules',
+      'Dedicated account manager',
+      'SLA guarantees (99.9% uptime)',
+      'Custom development',
+      'Enterprise security'
+    ],
+    limits: {
+      invoicesPerMonth: 'unlimited' as const,
+      integrations: 'unlimited' as const, 
+      users: 'unlimited' as const,
+      storage: 'unlimited'
+    },
+    ideal: 'Large enterprises, corporations, multi-location businesses',
+    color: 'purple' as const
+  },
+  {
+    id: 'hybrid',
+    name: 'Hybrid Premium',
+    subtitle: 'Ultimate solution',
+    description: 'SI + APP combined services with revenue sharing',
+    price: {
+      monthly: 200000,
+      annual: 2000000
+    },
+    originalAnnual: 2400000, // For showing savings
+    badge: 'Premium',
+    features: [
+      'All Enterprise features included',
+      'APP grant revenue sharing',
+      'Priority compliance processing',
+      'Advanced integration framework',
+      'Custom development support',
+      'Revenue optimization tools',
+      'Dedicated technical team',
+      'Strategic partnership benefits'
+    ],
+    limits: {
+      invoicesPerMonth: 'unlimited' as const,
+      integrations: 'unlimited' as const,
+      users: 'unlimited' as const, 
+      storage: 'unlimited'
+    },
+    ideal: 'System integrators, APP partners, technology partners',
+    color: 'indigo' as const
+  }
+];
+
+// ========================================
 // SOLUTION PATTERNS (Positive Outcomes)
 // ========================================
 

@@ -21,6 +21,7 @@ export {
   SolutionCard,
   FeatureCard,
   BeforeAfterCard,
+  PricingCard,
   type LegacyCardProps 
 } from './components/LegacyCard';
 
@@ -90,6 +91,7 @@ export {
   ENTERPRISE_SOLUTIONS_DATA,
   ENTERPRISE_FEATURES_DATA,
   BEFORE_AFTER_DATA,
+  SERVICE_PACKAGES_DATA,
   SOLUTION_PATTERNS,
   COLOR_SCHEMES,
   TYPOGRAPHY_PATTERNS,
