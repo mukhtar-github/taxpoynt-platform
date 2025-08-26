@@ -508,6 +508,152 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   );
 };
 
+// Before/After Card - specialized for transformation comparison
+interface BeforeAfterCardProps {
+  metric: string;
+  before: {
+    value: string;
+    description: string;
+    painPoints: string[];
+  };
+  after: {
+    value: string;
+    description: string;
+    benefits: string[];
+  };
+  improvement: string;
+  category: string;
+  className?: string;
+}
+
+const BeforeAfterCard: React.FC<BeforeAfterCardProps> = ({
+  metric,
+  before,
+  after,
+  improvement,
+  category,
+  className = '',
+}) => {
+  return (
+    <div className={`group relative bg-gradient-to-br from-purple-50 via-white to-violet-50/30 rounded-2xl 
+                    shadow-xl hover:shadow-2xl hover:shadow-purple-500/10 
+                    transition-all duration-300 hover:-translate-y-1 
+                    cursor-pointer border border-purple-200/50 hover:border-purple-300/50 
+                    backdrop-blur-sm overflow-hidden ${className}`}
+         style={{
+           background: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 50%, #f3e8ff 100%)',
+           boxShadow: '0 10px 25px -5px rgba(147, 51, 234, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+         }}>
+      
+      {/* Premium Background Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 via-transparent to-violet-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      
+      {/* Content */}
+      <div className="relative z-10 p-8">
+        {/* Category Badge */}
+        <div className="mb-4">
+          <span className="inline-block px-3 py-1 bg-purple-100/80 text-purple-700 text-xs font-bold rounded-full border border-purple-200/50">
+            {category}
+          </span>
+        </div>
+        
+        {/* Metric Title */}
+        <h3 className="text-xl md:text-2xl font-black text-purple-900 mb-6 leading-tight group-hover:text-purple-800 transition-colors duration-300"
+            style={{ 
+              textRendering: 'optimizeLegibility', 
+              WebkitFontSmoothing: 'antialiased',
+              fontWeight: 900,
+              textShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+          {metric}
+        </h3>
+        
+        {/* Before/After Comparison */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          {/* Before Section */}
+          <div className="relative">
+            {/* Before Header */}
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mr-3">
+                <span className="text-white text-sm font-bold">❌</span>
+              </div>
+              <span className="text-red-700 font-bold text-sm uppercase tracking-wide">Before TaxPoynt</span>
+            </div>
+            
+            {/* Before Value */}
+            <div className="text-2xl font-black text-red-800 mb-2">{before.value}</div>
+            <p className="text-sm text-slate-600 mb-3">{before.description}</p>
+            
+            {/* Pain Points */}
+            <div className="space-y-1">
+              {before.painPoints.slice(0, 2).map((point, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-xs text-slate-600 leading-tight">{point}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* After Section */}
+          <div className="relative">
+            {/* After Header */}
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mr-3">
+                <span className="text-white text-sm font-bold">✅</span>
+              </div>
+              <span className="text-green-700 font-bold text-sm uppercase tracking-wide">With TaxPoynt</span>
+            </div>
+            
+            {/* After Value */}
+            <div className="text-2xl font-black text-green-800 mb-2">{after.value}</div>
+            <p className="text-sm text-slate-600 mb-3">{after.description}</p>
+            
+            {/* Benefits */}
+            <div className="space-y-1">
+              {after.benefits.slice(0, 2).map((benefit, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-xs text-slate-600 leading-tight">{benefit}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Transformation Arrow */}
+        <div className="flex items-center justify-center mb-4">
+          <div className="bg-gradient-to-r from-purple-500 to-violet-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
+            {improvement}
+          </div>
+        </div>
+        
+        {/* Divider */}
+        <div className="relative mb-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-purple-200/50"></div>
+          </div>
+          <div className="relative flex justify-center">
+            <div className="bg-white px-3">
+              <span className="text-purple-400 text-sm">●</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Call to Action */}
+        <div className="text-center">
+          <p className="text-sm text-purple-700 font-medium">
+            See this transformation in your business
+          </p>
+        </div>
+      </div>
+      
+      {/* Hover Glow Effect */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+    </div>
+  );
+};
+
 export { 
   LegacyCard, 
   LegacyCardHeader, 
@@ -518,5 +664,6 @@ export {
   ProblemCard,
   SolutionCard,
   FeatureCard,
+  BeforeAfterCard,
   type LegacyCardProps 
 };

@@ -12,9 +12,11 @@ import {
   ProblemCard,
   SolutionCard,
   FeatureCard,
+  BeforeAfterCard,
   PROBLEMS_DATA,
   ENTERPRISE_SOLUTIONS_DATA,
   ENTERPRISE_FEATURES_DATA,
+  BEFORE_AFTER_DATA,
   buildGridClasses,
   TAXPOYNT_DESIGN_SYSTEM 
 } from '../design_system';
@@ -92,7 +94,7 @@ export const LandingPage: React.FC = () => {
                    background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.95) 0%, rgba(239, 246, 255, 0.95) 100%)',
                    backdropFilter: 'blur(10px)'
                  }}>
-              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#4338ca' }}></span>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#3730a3' }}></span>
               FIRS Certified Access Point Provider
             </div>
 
@@ -268,7 +270,7 @@ export const LandingPage: React.FC = () => {
                    background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95) 0%, rgba(238, 242, 255, 0.95) 100%)',
                    backdropFilter: 'blur(10px)'
                  }}>
-              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#1d4ed8' }}></span>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#1e40af' }}></span>
               Enterprise Performance Metrics
             </div>
             
@@ -924,7 +926,7 @@ export const LandingPage: React.FC = () => {
                    background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
                    backdropFilter: 'blur(10px)'
                  }}>
-              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#4f46e5' }}></span>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#3730a3' }}></span>
               Platform Capabilities
             </div>
             
@@ -1084,6 +1086,197 @@ export const LandingPage: React.FC = () => {
                 
                 {/* Subtle Pattern Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-transparent to-slate-50/20 rounded-3xl pointer-events-none"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Professional Transition to Before/After Section */}
+      <div className="relative">
+        {/* Smooth gradient transition */}
+        <div className="h-16 bg-gradient-to-b from-slate-50 via-purple-100 to-purple-50"></div>
+        
+        {/* Subtle shadow depth */}
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-purple-200/20"></div>
+      </div>
+
+      {/* Section 6: Before/After - Transformation Comparison */}
+      <section className="py-20 bg-gradient-to-br from-purple-50 via-violet-50/30 to-purple-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(147, 51, 234, 0.08)' 
+      }}>
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge - Purple Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-50/95 to-violet-50/95 backdrop-blur-sm border-2 border-purple-200/50 text-purple-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-purple-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(250, 245, 255, 0.95) 0%, rgba(245, 243, 255, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#6b21a8' }}></span>
+              Business Transformation
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-purple-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-700">The dramatic difference</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-purple-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(147, 51, 234, 0.3)'
+                        }}>
+                    TaxPoynt creates
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-violet-500 to-purple-500 rounded-full opacity-90"></div>
+                </span>
+                <span className="block mt-2 text-slate-700">in every business metric</span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              See the <span className="text-purple-600 font-bold">measurable transformation</span> TaxPoynt delivers across 6 critical business areas - from operational efficiency to employee satisfaction.
+            </p>
+          </div>
+
+          {/* Before/After Grid - Using Design System */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
+            {BEFORE_AFTER_DATA.map((comparison, index) => (
+              <BeforeAfterCard
+                key={index}
+                metric={comparison.metric}
+                before={comparison.before}
+                after={comparison.after}
+                improvement={comparison.improvement}
+                category={comparison.category}
+              />
+            ))}
+          </div>
+
+          {/* Premium Bottom CTA Section */}
+          <div className="text-center mt-24 mb-12">
+            {/* Transformation Hook */}
+            <div className="mb-8 mt-8">
+              <p className="text-3xl md:text-4xl text-slate-600 mb-6 font-bold"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                 }}>
+                Ready for your transformation?
+              </p>
+              <p className="text-4xl md:text-5xl font-black text-purple-600 mb-2"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   fontWeight: 950,
+                   textShadow: '0 2px 4px rgba(147, 51, 234, 0.3)'
+                 }}>
+                Start your Before/After story.
+              </p>
+            </div>
+            
+            {/* Transformation Statistics Card */}
+            <div className="relative max-w-5xl mx-auto">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-violet-500/10 to-purple-500/20 rounded-3xl blur-xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-white/10 rounded-3xl"></div>
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-white/95 via-purple-50/90 to-white/95 
+                              border-2 border-purple-200/50 rounded-3xl p-8 md:p-12 
+                              shadow-2xl backdrop-blur-sm"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(250,245,255,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                     backdropFilter: 'blur(16px)',
+                     boxShadow: '0 25px 50px -12px rgba(147, 51, 234, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                   }}>
+                
+                {/* Transformation Statistics */}
+                <div className="mb-8">
+                  <div className="text-6xl md:text-7xl font-black text-purple-600 mb-4 leading-none"
+                       style={{
+                         fontWeight: 950,
+                         textShadow: '0 4px 8px rgba(147, 51, 234, 0.3)'
+                       }}>
+                    6x
+                  </div>
+                  <p className="text-2xl md:text-3xl text-slate-600 font-bold leading-tight mb-2"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                    Average improvement across all business metrics
+                  </p>
+                  <p className="text-2xl md:text-3xl font-black text-purple-700 leading-tight"
+                     style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased', fontWeight: 900 }}>
+                    with TaxPoynt's unified platform.
+                  </p>
+                </div>
+                
+                {/* Elegant Divider */}
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gradient-to-r from-transparent via-purple-300 to-transparent"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-8 py-2 text-lg text-purple-500 font-medium">●  ●  ●</span>
+                  </div>
+                </div>
+                
+                {/* Transformation Message & CTA */}
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-slate-600 mb-6"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       textShadow: '0 2px 4px rgba(100, 116, 139, 0.1)'
+                     }}>
+                    Your transformation story starts with a single click.
+                  </p>
+                  
+                  {/* Clean Focused CTA Button */}
+                  <button
+                    onClick={() => router.push('/auth/signup')}
+                    className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-purple-600 via-violet-600 to-purple-700 hover:from-purple-700 hover:via-violet-700 hover:to-purple-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-purple-500/40 transition-all duration-500 hover:scale-105 transform border border-purple-500/20 hover:border-purple-400/40 min-w-[400px] mb-4"
+                    style={{
+                      background: 'linear-gradient(135deg, #9333ea 0%, #8b5cf6 50%, #7c3aed 100%)',
+                      boxShadow: '0 20px 40px -12px rgba(147, 51, 234, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      textRendering: 'optimizeLegibility',
+                      WebkitFontSmoothing: 'antialiased'
+                    }}
+                  >
+                    <span className="relative z-10 text-2xl font-black">Begin Your Transformation</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </button>
+                  
+                  {/* Supporting Text Below Button */}
+                  <div className="text-lg text-slate-600 font-medium">
+                    <span className="mr-2">🚀</span>
+                    Join businesses already experiencing these transformations
+                    <span className="ml-2">🚀</span>
+                  </div>
+                </div>
+                
+                {/* Subtle Pattern Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 via-transparent to-violet-50/20 rounded-3xl pointer-events-none"></div>
               </div>
             </div>
           </div>

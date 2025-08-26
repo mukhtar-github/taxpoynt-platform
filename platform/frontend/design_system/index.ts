@@ -20,6 +20,7 @@ export {
   ProblemCard,
   SolutionCard,
   FeatureCard,
+  BeforeAfterCard,
   type LegacyCardProps 
 } from './components/LegacyCard';
 
@@ -88,6 +89,7 @@ export {
   PROBLEMS_DATA,
   ENTERPRISE_SOLUTIONS_DATA,
   ENTERPRISE_FEATURES_DATA,
+  BEFORE_AFTER_DATA,
   SOLUTION_PATTERNS,
   COLOR_SCHEMES,
   TYPOGRAPHY_PATTERNS,

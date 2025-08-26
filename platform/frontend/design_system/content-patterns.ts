@@ -354,6 +354,103 @@ export const ENTERPRISE_FEATURES_DATA = [
 ];
 
 // ========================================
+// BEFORE/AFTER COMPARISON DATA - Transformation showcase
+// ========================================
+
+export const BEFORE_AFTER_DATA = [
+  {
+    metric: "Invoice Processing Time",
+    before: {
+      value: "4-6 hours",
+      description: "Manual data entry, format validation, multiple system updates",
+      painPoints: ["Manual data entry across 3-5 systems", "Format errors requiring rework", "Missing compliance fields", "Deadline pressure and overtime"]
+    },
+    after: {
+      value: "< 30 seconds",
+      description: "Automated processing with real-time validation and sync",
+      benefits: ["One-click invoice generation", "Automatic compliance validation", "Real-time system synchronization", "Guaranteed FIRS acceptance"]
+    },
+    improvement: "99.9% faster",
+    category: "Operational Efficiency"
+  },
+  {
+    metric: "System Integration Complexity",
+    before: {
+      value: "5+ disconnected systems",
+      description: "Manual data copying, version conflicts, truth scattered",
+      painPoints: ["SAP, QuickBooks, Salesforce all separate", "Manual data reconciliation daily", "Version conflicts and errors", "No single source of truth"]
+    },
+    after: {
+      value: "1 unified platform",
+      description: "150+ pre-built integrations with real-time sync",
+      benefits: ["All systems connected seamlessly", "Real-time data synchronization", "Single source of truth", "Zero manual reconciliation"]
+    },
+    improvement: "Complete unification",
+    category: "System Architecture"
+  },
+  {
+    metric: "Compliance Accuracy Rate",
+    before: {
+      value: "60-70% first-time success",
+      description: "Frequent rejections, manual fixes, compliance anxiety",
+      painPoints: ["30-40% rejection rate from FIRS", "Hours spent fixing errors", "Compliance rule confusion", "Penalty fees and stress"]
+    },
+    after: {
+      value: "99.9% success rate",
+      description: "Built-in validation, automatic updates, guaranteed compliance",
+      benefits: ["Automatic compliance validation", "Real-time regulation updates", "Zero rejection anxiety", "Penalty-free operations"]
+    },
+    improvement: "40% accuracy gain",
+    category: "Regulatory Compliance"
+  },
+  {
+    metric: "IT Resource Allocation",
+    before: {
+      value: "60% on maintenance",
+      description: "Constant system fixes, integration patches, technical debt",
+      painPoints: ["Custom API maintenance overhead", "System downtime and fixes", "Integration breaking regularly", "Technical debt accumulation"]
+    },
+    after: {
+      value: "5% on maintenance",
+      description: "Focus on innovation, strategic projects, business growth",
+      benefits: ["Zero custom integration maintenance", "99.9% platform uptime", "Resources freed for innovation", "Strategic IT initiatives"]
+    },
+    improvement: "55% resource liberation",
+    category: "Resource Optimization"
+  },
+  {
+    metric: "Business Scaling Capability",
+    before: {
+      value: "Limited by systems",
+      description: "Manual processes break under volume, growth bottlenecks",
+      painPoints: ["Manual processes don't scale", "System crashes during peaks", "Growth limited by infrastructure", "Exponential complexity increase"]
+    },
+    after: {
+      value: "Unlimited scalability",
+      description: "Enterprise-grade infrastructure handles millions of transactions",
+      benefits: ["Handles 1M+ transactions monthly", "Auto-scaling infrastructure", "Growth enables more growth", "Enterprise-ready architecture"]
+    },
+    improvement: "Infinite scale potential",
+    category: "Business Growth"
+  },
+  {
+    metric: "Employee Experience",
+    before: {
+      value: "Frustrated and stressed",
+      description: "Repetitive tasks, system fights, late nights fixing errors",
+      painPoints: ["Repetitive manual data entry", "Fighting with broken systems", "Overtime fixing compliance errors", "High stress, low satisfaction"]
+    },
+    after: {
+      value: "Empowered and strategic",
+      description: "Focus on high-value work, strategic initiatives, innovation",
+      benefits: ["Automated routine tasks", "Strategic project focus", "Work-life balance restored", "Career growth opportunities"]
+    },
+    improvement: "Complete transformation",
+    category: "Human Impact"
+  }
+];
+
+// ========================================
 // SOLUTION PATTERNS (Positive Outcomes)
 // ========================================
 
