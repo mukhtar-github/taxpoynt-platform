@@ -754,11 +754,11 @@ const PricingCard: React.FC<PricingCardProps> = ({
                     shadow-xl hover:shadow-2xl ${theme.shadow} 
                     transition-all duration-300 hover:-translate-y-1 
                     cursor-pointer border ${theme.border} 
-                    backdrop-blur-sm overflow-hidden ${className} ${
+                    backdrop-blur-sm ${className} ${
                       badge === 'Most Popular' ? 'ring-2 ring-green-500 ring-opacity-50 scale-105' : ''
                     } ${
                       badge === 'Recommended' ? 'ring-2 ring-purple-500 ring-opacity-50' : ''
-                    } min-h-[800px] flex flex-col`}
+                    } h-[850px] flex flex-col`}
          style={{
            background: theme.background,
            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
@@ -778,9 +778,9 @@ const PricingCard: React.FC<PricingCardProps> = ({
       
       {/* Content - Flexible container */}
       <div className="relative z-10 p-8 pt-20 flex flex-col flex-grow">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h3 className={`text-2xl md:text-3xl font-black ${theme.text} mb-2 leading-tight group-hover:opacity-90 transition-colors duration-300`}
+        {/* Header - Fixed height section */}
+        <div className="text-center mb-4 h-24 flex flex-col justify-center">
+          <h3 className={`text-xl md:text-2xl font-black ${theme.text} mb-1 leading-tight group-hover:opacity-90 transition-colors duration-300`}
               style={{ 
                 textRendering: 'optimizeLegibility', 
                 WebkitFontSmoothing: 'antialiased',
@@ -789,42 +789,42 @@ const PricingCard: React.FC<PricingCardProps> = ({
               }}>
             {name}
           </h3>
-          <p className="text-lg font-semibold text-slate-600 mb-2">{subtitle}</p>
-          <p className="text-sm text-slate-600 leading-relaxed">{description}</p>
+          <p className="text-sm font-semibold text-slate-600 mb-1">{subtitle}</p>
+          <p className="text-xs text-slate-600 leading-tight line-clamp-2">{description}</p>
         </div>
         
-        {/* Pricing */}
-        <div className="text-center mb-6">
+        {/* Pricing - Fixed height section */}
+        <div className="text-center mb-4 h-28 flex flex-col justify-center">
           {/* Primary Price (Monthly) */}
-          <div className="flex items-center justify-center mb-2">
-            <span className={`text-4xl md:text-5xl font-black ${theme.text}`}
+          <div className="flex items-center justify-center mb-1">
+            <span className={`text-3xl md:text-4xl font-black ${theme.text}`}
                   style={{ fontWeight: 950 }}>
               {formatPrice(primaryPrice)}
             </span>
           </div>
-          <div className="text-sm text-slate-600 font-semibold mb-3">
+          <div className="text-xs text-slate-600 font-semibold mb-2">
             /month
           </div>
           
           {/* Secondary Price (Annual) */}
           <div className="text-center">
-            <div className="text-lg text-slate-500 mb-1">
+            <div className="text-sm text-slate-500 mb-1">
               or {formatPrice(secondaryPrice)}/year
             </div>
-            <div className="inline-block px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
-              Save {formatPrice(savings)} ({savingsPercentage}%)
+            <div className="inline-block px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
+              Save {savingsPercentage}%
             </div>
           </div>
         </div>
         
-        {/* Features - Flexible section */}
-        <div className="flex-grow mb-6">
-          <h4 className="font-bold text-slate-900 mb-3">What's included:</h4>
-          <div className="space-y-2">
-            {features.slice(0, 6).map((feature, index) => (
-              <div key={index} className="flex items-start gap-3">
-                <span className="w-3 h-3 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: theme.dot }}></span>
-                <span className="text-slate-700 leading-relaxed text-sm"
+        {/* Features - Controlled flexible section */}
+        <div className="flex-grow mb-4 min-h-[200px] max-h-[250px] overflow-hidden">
+          <h4 className="font-bold text-slate-900 mb-2 text-sm">What's included:</h4>
+          <div className="space-y-1.5">
+            {features.slice(0, 8).map((feature, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <span className="w-2 h-2 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: theme.dot }}></span>
+                <span className="text-slate-700 leading-tight text-xs line-clamp-2"
                       style={{ 
                         textRendering: 'optimizeLegibility', 
                         WebkitFontSmoothing: 'antialiased'
@@ -833,44 +833,44 @@ const PricingCard: React.FC<PricingCardProps> = ({
                 </span>
               </div>
             ))}
-            {features.length > 6 && (
-              <div className="text-center mt-3">
-                <span className="text-xs text-slate-500 font-medium">+ {features.length - 6} more features</span>
+            {features.length > 8 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-slate-500 font-medium">+ {features.length - 8} more features</span>
               </div>
             )}
           </div>
         </div>
         
         {/* Bottom section - stays at bottom */}
-        <div className="mt-auto">
+        <div className="mt-auto h-[280px] flex flex-col justify-end">
           {/* Limits */}
-          <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-xl p-3 mb-4 border border-gray-100/50`}>
-            <h4 className="font-bold text-slate-900 mb-2 text-sm">Usage limits:</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-              <div>
-                <strong>{limits.invoicesPerMonth === 'unlimited' ? 'Unlimited' : `${limits.invoicesPerMonth}`}</strong>
-                <div>invoices/month</div>
+          <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-lg p-2 mb-3 border border-gray-100/50`}>
+            <h4 className="font-bold text-slate-900 mb-1 text-xs">Usage limits:</h4>
+            <div className="grid grid-cols-2 gap-1 text-xs text-slate-600">
+              <div className="text-center">
+                <strong className="text-xs">{limits.invoicesPerMonth === 'unlimited' ? '∞' : `${limits.invoicesPerMonth}`}</strong>
+                <div className="text-xs">invoices/mo</div>
               </div>
-              <div>
-                <strong>{limits.integrations === 'unlimited' ? 'Unlimited' : limits.integrations}</strong>
-                <div>integrations</div>
+              <div className="text-center">
+                <strong className="text-xs">{limits.integrations === 'unlimited' ? '∞' : limits.integrations}</strong>
+                <div className="text-xs">integrations</div>
               </div>
-              <div>
-                <strong>{limits.users === 'unlimited' ? 'Unlimited' : limits.users}</strong>
-                <div>users</div>
+              <div className="text-center">
+                <strong className="text-xs">{limits.users === 'unlimited' ? '∞' : limits.users}</strong>
+                <div className="text-xs">users</div>
               </div>
-              <div>
-                <strong>{limits.storage}</strong>
-                <div>storage</div>
+              <div className="text-center">
+                <strong className="text-xs">{limits.storage}</strong>
+                <div className="text-xs">storage</div>
               </div>
             </div>
           </div>
           
           {/* Ideal For */}
-          <div className="mb-4">
-            <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-3`}>
-              <h4 className="font-bold text-slate-900 mb-1 text-sm">Ideal for:</h4>
-              <p className="text-xs text-slate-600">{ideal}</p>
+          <div className="mb-3">
+            <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-2`}>
+              <h4 className="font-bold text-slate-900 mb-1 text-xs">Ideal for:</h4>
+              <p className="text-xs text-slate-600 line-clamp-2">{ideal}</p>
             </div>
           </div>
           
@@ -878,7 +878,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
           <div className="text-center">
             <button
               onClick={() => onSelectPackage(id)}
-              className={`w-full py-4 px-6 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform`}
+              className={`w-full py-3 px-4 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform text-sm`}
               style={{
                 textRendering: 'optimizeLegibility',
                 WebkitFontSmoothing: 'antialiased'
@@ -887,7 +887,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
               Get Started with {name}
             </button>
             
-            <p className="text-xs text-slate-500 mt-2">30-day money back guarantee</p>
+            <p className="text-xs text-slate-500 mt-1">30-day money back guarantee</p>
           </div>
         </div>
       </div>
