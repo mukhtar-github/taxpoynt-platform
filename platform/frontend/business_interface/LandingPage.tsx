@@ -163,102 +163,265 @@ export const LandingPage: React.FC = () => {
         <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-b from-black/3 to-transparent"></div>
       </div>
 
-      {/* Section 2: Premium Trust Indicators */}
-      <section className="py-20 bg-gradient-to-br from-white via-slate-50/30 to-white relative overflow-hidden" style={{ 
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(0,0,0,0.08)' 
+      {/* Section 2: Premium Trust Indicators - Upgraded to Match Solutions Quality */}
+      <section className="py-20 bg-gradient-to-br from-blue-50 via-indigo-50/30 to-blue-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(59, 130, 246, 0.08)' 
       }}>
-        {/* Subtle Background Patterns */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-green-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '8s' }}></div>
-          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-300 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '10s' }}></div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
-            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
-              {/* Premium Background Card */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge - Blue Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-50/95 to-indigo-50/95 backdrop-blur-sm border-2 border-blue-200/50 text-blue-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-blue-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95) 0%, rgba(238, 242, 255, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#1d4ed8' }}></span>
+              Enterprise Performance Metrics
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-blue-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-700">Results that speak</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-blue-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(37, 99, 235, 0.3)'
+                        }}>
+                    for themselves
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 rounded-full opacity-90"></div>
+                </span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              See the <span className="text-blue-600 font-bold">measurable impact</span> TaxPoynt delivers to Nigerian enterprises every day.
+            </p>
+          </div>
+
+          {/* Premium Trust Cards Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+            
+            {/* Trust Card 1 - Zero Errors */}
+            <div className="group relative p-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-2xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-blue-500/10 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-blue-200/50 hover:border-blue-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
               
-              <div className="relative z-10">
-                <div className="text-4xl md:text-5xl font-black text-green-600 mb-3 leading-none" 
-                     style={{ 
-                       textRendering: 'optimizeLegibility', 
-                       WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '900',
-                       textShadow: '0 2px 4px rgba(34, 197, 94, 0.15)',
-                       filter: 'drop-shadow(0 1px 2px rgba(34, 197, 94, 0.1))'
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-indigo-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Performance Badge */}
+                <div className="mb-4">
+                  <span className="inline-block px-3 py-1 bg-blue-100/80 text-blue-700 text-xs font-bold rounded-full border border-blue-200/50">
+                    Error Rate
+                  </span>
+                </div>
+                
+                {/* Large Metric */}
+                <div className="text-6xl md:text-7xl font-black text-blue-600 mb-4 leading-none"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(37, 99, 235, 0.3)'
                      }}>
                   Zero
                 </div>
-                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-green-700 transition-colors duration-300 leading-tight" 
+                
+                {/* Description */}
+                <div className="text-slate-700 font-semibold text-lg md:text-xl leading-tight mb-6"
                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                   E-invoice submission errors
                 </div>
-              </div>
-            </div>
-            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
-              {/* Premium Background Card */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
-              
-              <div className="relative z-10">
-                <div className="text-4xl md:text-5xl font-black text-green-600 mb-3 leading-none" 
-                     style={{ 
-                       textRendering: 'optimizeLegibility', 
-                       WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '900',
-                       textShadow: '0 2px 4px rgba(34, 197, 94, 0.15)',
-                       filter: 'drop-shadow(0 1px 2px rgba(34, 197, 94, 0.1))'
-                     }}>
-                  2 min
+                
+                {/* Impact Badge */}
+                <div className="mb-4">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    100% Success Rate
+                  </div>
                 </div>
-                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-green-700 transition-colors duration-300 leading-tight" 
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Trust Card 2 - Speed */}
+            <div className="group relative p-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-2xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-blue-500/10 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-blue-200/50 hover:border-blue-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-indigo-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Performance Badge */}
+                <div className="mb-4">
+                  <span className="inline-block px-3 py-1 bg-blue-100/80 text-blue-700 text-xs font-bold rounded-full border border-blue-200/50">
+                    Processing Time
+                  </span>
+                </div>
+                
+                {/* Large Metric */}
+                <div className="text-6xl md:text-7xl font-black text-blue-600 mb-4 leading-none"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(37, 99, 235, 0.3)'
+                     }}>
+                  2min
+                </div>
+                
+                {/* Description */}
+                <div className="text-slate-700 font-semibold text-lg md:text-xl leading-tight mb-6"
                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                   From sale to compliance submission
                 </div>
+                
+                {/* Impact Badge */}
+                <div className="mb-4">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    Lightning Fast
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
-              {/* Premium Background Card */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
-              <div className="relative z-10">
-                <div className="text-4xl md:text-5xl font-black text-green-600 mb-3 leading-none" 
-                     style={{ 
-                       textRendering: 'optimizeLegibility', 
-                       WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '900',
-                       textShadow: '0 2px 4px rgba(34, 197, 94, 0.15)',
-                       filter: 'drop-shadow(0 1px 2px rgba(34, 197, 94, 0.1))'
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Trust Card 3 - Coverage */}
+            <div className="group relative p-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-2xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-blue-500/10 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-blue-200/50 hover:border-blue-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-indigo-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Performance Badge */}
+                <div className="mb-4">
+                  <span className="inline-block px-3 py-1 bg-blue-100/80 text-blue-700 text-xs font-bold rounded-full border border-blue-200/50">
+                    Compliance Coverage
+                  </span>
+                </div>
+                
+                {/* Large Metric */}
+                <div className="text-6xl md:text-7xl font-black text-blue-600 mb-4 leading-none"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(37, 99, 235, 0.3)'
                      }}>
                   100%
                 </div>
-                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-green-700 transition-colors duration-300 leading-tight" 
+                
+                {/* Description */}
+                <div className="text-slate-700 font-semibold text-lg md:text-xl leading-tight mb-6"
                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                   Nigerian compliance coverage
                 </div>
+                
+                {/* Impact Badge */}
+                <div className="mb-4">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    FIRS Certified
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="group relative p-8 rounded-2xl hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
-              {/* Premium Background Card */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white via-green-50/30 to-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-xl"></div>
               
-              <div className="relative z-10">
-                <div className="text-4xl md:text-5xl font-black text-green-600 mb-3 leading-none" 
-                     style={{ 
-                       textRendering: 'optimizeLegibility', 
-                       WebkitFontSmoothing: 'antialiased',
-                       fontWeight: '900',
-                       textShadow: '0 2px 4px rgba(34, 197, 94, 0.15)',
-                       filter: 'drop-shadow(0 1px 2px rgba(34, 197, 94, 0.1))'
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Trust Card 4 - Integration */}
+            <div className="group relative p-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-2xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-blue-500/10 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-blue-200/50 hover:border-blue-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-indigo-50/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Performance Badge */}
+                <div className="mb-4">
+                  <span className="inline-block px-3 py-1 bg-blue-100/80 text-blue-700 text-xs font-bold rounded-full border border-blue-200/50">
+                    System Integration
+                  </span>
+                </div>
+                
+                {/* Large Metric */}
+                <div className="text-6xl md:text-7xl font-black text-blue-600 mb-4 leading-none"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(37, 99, 235, 0.3)'
                      }}>
                   Any
                 </div>
-                <div className="text-slate-700 text-lg md:text-xl font-semibold group-hover:text-green-700 transition-colors duration-300 leading-tight" 
+                
+                {/* Description */}
+                <div className="text-slate-700 font-semibold text-lg md:text-xl leading-tight mb-6"
                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
                   Software you already use
                 </div>
+                
+                {/* Impact Badge */}
+                <div className="mb-4">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    150+ APIs
+                  </div>
+                </div>
               </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
             </div>
+
           </div>
         </div>
       </section>
