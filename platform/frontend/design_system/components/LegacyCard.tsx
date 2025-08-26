@@ -769,15 +769,15 @@ const PricingCard: React.FC<PricingCardProps> = ({
       
       {/* Badge */}
       {badge && (
-        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 z-10">
-          <div className={`bg-gradient-to-r ${theme.badge} text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl border-2 border-white`}>
+        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+          <div className={`bg-gradient-to-r ${theme.badge} text-white px-6 py-3 rounded-full text-sm font-bold shadow-xl border-2 border-white`}>
             {badge}
           </div>
         </div>
       )}
       
       {/* Content */}
-      <div className="relative z-10 p-8 pt-16">
+      <div className="relative z-10 p-8 pt-20">
         {/* Header */}
         <div className="text-center mb-6">
           <h3 className={`text-2xl md:text-3xl font-black ${theme.text} mb-2 leading-tight group-hover:opacity-90 transition-colors duration-300`}

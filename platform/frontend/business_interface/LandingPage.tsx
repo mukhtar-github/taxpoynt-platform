@@ -25,7 +25,6 @@ import {
 
 export const LandingPage: React.FC = () => {
   const router = useRouter();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
 
   const handlePackageSelect = (packageId: string) => {
     // Navigate to signup with selected package (default to monthly)
@@ -1348,7 +1347,7 @@ export const LandingPage: React.FC = () => {
             </div>
             
             {/* Enhanced Subtitle */}
-            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium mb-8"
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
                style={{ 
                  textRendering: 'optimizeLegibility', 
                  WebkitFontSmoothing: 'antialiased',
@@ -1356,41 +1355,10 @@ export const LandingPage: React.FC = () => {
                }}>
               <span className="text-teal-600 font-bold">Authentic Nigerian pricing</span> from TaxPoynt's real service packages. No hidden fees, transparent costs, local payment methods.
             </p>
-            
-            {/* Billing Cycle Toggle */}
-            <div className="flex items-center justify-center">
-              <div className="bg-white rounded-2xl p-2 shadow-lg border-2 border-slate-200 flex items-center gap-2">
-                <button
-                  onClick={() => setBillingCycle('monthly')}
-                  className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 ${
-                    billingCycle === 'monthly'
-                      ? 'bg-teal-600 text-white shadow-lg'
-                      : 'bg-transparent text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingCycle('annual')}
-                  className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 relative ${
-                    billingCycle === 'annual'
-                      ? 'bg-teal-600 text-white shadow-lg'
-                      : 'bg-transparent text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Annual
-                </button>
-              </div>
-              {billingCycle === 'annual' && (
-                <span className="ml-3 px-3 py-1 text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
-                  Save 17%
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20 pt-12">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20 pt-16">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
@@ -1405,7 +1373,7 @@ export const LandingPage: React.FC = () => {
                 limits={pkg.limits}
                 ideal={pkg.ideal}
                 color={pkg.color}
-                billingCycle={billingCycle}
+                billingCycle="monthly"
                 onSelectPackage={handlePackageSelect}
               />
             ))}
