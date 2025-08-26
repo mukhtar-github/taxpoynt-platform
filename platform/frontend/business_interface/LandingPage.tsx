@@ -1358,37 +1358,37 @@ export const LandingPage: React.FC = () => {
             </p>
             
             {/* Billing Cycle Toggle */}
-            <div className="flex items-center justify-center">
-              <span className={`mr-4 text-lg font-semibold ${billingCycle === 'monthly' ? 'text-teal-900' : 'text-slate-500'}`}>
-                Monthly
-              </span>
+            <div className="flex items-center justify-center bg-white rounded-2xl p-4 shadow-lg border-2 border-slate-200 max-w-md mx-auto">
               <button
-                onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
-                className={`
-                  relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300
-                  ${billingCycle === 'annual' ? 'bg-teal-600' : 'bg-slate-200'}
-                `}
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-6 py-3 rounded-xl font-bold text-lg transition-all duration-300 mr-2 ${
+                  billingCycle === 'monthly'
+                    ? 'bg-teal-600 text-white shadow-lg scale-105'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
               >
-                <span
-                  className={`
-                    inline-block h-6 w-6 transform rounded-full bg-white transition-transform duration-300
-                    ${billingCycle === 'annual' ? 'translate-x-8' : 'translate-x-1'}
-                  `}
-                />
+                Monthly
               </button>
-              <span className={`ml-4 text-lg font-semibold ${billingCycle === 'annual' ? 'text-teal-900' : 'text-slate-500'}`}>
+              <button
+                onClick={() => setBillingCycle('annual')}
+                className={`px-6 py-3 rounded-xl font-bold text-lg transition-all duration-300 ml-2 relative ${
+                  billingCycle === 'annual'
+                    ? 'bg-teal-600 text-white shadow-lg scale-105'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
                 Annual
-              </span>
-              {billingCycle === 'annual' && (
-                <span className="ml-3 px-3 py-1 text-sm font-bold bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-full shadow-lg">
-                  Save up to 17%
-                </span>
-              )}
+                {billingCycle === 'annual' && (
+                  <span className="absolute -top-2 -right-2 px-2 py-1 text-xs font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
+                    17% OFF
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20 pt-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20 pt-12">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
