@@ -79,7 +79,7 @@ export const LandingPage: React.FC = () => {
           {/* Enhanced Badge */}
           <div className="inline-flex items-center px-8 py-4 bg-green-50/95 backdrop-blur-sm border border-green-300 text-green-800 rounded-full text-sm font-semibold mb-8 shadow-xl hover:shadow-green-200/50 transition-all duration-300 hover:scale-105" 
                style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-            <span className="w-2 h-2 bg-green-900 rounded-full mr-3"></span>
+            <span className="w-2 h-2 rounded-full mr-3" style={{ backgroundColor: '#166534' }}></span>
             FIRS Certified Access Point Provider
           </div>
 
@@ -288,7 +288,7 @@ export const LandingPage: React.FC = () => {
                    background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95) 0%, rgba(240, 253, 244, 0.95) 100%)',
                    backdropFilter: 'blur(10px)'
                  }}>
-              <span className="w-3 h-3 bg-blue-700 rounded-full mr-3"></span>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#1e40af' }}></span>
               The Nigerian Business Reality
             </div>
             
@@ -480,7 +480,7 @@ export const LandingPage: React.FC = () => {
                    background: 'linear-gradient(135deg, rgba(240, 253, 244, 0.95) 0%, rgba(236, 253, 245, 0.95) 100%)',
                    backdropFilter: 'blur(10px)'
                  }}>
-              <span className="w-3 h-3 bg-green-900 rounded-full mr-3"></span>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#166534' }}></span>
               The TaxPoynt Solution
             </div>
             
