@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Access Guard Component
  * =====================
@@ -17,7 +19,7 @@
  */
 
 import React, { ReactNode, useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, usePathname } from 'next/navigation';
 import { useRoleDetector, PlatformRole } from './role_detector';
 import { usePermissions, PermissionAction, PermissionResource } from './permission_provider';
 
@@ -393,6 +395,7 @@ export const AccessGuard: React.FC<AccessGuardProps> = ({
   const { detectionResult, isLoading: roleLoading } = useRoleDetector();
   const { getUserPermissions, isLoading: permissionLoading } = usePermissions();
   const router = useRouter();
+  const pathname = usePathname();
   const [isEvaluating, setIsEvaluating] = useState(true);
   const [accessResult, setAccessResult] = useState<AccessResult | null>(null);
 
@@ -405,7 +408,7 @@ export const AccessGuard: React.FC<AccessGuardProps> = ({
     currentRole: detectionResult?.primaryRole || null,
     organizationId: detectionResult?.organizationId,
     tenantId: detectionResult?.tenantId,
-    route: router.pathname,
+    route: pathname,
     metadata: {
       ...additionalContext,
       timestamp: new Date().toISOString()
@@ -446,7 +449,7 @@ export const AccessGuard: React.FC<AccessGuardProps> = ({
     roleLoading,
     permissionLoading,
     detectionResult,
-    router.pathname,
+    pathname,
     requiredRoles.join(','),
     requiredPermissions.join(','),
     requiredFeatureFlags.join(',')
@@ -542,6 +545,7 @@ export const useAccessControl = () => {
   const { detectionResult } = useRoleDetector();
   const { hasPermission, hasAnyPermission, hasAllPermissions } = usePermissions();
   const router = useRouter();
+  const pathname = usePathname();
 
   const evaluator = AccessEvaluator.getInstance();
 
@@ -552,7 +556,7 @@ export const useAccessControl = () => {
       currentRole: detectionResult?.primaryRole || null,
       organizationId: detectionResult?.organizationId,
       tenantId: detectionResult?.tenantId,
-      route: router.pathname,
+      route: pathname,
       metadata: {}
     };
 

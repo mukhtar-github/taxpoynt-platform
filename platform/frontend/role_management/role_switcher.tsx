@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Role Switcher Component
  * ======================

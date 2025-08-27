@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Role Detector
  * =============
@@ -14,7 +16,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 // Types based on backend role management system
 export enum PlatformRole {

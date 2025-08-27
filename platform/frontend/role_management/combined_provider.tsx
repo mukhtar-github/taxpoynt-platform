@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Combined Role Management Provider
  * ================================
