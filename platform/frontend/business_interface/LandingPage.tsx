@@ -1346,12 +1346,6 @@ export const LandingPage: React.FC = () => {
               </h2>
             </div>
             
-            {/* Strategic Buffer Subtitle */}
-            <div className="text-center mt-8 mb-4">
-              <p className="text-lg text-slate-600 max-w-2xl mx-auto font-medium">
-                Start your <span className="text-teal-600 font-bold">30-day free trial</span> today
-              </p>
-            </div>
           </div>
 
           {/* Pricing Cards Grid */}
