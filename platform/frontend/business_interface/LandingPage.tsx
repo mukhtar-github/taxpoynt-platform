@@ -1307,7 +1307,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6">
           
           {/* Enhanced Section Header */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-24">
             {/* Premium Badge - Teal Theme */}
             <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-teal-50/95 to-cyan-50/95 backdrop-blur-sm border-2 border-teal-200/50 text-teal-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-teal-200/40 transition-all duration-300 hover:scale-105"
                  style={{ 
@@ -1349,7 +1349,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-16">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-32">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
