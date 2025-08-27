@@ -654,7 +654,7 @@ const BeforeAfterCard: React.FC<BeforeAfterCardProps> = ({
   );
 };
 
-// Pricing Card - specialized for service packages
+// Pricing Card - Clean, modern implementation for service packages
 interface PricingCardProps {
   id: string;
   name: string;
@@ -696,50 +696,43 @@ const PricingCard: React.FC<PricingCardProps> = ({
   onSelectPackage,
   className = '',
 }) => {
-  const colorThemes = {
+  // Simplified theme configuration
+  const themes = {
     blue: {
-      gradient: 'from-blue-50 via-white to-indigo-50/30',
-      border: 'border-blue-200/50 hover:border-blue-300/50',
-      shadow: 'hover:shadow-blue-500/10',
+      card: 'from-blue-50 to-indigo-50/30 border-blue-200/50 hover:border-blue-300/50',
       badge: 'from-blue-500 to-indigo-500',
-      text: 'text-blue-900',
-      dot: '#1e40af',
-      background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)'
+      price: 'text-blue-900',
+      button: 'from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600',
+      dot: 'bg-blue-500'
     },
     green: {
-      gradient: 'from-green-50 via-white to-emerald-50/30',
-      border: 'border-green-200/50 hover:border-green-300/50',
-      shadow: 'hover:shadow-green-500/10',
+      card: 'from-green-50 to-emerald-50/30 border-green-200/50 hover:border-green-300/50',
       badge: 'from-green-500 to-emerald-500',
-      text: 'text-green-900',
-      dot: '#166534',
-      background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #ecfdf5 100%)'
+      price: 'text-green-900',
+      button: 'from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600',
+      dot: 'bg-green-500'
     },
     purple: {
-      gradient: 'from-purple-50 via-white to-violet-50/30',
-      border: 'border-purple-200/50 hover:border-purple-300/50',
-      shadow: 'hover:shadow-purple-500/10',
+      card: 'from-purple-50 to-violet-50/30 border-purple-200/50 hover:border-purple-300/50',
       badge: 'from-purple-500 to-violet-500',
-      text: 'text-purple-900',
-      dot: '#6b21a8',
-      background: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 50%, #f3e8ff 100%)'
+      price: 'text-purple-900',
+      button: 'from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600',
+      dot: 'bg-purple-500'
     },
     indigo: {
-      gradient: 'from-indigo-50 via-white to-slate-50/30',
-      border: 'border-indigo-200/50 hover:border-indigo-300/50',
-      shadow: 'hover:shadow-indigo-500/10',
+      card: 'from-indigo-50 to-slate-50/30 border-indigo-200/50 hover:border-indigo-300/50',
       badge: 'from-indigo-500 to-slate-500',
-      text: 'text-indigo-900',
-      dot: '#3730a3',
-      background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 50%, #f8fafc 100%)'
+      price: 'text-indigo-900',
+      button: 'from-indigo-500 to-slate-500 hover:from-indigo-600 hover:to-slate-600',
+      dot: 'bg-indigo-500'
     }
   };
 
-  const theme = colorThemes[color];
-  const primaryPrice = price.monthly;  // Always show monthly as primary
-  const secondaryPrice = price.annual;
+  const theme = themes[color];
   const savings = originalAnnual - price.annual;
   const savingsPercentage = Math.round((savings / originalAnnual) * 100);
+  const isPopular = badge === 'Most Popular';
+  const isRecommended = badge === 'Recommended';
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -750,150 +743,133 @@ const PricingCard: React.FC<PricingCardProps> = ({
   };
 
   return (
-    <div className={`group relative bg-gradient-to-br ${theme.gradient} rounded-2xl 
-                    shadow-xl hover:shadow-2xl ${theme.shadow} 
-                    transition-all duration-300 hover:-translate-y-1 
-                    cursor-pointer border ${theme.border} 
-                    backdrop-blur-sm ${className} ${
-                      badge === 'Most Popular' ? 'ring-2 ring-green-500 ring-opacity-50 scale-105' : ''
-                    } ${
-                      badge === 'Recommended' ? 'ring-2 ring-purple-500 ring-opacity-50' : ''
-                    } h-[900px] flex flex-col`}
-         style={{
-           background: theme.background,
-           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
-         }}>
-      
-      {/* Premium Background Overlay */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient.replace('via-white', 'via-transparent')} rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+    <div className={`
+      relative bg-gradient-to-br ${theme.card} rounded-2xl shadow-xl 
+      hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 
+      border backdrop-blur-sm h-full flex flex-col
+      ${isPopular ? 'ring-2 ring-green-500/50 scale-105' : ''}
+      ${isRecommended ? 'ring-2 ring-purple-500/50' : ''}
+      ${className}
+    `}>
       
       {/* Badge */}
       {badge && (
         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-          <div className={`bg-gradient-to-r ${theme.badge} text-white px-6 py-3 rounded-full text-sm font-bold shadow-xl border-2 border-white`}>
+          <div className={`
+            bg-gradient-to-r ${theme.badge} text-white px-4 py-2 rounded-full 
+            text-sm font-bold shadow-xl border-2 border-white
+          `}>
             {badge}
           </div>
         </div>
       )}
-      
-      {/* Content - Flexible container */}
-      <div className="relative z-10 p-8 pt-20 pb-8 flex flex-col flex-grow">
-        {/* Header - Fixed height section */}
-        <div className="text-center mb-6 h-24 flex flex-col justify-center">
-          <h3 className={`text-xl md:text-2xl font-black ${theme.text} mb-1 leading-tight group-hover:opacity-90 transition-colors duration-300`}
-              style={{ 
-                textRendering: 'optimizeLegibility', 
-                WebkitFontSmoothing: 'antialiased',
-                fontWeight: 900,
-                textShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}>
+
+      {/* Content */}
+      <div className="p-6 pt-12 flex-1 flex flex-col">
+        
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h3 className={`text-2xl font-bold ${theme.price} mb-2`}>
             {name}
           </h3>
-          <p className="text-sm font-semibold text-slate-600 mb-1">{subtitle}</p>
-          <p className="text-xs text-slate-600 leading-tight line-clamp-2">{description}</p>
+          <p className="text-slate-600 font-medium mb-1">{subtitle}</p>
+          <p className="text-sm text-slate-500">{description}</p>
         </div>
-        
-        {/* Pricing - Fixed height section */}
-        <div className="text-center mb-6 h-28 flex flex-col justify-center">
-          {/* Primary Price (Monthly) */}
-          <div className="flex items-center justify-center mb-1">
-            <span className={`text-3xl md:text-4xl font-black ${theme.text}`}
-                  style={{ fontWeight: 950 }}>
-              {formatPrice(primaryPrice)}
-            </span>
+
+        {/* Pricing */}
+        <div className="text-center mb-6">
+          <div className={`text-4xl font-bold ${theme.price} mb-1`}>
+            {formatPrice(price.monthly)}
           </div>
-          <div className="text-xs text-slate-600 font-semibold mb-2">
-            /month
-          </div>
+          <div className="text-sm text-slate-500 mb-3">/month</div>
           
-          {/* Secondary Price (Annual) */}
           <div className="text-center">
-            <div className="text-sm text-slate-500 mb-1">
-              or {formatPrice(secondaryPrice)}/year
+            <div className="text-slate-400 mb-2">
+              or {formatPrice(price.annual)}/year
             </div>
-            <div className="inline-block px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
+            <div className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
               Save {savingsPercentage}%
             </div>
           </div>
         </div>
-        
-        {/* Features - Controlled flexible section */}
-        <div className="flex-grow mb-6 min-h-[200px] max-h-[250px] overflow-hidden">
-          <h4 className="font-bold text-slate-900 mb-3 text-sm">What's included:</h4>
-          <div className="space-y-2">
+
+        {/* Features - Flexible section */}
+        <div className="flex-1 mb-6">
+          <h4 className="font-bold text-slate-900 mb-4">What's included:</h4>
+          <div className="space-y-3">
             {features.slice(0, 8).map((feature, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: theme.dot }}></span>
-                <span className="text-slate-700 leading-tight text-xs line-clamp-2"
-                      style={{ 
-                        textRendering: 'optimizeLegibility', 
-                        WebkitFontSmoothing: 'antialiased'
-                      }}>
+              <div key={index} className="flex items-start gap-3">
+                <div className={`w-2 h-2 rounded-full mt-2 ${theme.dot} flex-shrink-0`}></div>
+                <span className="text-slate-700 text-sm leading-relaxed">
                   {feature}
                 </span>
               </div>
             ))}
             {features.length > 8 && (
-              <div className="text-center mt-2">
-                <span className="text-xs text-slate-500 font-medium">+ {features.length - 8} more features</span>
+              <div className="text-center mt-3">
+                <span className="text-xs text-slate-500">
+                  + {features.length - 8} more features
+                </span>
               </div>
             )}
           </div>
         </div>
-        
-        {/* Bottom section - stays at bottom */}
-        <div className="mt-auto h-[320px] flex flex-col justify-end">
-          {/* Limits */}
-          <div className={`bg-gradient-to-r ${theme.gradient.replace('via-white', 'via-gray-50/50')} rounded-lg p-3 mb-4 border border-gray-100/50`}>
-            <h4 className="font-bold text-slate-900 mb-2 text-xs">Usage limits:</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+
+        {/* Bottom section - Auto-positioned */}
+        <div className="mt-auto space-y-4">
+          {/* Usage Limits */}
+          <div className="bg-slate-50 rounded-lg p-4">
+            <h4 className="font-bold text-slate-900 mb-3 text-sm">Usage limits:</h4>
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="text-center">
-                <strong className="text-xs">{limits.invoicesPerMonth === 'unlimited' ? '∞' : `${limits.invoicesPerMonth}`}</strong>
-                <div className="text-xs">invoices/mo</div>
+                <div className="font-bold text-slate-800">
+                  {limits.invoicesPerMonth === 'unlimited' ? '∞' : limits.invoicesPerMonth}
+                </div>
+                <div className="text-slate-500 text-xs">invoices/mo</div>
               </div>
               <div className="text-center">
-                <strong className="text-xs">{limits.integrations === 'unlimited' ? '∞' : limits.integrations}</strong>
-                <div className="text-xs">integrations</div>
+                <div className="font-bold text-slate-800">
+                  {limits.integrations === 'unlimited' ? '∞' : limits.integrations}
+                </div>
+                <div className="text-slate-500 text-xs">integrations</div>
               </div>
               <div className="text-center">
-                <strong className="text-xs">{limits.users === 'unlimited' ? '∞' : limits.users}</strong>
-                <div className="text-xs">users</div>
+                <div className="font-bold text-slate-800">
+                  {limits.users === 'unlimited' ? '∞' : limits.users}
+                </div>
+                <div className="text-slate-500 text-xs">users</div>
               </div>
               <div className="text-center">
-                <strong className="text-xs">{limits.storage}</strong>
-                <div className="text-xs">storage</div>
+                <div className="font-bold text-slate-800">{limits.storage}</div>
+                <div className="text-slate-500 text-xs">storage</div>
               </div>
             </div>
           </div>
-          
+
           {/* Ideal For */}
-          <div className="mb-4">
-            <div className={`bg-gradient-to-r ${theme.badge} bg-opacity-10 rounded-lg p-3`}>
-              <h4 className="font-bold text-slate-900 mb-1 text-xs">Ideal for:</h4>
-              <p className="text-xs text-slate-600 line-clamp-2">{ideal}</p>
-            </div>
+          <div className="bg-slate-50 rounded-lg p-4">
+            <h4 className="font-bold text-slate-900 mb-1 text-sm">Ideal for:</h4>
+            <p className="text-slate-600 text-sm">{ideal}</p>
           </div>
-          
+
           {/* CTA Button */}
-          <div className="text-center mb-3">
+          <div>
             <button
               onClick={() => onSelectPackage(id)}
-              className={`w-full py-3 px-4 bg-gradient-to-r ${theme.badge} hover:opacity-90 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 transform text-sm`}
-              style={{
-                textRendering: 'optimizeLegibility',
-                WebkitFontSmoothing: 'antialiased'
-              }}
+              className={`
+                w-full py-4 px-6 bg-gradient-to-r ${theme.button} text-white 
+                font-bold rounded-xl shadow-lg hover:shadow-xl transition-all 
+                duration-300 hover:scale-105 transform
+              `}
             >
               Get Started with {name}
             </button>
-            
-            <p className="text-xs text-slate-500 mt-3 mb-4">30-day money back guarantee</p>
+            <p className="text-center text-xs text-slate-400 mt-4 mb-2">
+              30-day money back guarantee
+            </p>
           </div>
         </div>
       </div>
-      
-      {/* Hover Glow Effect */}
-      <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${theme.gradient.replace('via-white', 'via-transparent')} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
     </div>
   );
 };
