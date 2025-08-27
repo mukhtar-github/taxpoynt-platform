@@ -104,16 +104,17 @@ class TaxPoyntAPIGateway:
     def _setup_middleware(self):
         """Configure FastAPI middleware"""
         
-        # CORS middleware
-        if self.config.cors_enabled:
-            self.app.add_middleware(
-                CORSMiddleware,
-                allow_origins=self.config.cors_origins,
-                allow_credentials=True,
-                allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-                allow_headers=["*"],
-                expose_headers=["X-Request-ID", "X-Rate-Limit-Remaining"]
-            )
+        # CORS middleware is now handled in main.py to ensure proper middleware order
+        # This prevents double CORS setup which can cause conflicts
+        # if self.config.cors_enabled:
+        #     self.app.add_middleware(
+        #         CORSMiddleware,
+        #         allow_origins=self.config.cors_origins,
+        #         allow_credentials=True,
+        #         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        #         allow_headers=["*"],
+        #         expose_headers=["X-Request-ID", "X-Rate-Limit-Remaining"]
+        #     )
         
         # Trusted host middleware
         if self.config.trusted_hosts:
@@ -125,6 +126,7 @@ class TaxPoyntAPIGateway:
         # Note: Request logging and monitoring now handled by Phase 4 ObservabilityMiddleware
         # in main.py - provides Prometheus metrics, OpenTelemetry tracing, and async logging
         # This eliminates synchronous logging bottlenecks and duplicate instrumentation
+        # CORS middleware also handled in main.py for proper middleware ordering
     
     def _setup_routers(self):
         """Setup role-based routers"""

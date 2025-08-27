@@ -237,7 +237,24 @@ def create_taxpoynt_app() -> FastAPI:
     gateway = TaxPoyntAPIGateway(config, role_manager, temp_message_router)
     app = gateway.get_app()
     
-    # Add health check middleware FIRST
+    # CRITICAL: Add CORS middleware FIRST to handle preflight requests properly
+    # This ensures CORS headers are added before any other middleware can interfere
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    logger.info(f"🌐 CORS Configuration - Allowed Origins: {allowed_origins}")
+    logger.info(f"🔄 CORS Debug Mode: {DEBUG}")
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=["X-Request-ID", "X-Rate-Limit-Remaining", "X-Total-Count"],
+        max_age=86400  # Cache preflight requests for 24 hours
+    )
+    
+    # Add health check middleware 
     app.add_middleware(HealthCheckMiddleware)
     
     # Add observability middleware (Phase 4)
