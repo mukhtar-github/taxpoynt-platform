@@ -115,14 +115,17 @@ export const SHADOW_PATTERNS = {
 // TYPOGRAPHY UTILITIES
 // ========================================
 
+// Base optimized text rendering
+const optimizedTextBase = {
+  fontFeatureSettings: '"kern" 1, "liga" 1',
+  textRendering: 'optimizeLegibility',
+  WebkitFontSmoothing: 'antialiased',
+  MozOsxFontSmoothing: 'grayscale'
+} as const;
+
 export const TYPOGRAPHY_STYLES = {
   // Optimized text rendering
-  optimizedText: {
-    fontFeatureSettings: '"kern" 1, "liga" 1',
-    textRendering: 'optimizeLegibility',
-    WebkitFontSmoothing: 'antialiased',
-    MozOsxFontSmoothing: 'grayscale'
-  },
+  optimizedText: optimizedTextBase,
 
   // Hero headline styles
   heroHeadline: {
@@ -130,7 +133,7 @@ export const TYPOGRAPHY_STYLES = {
     fontWeight: '950',
     lineHeight: '0.9',
     letterSpacing: '-0.02em',
-    ...TYPOGRAPHY_STYLES.optimizedText
+    ...optimizedTextBase
   },
 
   // Section headline styles
@@ -139,7 +142,7 @@ export const TYPOGRAPHY_STYLES = {
     fontWeight: '950',
     lineHeight: '0.9',
     letterSpacing: '-0.01em',
-    ...TYPOGRAPHY_STYLES.optimizedText
+    ...optimizedTextBase
   },
 
   // Subtitle styles
@@ -147,7 +150,7 @@ export const TYPOGRAPHY_STYLES = {
     fontSize: 'clamp(1.25rem, 3vw, 2rem)',
     fontWeight: '500',
     lineHeight: '1.5',
-    ...TYPOGRAPHY_STYLES.optimizedText
+    ...optimizedTextBase
   }
 } as const;
 
@@ -155,7 +158,7 @@ export const TYPOGRAPHY_STYLES = {
 // ANIMATION UTILITIES
 // ========================================
 
-export const ANIMATION_PATTERNS = {
+export const STYLE_ANIMATION_PATTERNS = {
   // Hover effects
   hover: {
     lift: 'hover:shadow-lg hover:-translate-y-1 transition-all duration-300',
@@ -326,6 +329,13 @@ export const ACCESSIBILITY_PATTERNS = {
     visible: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
     ring: 'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
   },
+  
+  // Focus ring as CSS-in-JS object
+  focusRing: {
+    outline: 'none',
+    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)',
+    borderRadius: '4px'
+  },
 
   // Screen reader utilities
   screenReader: {
@@ -338,7 +348,7 @@ export default {
   GRADIENT_PATTERNS,
   SHADOW_PATTERNS,
   TYPOGRAPHY_STYLES,
-  ANIMATION_PATTERNS,
+  STYLE_ANIMATION_PATTERNS,
   LAYOUT_PATTERNS,
   ACCESSIBILITY_PATTERNS,
   getGradientStyle,

@@ -99,10 +99,12 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ className = ''
           {ENTERPRISE_FEATURES_DATA.map((feature, index) => (
             <FeatureCard
               key={index}
-              emoji={feature.emoji}
+              category={feature.category}
+              icon={feature.icon}
               title={feature.title}
               description={feature.description}
-              benefits={feature.benefits}
+              capabilities={feature.capabilities}
+              metrics={feature.metrics}
               className="hover:scale-102 transition-transform duration-300"
             />
           ))}

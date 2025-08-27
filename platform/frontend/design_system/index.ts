@@ -318,10 +318,7 @@ export const generateComponentClasses = (
   return [...classes, ...additionalClasses].join(' ');
 };
 
-// Get responsive spacing
-export const getResponsiveSpacing = (mobile: string, desktop: string) => {
-  return `${TAXPOYNT_DESIGN_SYSTEM.spacing[mobile as keyof typeof TAXPOYNT_DESIGN_SYSTEM.spacing]} lg:${TAXPOYNT_DESIGN_SYSTEM.spacing[desktop as keyof typeof TAXPOYNT_DESIGN_SYSTEM.spacing]}`;
-};
+// Get responsive spacing - moved to style-utilities.ts
 
 // Get color with opacity
 export const getColorWithOpacity = (color: string, opacity: number) => {
@@ -552,7 +549,7 @@ export {
   GRADIENT_PATTERNS,
   SHADOW_PATTERNS,
   TYPOGRAPHY_STYLES,
-  ANIMATION_PATTERNS,
+  STYLE_ANIMATION_PATTERNS,
   LAYOUT_PATTERNS,
   ACCESSIBILITY_PATTERNS,
   getGradientStyle,
@@ -568,3 +565,18 @@ export {
 
 export { OptimizedImage } from './components/OptimizedImage';
 export type { OptimizedImageProps } from './components/OptimizedImage';
+
+// ========================================
+// ROLE-BASED THEMES
+// ========================================
+
+export {
+  ROLE_THEMES,
+  getRoleTheme,
+  getRoleThemeVariables,
+  getRoleSectionBackground,
+  getRoleButtonStyles,
+  getRoleCardStyles,
+  useRoleTheme
+} from './themes/role-themes';
+export type { UserRole, RoleTheme } from './themes/role-themes';

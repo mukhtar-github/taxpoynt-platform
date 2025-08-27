@@ -100,8 +100,8 @@ export const ProblemsSection: React.FC<ProblemsSectionProps> = ({ className = ''
               key={index}
               emoji={problem.emoji}
               title={problem.title}
-              description={problem.description}
-              impact={problem.impact}
+              quote={problem.quote}
+              attribution={problem.attribution}
               className="hover:scale-102 transition-transform duration-300"
             />
           ))}

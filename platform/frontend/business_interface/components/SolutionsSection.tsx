@@ -101,8 +101,10 @@ export const SolutionsSection: React.FC<SolutionsSectionProps> = ({ className = 
               key={index}
               emoji={solution.emoji}
               title={solution.title}
-              description={solution.description}
-              benefits={solution.benefits}
+              problem={solution.problem}
+              quote={solution.quote}
+              attribution={solution.attribution}
+              metrics={solution.metrics}
               className="hover:scale-102 transition-transform duration-300"
             />
           ))}

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SignInPage } from '../../../business_interface/auth/SignInPage';
+import { EnhancedSignInPage } from '../../../business_interface/auth/EnhancedSignInPage';
 import { authService } from '../../../shared_components/services/auth';
 
 export default function SignInPageWrapper() {
@@ -45,7 +45,7 @@ export default function SignInPageWrapper() {
   };
 
   return (
-    <SignInPage 
+    <EnhancedSignInPage 
       onSignIn={handleSignIn}
       isLoading={isLoading}
       error={error}

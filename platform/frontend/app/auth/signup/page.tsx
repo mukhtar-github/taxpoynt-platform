@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ConsentIntegratedRegistration } from '../../../business_interface/onboarding_flows/ConsentIntegratedRegistration';
+import { EnhancedConsentIntegratedRegistration } from '../../../business_interface/auth/EnhancedConsentIntegratedRegistration';
 import { authService } from '../../../shared_components/services/auth';
 
 function SignUpPageContent() {
@@ -68,7 +68,7 @@ function SignUpPageContent() {
   };
 
   return (
-    <ConsentIntegratedRegistration 
+    <EnhancedConsentIntegratedRegistration 
       onCompleteRegistration={handleCompleteRegistration}
       isLoading={isLoading}
       error={error}
