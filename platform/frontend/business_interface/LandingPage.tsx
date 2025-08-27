@@ -1345,20 +1345,10 @@ export const LandingPage: React.FC = () => {
                 <span className="block mt-2 text-slate-700">with transparent Nigerian pricing</span>
               </h2>
             </div>
-            
-            {/* Enhanced Subtitle */}
-            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium mt-4"
-               style={{ 
-                 textRendering: 'optimizeLegibility', 
-                 WebkitFontSmoothing: 'antialiased',
-                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
-               }}>
-              <span className="text-teal-600 font-bold">Authentic Nigerian pricing</span> from TaxPoynt's real service packages.
-            </p>
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-18">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-20">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
