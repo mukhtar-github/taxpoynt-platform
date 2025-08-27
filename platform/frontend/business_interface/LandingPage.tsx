@@ -1345,10 +1345,17 @@ export const LandingPage: React.FC = () => {
                 <span className="block mt-2 text-slate-700">with transparent Nigerian pricing</span>
               </h2>
             </div>
+            
+            {/* Strategic Buffer Subtitle */}
+            <div className="text-center mt-8 mb-4">
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto font-medium">
+                Start your <span className="text-teal-600 font-bold">30-day free trial</span> today
+              </p>
+            </div>
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-20">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-16">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
