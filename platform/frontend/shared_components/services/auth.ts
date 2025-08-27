@@ -79,7 +79,19 @@ class AuthService {
         password: userData.password,
         first_name: userData.first_name,
         last_name: userData.last_name,
-        role: this.mapServicePackageToRole(userData.service_package)
+        phone: userData.phone,
+        service_package: userData.service_package,
+        business_name: userData.business_name,
+        business_type: userData.business_type,
+        tin: userData.tin,
+        rc_number: userData.rc_number,
+        address: userData.address,
+        state: userData.state,
+        lga: userData.lga,
+        terms_accepted: userData.terms_accepted,
+        privacy_accepted: userData.privacy_accepted,
+        marketing_consent: userData.marketing_consent,
+        consents: userData.consents
       });
 
       // Store auth data using API client's method

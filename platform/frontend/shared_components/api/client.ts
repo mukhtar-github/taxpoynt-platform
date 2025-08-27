@@ -65,7 +65,19 @@ export interface RegisterRequest {
   password: string;
   first_name: string;
   last_name: string;
-  role: string;
+  phone?: string;
+  service_package: string;  // si, app, hybrid (instead of role)
+  business_name: string;    // Required by backend
+  business_type: string;    // Required by backend
+  tin?: string;
+  rc_number?: string;
+  address?: string;
+  state?: string;
+  lga?: string;
+  terms_accepted: boolean;
+  privacy_accepted: boolean;
+  marketing_consent?: boolean;
+  consents?: Record<string, any>;
 }
 
 /**
@@ -294,7 +306,9 @@ class TaxPoyntAPIClient {
         email: userData.email,
         first_name: userData.first_name,
         last_name: userData.last_name,
-        role: userData.role,
+        business_name: userData.business_name,
+        business_type: userData.business_type,
+        service_package: userData.service_package,
         password: '***hidden***'
       });
       
@@ -303,16 +317,20 @@ class TaxPoyntAPIClient {
         throw new Error('Missing required fields: email, password, first_name, last_name');
       }
       
-      if (!userData.role) {
-        console.warn('⚠️ No role specified, defaulting to system_integrator');
-        userData.role = 'system_integrator';
+      if (!userData.business_name || !userData.business_type) {
+        throw new Error('Missing required business fields: business_name, business_type');
+      }
+      
+      if (!userData.service_package) {
+        console.warn('⚠️ No service_package specified, defaulting to si');
+        userData.service_package = 'si';
       }
       
       console.log('🔄 Sending registration request...');
       const response = await this.client.post<AuthResponse>('/auth/register', userData);
       
       console.log('✅ Registration successful:', response.data.user.email);
-      console.log('👤 User created with role:', response.data.user.role);
+      console.log('👤 User created with service_package:', response.data.user.service_package);
       
       // Store authentication data
       this.storeAuth(response.data);

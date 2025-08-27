@@ -121,7 +121,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
     address: '',
     state: '',
     lga: '',
-    service_package: 'system_integrator',
+    service_package: 'si',  // Changed from 'system_integrator' to match backend expectation
     terms_accepted: false,
     privacy_accepted: false,
     marketing_consent: false
@@ -279,20 +279,20 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
         <div className="grid grid-cols-1 gap-3">
           {[
             { 
-              value: 'system_integrator', 
+              value: 'si', 
               label: 'System Integrator (SI)', 
               description: 'Connect multiple business systems',
               icon: '🔗',
               popular: true
             },
             { 
-              value: 'access_point_provider', 
+              value: 'app', 
               label: 'Access Point Provider (APP)', 
               description: 'Direct FIRS communication',
               icon: '🏛️'
             },
             { 
-              value: 'hybrid_user', 
+              value: 'hybrid', 
               label: 'Hybrid Solution', 
               description: 'Best of both worlds',
               icon: '⚡'
@@ -458,31 +458,61 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
 
       {/* Terms and Privacy */}
       <div className="space-y-4 pt-6 border-t border-gray-200">
-        <label className="flex items-start cursor-pointer">
+                <div className="flex items-start">
           <input
             type="checkbox"
             checked={formData.terms_accepted}
             onChange={(e) => setFormData({...formData, terms_accepted: e.target.checked})}
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1"
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer"
             required
           />
           <span className="ml-3 text-sm text-slate-600">
-            I agree to the Terms of Service and Privacy Policy (required)
+            I agree to the{' '}
+            <a 
+              href="/legal/terms" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Terms of Service
+            </a>
+            {' '}and{' '}
+            <a 
+              href="/legal/privacy" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Privacy Policy
+            </a>
+            {' '}(required)
           </span>
-        </label>
-        
-        <label className="flex items-start cursor-pointer">
+        </div>
+
+        <div className="flex items-start">
           <input
             type="checkbox"
             checked={formData.privacy_accepted}
             onChange={(e) => setFormData({...formData, privacy_accepted: e.target.checked})}
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1"
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer"
             required
           />
           <span className="ml-3 text-sm text-slate-600">
-            I acknowledge the NDPR data processing notice (required)
+            I acknowledge the{' '}
+            <a 
+              href="/legal/ndpr" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
+              onClick={(e) => e.stopPropagation()}
+            >
+              NDPR data processing notice
+            </a>
+            {' '}(required)
           </span>
-        </label>
+        </div>
       </div>
     </div>
   );
@@ -565,6 +595,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
             variant="outline"
             onClick={handlePrevious}
             disabled={currentStep === 0 || isLoading}
+            className="border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:text-blue-600 bg-white"
           >
             Previous
           </TaxPoyntButton>
@@ -573,6 +604,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
             variant="primary"
             onClick={handleNext}
             disabled={isLoading}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md hover:shadow-lg"
           >
             {currentStep === steps.length - 1 
               ? (isLoading ? 'Creating Account...' : 'Complete Registration')
