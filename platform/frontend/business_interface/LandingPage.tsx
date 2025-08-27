@@ -1497,6 +1497,329 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Professional Transition to Final CTA Section */}
+      <div className="relative">
+        {/* Smooth gradient transition */}
+        <div className="h-16 bg-gradient-to-b from-teal-50 via-slate-100 to-slate-50"></div>
+        
+        {/* Subtle shadow depth */}
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-slate-200/20"></div>
+      </div>
+
+      {/* Section 8: Final CTA - Demo & Contact Options */}
+      <section className="py-20 bg-gradient-to-br from-slate-50 via-gray-50/30 to-slate-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(71, 85, 105, 0.08)' 
+      }}>
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge - Slate Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-slate-50/95 to-gray-50/95 backdrop-blur-sm border-2 border-slate-200/50 text-slate-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-slate-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(249, 250, 251, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#475569' }}></span>
+              Ready to Transform Your Business?
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-slate-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-600">Join thousands of businesses</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-blue-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(37, 99, 235, 0.3)'
+                        }}>
+                    already transformed
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-blue-500 rounded-full opacity-90"></div>
+                </span>
+                <span className="block mt-2 text-slate-600">by TaxPoynt's platform</span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              Don't let compliance complexity hold back your business growth. <span className="text-blue-600 font-bold">Start your transformation</span> with Nigeria's leading e-invoicing platform.
+            </p>
+          </div>
+
+          {/* CTA Options Grid */}
+          <div className="grid md:grid-cols-2 gap-8 mb-20">
+            
+            {/* Demo Booking Card */}
+            <div className="group relative p-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-3xl 
+                            shadow-2xl hover:shadow-2xl hover:shadow-blue-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-blue-200/50 hover:border-blue-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #eef2ff 100%)',
+                   boxShadow: '0 25px 50px -12px rgba(37, 99, 235, 0.15), 0 10px 20px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.3)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-indigo-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Icon */}
+                <div className="mb-6">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-3xl 
+                                  flex items-center justify-center text-6xl mx-auto group-hover:shadow-lg 
+                                  transition-all duration-300 border border-blue-100/50 group-hover:scale-105"
+                       style={{
+                         background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%)',
+                         backdropFilter: 'blur(10px)'
+                       }}>
+                    🎯
+                  </div>
+                </div>
+                
+                {/* Title */}
+                <h3 className="text-3xl md:text-4xl font-black text-blue-900 mb-4 leading-tight"
+                    style={{ 
+                      textRendering: 'optimizeLegibility', 
+                      WebkitFontSmoothing: 'antialiased',
+                      fontWeight: 950,
+                      textShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                    }}>
+                  See TaxPoynt in Action
+                </h3>
+                
+                {/* Description */}
+                <p className="text-lg text-slate-600 mb-8 leading-relaxed"
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased'
+                   }}>
+                  Book a <span className="font-bold text-blue-700">personalized demo</span> with our Nigerian team. See exactly how TaxPoynt integrates with your business systems and transforms your compliance workflow.
+                </p>
+                
+                {/* Benefits */}
+                <div className="mb-8 text-left">
+                  <div className="space-y-3">
+                    {[
+                      "Personalized demo with your data",
+                      "Integration assessment for your systems", 
+                      "Custom ROI calculation for your business",
+                      "Live Q&A with TaxPoynt experts"
+                    ].map((benefit, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <span className="text-slate-700 leading-relaxed">
+                          {benefit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* CTA Button */}
+                <button
+                  onClick={() => router.push('/demo')}
+                  className="group relative w-full py-6 px-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-105 transform border border-blue-500/20 text-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #1d4ed8 100%)',
+                    boxShadow: '0 20px 40px -12px rgba(37, 99, 235, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.2)',
+                    textRendering: 'optimizeLegibility',
+                    WebkitFontSmoothing: 'antialiased'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center">
+                    📅 Book Your Demo Now
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+                
+                <p className="text-sm text-slate-500 mt-4">
+                  30-minute session • No commitment required
+                </p>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Contact Sales Card */}
+            <div className="group relative p-8 bg-gradient-to-br from-green-50 via-white to-emerald-50/50 rounded-3xl 
+                            shadow-2xl hover:shadow-2xl hover:shadow-green-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-green-200/50 hover:border-green-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #ecfdf5 100%)',
+                   boxShadow: '0 25px 50px -12px rgba(34, 197, 94, 0.15), 0 10px 20px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.3)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 via-transparent to-emerald-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Icon */}
+                <div className="mb-6">
+                  <div className="w-20 h-20 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-3xl 
+                                  flex items-center justify-center text-6xl mx-auto group-hover:shadow-lg 
+                                  transition-all duration-300 border border-green-100/50 group-hover:scale-105"
+                       style={{
+                         background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                         backdropFilter: 'blur(10px)'
+                       }}>
+                    💬
+                  </div>
+                </div>
+                
+                {/* Title */}
+                <h3 className="text-3xl md:text-4xl font-black text-green-900 mb-4 leading-tight"
+                    style={{ 
+                      textRendering: 'optimizeLegibility', 
+                      WebkitFontSmoothing: 'antialiased',
+                      fontWeight: 950,
+                      textShadow: '0 2px 4px rgba(34, 197, 94, 0.2)'
+                    }}>
+                  Talk to Our Experts
+                </h3>
+                
+                {/* Description */}
+                <p className="text-lg text-slate-600 mb-8 leading-relaxed"
+                   style={{ 
+                     textRendering: 'optimizeLegibility', 
+                     WebkitFontSmoothing: 'antialiased'
+                   }}>
+                  Get expert guidance from our <span className="font-bold text-green-700">Nigerian compliance specialists</span>. Discuss your specific needs and get a tailored solution recommendation.
+                </p>
+                
+                {/* Benefits */}
+                <div className="mb-8 text-left">
+                  <div className="space-y-3">
+                    {[
+                      "Free consultation with compliance experts",
+                      "Custom pricing for your business size",
+                      "Implementation planning and timeline",
+                      "Nigerian business compliance guidance"
+                    ].map((benefit, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <span className="text-slate-700 leading-relaxed">
+                          {benefit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* CTA Button */}
+                <button
+                  onClick={() => router.push('/contact')}
+                  className="group relative w-full py-6 px-8 bg-gradient-to-r from-green-600 via-emerald-600 to-green-700 hover:from-green-700 hover:via-emerald-700 hover:to-green-800 text-white font-bold rounded-2xl shadow-2xl hover:shadow-green-500/40 transition-all duration-500 hover:scale-105 transform border border-green-500/20 text-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, #16a34a 0%, #10b981 50%, #059669 100%)',
+                    boxShadow: '0 20px 40px -12px rgba(34, 197, 94, 0.4), 0 8px 16px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.2)',
+                    textRendering: 'optimizeLegibility',
+                    WebkitFontSmoothing: 'antialiased'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center">
+                    🇳🇬 Contact Sales Team
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+                
+                <p className="text-sm text-slate-500 mt-4">
+                  Response within 2 hours • Local Nigerian support
+                </p>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+          </div>
+
+          {/* Final Reassurance Section */}
+          <div className="text-center">
+            {/* Trust Guarantees Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+              <div className="text-center">
+                <div className="text-4xl mb-3">🛡️</div>
+                <div className="text-lg font-black text-slate-700 mb-1">FIRS Certified</div>
+                <div className="text-sm text-slate-600">Official Access Point Provider</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl mb-3">💰</div>
+                <div className="text-lg font-black text-slate-700 mb-1">Money Back</div>
+                <div className="text-sm text-slate-600">30-day guarantee</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl mb-3">📞</div>
+                <div className="text-lg font-black text-slate-700 mb-1">Nigerian Support</div>
+                <div className="text-sm text-slate-600">24/7 local assistance</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl mb-3">⚡</div>
+                <div className="text-lg font-black text-slate-700 mb-1">Fast Setup</div>
+                <div className="text-sm text-slate-600">Live in 48 hours</div>
+              </div>
+            </div>
+            
+            {/* Final Call to Action */}
+            <div className="max-w-3xl mx-auto">
+              <p className="text-2xl md:text-3xl font-bold text-slate-600 mb-8"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                 }}>
+                Ready to eliminate compliance complexity forever?
+              </p>
+              
+              {/* Primary Action */}
+              <button
+                onClick={() => router.push('/auth/signup')}
+                className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-slate-600 via-gray-600 to-slate-700 hover:from-slate-700 hover:via-gray-700 hover:to-slate-800 text-white font-bold rounded-3xl shadow-2xl hover:shadow-slate-500/40 transition-all duration-500 hover:scale-105 transform border border-slate-500/20 hover:border-slate-400/40 min-w-[400px] mb-6"
+                style={{
+                  background: 'linear-gradient(135deg, #475569 0%, #6b7280 50%, #374151 100%)',
+                  boxShadow: '0 25px 50px -12px rgba(71, 85, 105, 0.4), 0 10px 20px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.2)',
+                  textRendering: 'optimizeLegibility',
+                  WebkitFontSmoothing: 'antialiased'
+                }}
+              >
+                <span className="relative z-10 text-2xl font-black">🚀 Start Free Trial Now</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </button>
+              
+              {/* Supporting Text */}
+              <div className="text-lg text-slate-600 font-medium">
+                <span className="mr-2">✨</span>
+                No setup fees • Cancel anytime • Nigerian payment methods accepted
+                <span className="ml-2">✨</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </div>
   );
 };
