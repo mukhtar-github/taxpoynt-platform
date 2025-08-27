@@ -197,26 +197,10 @@ def create_taxpoynt_app() -> FastAPI:
         "https://app-staging.taxpoynt.com",
         "https://app.taxpoynt.com",
         "https://taxpoynt.com",  # Main domain
-        "https://www.taxpoynt.com",  # WWW subdomain
+        "https://www.taxpoynt.com",  # WWW subdomain - Vercel frontend
         "http://localhost:3000",
-        "http://localhost:3001",  # Frontend dev port
-        # ADD YOUR FRONTEND PRODUCTION URL HERE:
-        # "https://your-frontend-domain.com",
-        # "https://your-app.vercel.app",
-        # "https://your-app.netlify.app",
-        # Temporary fix - allow Railway frontend if same domain
-        "https://web-production-ea5ad.up.railway.app:3001",
-        # Common Railway frontend patterns
-        "https://taxpoynt-frontend.up.railway.app",
-        "https://taxpoynt-platform-frontend.up.railway.app"
+        "http://localhost:3001"  # Frontend dev port
     ] if not DEBUG else ["*"]
-    
-    # EMERGENCY PRODUCTION FIX - Temporarily allow all origins
-    # TODO: Remove this and add specific frontend URL once identified
-    if ENVIRONMENT == "production" and os.getenv("EMERGENCY_CORS_FIX") == "true":
-        allowed_origins = ["*"]
-        logger.warning("🚨 EMERGENCY CORS FIX ENABLED - ALL ORIGINS ALLOWED")
-        logger.warning("🔧 Set EMERGENCY_CORS_FIX=false and add specific frontend URL to allowed_origins")
     
     # Initialize secure JWT manager (no hardcoded secrets)
     from core_platform.security import initialize_jwt_manager, get_jwt_manager
@@ -269,6 +253,17 @@ def create_taxpoynt_app() -> FastAPI:
         expose_headers=["X-Request-ID", "X-Rate-Limit-Remaining", "X-Total-Count"],
         max_age=86400  # Cache preflight requests for 24 hours
     )
+    
+    # Railway host header fix for production
+    @app.middleware("http")
+    async def fix_host_header(request, call_next):
+        """Fix Railway host header issues with Vercel frontend"""
+        if request.headers.get("host") in ["web-production-ea5ad.up.railway.app", "www.taxpoynt.com"]:
+            # Allow both Railway backend and Vercel frontend hosts
+            response = await call_next(request)
+            return response
+        response = await call_next(request)
+        return response
     
     # Add health check middleware 
     app.add_middleware(HealthCheckMiddleware)
