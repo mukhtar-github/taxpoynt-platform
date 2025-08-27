@@ -543,3 +543,28 @@ export const borders = {
     8: '8px',
   }
 };
+
+// ========================================
+// STYLE UTILITIES EXPORTS
+// ========================================
+
+export {
+  GRADIENT_PATTERNS,
+  SHADOW_PATTERNS,
+  TYPOGRAPHY_STYLES,
+  ANIMATION_PATTERNS,
+  LAYOUT_PATTERNS,
+  ACCESSIBILITY_PATTERNS,
+  getGradientStyle,
+  getShadowStyle,
+  combineStyles,
+  getSectionBackground,
+  getResponsiveSpacing
+} from './style-utilities';
+
+// ========================================
+// PERFORMANCE COMPONENTS
+// ========================================
+
+export { OptimizedImage } from './components/OptimizedImage';
+export type { OptimizedImageProps } from './components/OptimizedImage';
