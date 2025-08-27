@@ -754,7 +754,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
       
       {/* Badge */}
       {badge && (
-        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-10">
           <div className={`
             bg-gradient-to-r ${theme.badge} text-white px-4 py-2 rounded-full 
             text-sm font-bold shadow-xl border-2 border-white
