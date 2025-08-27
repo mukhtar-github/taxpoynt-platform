@@ -1820,6 +1820,566 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Professional Transition to Testimonials Section */}
+      <div className="relative">
+        {/* Smooth gradient transition */}
+        <div className="h-16 bg-gradient-to-b from-slate-50 via-amber-100 to-amber-50"></div>
+        
+        {/* Subtle shadow depth */}
+        <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-amber-200/20"></div>
+      </div>
+
+      {/* Section 9: Testimonials - Customer Social Proof */}
+      <section className="py-20 bg-gradient-to-br from-amber-50 via-orange-50/30 to-amber-50 relative overflow-hidden" style={{ 
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(245, 158, 11, 0.08)' 
+      }}>
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Enhanced Section Header */}
+          <div className="text-center mb-20">
+            {/* Premium Badge - Amber Theme */}
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-amber-50/95 to-orange-50/95 backdrop-blur-sm border-2 border-amber-200/50 text-amber-800 rounded-full text-base font-bold mb-8 shadow-xl hover:shadow-amber-200/40 transition-all duration-300 hover:scale-105"
+                 style={{ 
+                   textRendering: 'optimizeLegibility', 
+                   WebkitFontSmoothing: 'antialiased',
+                   background: 'linear-gradient(135deg, rgba(254, 252, 232, 0.95) 0%, rgba(255, 251, 235, 0.95) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <span className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: '#d97706' }}></span>
+              Success Stories from Nigerian Businesses
+            </div>
+            
+            {/* Dramatic Headline */}
+            <div className="relative mb-8">
+              <h2 className="text-5xl md:text-7xl font-black text-amber-900 mb-4 leading-[0.9] tracking-tight"
+                  style={{ 
+                    textRendering: 'optimizeLegibility', 
+                    WebkitFontSmoothing: 'antialiased',
+                    fontWeight: 950,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                <span className="text-slate-700">Hear from businesses</span>
+                <br />
+                <span className="relative inline-block">
+                  <span className="text-amber-600 italic font-black"
+                        style={{ 
+                          fontWeight: 950,
+                          textShadow: '0 2px 4px rgba(245, 158, 11, 0.3)'
+                        }}>
+                    just like yours
+                  </span>
+                  {/* Dramatic underline effect */}
+                  <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 rounded-full opacity-90"></div>
+                </span>
+                <span className="block mt-2 text-slate-700">who chose TaxPoynt</span>
+              </h2>
+            </div>
+            
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+               style={{ 
+                 textRendering: 'optimizeLegibility', 
+                 WebkitFontSmoothing: 'antialiased',
+                 textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+               }}>
+              Real Nigerian businesses sharing <span className="text-amber-600 font-bold">their transformation stories</span> and measurable results with TaxPoynt's platform.
+            </p>
+          </div>
+
+          {/* Testimonials Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
+            
+            {/* Testimonial 1 - Lagos Tech Company */}
+            <div className="group relative p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 rounded-3xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-amber-200/50 hover:border-amber-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 50%, #fff7ed 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-amber-400 text-xl">⭐</span>
+                  ))}
+                </div>
+                
+                {/* Quote */}
+                <div className="relative mb-6">
+                  <div className="absolute -left-2 -top-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10 italic mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       lineHeight: '1.6'
+                     }}>
+                    TaxPoynt transformed our compliance from a 40-hour weekly nightmare to a 2-hour automated process. Our development team can now focus on building products instead of managing invoices.
+                  </p>
+                  <div className="absolute -right-2 -bottom-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                </div>
+                
+                {/* Results Badge */}
+                <div className="mb-6">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    95% Time Saved
+                  </div>
+                </div>
+                
+                {/* Attribution */}
+                <div className="border-t border-amber-200/50 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      AK
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Adebayo Kolawole</div>
+                      <div className="text-amber-700 text-sm font-medium">CTO, TechVantage Solutions</div>
+                      <div className="text-slate-500 text-xs">Lagos • 500+ employees</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Testimonial 2 - Abuja Manufacturing */}
+            <div className="group relative p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 rounded-3xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-amber-200/50 hover:border-amber-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 50%, #fff7ed 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-amber-400 text-xl">⭐</span>
+                  ))}
+                </div>
+                
+                {/* Quote */}
+                <div className="relative mb-6">
+                  <div className="absolute -left-2 -top-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10 italic mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       lineHeight: '1.6'
+                     }}>
+                    Before TaxPoynt, we had 3 staff members working full-time on compliance. Now the same work happens automatically while they focus on strategic operations that grow our business.
+                  </p>
+                  <div className="absolute -right-2 -bottom-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                </div>
+                
+                {/* Results Badge */}
+                <div className="mb-6">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    3 Full-Time Roles Automated
+                  </div>
+                </div>
+                
+                {/* Attribution */}
+                <div className="border-t border-amber-200/50 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      FO
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Fatima Okafor</div>
+                      <div className="text-amber-700 text-sm font-medium">Operations Director, NorthSteel Industries</div>
+                      <div className="text-slate-500 text-xs">Abuja • 1,200+ employees</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Testimonial 3 - Port Harcourt SME */}
+            <div className="group relative p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 rounded-3xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-amber-200/50 hover:border-amber-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 50%, #fff7ed 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-amber-400 text-xl">⭐</span>
+                  ))}
+                </div>
+                
+                {/* Quote */}
+                <div className="relative mb-6">
+                  <div className="absolute -left-2 -top-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10 italic mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       lineHeight: '1.6'
+                     }}>
+                    As a growing SME, compliance was becoming our biggest bottleneck. TaxPoynt's platform scales with us - from 50 invoices to 500+ monthly without adding complexity or staff.
+                  </p>
+                  <div className="absolute -right-2 -bottom-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                </div>
+                
+                {/* Results Badge */}
+                <div className="mb-6">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    10x Business Growth Enabled
+                  </div>
+                </div>
+                
+                {/* Attribution */}
+                <div className="border-t border-amber-200/50 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      EI
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Emmanuel Ikenna</div>
+                      <div className="text-amber-700 text-sm font-medium">CEO, Rivers Commerce Hub</div>
+                      <div className="text-slate-500 text-xs">Port Harcourt • Growing SME</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Testimonial 4 - Kano Retail */}
+            <div className="group relative p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 rounded-3xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-amber-200/50 hover:border-amber-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 50%, #fff7ed 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-amber-400 text-xl">⭐</span>
+                  ))}
+                </div>
+                
+                {/* Quote */}
+                <div className="relative mb-6">
+                  <div className="absolute -left-2 -top-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10 italic mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       lineHeight: '1.6'
+                     }}>
+                    TaxPoynt's Nigerian support team understands our business context. When we had questions about northern Nigeria commerce regulations, they provided expert guidance immediately.
+                  </p>
+                  <div className="absolute -right-2 -bottom-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                </div>
+                
+                {/* Results Badge */}
+                <div className="mb-6">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    100% Compliance Accuracy
+                  </div>
+                </div>
+                
+                {/* Attribution */}
+                <div className="border-t border-amber-200/50 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      AU
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Aisha Usman</div>
+                      <div className="text-amber-700 text-sm font-medium">Finance Manager, Northern Trade Networks</div>
+                      <div className="text-slate-500 text-xs">Kano • 200+ employees</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Testimonial 5 - Ibadan Restaurant Chain */}
+            <div className="group relative p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 rounded-3xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-amber-200/50 hover:border-amber-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 50%, #fff7ed 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-amber-400 text-xl">⭐</span>
+                  ))}
+                </div>
+                
+                {/* Quote */}
+                <div className="relative mb-6">
+                  <div className="absolute -left-2 -top-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10 italic mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       lineHeight: '1.6'
+                     }}>
+                    Our restaurant chain processes 200+ daily transactions across multiple locations. TaxPoynt handles everything automatically - our managers focus on customer service, not paperwork.
+                  </p>
+                  <div className="absolute -right-2 -bottom-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                </div>
+                
+                {/* Results Badge */}
+                <div className="mb-6">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    Zero Compliance Stress
+                  </div>
+                </div>
+                
+                {/* Attribution */}
+                <div className="border-t border-amber-200/50 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      OA
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Olumide Adebayo</div>
+                      <div className="text-amber-700 text-sm font-medium">Operations Manager, Taste of Yoruba</div>
+                      <div className="text-slate-500 text-xs">Ibadan • Restaurant Chain</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+            {/* Testimonial 6 - Enugu E-commerce */}
+            <div className="group relative p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 rounded-3xl 
+                            shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 
+                            transition-all duration-300 hover:-translate-y-1 
+                            cursor-pointer border border-amber-200/50 hover:border-amber-300/50 
+                            backdrop-blur-sm"
+                 style={{
+                   background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 50%, #fff7ed 100%)',
+                   boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+                 }}>
+              
+              {/* Premium Background Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Rating Stars */}
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-amber-400 text-xl">⭐</span>
+                  ))}
+                </div>
+                
+                {/* Quote */}
+                <div className="relative mb-6">
+                  <div className="absolute -left-2 -top-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                  <p className="text-lg text-slate-700 leading-relaxed relative z-10 italic mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       lineHeight: '1.6'
+                     }}>
+                    TaxPoynt's API integration with our Shopify store was seamless. Every online sale automatically generates compliant invoices. Our customers receive proper documentation instantly.
+                  </p>
+                  <div className="absolute -right-2 -bottom-2 text-4xl text-amber-200/60 font-bold leading-none">"</div>
+                </div>
+                
+                {/* Results Badge */}
+                <div className="mb-6">
+                  <div className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
+                    Instant E-commerce Integration
+                  </div>
+                </div>
+                
+                {/* Attribution */}
+                <div className="border-t border-amber-200/50 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      CN
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Chioma Nwosu</div>
+                      <div className="text-amber-700 text-sm font-medium">Founder, Eastern Electronics Online</div>
+                      <div className="text-slate-500 text-xs">Enugu • E-commerce Platform</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Glow Effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+
+          </div>
+
+          {/* Overall Statistics Section */}
+          <div className="text-center">
+            {/* Trust Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-black text-amber-600 mb-2"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(245, 158, 11, 0.3)'
+                     }}>
+                  2,500+
+                </div>
+                <div className="text-lg font-bold text-slate-700">Happy Businesses</div>
+                <div className="text-sm text-slate-500">across Nigeria</div>
+              </div>
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-black text-amber-600 mb-2"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(245, 158, 11, 0.3)'
+                     }}>
+                  4.9/5
+                </div>
+                <div className="text-lg font-bold text-slate-700">Average Rating</div>
+                <div className="text-sm text-slate-500">from 1,000+ reviews</div>
+              </div>
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-black text-amber-600 mb-2"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(245, 158, 11, 0.3)'
+                     }}>
+                  99.9%
+                </div>
+                <div className="text-lg font-bold text-slate-700">Success Rate</div>
+                <div className="text-sm text-slate-500">invoice submissions</div>
+              </div>
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-black text-amber-600 mb-2"
+                     style={{
+                       fontWeight: 950,
+                       textShadow: '0 4px 8px rgba(245, 158, 11, 0.3)'
+                     }}>
+                  48hrs
+                </div>
+                <div className="text-lg font-bold text-slate-700">Setup Time</div>
+                <div className="text-sm text-slate-500">average implementation</div>
+              </div>
+            </div>
+            
+            {/* Final Testimonial CTA */}
+            <div className="max-w-4xl mx-auto">
+              <div className="relative p-12 bg-gradient-to-br from-white/95 via-amber-50/90 to-white/95 
+                              border-2 border-amber-200/50 rounded-3xl shadow-2xl backdrop-blur-sm"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(254,252,232,0.9) 50%, rgba(255,255,255,0.95) 100%)',
+                     backdropFilter: 'blur(16px)',
+                     boxShadow: '0 25px 50px -12px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+                   }}>
+                
+                <div className="mb-8">
+                  <p className="text-3xl md:text-4xl font-bold text-slate-600 mb-4"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
+                     }}>
+                    Join thousands of satisfied Nigerian businesses
+                  </p>
+                  <p className="text-4xl md:text-5xl font-black text-amber-600 leading-tight"
+                     style={{ 
+                       textRendering: 'optimizeLegibility', 
+                       WebkitFontSmoothing: 'antialiased',
+                       fontWeight: 950,
+                       textShadow: '0 2px 4px rgba(245, 158, 11, 0.3)'
+                     }}>
+                    Your success story starts here.
+                  </p>
+                </div>
+                
+                {/* CTA Button */}
+                <button
+                  onClick={() => router.push('/auth/signup')}
+                  className="group relative inline-flex items-center justify-center px-16 py-6 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:via-orange-700 hover:to-amber-800 text-white font-bold rounded-3xl shadow-2xl hover:shadow-amber-500/40 transition-all duration-500 hover:scale-105 transform border border-amber-500/20 hover:border-amber-400/40 min-w-[400px] text-2xl mb-6"
+                  style={{
+                    background: 'linear-gradient(135deg, #d97706 0%, #ea580c 50%, #c2410c 100%)',
+                    boxShadow: '0 25px 50px -12px rgba(245, 158, 11, 0.4), 0 10px 20px -4px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.2)',
+                    textRendering: 'optimizeLegibility',
+                    WebkitFontSmoothing: 'antialiased'
+                  }}
+                >
+                  <span className="relative z-10">⭐ Start Your Success Story</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+                
+                {/* Supporting Text */}
+                <div className="text-lg text-slate-600 font-medium">
+                  <span className="mr-2">🇳🇬</span>
+                  Join 2,500+ Nigerian businesses already transforming with TaxPoynt
+                  <span className="ml-2">⭐</span>
+                </div>
+                
+                {/* Subtle Pattern Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-orange-50/20 rounded-3xl pointer-events-none"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </div>
   );
 };
