@@ -216,7 +216,7 @@ def create_taxpoynt_app() -> FastAPI:
         port=PORT,
         cors_enabled=True,
         cors_origins=allowed_origins,
-        trusted_hosts=["taxpoynt.com", "*.taxpoynt.com"] if not DEBUG else None,
+        trusted_hosts=None,  # Disable for production - Railway handles host validation
         security=RoutingSecurityLevel.STANDARD,
         jwt_secret_key="SECURE_JWT_MANAGED_BY_JWT_MANAGER",  # Placeholder - actual security handled by JWT Manager
         jwt_expiration_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")),  # Reduced from 1440 to 60 minutes
