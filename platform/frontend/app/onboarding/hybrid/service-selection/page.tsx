@@ -49,8 +49,8 @@ export default function HybridServiceSelectionPage() {
         // Both services - go to combined setup
         router.push('/onboarding/hybrid/combined-setup');
       } else if (selectedServices.includes('si')) {
-        // SI only - go to SI setup
-        router.push('/onboarding/si/integration-setup');
+        // SI only - go to SI service selection
+        router.push('/onboarding/si/service-selection');
       } else if (selectedServices.includes('app')) {
         // APP only - go to APP setup
         router.push('/onboarding/app/invoice-processing-setup');

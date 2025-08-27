@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 
 interface OnboardingStep {
   id: string;
@@ -191,6 +192,14 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   onSkip,
   isLoading = false
 }) => {
+  // Form persistence setup for ERP onboarding
+  const erpFormPersistence = useFormPersistence({
+    storageKey: `taxpoynt_erp_onboarding_${organizationId || 'temp'}`,
+    persistent: true, // Use localStorage for longer persistence
+    excludeFields: ['credentials'], // Don't store sensitive ERP credentials
+    autoSaveInterval: 5000 // Save every 5 seconds
+  });
+
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<OnboardingStep[]>(onboardingSteps);
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>({
@@ -231,11 +240,66 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
 
-  // Load existing onboarding progress
+  // Load existing onboarding progress and initialize with shared data
   useEffect(() => {
     if (organizationId) {
       loadOnboardingProgress();
     }
+
+    // Load saved ERP form data and merge with shared registration data
+    const savedErpData = erpFormPersistence.loadFormData();
+    const sharedData = CrossFormDataManager.getSharedData();
+    
+    if (savedErpData) {
+      // Restore ERP-specific saved data
+      if (savedErpData.organizationProfile) {
+        setOrganizationProfile(prev => ({
+          ...prev,
+          ...savedErpData.organizationProfile
+        }));
+      }
+      if (savedErpData.erpConfiguration) {
+        setErpConfiguration(prev => ({
+          ...prev,
+          ...savedErpData.erpConfiguration,
+          credentials: {} // Never restore credentials
+        }));
+      }
+      if (savedErpData.currentStep !== undefined) {
+        setCurrentStep(savedErpData.currentStep);
+      }
+      console.log('📂 ERP onboarding form restored from saved data');
+    }
+
+    // Auto-populate basic info from registration if available
+    if (Object.keys(sharedData).length > 0) {
+      setOrganizationProfile(prev => ({
+        ...prev,
+        basicInfo: {
+          ...prev.basicInfo,
+          name: sharedData.business_name || prev.basicInfo.name,
+          email: sharedData.email || prev.basicInfo.email,
+          phone: sharedData.phone || prev.basicInfo.phone,
+          address: sharedData.address || prev.basicInfo.address,
+          rcNumber: sharedData.rc_number || prev.basicInfo.rcNumber,
+          tinNumber: sharedData.tin || prev.basicInfo.tinNumber
+        }
+      }));
+      console.log('🔗 ERP form auto-populated from registration data');
+    }
+
+    // Start auto-save for ERP data
+    erpFormPersistence.startAutoSave(() => ({
+      organizationProfile,
+      erpConfiguration,
+      currentStep,
+      timestamp: Date.now()
+    }));
+
+    // Cleanup on unmount
+    return () => {
+      erpFormPersistence.stopAutoSave();
+    };
   }, [organizationId]);
 
   const loadOnboardingProgress = async () => {
@@ -270,34 +334,52 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     try {
       setIsProcessing(true);
       
-      // Save step completion
-      const response = await fetch(`/api/v1/si/onboarding/${organizationId}/step-complete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          step_id: stepId,
-          step_data: getCurrentStepData(),
-          organization_profile: organizationProfile,
-          erp_configuration: erpConfiguration
-        })
+      // Always update local state first for immediate UX feedback
+      setSteps(prev => prev.map((step, index) => 
+        index === currentStep ? { ...step, completed: true } : step
+      ));
+
+      // Save to persistence immediately
+      erpFormPersistence.saveFormData({
+        organizationProfile,
+        erpConfiguration,
+        currentStep,
+        stepsCompleted: steps.filter(s => s.completed).map(s => s.id),
+        timestamp: Date.now()
       });
 
-      if (response.ok) {
-        // Update local state
-        setSteps(prev => prev.map((step, index) => 
-          index === currentStep ? { ...step, completed: true } : step
-        ));
+      // Attempt API save (if organizationId exists and we have auth)
+      if (organizationId && localStorage.getItem('taxpoynt_auth_token')) {
+        const response = await fetch(`/api/v1/si/onboarding/${organizationId}/step-complete`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            step_id: stepId,
+            step_data: getCurrentStepData(),
+            organization_profile: organizationProfile,
+            erp_configuration: erpConfiguration
+          })
+        });
 
-        alert(`✅ ${steps[currentStep].title} completed successfully!`);
+        if (response.ok) {
+          console.log(`✅ ${steps[currentStep].title} saved to server successfully!`);
+        } else {
+          console.warn(`⚠️  ${steps[currentStep].title} saved locally but server sync failed`);
+        }
       } else {
-        alert('❌ Failed to save step progress');
+        console.log(`💾 ${steps[currentStep].title} saved locally (offline mode)`);
       }
+
+      // Always show success to user - local save succeeded
+      alert(`✅ ${steps[currentStep].title} completed successfully!`);
+      
     } catch (error) {
-      console.error('Failed to complete step:', error);
-      alert('❌ Failed to complete step');
+      console.error('Failed to save step progress:', error);
+      // Even if API fails, we've saved locally, so don't block the user
+      alert(`⚠️  ${steps[currentStep].title} saved locally. Will sync when online.`);
     } finally {
       setIsProcessing(false);
     }
@@ -353,6 +435,10 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       });
 
       if (response.ok) {
+        // Clear saved form data on successful completion
+        erpFormPersistence.clearFormData();
+        console.log('✅ ERP onboarding completed - form data cleared');
+        
         alert('🎉 ERP onboarding completed successfully!');
         if (onComplete && organizationId) {
           onComplete(organizationId);

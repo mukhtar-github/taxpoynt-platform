@@ -47,7 +47,7 @@ function SignUpPageContent() {
       
       // Redirect to appropriate onboarding based on service selection
       if (registrationData.service_package === 'si') {
-        router.push('/onboarding/si/integration-setup');
+        router.push('/onboarding/si/service-selection');
       } else if (registrationData.service_package === 'app') {
         router.push('/onboarding/app/invoice-processing-setup');
       } else if (registrationData.service_package === 'hybrid') {

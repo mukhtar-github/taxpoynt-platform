@@ -5,8 +5,9 @@
  * while maintaining full NDPR compliance and sophisticated consent management
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthLayout } from '../../shared_components/auth/AuthLayout';
+import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { 
   TYPOGRAPHY_STYLES, 
@@ -108,6 +109,14 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
   error
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  // Form persistence setup
+  const formPersistence = useFormPersistence({
+    storageKey: 'taxpoynt_registration_form',
+    persistent: false, // Use sessionStorage for privacy
+    excludeFields: ['password', 'confirmPassword'],
+    autoSaveInterval: 3000 // Save every 3 seconds
+  });
+
   const [formData, setFormData] = useState<any>({
     email: '',
     password: '',
@@ -139,14 +148,63 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
     { id: 'complete', title: 'Complete', description: 'Finalize your registration' }
   ];
 
+  // Initialize form with persistence and shared data
+  useEffect(() => {
+    // Load saved form data and merge with shared data
+    const savedData = formPersistence.loadFormData();
+    const sharedData = CrossFormDataManager.getSharedData();
+    
+    if (savedData || Object.keys(sharedData).length > 0) {
+      const mergedData = {
+        ...formData,
+        ...sharedData,
+        ...savedData,
+        // Never restore sensitive fields
+        password: '',
+        confirmPassword: '',
+        terms_accepted: false,
+        privacy_accepted: false
+      };
+      setFormData(mergedData);
+      console.log('📝 Registration form restored from saved data');
+    }
+
+    // Start auto-save
+    formPersistence.startAutoSave(() => formData);
+
+    // Cleanup on unmount
+    return () => {
+      formPersistence.stopAutoSave();
+    };
+  }, []);
+
   // Initialize consent choices
-  React.useEffect(() => {
+  useEffect(() => {
     const initialConsents: Record<string, boolean> = {};
     consentItems.forEach(item => {
       initialConsents[item.id] = item.required; // Required consents pre-checked
     });
     setConsentChoices(initialConsents);
   }, []);
+
+  // Save form data when it changes (with debouncing handled by auto-save)
+  useEffect(() => {
+    if (Object.keys(formData).some(key => formData[key] !== '')) {
+      // Save shared data for cross-form population
+      CrossFormDataManager.saveSharedData({
+        email: formData.email,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone: formData.phone,
+        business_name: formData.business_name,
+        business_type: formData.business_type,
+        rc_number: formData.rc_number,
+        address: formData.address,
+        state: formData.state,
+        lga: formData.lga
+      });
+    }
+  }, [formData]);
 
   const validateStep = (step: number): boolean => {
     const errors: {[key: string]: string} = {};
@@ -213,8 +271,14 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
       };
       
       await onCompleteRegistration(registrationData);
+      
+      // Clear form data on successful registration
+      formPersistence.clearFormData();
+      console.log('✅ Registration successful - form data cleared');
+      
     } catch (err) {
       console.error('Registration failed:', err);
+      // Keep form data on failure so user doesn't lose their input
     }
   };
 
@@ -469,7 +533,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
           <span className="ml-3 text-sm text-slate-600">
             I agree to the{' '}
             <a 
-              href="/legal/terms" 
+              href="/legal/terms-of-service" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-blue-600 hover:text-blue-800 underline font-medium"
@@ -479,7 +543,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
             </a>
             {' '}and{' '}
             <a 
-              href="/legal/privacy" 
+              href="/legal/privacy-policy" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-blue-600 hover:text-blue-800 underline font-medium"
@@ -502,7 +566,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
           <span className="ml-3 text-sm text-slate-600">
             I acknowledge the{' '}
             <a 
-              href="/legal/ndpr" 
+              href="/legal/ndpr-notice" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-blue-600 hover:text-blue-800 underline font-medium"

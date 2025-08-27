@@ -1,5 +1,7 @@
 import React from 'react';
 import './globals.css';
+import { CombinedRoleProvider } from '../role_management/combined_provider';
+import { FeatureFlagProvider } from '../role_management/feature_flag_provider';
 
 export const metadata = {
   title: 'TaxPoynt - Secure E-invoicing Solution',
@@ -51,7 +53,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <FeatureFlagProvider>
+          <CombinedRoleProvider>
+            {children}
+          </CombinedRoleProvider>
+        </FeatureFlagProvider>
+      </body>
     </html>
   );
 }
