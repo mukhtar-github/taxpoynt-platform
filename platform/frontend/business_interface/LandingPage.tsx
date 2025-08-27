@@ -1347,7 +1347,7 @@ export const LandingPage: React.FC = () => {
             </div>
             
             {/* Enhanced Subtitle */}
-            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium"
+            <p className="text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium mt-4"
                style={{ 
                  textRendering: 'optimizeLegibility', 
                  WebkitFontSmoothing: 'antialiased',
@@ -1358,7 +1358,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-16">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-18">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
