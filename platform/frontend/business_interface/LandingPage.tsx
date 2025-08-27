@@ -1353,12 +1353,12 @@ export const LandingPage: React.FC = () => {
                  WebkitFontSmoothing: 'antialiased',
                  textShadow: '0 2px 4px rgba(100, 116, 139, 0.3)'
                }}>
-              <span className="text-teal-600 font-bold">Authentic Nigerian pricing</span> from TaxPoynt's real service packages. No hidden fees, transparent costs, local payment methods.
+              <span className="text-teal-600 font-bold">Authentic Nigerian pricing</span> from TaxPoynt's real service packages.
             </p>
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-24">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-32 pt-16">
             {SERVICE_PACKAGES_DATA.map((pkg, index) => (
               <PricingCard
                 key={pkg.id}
