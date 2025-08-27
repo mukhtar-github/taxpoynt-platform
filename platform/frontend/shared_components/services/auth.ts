@@ -163,12 +163,33 @@ class AuthService {
    * Handle authentication errors consistently
    */
   handleAuthError(error: any): string {
+    console.log('🔍 Auth Error Debug:', error);
+    
     if (error && typeof error === 'object' && 'message' in error) {
       const apiError = error as APIError;
+      
+      console.log(`🚨 API Error - Status: ${apiError.status}, Message: ${apiError.message}`);
+      console.log('📋 Error Details:', apiError.details);
       
       // Map specific error codes to user-friendly messages
       switch (apiError.status) {
         case 400:
+          // Try to extract specific field errors from details
+          if (apiError.details && typeof apiError.details === 'object') {
+            if (apiError.details.detail && typeof apiError.details.detail === 'string') {
+              return apiError.details.detail;
+            }
+            if (apiError.details.message && typeof apiError.details.message === 'string') {
+              return apiError.details.message;
+            }
+            // Handle FastAPI validation errors
+            if (Array.isArray(apiError.details.detail)) {
+              const validationErrors = apiError.details.detail
+                .map((err: any) => `${err.loc?.join('.')}: ${err.msg}`)
+                .join(', ');
+              return `Validation errors: ${validationErrors}`;
+            }
+          }
           return apiError.message || 'Invalid request. Please check your information.';
         case 401:
           return 'Invalid email or password. Please try again.';
@@ -176,6 +197,15 @@ class AuthService {
           return 'Access denied. Please contact support.';
         case 409:
           return 'Email address is already registered. Please try signing in instead.';
+        case 422:
+          // Handle FastAPI validation errors specifically
+          if (apiError.details && Array.isArray(apiError.details.detail)) {
+            const validationErrors = apiError.details.detail
+              .map((err: any) => `${err.loc?.join('.')}: ${err.msg}`)
+              .join(', ');
+            return `Please check: ${validationErrors}`;
+          }
+          return 'Please check your input data for errors.';
         case 429:
           return 'Too many requests. Please wait a moment and try again.';
         case 500:
@@ -188,7 +218,13 @@ class AuthService {
       }
     }
 
+    // Handle string errors
+    if (typeof error === 'string') {
+      return error;
+    }
+
     // Fallback for unknown error types
+    console.log('❓ Unknown error type:', typeof error, error);
     return 'An unexpected error occurred. Please try again.';
   }
 

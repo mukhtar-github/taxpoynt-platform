@@ -206,8 +206,11 @@ class TaxPoyntAPIClient {
     if (error.response) {
       // Server responded with error status
       const errorData = error.response.data as APIErrorResponseData;
+      
+      console.log(`🌐 HTTP Error ${error.response.status}:`, error.response.data);
+      
       return {
-        message: errorData?.detail || errorData?.message || 'Server error occurred',
+        message: errorData?.detail || errorData?.message || `HTTP ${error.response.status} error`,
         status: error.response.status,
         code: errorData?.code,
         details: error.response.data,
@@ -215,6 +218,7 @@ class TaxPoyntAPIClient {
       };
     } else if (error.request) {
       // Request made but no response received
+      console.log('🔌 Network Error:', error.message);
       return {
         message: 'Network error - please check your connection',
         status: 0,
@@ -224,6 +228,7 @@ class TaxPoyntAPIClient {
       };
     } else {
       // Something else happened
+      console.log('❓ Request Setup Error:', error.message);
       return {
         message: error.message || 'An unexpected error occurred',
         status: 0,
@@ -285,11 +290,29 @@ class TaxPoyntAPIClient {
   public async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
       console.log('🚀 TaxPoynt API: Attempting registration to:', `${API_BASE_URL}/auth/register`);
-      console.log('📝 Registration data:', { ...userData, password: '***hidden***' });
+      console.log('📝 Registration data:', { 
+        email: userData.email,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        role: userData.role,
+        password: '***hidden***'
+      });
       
+      // Validate required fields before sending
+      if (!userData.email || !userData.password || !userData.first_name || !userData.last_name) {
+        throw new Error('Missing required fields: email, password, first_name, last_name');
+      }
+      
+      if (!userData.role) {
+        console.warn('⚠️ No role specified, defaulting to system_integrator');
+        userData.role = 'system_integrator';
+      }
+      
+      console.log('🔄 Sending registration request...');
       const response = await this.client.post<AuthResponse>('/auth/register', userData);
       
       console.log('✅ Registration successful:', response.data.user.email);
+      console.log('👤 User created with role:', response.data.user.role);
       
       // Store authentication data
       this.storeAuth(response.data);
