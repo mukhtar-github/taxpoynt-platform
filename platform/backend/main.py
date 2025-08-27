@@ -199,8 +199,24 @@ def create_taxpoynt_app() -> FastAPI:
         "https://taxpoynt.com",  # Main domain
         "https://www.taxpoynt.com",  # WWW subdomain
         "http://localhost:3000",
-        "http://localhost:3001"  # Frontend dev port
+        "http://localhost:3001",  # Frontend dev port
+        # ADD YOUR FRONTEND PRODUCTION URL HERE:
+        # "https://your-frontend-domain.com",
+        # "https://your-app.vercel.app",
+        # "https://your-app.netlify.app",
+        # Temporary fix - allow Railway frontend if same domain
+        "https://web-production-ea5ad.up.railway.app:3001",
+        # Common Railway frontend patterns
+        "https://taxpoynt-frontend.up.railway.app",
+        "https://taxpoynt-platform-frontend.up.railway.app"
     ] if not DEBUG else ["*"]
+    
+    # EMERGENCY PRODUCTION FIX - Temporarily allow all origins
+    # TODO: Remove this and add specific frontend URL once identified
+    if ENVIRONMENT == "production" and os.getenv("EMERGENCY_CORS_FIX") == "true":
+        allowed_origins = ["*"]
+        logger.warning("🚨 EMERGENCY CORS FIX ENABLED - ALL ORIGINS ALLOWED")
+        logger.warning("🔧 Set EMERGENCY_CORS_FIX=false and add specific frontend URL to allowed_origins")
     
     # Initialize secure JWT manager (no hardcoded secrets)
     from core_platform.security import initialize_jwt_manager, get_jwt_manager

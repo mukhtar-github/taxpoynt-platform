@@ -83,6 +83,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Skip chrome-extension and other unsupported schemes
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+  
   // Handle different caching strategies
   if (CACHE_FIRST_PATTERNS.some(pattern => pattern.test(url.pathname))) {
     event.respondWith(cacheFirst(request));
