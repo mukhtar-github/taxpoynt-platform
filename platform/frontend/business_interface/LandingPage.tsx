@@ -2380,6 +2380,275 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Professional Footer */}
+      <footer className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 text-white relative overflow-hidden">
+        
+        {/* Premium Background Effects */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-br from-blue-600/10 to-indigo-600/10 rounded-full filter blur-3xl"></div>
+          <div className="absolute top-0 right-1/4 w-80 h-80 bg-gradient-to-br from-green-600/10 to-emerald-600/10 rounded-full filter blur-3xl"></div>
+          <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-gradient-to-br from-amber-600/10 to-orange-600/10 rounded-full filter blur-3xl transform -translate-x-1/2"></div>
+        </div>
+        
+        {/* Main Footer Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-16 pb-8">
+          
+          {/* Top Section */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+            
+            {/* Company Info */}
+            <div className="lg:col-span-1">
+              {/* Logo & Brand */}
+              <div className="flex items-center space-x-3 mb-6">
+                <img 
+                  src="/logo.svg" 
+                  alt="TaxPoynt Logo" 
+                  className="h-10 w-auto filter brightness-0 invert"
+                />
+                <div>
+                  <div className="text-2xl font-bold text-white" style={{ textShadow: '0 1px 2px rgba(255, 255, 255, 0.1)' }}>TaxPoynt</div>
+                  <div className="text-sm text-slate-300 font-medium">Nigeria's #1 E-invoicing Platform</div>
+                </div>
+              </div>
+              
+              <p className="text-slate-300 leading-relaxed mb-6" style={{ 
+                textRendering: 'optimizeLegibility', 
+                WebkitFontSmoothing: 'antialiased' 
+              }}>
+                Transform your business compliance from complexity to competitive advantage with Nigeria's leading FIRS-certified e-invoicing platform.
+              </p>
+              
+              {/* Certifications */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-sm font-bold">🛡️</div>
+                  <span className="text-slate-300">FIRS Certified Access Point Provider</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center text-sm font-bold">🇳🇬</div>
+                  <span className="text-slate-300">Nigerian Business Compliance Expert</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center text-sm font-bold">⭐</div>
+                  <span className="text-slate-300">2,500+ Satisfied Nigerian Businesses</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Product Links */}
+            <div>
+              <h4 className="text-lg font-bold text-white mb-6 border-b border-slate-700 pb-2">Product</h4>
+              <div className="space-y-4">
+                {[
+                  { name: 'Platform Features', href: '#features' },
+                  { name: 'Service Packages', href: '#pricing' },
+                  { name: 'API Integration', href: '/integrations' },
+                  { name: 'System Integrations', href: '/systems' },
+                  { name: 'Compliance Tools', href: '/compliance' },
+                  { name: 'Analytics Dashboard', href: '/analytics' },
+                  { name: 'Mobile App', href: '/mobile' }
+                ].map((link, index) => (
+                  <div key={index}>
+                    <a 
+                      href={link.href}
+                      className="text-slate-300 hover:text-white transition-colors duration-200 flex items-center group"
+                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
+                    >
+                      <span className="w-2 h-2 bg-slate-500 rounded-full mr-3 group-hover:bg-blue-400 transition-colors duration-200"></span>
+                      {link.name}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Company Links */}
+            <div>
+              <h4 className="text-lg font-bold text-white mb-6 border-b border-slate-700 pb-2">Company</h4>
+              <div className="space-y-4">
+                {[
+                  { name: 'About TaxPoynt', href: '/about' },
+                  { name: 'Contact Us', href: '/contact' },
+                  { name: 'Book Demo', href: '/demo' },
+                  { name: 'Success Stories', href: '/testimonials' },
+                  { name: 'Nigerian Team', href: '/team' },
+                  { name: 'Careers', href: '/careers' },
+                  { name: 'Press & Media', href: '/press' }
+                ].map((link, index) => (
+                  <div key={index}>
+                    <a 
+                      href={link.href}
+                      className="text-slate-300 hover:text-white transition-colors duration-200 flex items-center group"
+                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
+                    >
+                      <span className="w-2 h-2 bg-slate-500 rounded-full mr-3 group-hover:bg-green-400 transition-colors duration-200"></span>
+                      {link.name}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Support & Legal */}
+            <div>
+              <h4 className="text-lg font-bold text-white mb-6 border-b border-slate-700 pb-2">Support & Legal</h4>
+              <div className="space-y-4 mb-8">
+                {[
+                  { name: 'Help Center', href: '/help' },
+                  { name: 'Documentation', href: '/docs' },
+                  { name: 'API Reference', href: '/api-docs' },
+                  { name: 'System Status', href: '/status' },
+                  { name: 'Terms of Service', href: '/terms' },
+                  { name: 'Privacy Policy', href: '/privacy' },
+                  { name: 'NDPA Compliance', href: '/ndpa' }
+                ].map((link, index) => (
+                  <div key={index}>
+                    <a 
+                      href={link.href}
+                      className="text-slate-300 hover:text-white transition-colors duration-200 flex items-center group"
+                      style={{ textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}
+                    >
+                      <span className="w-2 h-2 bg-slate-500 rounded-full mr-3 group-hover:bg-amber-400 transition-colors duration-200"></span>
+                      {link.name}
+                    </a>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Newsletter Signup */}
+              <div className="bg-slate-800/50 rounded-xl p-6 backdrop-blur-sm border border-slate-700/50">
+                <h5 className="text-white font-bold mb-3 flex items-center gap-2">
+                  <span>📧</span> Stay Updated
+                </h5>
+                <p className="text-slate-300 text-sm mb-4">Get compliance updates and platform news delivered to your inbox</p>
+                <div className="flex gap-2">
+                  <input 
+                    type="email" 
+                    placeholder="Enter your email"
+                    className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors duration-200 text-sm"
+                  />
+                  <button className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold rounded-lg transition-all duration-200 hover:scale-105 shadow-lg">
+                    ✨
+                  </button>
+                </div>
+                <p className="text-slate-400 text-xs mt-2">No spam. Unsubscribe anytime.</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Divider */}
+          <div className="border-t border-slate-700 pt-8">
+            
+            {/* Contact Info Row */}
+            <div className="grid md:grid-cols-3 gap-8 mb-8">
+              
+              {/* Address */}
+              <div className="text-center md:text-left">
+                <h5 className="text-white font-bold mb-4 flex items-center justify-center md:justify-start gap-2">
+                  <span className="text-2xl">🏢</span> Nigerian Office
+                </h5>
+                <div className="text-slate-300 space-y-1 leading-relaxed">
+                  <p className="font-medium">TaxPoynt Nigeria Limited</p>
+                  <p>Plot 123, Cadastral Zone A01</p>
+                  <p>Central Business District</p>
+                  <p>Abuja, FCT 900001, Nigeria</p>
+                  <p className="text-sm text-slate-400 mt-2">🏛️ Corporate Registration: RC 1234567</p>
+                </div>
+              </div>
+              
+              {/* Contact */}
+              <div className="text-center">
+                <h5 className="text-white font-bold mb-4 flex items-center justify-center gap-2">
+                  <span className="text-2xl">📞</span> Contact Info
+                </h5>
+                <div className="text-slate-300 space-y-3">
+                  <div className="flex items-center justify-center gap-3 hover:text-white transition-colors duration-200 cursor-pointer">
+                    <span className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center">📧</span>
+                    <a href="mailto:hello@taxpoynt.com" className="hover:text-blue-400 transition-colors duration-200">hello@taxpoynt.com</a>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 hover:text-white transition-colors duration-200 cursor-pointer">
+                    <span className="w-8 h-8 bg-green-600/20 rounded-lg flex items-center justify-center">☎️</span>
+                    <a href="tel:+2341234567890" className="hover:text-green-400 transition-colors duration-200">+234 (0) 123 456 7890</a>
+                  </div>
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center">💬</span>
+                    <span className="text-sm">24/7 Live Chat Support</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center">⏰</span>
+                    <span className="text-sm">Response within 2 hours</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Social Links */}
+              <div className="text-center md:text-right">
+                <h5 className="text-white font-bold mb-4 flex items-center justify-center md:justify-end gap-2">
+                  <span className="text-2xl">🌐</span> Follow Us
+                </h5>
+                <div className="flex justify-center md:justify-end gap-3 mb-4">
+                  {[
+                    { name: 'LinkedIn', icon: '💼', href: 'https://linkedin.com/company/taxpoynt', color: 'hover:bg-blue-600' },
+                    { name: 'Twitter', icon: '🐦', href: 'https://twitter.com/taxpoynt', color: 'hover:bg-sky-500' },
+                    { name: 'Facebook', icon: '📘', href: 'https://facebook.com/taxpoynt', color: 'hover:bg-blue-700' },
+                    { name: 'YouTube', icon: '📺', href: 'https://youtube.com/@taxpoynt', color: 'hover:bg-red-600' }
+                  ].map((social, index) => (
+                    <a 
+                      key={index}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`w-12 h-12 bg-slate-800 ${social.color} rounded-lg flex items-center justify-center text-xl transition-all duration-200 hover:scale-110 hover:shadow-lg`}
+                      title={social.name}
+                    >
+                      {social.icon}
+                    </a>
+                  ))}
+                </div>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Connect with Nigeria's #1 E-invoicing Platform
+                  <br />
+                  <span className="text-xs">Join our community of 2,500+ businesses</span>
+                </p>
+              </div>
+            </div>
+            
+            {/* Bottom Bar */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-slate-700">
+              
+              {/* Copyright */}
+              <div className="text-slate-400 text-sm text-center md:text-left">
+                <p className="mb-1">&copy; {new Date().getFullYear()} TaxPoynt Nigeria Limited. All rights reserved.</p>
+                <p className="text-xs">FIRS Certified Access Point Provider • Corporate RC: 1234567 • VAT: 12345678-0001</p>
+              </div>
+              
+              {/* Security & Compliance Badges */}
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700/50">
+                  <span className="text-green-400 text-sm">🔒</span>
+                  <span className="text-slate-300 text-xs font-medium">SSL Secured</span>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700/50">
+                  <span className="text-blue-400 text-sm">🛡️</span>
+                  <span className="text-slate-300 text-xs font-medium">GDPR Compliant</span>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700/50">
+                  <span className="text-purple-400 text-sm">🏛️</span>
+                  <span className="text-slate-300 text-xs font-medium">NDPA Certified</span>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700/50">
+                  <span className="text-amber-400 text-sm">⭐</span>
+                  <span className="text-slate-300 text-xs font-medium">ISO 27001</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Bottom Gradient */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-500 to-transparent"></div>
+      </footer>
+
     </div>
   );
 };
