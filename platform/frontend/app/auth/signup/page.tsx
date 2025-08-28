@@ -46,6 +46,7 @@ function SignUpPageContent() {
 
       // Transform streamlined data to full registration format expected by backend
       const fullRegistrationData = {
+        // Required fields only - optional fields omitted to avoid validation issues
         email: registrationData.email,
         password: registrationData.password,
         first_name: registrationData.first_name,
@@ -55,21 +56,24 @@ function SignUpPageContent() {
         terms_accepted: registrationData.terms_accepted,
         privacy_accepted: registrationData.privacy_accepted,
         marketing_consent: false, // Default to false, can be updated later
-        // Optional fields - will be collected during onboarding
-        phone: '',
-        business_type: '',
-        tin: '',
-        rc_number: '',
-        address: '',
-        state: '',
-        lga: '',
-        consents: {}
+        // Note: Optional fields like business_type, phone, tin, etc. are omitted
+        // to avoid backend validation issues and will be collected during onboarding
       };
 
       console.log('📋 Full registration data being sent:', {
         ...fullRegistrationData,
         password: '***hidden***'
       });
+
+      // Additional debug logging to see exact field values
+      console.log('🔍 Field by field validation:');
+      console.log('  email:', fullRegistrationData.email, '(length:', fullRegistrationData.email.length, ')');
+      console.log('  first_name:', fullRegistrationData.first_name, '(length:', fullRegistrationData.first_name.length, ')');
+      console.log('  last_name:', fullRegistrationData.last_name, '(length:', fullRegistrationData.last_name.length, ')');
+      console.log('  business_name:', fullRegistrationData.business_name, '(length:', fullRegistrationData.business_name.length, ')');
+      console.log('  service_package:', fullRegistrationData.service_package);
+      console.log('  terms_accepted:', fullRegistrationData.terms_accepted);
+      console.log('  privacy_accepted:', fullRegistrationData.privacy_accepted);
 
       // Register with complete data using auth service
       const authResponse = await authService.register(fullRegistrationData);

@@ -338,24 +338,27 @@ class TaxPoyntAPIClient {
       this.storeAuth(response.data);
       
       return response.data;
-    } catch (error) {
-      console.error('❌ Registration failed:', error);
-      
-      // Enhanced error handling for registration
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status;
-        const data = error.response?.data;
-        
-        console.log('🔍 Detailed error info:', {
-          status,
-          data,
-          headers: error.response?.headers,
-          config: {
-            url: error.config?.url,
-            method: error.config?.method,
-            data: error.config?.data ? JSON.parse(error.config.data) : null
-          }
-        });
+          } catch (error) {
+        console.error('❌ Registration failed:', error);
+
+        // Enhanced error handling for registration
+        if (axios.isAxiosError(error)) {
+          const status = error.response?.status;
+          const data = error.response?.data;
+
+          console.log('🔍 Detailed error info:', {
+            status,
+            data,
+            headers: error.response?.headers,
+            config: {
+              url: error.config?.url,
+              method: error.config?.method,
+              data: error.config?.data ? JSON.parse(error.config.data) : null
+            }
+          });
+
+          // Log the raw response data to see what's actually being returned
+          console.log('📄 Raw error response data:', JSON.stringify(data, null, 2));
         
         if (status === 400) {
           // Parse 400 errors to provide specific feedback
