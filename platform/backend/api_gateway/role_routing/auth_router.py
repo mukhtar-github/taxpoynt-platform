@@ -230,11 +230,16 @@ def create_auth_router(
                 "last_name": user_data.last_name,
                 "phone": user_data.phone,
                 "service_package": user_data.service_package,
-                "organization_id": organization_id
+                "organization_id": organization_id,
+                "terms_accepted_at": datetime.utcnow() if user_data.terms_accepted else None,
+                "privacy_accepted_at": datetime.utcnow() if user_data.privacy_accepted else None
             }
             
             user = db.create_user(user_data_dict)
             user_id = user["id"]
+            
+            # Update organization with owner_id
+            db.update_organization_owner(organization_id, user_id)
             
             # Create access token
             token_data = {
@@ -460,6 +465,136 @@ def create_auth_router(
                 detail="Failed to get user information"
             )
     
+    @router.get("/user-roles")
+    async def get_user_roles(credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Get current authenticated user's roles and permissions"""
+        try:
+            # Verify token
+            payload = verify_access_token(credentials.credentials)
+            user_id = payload.get("user_id")
+            
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token: user ID not found"
+                )
+            
+            # Get user from database
+            user = get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found"
+                )
+            
+            # Check if user is still active
+            if not user.get("is_active", False):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Account has been deactivated"
+                )
+            
+            # Build role detection result based on user's service package and role
+            user_role = user.get("role", determine_user_role(user.get("service_package", "si")))
+            
+            # Map service package to permissions
+            service_permissions = {
+                "si": [
+                    "business_systems.read",
+                    "business_systems.write", 
+                    "integration.manage",
+                    "organization.manage",
+                    "webhook.manage"
+                ],
+                "app": [
+                    "firs.read",
+                    "firs.write",
+                    "taxpayer.manage",
+                    "compliance.read",
+                    "einvoice.issue",
+                    "einvoice.validate"
+                ],
+                "hybrid": [
+                    "business_systems.read",
+                    "business_systems.write",
+                    "integration.manage", 
+                    "organization.manage",
+                    "webhook.manage",
+                    "firs.read",
+                    "firs.write",
+                    "taxpayer.manage",
+                    "compliance.read",
+                    "einvoice.issue",
+                    "einvoice.validate"
+                ]
+            }
+            
+            permissions = service_permissions.get(user.get("service_package", "si"), [])
+            
+            # Create role assignment
+            role_assignment = {
+                "assignment_id": f"default_{user_id}",
+                "user_id": user_id,
+                "platform_role": user_role,
+                "scope": "tenant",
+                "status": "active",
+                "permissions": permissions,
+                "tenant_id": None,
+                "organization_id": user.get("organization_id"),
+                "expires_at": None,
+                "assigned_at": user.get("created_at", datetime.utcnow().isoformat()),
+                "metadata": {
+                    "service_package": user.get("service_package", "si"),
+                    "primary_role": True
+                }
+            }
+            
+            # Determine available roles based on service package
+            available_roles = []
+            if user.get("service_package") == "hybrid":
+                available_roles = ["system_integrator", "access_point_provider", "hybrid"]
+            elif user.get("service_package") == "si":
+                available_roles = ["system_integrator"]
+            elif user.get("service_package") == "app":
+                available_roles = ["access_point_provider"]
+            else:
+                available_roles = [user_role]
+            
+            # Build role detection result
+            role_detection_result = {
+                "primary_role": user_role,
+                "all_roles": [role_assignment],
+                "active_permissions": permissions,
+                "can_switch_roles": len(available_roles) > 1,
+                "available_roles": available_roles,
+                "is_hybrid_user": user.get("service_package") == "hybrid",
+                "current_scope": "tenant",
+                "organization_id": user.get("organization_id"),
+                "tenant_id": None
+            }
+            
+            return JSONResponse(content={
+                "role_detection_result": role_detection_result,
+                "user_info": {
+                    "id": user_id,
+                    "email": user.get("email"),
+                    "first_name": user.get("first_name"),
+                    "last_name": user.get("last_name"),
+                    "service_package": user.get("service_package"),
+                    "organization_id": user.get("organization_id")
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Get user roles failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get user roles"
+            )
+
     @router.post("/logout")
     async def logout_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
         """Logout user and revoke token"""

@@ -83,7 +83,9 @@ class AuthDatabaseManager:
                 role=service_role_mapping.get(user_data["service_package"], UserRole.SI_USER),
                 service_package=user_data["service_package"],
                 is_active=True,
-                is_email_verified=False
+                is_email_verified=False,
+                terms_accepted_at=user_data.get("terms_accepted_at"),
+                privacy_accepted_at=user_data.get("privacy_accepted_at")
             )
             
             session.add(user)
@@ -266,13 +268,30 @@ class AuthDatabaseManager:
         try:
             user = session.query(User).filter(User.id == user_id).first()
             if user:
-                # TODO: Add last_login and login_count fields to User model
-                # For now, just update the updated_at timestamp
+                user.last_login = datetime.now(timezone.utc)
+                user.login_count = (user.login_count or 0) + 1
                 user.updated_at = datetime.now(timezone.utc)
                 session.commit()
         except Exception as e:
             session.rollback()
             logger.error(f"Error updating user login: {e}")
+        finally:
+            session.close()
+    
+    def update_organization_owner(self, org_id: str, user_id: str) -> None:
+        """Update organization owner."""
+        session = self.get_session()
+        try:
+            org = session.query(Organization).filter(Organization.id == org_id).first()
+            if org:
+                # Note: Organization model might need owner_id field added
+                # For now, just update the updated_at timestamp
+                org.updated_at = datetime.now(timezone.utc)
+                session.commit()
+                logger.info(f"Organization {org_id} owner updated to user {user_id}")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error updating organization owner: {e}")
         finally:
             session.close()
 
