@@ -85,7 +85,7 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     switch (servicePackage) {
       case 'si':
         if (state.currentStep === 'service_introduction' || !state.hasStarted) {
-          router.push(`${baseRoutes.si}/service-selection`);
+          router.push(`${baseRoutes.si}/integration-choice`);
         } else if (state.currentStep === 'integration_choice') {
           router.push(`${baseRoutes.si}/integration-choice`);
         } else if (state.currentStep === 'business_systems_setup') {
@@ -95,8 +95,8 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
         } else if (state.completedSteps.includes('onboarding_complete')) {
           router.push('/dashboard/si');
         } else {
-          // Default to service selection
-          router.push(`${baseRoutes.si}/service-selection`);
+          // Default to integration choice
+          router.push(`${baseRoutes.si}/integration-choice`);
         }
         break;
 

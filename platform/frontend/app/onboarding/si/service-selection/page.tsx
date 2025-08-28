@@ -97,20 +97,8 @@ export default function SIServiceSelectionPage() {
     try {
       console.log('SI user selected integration:', selectedIntegration);
       
-      // Route to appropriate setup flow
-      switch (selectedIntegration) {
-        case 'business_systems':
-          router.push('/onboarding/si/business-systems-setup');
-          break;
-        case 'financial_systems':
-          router.push('/onboarding/si/financial-systems-setup');
-          break;
-        case 'both_systems':
-          router.push('/onboarding/si/complete-integration-setup');
-          break;
-        default:
-          router.push('/onboarding/si/integration-setup'); // Fallback to existing flow
-      }
+      // Route to our new enhanced integration choice page first
+      router.push('/onboarding/si/integration-choice');
       
     } catch (error) {
       console.error('Integration selection failed:', error);
