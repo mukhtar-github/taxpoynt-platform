@@ -113,7 +113,7 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
   const formPersistence = useFormPersistence({
     storageKey: 'taxpoynt_registration_form',
     persistent: false, // Use sessionStorage for privacy
-    excludeFields: ['password', 'confirmPassword'],
+    excludeFields: ['password', 'confirmPassword', 'terms_accepted', 'privacy_accepted'],
     autoSaveInterval: 3000 // Save every 3 seconds
   });
 
@@ -134,6 +134,12 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
     terms_accepted: false,
     privacy_accepted: false,
     marketing_consent: false
+  });
+
+  // Separate state for critical consent fields to prevent accidental reset
+  const [criticalConsents, setCriticalConsents] = useState({
+    terms_accepted: false,
+    privacy_accepted: false
   });
   
   const [consentChoices, setConsentChoices] = useState<Record<string, boolean>>({});
@@ -159,11 +165,12 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
         ...formData,
         ...sharedData,
         ...savedData,
-        // Never restore sensitive fields
+        // Never restore sensitive fields or reset valid consent choices
         password: '',
         confirmPassword: '',
-        terms_accepted: false,
-        privacy_accepted: false
+        // Preserve existing consent state if user already accepted
+        terms_accepted: savedData?.terms_accepted || formData.terms_accepted,
+        privacy_accepted: savedData?.privacy_accepted || formData.privacy_accepted
       };
       setFormData(mergedData);
       console.log('📝 Registration form restored from saved data');
@@ -229,8 +236,8 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
       if (missingConsents.length > 0) {
         errors.consent = 'All required consents must be accepted';
       }
-      if (!formData.terms_accepted) errors.terms_accepted = 'Terms must be accepted';
-      if (!formData.privacy_accepted) errors.privacy_accepted = 'Privacy policy must be accepted';
+      if (!criticalConsents.terms_accepted) errors.terms_accepted = 'Terms must be accepted';
+      if (!criticalConsents.privacy_accepted) errors.privacy_accepted = 'Privacy policy must be accepted';
     }
     
     setFieldErrors(errors);
@@ -261,14 +268,29 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
     }
 
     try {
+      // Final validation before submission
+      if (!validateStep(2)) {
+        console.error('❌ Registration validation failed at final step');
+        return;
+      }
+
       const registrationData = {
         ...formData,
+        // Override with critical consent state to ensure they're included
+        terms_accepted: criticalConsents.terms_accepted,
+        privacy_accepted: criticalConsents.privacy_accepted,
         consents: consentChoices,
         banking_integration_enabled: consentChoices['banking_integration_intent'],
         banking_consent_complete: bankingConsentComplete,
         timestamp: new Date().toISOString(),
         ndpr_compliant: true
       };
+
+      console.log('🚀 Submitting registration with data:', {
+        ...registrationData,
+        password: '***hidden***',
+        critical_consents: criticalConsents
+      });
       
       await onCompleteRegistration(registrationData);
       
@@ -525,9 +547,11 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
                 <div className="flex items-start">
           <input
             type="checkbox"
-            checked={formData.terms_accepted}
-            onChange={(e) => setFormData({...formData, terms_accepted: e.target.checked})}
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer"
+            checked={criticalConsents.terms_accepted}
+            onChange={(e) => setCriticalConsents({...criticalConsents, terms_accepted: e.target.checked})}
+            className={`h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer ${
+              fieldErrors.terms_accepted ? 'border-red-500' : ''
+            }`}
             required
           />
           <span className="ml-3 text-sm text-slate-600">
@@ -553,14 +577,19 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
             </a>
             {' '}(required)
           </span>
+          {fieldErrors.terms_accepted && (
+            <p className="ml-7 mt-1 text-sm text-red-600">{fieldErrors.terms_accepted}</p>
+          )}
         </div>
 
         <div className="flex items-start">
           <input
             type="checkbox"
-            checked={formData.privacy_accepted}
-            onChange={(e) => setFormData({...formData, privacy_accepted: e.target.checked})}
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer"
+            checked={criticalConsents.privacy_accepted}
+            onChange={(e) => setCriticalConsents({...criticalConsents, privacy_accepted: e.target.checked})}
+            className={`h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer ${
+              fieldErrors.privacy_accepted ? 'border-red-500' : ''
+            }`}
             required
           />
           <span className="ml-3 text-sm text-slate-600">
@@ -576,6 +605,9 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
             </a>
             {' '}(required)
           </span>
+          {fieldErrors.privacy_accepted && (
+            <p className="ml-7 mt-1 text-sm text-red-600">{fieldErrors.privacy_accepted}</p>
+          )}
         </div>
       </div>
     </div>
@@ -634,7 +666,29 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
           <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
             <div className="flex items-center">
               <span className="text-red-600 mr-3 text-xl">⚠️</span>
-              <div className="text-red-700">{error}</div>
+              <div>
+                <div className="text-red-700 font-medium">{error}</div>
+                <div className="text-red-600 text-sm mt-1">
+                  Please check your information and try again. If the problem persists, contact support.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Field Errors Display */}
+        {Object.keys(fieldErrors).length > 0 && (
+          <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+            <div className="flex items-start">
+              <span className="text-orange-600 mr-3 text-xl">📝</span>
+              <div>
+                <div className="text-orange-800 font-medium mb-2">Please complete the following fields:</div>
+                <ul className="text-orange-700 text-sm space-y-1">
+                  {Object.entries(fieldErrors).map(([field, message]) => (
+                    <li key={field}>• {message}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         )}

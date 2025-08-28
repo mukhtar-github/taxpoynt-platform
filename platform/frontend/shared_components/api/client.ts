@@ -338,6 +338,41 @@ class TaxPoyntAPIClient {
       return response.data;
     } catch (error) {
       console.error('❌ Registration failed:', error);
+      
+      // Enhanced error handling for registration
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        
+        console.log('🔍 Detailed error info:', {
+          status,
+          data,
+          headers: error.response?.headers,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            data: error.config?.data ? JSON.parse(error.config.data) : null
+          }
+        });
+        
+        if (status === 400) {
+          // Parse 400 errors to provide specific feedback
+          const detail = data?.detail || 'Registration failed due to validation errors';
+          
+          if (detail.includes('Terms and conditions must be accepted')) {
+            throw new Error('Please accept the terms and conditions to continue');
+          } else if (detail.includes('Privacy policy must be accepted')) {
+            throw new Error('Please accept the privacy policy to continue');
+          } else if (detail.includes('Email address is already registered')) {
+            throw new Error('This email address is already registered. Please use a different email or try logging in.');
+          } else if (detail.includes('Invalid service package')) {
+            throw new Error('Please select a valid service package');
+          } else {
+            throw new Error(`Registration validation failed: ${detail}`);
+          }
+        }
+      }
+      
       throw error; // Re-throw formatted error from interceptor
     }
   }
