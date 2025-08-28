@@ -68,7 +68,7 @@ export interface RegisterRequest {
   phone?: string;
   service_package: string;  // si, app, hybrid (instead of role)
   business_name: string;    // Required by backend
-  business_type: string;    // Required by backend
+  business_type?: string;   // Now optional - collected during onboarding
   tin?: string;
   rc_number?: string;
   address?: string;
@@ -317,9 +317,11 @@ class TaxPoyntAPIClient {
         throw new Error('Missing required fields: email, password, first_name, last_name');
       }
       
-      if (!userData.business_name || !userData.business_type) {
-        throw new Error('Missing required business fields: business_name, business_type');
+      if (!userData.business_name) {
+        throw new Error('Missing required business field: business_name');
       }
+      
+      // Note: business_type is now optional and collected during onboarding
       
       if (!userData.service_package) {
         console.warn('⚠️ No service_package specified, defaulting to si');

@@ -38,7 +38,7 @@ export interface RegisterRequest {
   phone?: string;
   service_package: string;
   business_name: string;
-  business_type: string;
+  business_type?: string;  // Now optional - collected during onboarding
   tin?: string;
   rc_number?: string;
   address?: string;

@@ -55,7 +55,7 @@ class UserRegisterRequest(BaseModel):
     phone: Optional[str] = None
     service_package: str = "si"  # si, app, hybrid
     business_name: str
-    business_type: str
+    business_type: Optional[str] = None  # Now optional, collected during onboarding
     tin: Optional[str] = None
     rc_number: Optional[str] = None
     address: Optional[str] = None
@@ -209,7 +209,7 @@ def create_auth_router(
             # Create organization record in database
             organization_data = {
                 "name": user_data.business_name,
-                "business_type": user_data.business_type,
+                "business_type": user_data.business_type or "To be determined",  # Default if not provided
                 "tin": user_data.tin,
                 "rc_number": user_data.rc_number,
                 "address": user_data.address,

@@ -50,20 +50,26 @@ function SignUpPageContent() {
         password: registrationData.password,
         first_name: registrationData.first_name,
         last_name: registrationData.last_name,
-        phone: '', // Will be collected during onboarding
         service_package: registrationData.service_package,
         business_name: registrationData.business_name,
-        business_type: '', // Will be collected during onboarding
-        tin: '', // Will be collected during onboarding
-        rc_number: '', // Will be collected during onboarding
-        address: '', // Will be collected during onboarding
-        state: '', // Will be collected during onboarding
-        lga: '', // Will be collected during onboarding
         terms_accepted: registrationData.terms_accepted,
         privacy_accepted: registrationData.privacy_accepted,
         marketing_consent: false, // Default to false, can be updated later
-        consents: {} // Will be collected during service-specific onboarding
+        // Optional fields - will be collected during onboarding
+        phone: '',
+        business_type: '',
+        tin: '',
+        rc_number: '',
+        address: '',
+        state: '',
+        lga: '',
+        consents: {}
       };
+
+      console.log('📋 Full registration data being sent:', {
+        ...fullRegistrationData,
+        password: '***hidden***'
+      });
 
       // Register with complete data using auth service
       const authResponse = await authService.register(fullRegistrationData);
