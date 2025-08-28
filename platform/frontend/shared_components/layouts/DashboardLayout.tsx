@@ -32,6 +32,7 @@ interface NavigationItem {
   icon: string;
   badge?: string;
   roles: ('si' | 'app' | 'hybrid')[];
+  prefetch?: boolean; // Disable prefetching for non-existent routes
 }
 
 const navigationItems: NavigationItem[] = [
@@ -48,7 +49,8 @@ const navigationItems: NavigationItem[] = [
     href: '/dashboard/integrations',
     icon: '🔗',
     badge: '15',
-    roles: ['si', 'hybrid']
+    roles: ['si', 'hybrid'],
+    prefetch: false
   },
   {
     id: 'firs-communication',
@@ -63,28 +65,32 @@ const navigationItems: NavigationItem[] = [
     href: '/dashboard/processing',
     icon: '⚙️',
     badge: '45',
-    roles: ['si', 'app', 'hybrid']
+    roles: ['si', 'app', 'hybrid'],
+    prefetch: false
   },
   {
     id: 'compliance',
     label: 'Compliance',
     href: '/dashboard/compliance',
     icon: '✅',
-    roles: ['si', 'app', 'hybrid']
+    roles: ['si', 'app', 'hybrid'],
+    prefetch: false
   },
   {
     id: 'analytics',
     label: 'Analytics',
     href: '/dashboard/analytics',
     icon: '📈',
-    roles: ['si', 'app', 'hybrid']
+    roles: ['si', 'app', 'hybrid'],
+    prefetch: false
   },
   {
     id: 'financial',
     label: 'Financial Systems',
     href: '/dashboard/financial',
     icon: '💰',
-    roles: ['si', 'hybrid']
+    roles: ['si', 'hybrid'],
+    prefetch: false
   },
   {
     id: 'security',
@@ -98,7 +104,8 @@ const navigationItems: NavigationItem[] = [
     label: 'System Tools',
     href: '/dashboard/tools',
     icon: '🛠️',
-    roles: ['si', 'hybrid']
+    roles: ['si', 'hybrid'],
+    prefetch: false
   },
   {
     id: 'workflows',
@@ -294,6 +301,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Link
                 key={item.id}
                 href={item.href}
+                prefetch={item.prefetch !== false}
                 className={`flex items-center p-3 rounded-xl transition-all duration-200 ${
                   activeTab === item.id
                     ? `bg-${theme.accent} text-white shadow-lg`

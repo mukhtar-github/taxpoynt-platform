@@ -106,29 +106,24 @@ export default function SIIntegrationChoicePage() {
     }
   ];
 
-  const handleContinue = async () => {
-    if (!selectedIntegration) {
-      alert('Please select an integration type to continue');
-      return;
-    }
-
-    const choice = integrationChoices.find(c => c.id === selectedIntegration);
+  const handleIntegrationSelect = async (integrationId: string) => {
+    const choice = integrationChoices.find(c => c.id === integrationId);
     if (!choice) return;
 
     setIsLoading(true);
+    setSelectedIntegration(integrationId);
     
     try {
-      console.log('📊 SI user selected integration:', selectedIntegration);
+      console.log('📊 SI user selected integration:', integrationId);
       
       // Save integration choice to user profile/onboarding state
-      OnboardingStateManager.updateStep(user.id, selectedIntegration, true);
+      OnboardingStateManager.updateStep(user.id, integrationId, true);
       
-      // Route to appropriate setup flow
+      // Route immediately to appropriate setup flow
       router.push(choice.nextStep);
       
     } catch (error) {
       console.error('Integration selection failed:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -182,18 +177,18 @@ export default function SIIntegrationChoicePage() {
           {integrationChoices.map((choice) => (
             <div
               key={choice.id}
-              onClick={() => setSelectedIntegration(choice.id)}
-              className={`relative border-2 rounded-2xl p-6 cursor-pointer transition-all duration-200 ${
-                selectedIntegration === choice.id
-                  ? 'border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100 transform scale-105'
-                  : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+              onClick={() => handleIntegrationSelect(choice.id)}
+              className={`relative border-2 rounded-2xl p-6 cursor-pointer transition-all duration-200 hover:border-indigo-400 hover:shadow-xl hover:transform hover:scale-105 ${
+                isLoading && selectedIntegration === choice.id
+                  ? 'border-indigo-500 bg-indigo-50 opacity-75 pointer-events-none'
+                  : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {/* Selection Indicator */}
-              {selectedIntegration === choice.id && (
+              {/* Loading Indicator */}
+              {isLoading && selectedIntegration === choice.id && (
                 <div className="absolute -top-3 -right-3">
                   <div className="bg-indigo-500 text-white rounded-full w-8 h-8 flex items-center justify-center">
-                    ✓
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   </div>
                 </div>
               )}
@@ -233,36 +228,34 @@ export default function SIIntegrationChoicePage() {
                 </div>
               </div>
 
-              {/* Detailed Description (only for selected) */}
-              {selectedIntegration === choice.id && (
-                <div className="mt-4 pt-4 border-t border-indigo-200">
-                  <p className="text-sm text-indigo-800">{choice.detailedDescription}</p>
+              {/* Click to continue indicator */}
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center text-sm text-indigo-600 font-medium">
+                  <span>Click to start setup</span>
+                  <span className="ml-1">→</span>
                 </div>
-              )}
+              </div>
             </div>
           ))}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-lg mx-auto">
-          <TaxPoyntButton
-            variant="primary"
-            onClick={handleContinue}
-            loading={isLoading}
-            disabled={!selectedIntegration || isLoading}
-            className="flex-1"
-          >
-            {selectedIntegration ? 'Continue with Setup' : 'Select an Option'}
-          </TaxPoyntButton>
-          
+        <div className="flex justify-center">
           <TaxPoyntButton
             variant="secondary"
             onClick={handleSkipForNow}
             disabled={isLoading}
-            className="flex-1"
+            className="px-8"
           >
-            Skip for Now
+            Skip Setup for Now
           </TaxPoyntButton>
+        </div>
+        
+        {/* Instruction Text */}
+        <div className="text-center mt-6">
+          <p className="text-gray-600 text-sm">
+            💡 <strong>Tip:</strong> Click on any integration card above to start the setup process immediately
+          </p>
         </div>
 
         {/* Help Section */}
