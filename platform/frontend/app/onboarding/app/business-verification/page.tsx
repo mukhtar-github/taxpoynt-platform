@@ -214,7 +214,7 @@ export default function APPBusinessVerificationPage() {
               onChange={(e) => setFormData({...formData, tin: e.target.value})}
               variant={fieldErrors.tin ? 'error' : 'default'}
               placeholder="12345678-0001"
-              helpText="Format: 12345678-0001"
+              helperText="Format: 12345678-0001"
             />
 
             {/* RC Number */}

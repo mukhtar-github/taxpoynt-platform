@@ -116,6 +116,15 @@ class FIRSIntegrationEndpointsV1:
             response_model=V1ResponseModel
         )
         
+        self.router.add_api_route(
+            "/test-connection",
+            self.test_firs_connection,
+            methods=["POST"],
+            summary="Test FIRS connection",
+            description="Test connection to FIRS with provided credentials",
+            response_model=V1ResponseModel
+        )
+        
         # Invoice Submission Routes
         self.router.add_api_route(
             "/invoices/submit",
@@ -332,6 +341,37 @@ class FIRSIntegrationEndpointsV1:
         except Exception as e:
             logger.error(f"Error refreshing FIRS token in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to refresh FIRS token")
+    
+    async def test_firs_connection(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Test FIRS connection with provided credentials"""
+        try:
+            body = await request.json()
+            
+            # Validate required fields
+            if not body.get('api_key') or not body.get('api_secret'):
+                raise HTTPException(status_code=400, detail="API key and secret are required")
+            
+            # Test connection to FIRS
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="test_firs_connection",
+                payload={
+                    "credentials": {
+                        "api_key": body.get('api_key'),
+                        "api_secret": body.get('api_secret'),
+                        "environment": body.get('environment', 'sandbox')
+                    },
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "firs_connection_tested")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error testing FIRS connection in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to test FIRS connection")
     
     async def get_firs_auth_status(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get FIRS authentication status"""

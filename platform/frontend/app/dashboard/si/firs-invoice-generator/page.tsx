@@ -214,7 +214,7 @@ export default function FIRSInvoiceGeneratorPage() {
   };
 
   const getSourceIcon = (type: string) => {
-    const icons = {
+    const icons: Record<string, string> = {
       'erp': '🏢',
       'crm': '👥',
       'pos': '🛒',

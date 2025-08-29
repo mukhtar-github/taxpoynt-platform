@@ -269,7 +269,7 @@ export default function BusinessSystemsSetupPage() {
   };
 
   const getSystemAPIEndpoint = (category: string): string => {
-    const endpoints = {
+    const endpoints: Record<string, string> = {
       'erp': '/api/v1/si/integrations/erp',
       'crm': '/api/v1/si/integrations/crm', 
       'pos': '/api/v1/si/integrations/pos',

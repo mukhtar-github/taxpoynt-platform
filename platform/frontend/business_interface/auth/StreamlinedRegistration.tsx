@@ -163,7 +163,7 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
         onChange={(e) => setFormData({...formData, password: e.target.value})}
         variant={fieldErrors.password ? 'error' : 'default'}
         required
-        helpText="At least 8 characters"
+        helperText="At least 8 characters"
       />
 
       {/* Display errors */}
@@ -186,7 +186,7 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
         onChange={(e) => setFormData({...formData, business_name: e.target.value})}
         variant={fieldErrors.business_name ? 'error' : 'default'}
         required
-        helpText="We'll collect more business details later based on your service choice"
+        helperText="We'll collect more business details later based on your service choice"
       />
 
       {fieldErrors.business_name && (
