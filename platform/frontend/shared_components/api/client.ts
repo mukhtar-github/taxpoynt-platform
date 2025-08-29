@@ -6,6 +6,9 @@
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { secureTokenStorage } from '../utils/secureTokenStorage';
+import { secureLogger } from '../utils/secureLogger';
+import { secureConfig } from '../utils/secureConfig';
 
 // Extend Axios config to include metadata
 interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -256,7 +259,7 @@ class TaxPoyntAPIClient {
    */
   private getStoredToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
+    return secureTokenStorage.getToken();
   }
 
   /**
@@ -265,8 +268,14 @@ class TaxPoyntAPIClient {
   private storeAuth(authData: AuthResponse): void {
     if (typeof window === 'undefined') return;
     
-    localStorage.setItem(TOKEN_KEY, authData.access_token);
-    localStorage.setItem(USER_KEY, JSON.stringify(authData.user));
+    // SECURITY: Store token securely using secureTokenStorage
+    secureTokenStorage.storeToken(authData.access_token, { 
+      encryptTokens: true, 
+      autoRefresh: true 
+    });
+    
+    // Store user data in sessionStorage for privacy
+    sessionStorage.setItem(USER_KEY, JSON.stringify(authData.user));
   }
 
   /**
@@ -275,8 +284,8 @@ class TaxPoyntAPIClient {
   private clearAuth(): void {
     if (typeof window === 'undefined') return;
     
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    secureTokenStorage.clearToken();
+    sessionStorage.removeItem(USER_KEY);
   }
 
   /**
@@ -285,7 +294,7 @@ class TaxPoyntAPIClient {
   public getStoredUser(): any | null {
     if (typeof window === 'undefined') return null;
     
-    const userStr = localStorage.getItem(USER_KEY);
+    const userStr = sessionStorage.getItem(USER_KEY);
     return userStr ? JSON.parse(userStr) : null;
   }
 
@@ -301,15 +310,10 @@ class TaxPoyntAPIClient {
    */
   public async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
-      console.log('🚀 TaxPoynt API: Attempting registration to:', `${API_BASE_URL}/auth/register`);
-      console.log('📝 Registration data:', { 
-        email: userData.email,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        business_name: userData.business_name,
-        business_type: userData.business_type,
-        service_package: userData.service_package,
-        password: '***hidden***'
+      secureLogger.userAction('TaxPoynt API: Attempting registration', { 
+        endpoint: `${API_BASE_URL}/auth/register`,
+        user_email: userData.email,
+        service_package: userData.service_package
       });
       
       // Validate required fields before sending
@@ -328,37 +332,41 @@ class TaxPoyntAPIClient {
         userData.service_package = 'si';
       }
       
-      console.log('🔄 Sending registration request...');
+      secureLogger.userAction('Sending registration request');
       const response = await this.client.post<AuthResponse>('/auth/register', userData);
       
-      console.log('✅ Registration successful:', response.data.user.email);
-      console.log('👤 User created with service_package:', response.data.user.service_package);
+      secureLogger.success('Registration successful', { 
+        user_email: response.data.user.email,
+        service_package: response.data.user.service_package 
+      });
       
       // Store authentication data
       this.storeAuth(response.data);
       
       return response.data;
           } catch (error) {
-        console.error('❌ Registration failed:', error);
+        secureLogger.error('Registration failed', error);
 
         // Enhanced error handling for registration
         if (axios.isAxiosError(error)) {
           const status = error.response?.status;
           const data = error.response?.data;
 
-          console.log('🔍 Detailed error info:', {
+          secureLogger.error('Registration error details', {
             status,
-            data,
+            data: secureConfig.sanitizeConfig(data),
             headers: error.response?.headers,
             config: {
               url: error.config?.url,
               method: error.config?.method,
-              data: error.config?.data ? JSON.parse(error.config.data) : null
+              data: error.config?.data ? secureConfig.sanitizeConfig(JSON.parse(error.config.data)) : null
             }
           });
 
           // Log the raw response data to see what's actually being returned
-          console.log('📄 Raw error response data:', JSON.stringify(data, null, 2));
+          secureLogger.error('Raw error response data', { 
+            data: secureConfig.sanitizeConfig(data) 
+          });
         
         if (status === 400) {
           // Parse 400 errors to provide specific feedback
@@ -410,7 +418,7 @@ class TaxPoyntAPIClient {
       await this.client.post('/auth/logout');
     } catch (error) {
       // Continue with logout even if server call fails
-      console.warn('Logout server call failed:', error);
+      secureLogger.error('Logout server call failed', error);
     } finally {
       this.clearAuth();
     }

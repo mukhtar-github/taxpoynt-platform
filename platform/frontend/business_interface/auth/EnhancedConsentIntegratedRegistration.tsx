@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthLayout } from '../../shared_components/auth/AuthLayout';
 import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
+import { secureLogger } from '../../shared_components/utils/secureLogger';
 import { 
   TYPOGRAPHY_STYLES, 
   combineStyles, 
@@ -286,20 +287,20 @@ export const EnhancedConsentIntegratedRegistration: React.FC<EnhancedConsentInte
         ndpr_compliant: true
       };
 
-      console.log('🚀 Submitting registration with data:', {
-        ...registrationData,
-        password: '***hidden***',
-        critical_consents: criticalConsents
+      secureLogger.userAction('Submitting enhanced consent registration', {
+        has_critical_consents: !!criticalConsents.terms_accepted && !!criticalConsents.privacy_accepted,
+        banking_integration_enabled: consentChoices['banking_integration_intent'],
+        ndpr_compliant: true
       });
       
       await onCompleteRegistration(registrationData);
       
       // Clear form data on successful registration
       formPersistence.clearFormData();
-      console.log('✅ Registration successful - form data cleared');
+      secureLogger.success('Enhanced consent registration successful - form data cleared');
       
     } catch (err) {
-      console.error('Registration failed:', err);
+      secureLogger.error('Enhanced consent registration failed', err);
       // Keep form data on failure so user doesn't lose their input
     }
   };

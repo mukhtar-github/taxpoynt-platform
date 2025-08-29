@@ -20,6 +20,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRoleDetector, PlatformRole } from './role_detector';
 import { usePermissions } from './permission_provider';
+import { secureLogger } from '../shared_components/utils/secureLogger';
 
 // Role metadata for UI display
 export interface RoleMetadata {
@@ -241,7 +242,10 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
         setIsDropdownOpen(false);
 
         // Show success message (optional)
-        console.log(`Successfully switched to ${ROLE_METADATA[newRole].displayName}`);
+        secureLogger.userAction('Role switch successful', { 
+          new_role: newRole,
+          display_name: ROLE_METADATA[newRole].displayName 
+        });
         
       } else {
         throw new Error('Role switch failed');

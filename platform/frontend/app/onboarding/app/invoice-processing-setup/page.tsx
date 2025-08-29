@@ -7,6 +7,8 @@ import { OnboardingStateManager } from '../../../../shared_components/onboarding
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
 import { TaxPoyntAPIClient } from '../../../../shared_components/api/client';
 import { APIResponse } from '../../../../si_interface/types';
+import { secureConfig, validateConfig } from '../../../../shared_components/utils/secureConfig';
+import { secureLogger } from '../../../../shared_components/utils/secureLogger';
 
 interface FIRSSetupData {
   firs_api_key: string;
@@ -77,24 +79,40 @@ export default function APPInvoiceProcessingSetupPage() {
   const testFIRSConnection = async () => {
     if (!validateStep(1)) return;
 
+    // SECURITY: Validate configuration for sensitive data exposure
+    const securityValidation = validateConfig(setupData);
+    if (!securityValidation.isValid) {
+      secureLogger.error('Security violation detected in FIRS setup', {
+        violations: securityValidation.violations,
+        recommendations: securityValidation.recommendations
+      });
+      setConnectionStatus('failed');
+      return;
+    }
+
     setConnectionStatus('testing');
     
     try {
       const apiClient = new TaxPoyntAPIClient();
-      const response = await apiClient.post<APIResponse>('/api/v1/app/firs/test-connection', {
+      
+      // SECURITY: Sanitize data before sending to API
+      const sanitizedData = secureConfig.sanitizeConfig({
         api_key: setupData.firs_api_key,
         api_secret: setupData.firs_api_secret,
         environment: setupData.environment
       });
       
+      const response = await apiClient.post<APIResponse>('/api/v1/app/firs/test-connection', sanitizedData);
+      
       if (response.success) {
         setConnectionStatus('success');
+        secureLogger.userAction('FIRS connection test successful', { environment: setupData.environment });
         setTimeout(() => setCurrentStep(2), 1000);
       } else {
         setConnectionStatus('failed');
       }
     } catch (error) {
-      console.error('FIRS connection test failed:', error);
+      secureLogger.error('FIRS connection test failed', error);
       setConnectionStatus('failed');
     }
   };
@@ -102,25 +120,43 @@ export default function APPInvoiceProcessingSetupPage() {
   const handleComplete = async () => {
     if (!validateStep(3)) return;
 
+    // SECURITY: Final validation before saving sensitive configuration
+    const securityValidation = validateConfig(setupData);
+    if (!securityValidation.isValid) {
+      secureLogger.error('Security violation detected before saving FIRS config', {
+        violations: securityValidation.violations,
+        recommendations: securityValidation.recommendations
+      });
+      setFieldErrors({ general: 'Security validation failed. Please check your configuration.' });
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     
     try {
       const apiClient = new TaxPoyntAPIClient();
       
+      // SECURITY: Sanitize data before saving to backend
+      const sanitizedSetupData = secureConfig.sanitizeConfig(setupData);
+      
       // Save FIRS configuration
       await apiClient.post<APIResponse>('/api/v1/app/setup/firs-configuration', {
-        ...setupData,
+        ...sanitizedSetupData,
         user_id: user.id
       });
       
       // Mark onboarding as complete
       OnboardingStateManager.completeOnboarding(user.id);
       
-      console.log('✅ APP Invoice Processing setup completed successfully');
+      secureLogger.userAction('APP Invoice Processing setup completed successfully', { 
+        user_id: user.id,
+        environment: setupData.environment 
+      });
       router.push('/dashboard/app');
       
     } catch (error) {
-      console.error('❌ APP onboarding failed:', error);
+      secureLogger.error('APP onboarding failed', error);
       setFieldErrors({ general: 'Setup failed. Please try again.' });
     } finally {
       setIsLoading(false);

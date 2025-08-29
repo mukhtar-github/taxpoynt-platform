@@ -15,6 +15,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import { secureTokenStorage } from '../../shared_components/utils/secureTokenStorage';
+import { secureLogger } from '../../shared_components/utils/secureLogger';
 
 interface BusinessSystem {
   id: string;
@@ -325,7 +327,7 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
       const response = await fetch(`/api/v1/si/integrations/${systemId}/test`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+          'Authorization': secureTokenStorage.getAuthorizationHeader() || '',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -343,7 +345,7 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
         alert(`❌ Connection failed: ${result.error}`);
       }
     } catch (error) {
-      console.error('Connection test failed:', error);
+      secureLogger.error('Connection test failed', error);
       setTestResults(prev => ({ ...prev, [systemId]: false }));
       alert('Connection test failed. Please check your credentials.');
     } finally {
@@ -357,7 +359,7 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
       const response = await fetch('/api/v1/si/integrations/deploy', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+          'Authorization': secureTokenStorage.getAuthorizationHeader() || '',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -379,7 +381,7 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
         alert(`Deployment failed: ${result.error}`);
       }
     } catch (error) {
-      console.error('Deployment failed:', error);
+      secureLogger.error('Deployment failed', error);
       alert('Deployment failed. Please try again.');
     } finally {
       setIsProcessing(false);
