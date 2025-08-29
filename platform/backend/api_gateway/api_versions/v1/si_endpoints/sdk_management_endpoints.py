@@ -22,73 +22,34 @@ from core_platform.messaging.message_router import ServiceRole, MessageRouter
 from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from api_gateway.documentation.sdk_generator import SDKGenerator, SDKConfig, SDKLanguage
-from ..version_models import V1ResponseModel, V1ErrorModel
+from core_platform.data_management.models import (
+    SDK, SDKVersion, SDKDownload, SDKUsageLog, SandboxScenario, 
+    SandboxTestResult, SDKDocumentation, SDKFeedback, SDKAnalytics,
+    SDKLanguage as SDKLanguageEnum, SDKStatus, FeedbackType, TestStatus,
+    DEMO_SDK_DATA, DEMO_SCENARIOS
+)
+from core_platform.services.sdk_management_service import SDKManagementService
+from core_platform.data_management.database_init import get_database_session
+from ..version_models import V1ResponseModel, V1ErrorModel  # pyright: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
-# Mock SDK data for demonstration
-MOCK_SDK_CATALOG = {
-    "python": {
-        "name": "Python SDK",
-        "version": "1.0.0",
-        "language": "python",
-        "description": "Official Python SDK for TaxPoynt platform integration",
-        "features": ["Authentication", "Invoice Management", "Compliance Checking", "Webhook Handling"],
-        "download_count": 1250,
-        "last_updated": "2024-12-31T00:00:00Z",
-        "compatibility": ["Python 3.8+", "FastAPI", "Django", "Flask"],
-        "documentation_url": "/api/v1/si/sdk/documentation/python",
-        "examples": ["Basic Integration", "Invoice Creation", "Webhook Processing"],
-        "dependencies": ["requests>=2.25.0", "pydantic>=1.8.0"]
-    },
-    "javascript": {
-        "name": "JavaScript/Node.js SDK",
-        "version": "1.0.0",
-        "language": "javascript",
-        "description": "Official JavaScript SDK for TaxPoynt platform integration",
-        "features": ["Browser & Node.js Support", "TypeScript Types", "Promise-based API", "Error Handling"],
-        "download_count": 890,
-        "last_updated": "2024-12-31T00:00:00Z",
-        "compatibility": ["Node.js 16+", "Modern Browsers", "React", "Vue.js"],
-        "documentation_url": "/api/v1/si/sdk/documentation/javascript",
-        "examples": ["Frontend Integration", "Backend API", "Webhook Endpoints"],
-        "dependencies": ["axios>=0.21.0", "joi>=17.0.0"]
-    }
-}
+# Use imported demo data from models
+MOCK_SDK_CATALOG = DEMO_SDK_DATA
 
-# Mock API testing scenarios
-MOCK_API_SCENARIOS = {
-    "authentication": {
-        "name": "Authentication Test",
-        "description": "Test API key authentication and token generation",
-        "endpoint": "/api/v1/auth/login",
-        "method": "POST",
-        "headers": {"Content-Type": "application/json"},
-        "body": {"api_key": "your_api_key", "api_secret": "your_api_secret"},
-        "expected_response": {"status": "success", "token": "jwt_token_here"}
-    },
-    "invoice_creation": {
-        "name": "Invoice Creation Test",
-        "description": "Test creating a new invoice through the API",
-        "endpoint": "/api/v1/invoices",
-        "method": "POST",
-        "headers": {"Authorization": "Bearer {token}", "Content-Type": "application/json"},
-        "body": {
-            "invoice_number": "INV-001",
-            "amount": 1000.00,
-            "currency": "NGN",
-            "customer_name": "Test Customer",
-            "items": [{"name": "Test Item", "quantity": 1, "unit_price": 1000.00}]
-        },
-        "expected_response": {"status": "success", "invoice_id": "inv_123"}
-    }
-}
+# Use imported demo scenarios from models
+MOCK_API_SCENARIOS = DEMO_SCENARIOS
 
 def create_sdk_management_router(role_detector, permission_guard: APIPermissionGuard, message_router: MessageRouter) -> APIRouter:
     """Create SDK management router with all endpoints"""
     
     router = APIRouter(prefix="/sdk", tags=["SDK Management"])
+    
+    def get_sdk_service() -> SDKManagementService:
+        """Get SDK management service with database session."""
+        db_session = get_database_session()
+        return SDKManagementService(db_session)
     
     @router.get("/catalog", response_model=V1ResponseModel)
     async def get_sdk_catalog(
@@ -98,18 +59,12 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     ):
         """Get available SDKs catalog with optional language filtering"""
         try:
-            catalog = MOCK_SDK_CATALOG
-            
-            if language:
-                catalog = {k: v for k, v in catalog.items() if v["language"] == language}
+            sdk_service = get_sdk_service()
+            catalog_data = await sdk_service.get_sdk_catalog(language)
             
             return V1ResponseModel(
                 success=True,
-                data={
-                    "sdk_catalog": catalog,
-                    "total_count": len(catalog),
-                    "languages_available": list(set(sdk["language"] for sdk in catalog.values()))
-                },
+                data=catalog_data,
                 message="SDK catalog retrieved successfully"
             )
             
@@ -125,10 +80,11 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     ):
         """Get specific SDK by programming language"""
         try:
-            if language not in MOCK_SDK_CATALOG:
-                raise HTTPException(status_code=404, detail=f"SDK for language '{language}' not found")
+            sdk_service = get_sdk_service()
+            sdk_info = await sdk_service.get_sdk_by_language(language)
             
-            sdk_info = MOCK_SDK_CATALOG[language]
+            if not sdk_info:
+                raise HTTPException(status_code=404, detail=f"SDK for language '{language}' not found")
             
             return V1ResponseModel(
                 success=True,
@@ -145,31 +101,18 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     @router.post("/generate", response_model=V1ResponseModel)
     async def generate_sdk(
         request: Request,
-        sdk_config: SDKConfig,
+        language: str,
+        custom_config: Optional[Dict[str, Any]] = None,
         context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
     ):
         """Generate a new SDK based on configuration"""
         try:
-            # Initialize SDK generator
-            generator = SDKGenerator()
-            
-            # Generate SDK
-            sdk_path = await generator.generate_sdk(sdk_config)
-            
-            if not sdk_path or not sdk_path.exists():
-                raise HTTPException(status_code=500, detail="SDK generation failed")
-            
-            # Log SDK generation
-            logger.info(f"SDK generated successfully for {sdk_config.language} at {sdk_path}")
+            sdk_service = get_sdk_service()
+            sdk_data = await sdk_service.generate_sdk_package(language, custom_config)
             
             return V1ResponseModel(
                 success=True,
-                data={
-                    "sdk_path": str(sdk_path),
-                    "language": sdk_config.language.value,
-                    "generated_at": datetime.utcnow().isoformat(),
-                    "download_url": f"/api/v1/si/sdk/download/{sdk_path.name}"
-                },
+                data=sdk_data,
                 message="SDK generated successfully"
             )
             
@@ -348,9 +291,12 @@ python-dotenv>=0.19.0
     ):
         """Get available API testing scenarios for sandbox"""
         try:
+            sdk_service = get_sdk_service()
+            scenarios_data = await sdk_service.get_sandbox_scenarios()
+            
             return V1ResponseModel(
                 success=True,
-                data={"scenarios": MOCK_API_SCENARIOS},
+                data=scenarios_data,
                 message="Sandbox scenarios retrieved successfully"
             )
             
@@ -369,32 +315,20 @@ python-dotenv>=0.19.0
     ):
         """Test an API scenario in the sandbox environment"""
         try:
-            if scenario_name not in MOCK_API_SCENARIOS:
-                raise HTTPException(status_code=404, detail=f"Scenario '{scenario_name}' not found")
+            sdk_service = get_sdk_service()
             
-            scenario = MOCK_API_SCENARIOS[scenario_name]
-            
-            # In production, this would make actual API calls to test endpoints
-            # For now, we'll simulate the response
-            
-            # Simulate API call delay
-            import asyncio
-            await asyncio.sleep(0.5)
-            
-            # Mock successful response
-            test_result = {
-                "scenario": scenario_name,
-                "status": "success",
-                "response_time_ms": 450,
-                "status_code": 200,
-                "response_body": scenario["expected_response"],
-                "headers_sent": {**scenario["headers"], **(custom_headers or {})},
-                "body_sent": custom_body or scenario["body"],
-                "tested_at": datetime.utcnow().isoformat()
+            test_data = {
+                "api_key": api_key,
+                "custom_headers": custom_headers or {},
+                "custom_body": custom_body
             }
             
-            # Log the test
-            logger.info(f"API scenario '{scenario_name}' tested successfully by user")
+            user_id = getattr(context, 'user_id', 'anonymous')
+            organization_id = getattr(context, 'organization_id', 'default')
+            
+            test_result = await sdk_service.execute_sandbox_test(
+                scenario_name, user_id, organization_id, test_data
+            )
             
             return V1ResponseModel(
                 success=True,
@@ -402,8 +336,8 @@ python-dotenv>=0.19.0
                 message="API scenario tested successfully"
             )
             
-        except HTTPException:
-            raise
+        except ValueError as ve:
+            raise HTTPException(status_code=404, detail=str(ve))
         except Exception as e:
             logger.error(f"API scenario test failed: {e}")
             raise HTTPException(status_code=500, detail="API scenario test failed")
@@ -412,26 +346,17 @@ python-dotenv>=0.19.0
     async def get_sdk_usage_analytics(
         request: Request,
         period: str = "30d",
+        language: Optional[str] = None,
         context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
     ):
         """Get SDK usage analytics and metrics"""
         try:
-            # Mock analytics data
-            analytics = {
-                "period": period,
-                "total_downloads": sum(sdk["download_count"] for sdk in MOCK_SDK_CATALOG.values()),
-                "downloads_by_language": {lang: sdk["download_count"] for lang, sdk in MOCK_SDK_CATALOG.items()},
-                "popular_features": ["Authentication", "Invoice Management", "Compliance Checking"],
-                "integration_success_rate": 0.94,
-                "average_response_time_ms": 245,
-                "error_rate": 0.06,
-                "top_organizations": ["TechCorp", "FinanceHub", "RetailPlus"],
-                "generated_at": datetime.utcnow().isoformat()
-            }
+            sdk_service = get_sdk_service()
+            analytics_data = await sdk_service.get_sdk_analytics(period, language)
             
             return V1ResponseModel(
                 success=True,
-                data={"analytics": analytics},
+                data=analytics_data,
                 message="SDK usage analytics retrieved successfully"
             )
             
@@ -450,31 +375,33 @@ python-dotenv>=0.19.0
     ):
         """Submit feedback for SDK experience"""
         try:
-            if language not in MOCK_SDK_CATALOG:
-                raise HTTPException(status_code=404, detail=f"Language '{language}' not found")
-            
             if not 1 <= rating <= 5:
                 raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
             
-            # In production, this would save to database
-            feedback = {
-                "language": language,
+            sdk_service = get_sdk_service()
+            
+            user_id = getattr(context, 'user_id', 'anonymous')
+            organization_id = getattr(context, 'organization_id', 'default')
+            
+            feedback_data = {
                 "feedback_type": feedback_type,
                 "rating": rating,
                 "comments": comments,
-                "submitted_at": datetime.utcnow().isoformat(),
-                "user_id": context.user_id if context else "anonymous"
+                "is_public": True
             }
             
-            # Log feedback
-            logger.info(f"SDK feedback submitted for {language}: {rating}/5 - {feedback_type}")
+            result = await sdk_service.submit_sdk_feedback(
+                language, user_id, organization_id, feedback_data
+            )
             
             return V1ResponseModel(
                 success=True,
-                data={"feedback": feedback},
+                data=result,
                 message="Feedback submitted successfully"
             )
             
+        except ValueError as ve:
+            raise HTTPException(status_code=404, detail=str(ve))
         except HTTPException:
             raise
         except Exception as e:

@@ -42,6 +42,14 @@ from .business_systems import (
     TaxpayerStatus, WebhookEventType, AuditEventType
 )
 
+# SDK Management Models
+from .sdk_management import (
+    SDK, SDKVersion, SDKDownload, SDKUsageLog, SandboxScenario, 
+    SandboxTestResult, SDKDocumentation, SDKFeedback, SDKAnalytics,
+    SDKLanguage, SDKStatus, FeedbackType, TestStatus,
+    DEMO_SDK_DATA, DEMO_SCENARIOS
+)
+
 __all__ = [
     "Base",
     "User", 
@@ -90,5 +98,21 @@ __all__ = [
     "DocumentType",
     "TaxpayerStatus",
     "WebhookEventType",
-    "AuditEventType"
+    "AuditEventType",
+    # SDK Management Models
+    "SDK",
+    "SDKVersion", 
+    "SDKDownload",
+    "SDKUsageLog",
+    "SandboxScenario",
+    "SandboxTestResult",
+    "SDKDocumentation",
+    "SDKFeedback",
+    "SDKAnalytics",
+    "SDKLanguage",
+    "SDKStatus",
+    "FeedbackType",
+    "TestStatus",
+    "DEMO_SDK_DATA",
+    "DEMO_SCENARIOS"
 ]

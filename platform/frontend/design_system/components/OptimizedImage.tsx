@@ -5,6 +5,8 @@
  * lazy loading, and accessibility improvements
  */
 
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useLazyLoading, getOptimizedImageSrc } from '../../shared_components/utils/performance';
 

@@ -5,6 +5,8 @@
  * Complete navigation system for all platform needs
  */
 
+'use client';
+
 import React, { useState, forwardRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
