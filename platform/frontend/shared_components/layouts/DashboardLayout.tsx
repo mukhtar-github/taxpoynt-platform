@@ -60,6 +60,20 @@ const navigationItems: NavigationItem[] = [
     roles: ['app', 'hybrid']
   },
   {
+    id: 'firs-invoicing',
+    label: 'FIRS Invoice Generator',
+    href: '/dashboard/si/firs-invoice-generator',
+    icon: '📋',
+    roles: ['si', 'hybrid']
+  },
+  {
+    id: 'business-systems',
+    label: 'Business Systems',
+    href: '/dashboard/si/business-systems',
+    icon: '🏢',
+    roles: ['si', 'hybrid']
+  },
+  {
     id: 'processing',
     label: 'Processing Center',
     href: '/dashboard/processing',

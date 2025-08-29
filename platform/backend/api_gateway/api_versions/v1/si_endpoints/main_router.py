@@ -34,6 +34,7 @@ from .financial_endpoints import (
 )
 from .transaction_endpoints import create_transaction_router
 from .compliance_endpoints import create_compliance_router
+from .firs_invoice_endpoints import create_firs_invoice_router
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class SIRouterV1:
         self.message_router = message_router
         self.router = APIRouter(prefix="/si", tags=["System Integrator V1"])
         self._setup_routes()
+        self._include_sub_routers()
         
         logger.info("SI Router V1 initialized")
     
@@ -297,6 +299,15 @@ class SIRouterV1:
             response_model=V1ResponseModel,
             dependencies=[Depends(self._require_si_role)]
         )
+    
+    def _include_sub_routers(self):
+        """Include all SI sub-routers"""
+        
+        # FIRS Invoice Generation Routes
+        firs_invoice_router = create_firs_invoice_router()
+        self.router.include_router(firs_invoice_router, tags=["FIRS Invoice Generation"])
+        
+        logger.info("SI sub-routers included successfully")
     
     async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
         """Dependency to ensure System Integrator role access for v1"""
