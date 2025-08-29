@@ -92,6 +92,8 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
           router.push(`${baseRoutes.si}/business-systems-setup`);
         } else if (state.currentStep === 'financial_systems_setup') {
           router.push(`${baseRoutes.si}/financial-systems-setup`);
+        } else if (state.currentStep === 'reconciliation_setup') {
+          router.push(`${baseRoutes.si}/reconciliation-setup`);
         } else if (state.completedSteps.includes('onboarding_complete')) {
           router.push('/dashboard/si');
         } else {
