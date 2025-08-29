@@ -114,6 +114,14 @@ const navigationItems: NavigationItem[] = [
     roles: ['app', 'hybrid']
   },
   {
+    id: 'sdk-hub',
+    label: 'SDK Hub',
+    href: '/dashboard/si/sdk-hub',
+    icon: '🚀',
+    roles: ['si', 'hybrid'],
+    prefetch: false
+  },
+  {
     id: 'tools',
     label: 'System Tools',
     href: '/dashboard/tools',

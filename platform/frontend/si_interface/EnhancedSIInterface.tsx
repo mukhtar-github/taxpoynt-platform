@@ -797,6 +797,47 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
           </DashboardCard>
         </div>
 
+        {/* SDK Hub Quick Access */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-lg p-6 mb-8 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h2 
+                className="text-2xl font-bold text-white mb-2"
+                style={TYPOGRAPHY_STYLES.optimizedText}
+              >
+                🚀 SDK Hub - Integration Made Easy
+              </h2>
+              <p className="text-blue-100 mb-4">
+                Download, test, and integrate TaxPoynt SDKs for seamless business system connectivity
+              </p>
+              <div className="flex items-center space-x-4 text-sm text-blue-200">
+                <span>📦 Multiple Languages</span>
+                <span>🧪 Interactive Testing</span>
+                <span>📚 Comprehensive Docs</span>
+                <span>🔗 Ready-to-Use Examples</span>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <TaxPoyntButton
+                variant="outline"
+                size="lg"
+                onClick={() => router.push('/dashboard/si/sdk-hub')}
+                className="border-white text-white hover:bg-white hover:text-blue-700"
+              >
+                🚀 Access SDK Hub
+              </TaxPoyntButton>
+              <TaxPoyntButton
+                variant="primary"
+                size="lg"
+                onClick={() => router.push('/dashboard/si/sdk-sandbox')}
+                className="bg-white text-blue-700 hover:bg-gray-100"
+              >
+                🧪 Test SDKs
+              </TaxPoyntButton>
+            </div>
+          </div>
+        </div>
+
         {/* Auto-Reconciled Transactions - Real-time Financial Data Convergence */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border-l-4 border-emerald-500">
           <div className="flex items-center justify-between mb-6">

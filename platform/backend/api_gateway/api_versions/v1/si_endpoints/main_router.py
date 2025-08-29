@@ -35,6 +35,7 @@ from .financial_endpoints import (
 from .transaction_endpoints import create_transaction_router
 from .compliance_endpoints import create_compliance_router
 from .firs_invoice_endpoints import create_firs_invoice_router
+from .sdk_management_endpoints import create_sdk_management_router
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +307,14 @@ class SIRouterV1:
         # FIRS Invoice Generation Routes
         firs_invoice_router = create_firs_invoice_router()
         self.router.include_router(firs_invoice_router, tags=["FIRS Invoice Generation"])
+        
+        # SDK Management Routes
+        sdk_management_router = create_sdk_management_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(sdk_management_router, tags=["SDK Management"])
         
         logger.info("SI sub-routers included successfully")
     
