@@ -5,9 +5,13 @@
  * Advanced details moved to service-specific onboarding flows
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthLayout } from '../../shared_components/auth/AuthLayout';
-import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
+import { TaxPoyntButton } from '../../design_system/components/TaxPoyntButton';
+import { TaxPoyntInput } from '../../design_system/components/TaxPoyntInput';
+import { FormField } from '../../design_system/components/FormField';
+import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
+import { secureLogger } from '../../shared_components/utils/secureLogger';
 
 interface StreamlinedRegistrationProps {
   onCompleteRegistration: (registrationData: StreamlinedRegistrationData) => Promise<void>;
@@ -16,23 +20,19 @@ interface StreamlinedRegistrationProps {
 }
 
 interface StreamlinedRegistrationData {
-  // Personal Information
   first_name: string;
   last_name: string;
   email: string;
   password: string;
-  
-  // Basic Business Information
   business_name: string;
+  companyType?: string;
+  companySize?: string;
   service_package: 'si' | 'app' | 'hybrid';
-  
-  // Essential Consents
   terms_accepted: boolean;
   privacy_accepted: boolean;
-  
-  // Trial Information
   trial_started: boolean;
   trial_start_date: string;
+  [key: string]: any; // Allow string indexing for form persistence
 }
 
 export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = ({
@@ -47,6 +47,8 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     email: '',
     password: '',
     business_name: '',
+    companyType: '',
+    companySize: '',
     service_package: 'si',
     terms_accepted: false,
     privacy_accepted: false,
@@ -55,6 +57,63 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
   });
   
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Form persistence setup
+  const formPersistence = useFormPersistence({
+    storageKey: 'taxpoynt_streamlined_registration',
+    persistent: false, // Use sessionStorage for privacy
+    excludeFields: ['password', 'terms_accepted', 'privacy_accepted'],
+    enableCrossFormSharing: true,
+    autoSaveInterval: 3000 // Save every 3 seconds
+  });
+
+  // Initialize form with persistence and shared data
+  useEffect(() => {
+    // Load saved form data and merge with shared data
+    const savedData = formPersistence.loadFormData();
+    const sharedData = CrossFormDataManager.getSharedData();
+    
+    if (savedData || Object.keys(sharedData).length > 0) {
+      const mergedData = {
+        ...formData,
+        ...sharedData,
+        ...savedData,
+        // Never restore sensitive fields
+        password: '',
+        // Preserve existing consent state
+        terms_accepted: savedData?.terms_accepted || formData.terms_accepted,
+        privacy_accepted: savedData?.privacy_accepted || formData.privacy_accepted
+      };
+      setFormData(mergedData);
+      secureLogger.formData('Form restored from saved data', { 
+        has_saved_data: !!savedData,
+        has_shared_data: Object.keys(sharedData).length > 0
+      });
+    }
+
+    // Start auto-save
+    formPersistence.startAutoSave(() => formData);
+
+    // Cleanup on unmount
+    return () => {
+      formPersistence.stopAutoSave();
+    };
+  }, []);
+
+  // Save form data when it changes
+  useEffect(() => {
+    if (Object.keys(formData).some(key => formData[key] !== '')) {
+      // Save shared data for cross-form population
+      CrossFormDataManager.saveSharedData({
+        email: formData.email,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        business_name: formData.business_name,
+        companyType: formData.companyType,
+        companySize: formData.companySize
+      });
+    }
+  }, [formData]);
 
   const steps = [
     { id: 'personal', title: 'Personal Info', description: 'Your basic information' },
@@ -78,6 +137,8 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
         
       case 1: // Business Info
         if (!formData.business_name.trim()) errors.business_name = 'Business name is required';
+        if (!formData.companyType) errors.companyType = 'Company type is required';
+        if (!formData.companySize) errors.companySize = 'Company size is required';
         break;
         
       case 2: // Service Selection - No validation needed, has default
@@ -113,57 +174,77 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     if (!validateCurrentStep()) return;
     
     try {
-      console.log('🚀 Starting streamlined registration:', {
-        ...formData,
-        password: '***hidden***'
+      secureLogger.userAction('Starting streamlined registration', {
+        service_package: formData.service_package,
+        company_type: formData.companyType,
+        company_size: formData.companySize
       });
       await onCompleteRegistration(formData);
     } catch (err) {
-      console.error('Registration failed:', err);
+      secureLogger.error('Registration failed', err);
     }
   };
 
   const renderPersonalStep = () => (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to TaxPoynt! 👋</h2>
-        <p className="text-gray-600">Let's start with your basic information</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Let's get started 👋</h2>
+        <p className="text-gray-600">Create your account to begin your 7-day free trial</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TaxPoyntInput
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <FormField
           label="First Name"
+          name="first_name"
+          type="text"
           value={formData.first_name}
-          onChange={(e) => setFormData({...formData, first_name: e.target.value})}
-          variant={fieldErrors.first_name ? 'error' : 'default'}
+          onChange={(value) => setFormData({...formData, first_name: value})}
+          placeholder="John"
           required
+          error={fieldErrors.first_name}
+          showPersistenceIndicator={true}
+          autoPopulateFromShared={true}
         />
-        <TaxPoyntInput
+        
+        <FormField
           label="Last Name"
+          name="last_name"
+          type="text"
           value={formData.last_name}
-          onChange={(e) => setFormData({...formData, last_name: e.target.value})}
-          variant={fieldErrors.last_name ? 'error' : 'default'}
+          onChange={(value) => setFormData({...formData, last_name: value})}
+          placeholder="Doe"
           required
+          error={fieldErrors.last_name}
+          showPersistenceIndicator={true}
+          autoPopulateFromShared={true}
         />
       </div>
-      
-      <TaxPoyntInput
+
+      <FormField
         label="Work Email"
+        name="email"
         type="email"
         value={formData.email}
-        onChange={(e) => setFormData({...formData, email: e.target.value})}
-        variant={fieldErrors.email ? 'error' : 'default'}
+        onChange={(value) => setFormData({...formData, email: value})}
+        placeholder="john@company.com"
         required
+        error={fieldErrors.email}
+        showPersistenceIndicator={true}
+        autoPopulateFromShared={true}
       />
       
-      <TaxPoyntInput
+      <FormField
         label="Password"
+        name="password"
         type="password"
         value={formData.password}
-        onChange={(e) => setFormData({...formData, password: e.target.value})}
-        variant={fieldErrors.password ? 'error' : 'default'}
+        onChange={(value) => setFormData({...formData, password: value})}
+        placeholder="Create a secure password"
         required
+        error={fieldErrors.password}
         helperText="At least 8 characters"
+        showPersistenceIndicator={false}
+        autoPopulateFromShared={false}
       />
 
       {/* Display errors */}
@@ -180,18 +261,60 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
         <p className="text-gray-600">Basic business information to get started</p>
       </div>
 
-      <TaxPoyntInput
+      <FormField
         label="Business Name"
+        name="business_name"
+        type="text"
         value={formData.business_name}
-        onChange={(e) => setFormData({...formData, business_name: e.target.value})}
-        variant={fieldErrors.business_name ? 'error' : 'default'}
+        onChange={(value) => setFormData({...formData, business_name: value})}
+        placeholder="Your Company Ltd"
         required
+        error={fieldErrors.business_name}
         helperText="We'll collect more business details later based on your service choice"
+        showPersistenceIndicator={true}
+        autoPopulateFromShared={true}
       />
 
-      {fieldErrors.business_name && (
-        <p className="text-sm text-red-600">{fieldErrors.business_name}</p>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <FormField
+          label="Company Type"
+          name="companyType"
+          type="select"
+          value={formData.companyType || ''}
+          onChange={(value) => setFormData({...formData, companyType: value})}
+          required
+          error={fieldErrors.companyType}
+          options={[
+            { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
+            { value: 'partnership', label: 'Partnership' },
+            { value: 'limited_company', label: 'Limited Company' },
+            { value: 'public_company', label: 'Public Company' },
+            { value: 'non_profit', label: 'Non-Profit' },
+            { value: 'cooperative', label: 'Cooperative' }
+          ]}
+          showPersistenceIndicator={true}
+          autoPopulateFromShared={true}
+        />
+        
+        <FormField
+          label="Company Size"
+          name="companySize"
+          type="select"
+          value={formData.companySize || ''}
+          onChange={(value) => setFormData({...formData, companySize: value})}
+          required
+          error={fieldErrors.companySize}
+          options={[
+            { value: 'startup', label: 'Startup (1-10 employees)' },
+            { value: 'small', label: 'Small (11-50 employees)' },
+            { value: 'medium', label: 'Medium (51-200 employees)' },
+            { value: 'large', label: 'Large (201-1000 employees)' },
+            { value: 'enterprise', label: 'Enterprise (1000+ employees)' }
+          ]}
+          showPersistenceIndicator={true}
+          autoPopulateFromShared={true}
+        />
+      </div>
     </div>
   );
 

@@ -1,0 +1,597 @@
+"""
+Tracking Management Endpoints - API v1
+======================================
+Access Point Provider endpoints for real-time tracking of invoice transmission status and FIRS responses.
+Handles status monitoring, real-time updates, and transmission progress tracking.
+"""
+import logging
+from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
+from fastapi.responses import JSONResponse
+from datetime import datetime
+
+from core_platform.authentication.role_manager import PlatformRole
+from core_platform.messaging.message_router import ServiceRole, MessageRouter
+from api_gateway.role_routing.models import HTTPRoutingContext
+from api_gateway.role_routing.role_detector import HTTPRoleDetector
+from api_gateway.role_routing.permission_guard import APIPermissionGuard
+from ..version_models import V1ResponseModel
+
+logger = logging.getLogger(__name__)
+
+
+class TrackingManagementEndpointsV1:
+    """
+    Tracking Management Endpoints - Version 1
+    ==========================================
+    Manages real-time tracking of invoice transmissions for APP providers:
+    
+    **Tracking Management Features:**
+    - **Real-time Status**: Live transmission status monitoring
+    - **Progress Tracking**: Detailed progress tracking for batch processing
+    - **FIRS Response Tracking**: Monitor FIRS acknowledgments and responses
+    - **Performance Metrics**: Transmission performance and timing metrics
+    - **Alert Management**: Real-time alerts for transmission issues
+    - **Historical Analysis**: Transmission trends and analytics
+    
+    **Tracking Capabilities:**
+    - Real-time status updates
+    - Progress monitoring for large batches
+    - FIRS response correlation
+    - Performance analytics
+    - Issue detection and alerting
+    """
+    
+    def __init__(self, 
+                 role_detector: HTTPRoleDetector,
+                 permission_guard: APIPermissionGuard,
+                 message_router: MessageRouter):
+        self.role_detector = role_detector
+        self.permission_guard = permission_guard
+        self.message_router = message_router
+        self.router = APIRouter(prefix="/tracking", tags=["Tracking Management V1"])
+        
+        # Define tracking capabilities
+        self.tracking_capabilities = {
+            "real_time_monitoring": {
+                "features": ["live_status_updates", "progress_tracking", "completion_monitoring"],
+                "description": "Real-time monitoring of transmission status and progress"
+            },
+            "firs_response_tracking": {
+                "features": ["acknowledgment_tracking", "response_correlation", "status_mapping"],
+                "description": "Track FIRS responses and acknowledgments"
+            },
+            "performance_analytics": {
+                "features": ["timing_analysis", "throughput_metrics", "success_rates"],
+                "description": "Performance analytics and metrics tracking"
+            },
+            "alert_management": {
+                "features": ["real_time_alerts", "threshold_monitoring", "notification_system"],
+                "description": "Alert management for transmission issues"
+            }
+        }
+        
+        self._setup_routes()
+        logger.info("Tracking Management Endpoints V1 initialized")
+    
+    def _setup_routes(self):
+        """Setup tracking management routes"""
+        
+        # Tracking Overview and Metrics
+        self.router.add_api_route(
+            "/metrics",
+            self.get_tracking_metrics,
+            methods=["GET"],
+            summary="Get tracking metrics",
+            description="Get comprehensive tracking metrics and statistics",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/overview",
+            self.get_tracking_overview,
+            methods=["GET"],
+            summary="Get tracking overview",
+            description="Get tracking overview and dashboard data",
+            response_model=V1ResponseModel
+        )
+        
+        # Transmission Status Tracking
+        self.router.add_api_route(
+            "/transmissions",
+            self.get_transmission_statuses,
+            methods=["GET"],
+            summary="Get transmission statuses",
+            description="Get current status of all transmissions",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/transmissions/{transmission_id}",
+            self.get_transmission_tracking,
+            methods=["GET"],
+            summary="Get transmission tracking",
+            description="Get detailed tracking information for specific transmission",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/transmissions/{transmission_id}/progress",
+            self.get_transmission_progress,
+            methods=["GET"],
+            summary="Get transmission progress",
+            description="Get real-time progress of transmission",
+            response_model=V1ResponseModel
+        )
+        
+        # Real-time Updates
+        self.router.add_api_route(
+            "/live-updates",
+            self.get_live_updates,
+            methods=["GET"],
+            summary="Get live updates",
+            description="Get real-time updates for active transmissions",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/status-changes",
+            self.get_recent_status_changes,
+            methods=["GET"],
+            summary="Get recent status changes",
+            description="Get recent status changes across all transmissions",
+            response_model=V1ResponseModel
+        )
+        
+        # FIRS Response Tracking
+        self.router.add_api_route(
+            "/firs-responses",
+            self.get_firs_responses,
+            methods=["GET"],
+            summary="Get FIRS responses",
+            description="Get FIRS acknowledgments and responses",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/firs-responses/{transmission_id}",
+            self.get_firs_response_details,
+            methods=["GET"],
+            summary="Get FIRS response details",
+            description="Get detailed FIRS response for specific transmission",
+            response_model=V1ResponseModel
+        )
+        
+        # Performance Analytics
+        self.router.add_api_route(
+            "/performance/metrics",
+            self.get_performance_metrics,
+            methods=["GET"],
+            summary="Get performance metrics",
+            description="Get transmission performance metrics and analytics",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/performance/trends",
+            self.get_performance_trends,
+            methods=["GET"],
+            summary="Get performance trends",
+            description="Get transmission performance trends over time",
+            response_model=V1ResponseModel
+        )
+        
+        # Alerts and Notifications
+        self.router.add_api_route(
+            "/alerts",
+            self.get_active_alerts,
+            methods=["GET"],
+            summary="Get active alerts",
+            description="Get current active alerts and issues",
+            response_model=V1ResponseModel
+        )
+        
+        self.router.add_api_route(
+            "/alerts/{alert_id}/acknowledge",
+            self.acknowledge_alert,
+            methods=["POST"],
+            summary="Acknowledge alert",
+            description="Acknowledge and resolve alert",
+            response_model=V1ResponseModel
+        )
+        
+        # Search and Filtering
+        self.router.add_api_route(
+            "/search",
+            self.search_transmissions,
+            methods=["GET"],
+            summary="Search transmissions",
+            description="Search transmissions by various criteria",
+            response_model=V1ResponseModel
+        )
+        
+        # Batch Operations
+        self.router.add_api_route(
+            "/batch-status",
+            self.get_batch_status_summary,
+            methods=["GET"],
+            summary="Get batch status summary",
+            description="Get status summary for multiple batches",
+            response_model=V1ResponseModel
+        )
+    
+    # Tracking Metrics Endpoints
+    async def get_tracking_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get comprehensive tracking metrics"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_tracking_metrics",
+                payload={
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            # Add demo data if service not available
+            if not result:
+                result = {
+                    "totalTransmissions": 456,
+                    "processing": 23,
+                    "completed": 430,
+                    "failed": 3,
+                    "averageProcessingTime": "2.5 minutes",
+                    "successRate": 94.3,
+                    "todayTransmissions": 45,
+                    "realTimeStatus": {
+                        "activeTransmissions": 12,
+                        "queuedTransmissions": 8,
+                        "firsResponsePending": 5
+                    }
+                }
+            
+            # Add capabilities information
+            result["capabilities"] = self.tracking_capabilities
+            
+            return self._create_v1_response(result, "tracking_metrics_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting tracking metrics in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get tracking metrics")
+    
+    async def get_tracking_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get tracking overview"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_tracking_overview",
+                payload={
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "tracking_overview_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting tracking overview in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get tracking overview")
+    
+    # Transmission Status Tracking
+    async def get_transmission_statuses(self, 
+                                      status: Optional[str] = Query(None, description="Filter by status"),
+                                      limit: Optional[int] = Query(50, description="Number of transmissions to return"),
+                                      context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get current status of all transmissions"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_transmission_statuses",
+                payload={
+                    "status": status,
+                    "limit": limit,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            # Add demo data if service not available
+            if not result:
+                result = [
+                    {
+                        "id": "TX-2024-001",
+                        "batchId": "BATCH-2024-015",
+                        "submittedAt": "2024-01-15 14:30:00",
+                        "status": "accepted",
+                        "invoiceCount": 156,
+                        "processedCount": 156,
+                        "acceptedCount": 156,
+                        "rejectedCount": 0,
+                        "firsResponse": {
+                            "acknowledgeId": "ACK-FIRS-2024-001",
+                            "responseDate": "2024-01-15 14:32:15",
+                            "message": "All invoices processed successfully"
+                        }
+                    },
+                    {
+                        "id": "TX-2024-002",
+                        "batchId": "BATCH-2024-014",
+                        "submittedAt": "2024-01-15 13:45:00",
+                        "status": "processing",
+                        "invoiceCount": 89,
+                        "processedCount": 67,
+                        "acceptedCount": 67,
+                        "rejectedCount": 0
+                    }
+                ]
+            
+            return self._create_v1_response(result, "transmission_statuses_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting transmission statuses in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get transmission statuses")
+    
+    async def get_transmission_tracking(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get detailed tracking information for specific transmission"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_transmission_tracking",
+                payload={
+                    "transmission_id": transmission_id,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "transmission_tracking_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting transmission tracking {transmission_id} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get transmission tracking")
+    
+    async def get_transmission_progress(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get real-time progress of transmission"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_transmission_progress",
+                payload={
+                    "transmission_id": transmission_id,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "transmission_progress_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting transmission progress {transmission_id} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get transmission progress")
+    
+    # Real-time Updates
+    async def get_live_updates(self, 
+                             since: Optional[str] = Query(None, description="Get updates since timestamp"),
+                             context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get real-time updates for active transmissions"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_live_updates",
+                payload={
+                    "since": since,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "live_updates_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting live updates in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get live updates")
+    
+    async def get_recent_status_changes(self, 
+                                      hours: Optional[int] = Query(24, description="Hours of status changes to retrieve"),
+                                      context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get recent status changes across all transmissions"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_recent_status_changes",
+                payload={
+                    "hours": hours,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "recent_status_changes_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting recent status changes in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get recent status changes")
+    
+    # FIRS Response Tracking
+    async def get_firs_responses(self, 
+                               status: Optional[str] = Query(None, description="Filter by response status"),
+                               limit: Optional[int] = Query(50, description="Number of responses to return"),
+                               context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get FIRS acknowledgments and responses"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_firs_responses",
+                payload={
+                    "status": status,
+                    "limit": limit,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "firs_responses_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting FIRS responses in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get FIRS responses")
+    
+    async def get_firs_response_details(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get detailed FIRS response for specific transmission"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_firs_response_details",
+                payload={
+                    "transmission_id": transmission_id,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "firs_response_details_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting FIRS response details {transmission_id} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get FIRS response details")
+    
+    # Performance Analytics
+    async def get_performance_metrics(self, 
+                                    period: Optional[str] = Query("24h", description="Metrics period"),
+                                    context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get transmission performance metrics"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_performance_metrics",
+                payload={
+                    "period": period,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "performance_metrics_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting performance metrics in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get performance metrics")
+    
+    async def get_performance_trends(self, 
+                                   period: Optional[str] = Query("7d", description="Trends period"),
+                                   context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get transmission performance trends"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_performance_trends",
+                payload={
+                    "period": period,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "performance_trends_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting performance trends in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get performance trends")
+    
+    # Alerts and Notifications
+    async def get_active_alerts(self, 
+                              severity: Optional[str] = Query(None, description="Filter by alert severity"),
+                              context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get current active alerts"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_active_alerts",
+                payload={
+                    "severity": severity,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "active_alerts_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting active alerts in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get active alerts")
+    
+    async def acknowledge_alert(self, alert_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Acknowledge and resolve alert"""
+        try:
+            body = await request.json()
+            
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="acknowledge_alert",
+                payload={
+                    "alert_id": alert_id,
+                    "acknowledgment_data": body,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "alert_acknowledged")
+        except Exception as e:
+            logger.error(f"Error acknowledging alert {alert_id} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to acknowledge alert")
+    
+    # Search and Filtering
+    async def search_transmissions(self, 
+                                 query: str = Query(..., description="Search query"),
+                                 filter_type: Optional[str] = Query("all", description="Search filter type"),
+                                 limit: Optional[int] = Query(20, description="Number of results to return"),
+                                 context: HTTPRoutingContext = Depends(lambda: None)):
+        """Search transmissions by various criteria"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="search_transmissions",
+                payload={
+                    "query": query,
+                    "filter_type": filter_type,
+                    "limit": limit,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "transmissions_searched")
+        except Exception as e:
+            logger.error(f"Error searching transmissions in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to search transmissions")
+    
+    # Batch Operations
+    async def get_batch_status_summary(self, 
+                                     batch_ids: List[str] = Query(..., description="List of batch IDs"),
+                                     context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get status summary for multiple batches"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="get_batch_status_summary",
+                payload={
+                    "batch_ids": batch_ids,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "batch_status_summary_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting batch status summary in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get batch status summary")
+    
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+        """Create standardized v1 response format"""
+        response_data = {
+            "success": True,
+            "action": action,
+            "api_version": "v1",
+            "timestamp": datetime.now().isoformat(),
+            "data": data
+        }
+        
+        return JSONResponse(content=response_data, status_code=status_code)
+
+
+def create_tracking_management_router(role_detector: HTTPRoleDetector,
+                                     permission_guard: APIPermissionGuard,
+                                     message_router: MessageRouter) -> APIRouter:
+    """Factory function to create Tracking Management Router"""
+    tracking_endpoints = TrackingManagementEndpointsV1(role_detector, permission_guard, message_router)
+    return tracking_endpoints.router
+

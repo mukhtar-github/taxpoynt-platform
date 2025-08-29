@@ -259,6 +259,47 @@ export const ConsentIntegratedRegistration: React.FC<ConsentIntegratedRegistrati
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
+            Company Type *
+          </label>
+          <select
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={formData.companyType || ''}
+            onChange={(e) => setFormData({...formData, companyType: e.target.value})}
+          >
+            <option value="">Select company type</option>
+            <option value="sole_proprietorship">Sole Proprietorship</option>
+            <option value="partnership">Partnership</option>
+            <option value="limited_company">Limited Company</option>
+            <option value="public_company">Public Company</option>
+            <option value="non_profit">Non-Profit</option>
+            <option value="cooperative">Cooperative</option>
+          </select>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Company Size *
+          </label>
+          <select
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={formData.companySize || ''}
+            onChange={(e) => setFormData({...formData, companySize: e.target.value})}
+          >
+            <option value="">Select company size</option>
+            <option value="startup">Startup (1-10 employees)</option>
+            <option value="small">Small (11-50 employees)</option>
+            <option value="medium">Medium (51-200 employees)</option>
+            <option value="large">Large (201-1000 employees)</option>
+            <option value="enterprise">Enterprise (1000+ employees)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Business Email *
           </label>
           <input
@@ -304,49 +345,28 @@ export const ConsentIntegratedRegistration: React.FC<ConsentIntegratedRegistrati
 
   const renderBusinessDetailsStep = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Industry Sector *
-          </label>
-          <select
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={formData.industry || ''}
-            onChange={(e) => setFormData({...formData, industry: e.target.value})}
-          >
-            <option value="">Select your industry</option>
-            <option value="manufacturing">Manufacturing</option>
-            <option value="retail">Retail & E-commerce</option>
-            <option value="services">Professional Services</option>
-            <option value="technology">Technology</option>
-            <option value="healthcare">Healthcare</option>
-            <option value="education">Education</option>
-            <option value="hospitality">Hospitality</option>
-            <option value="construction">Construction</option>
-            <option value="agriculture">Agriculture</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Company Size *
-          </label>
-          <select
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={formData.companySize || ''}
-            onChange={(e) => setFormData({...formData, companySize: e.target.value})}
-          >
-            <option value="">Select company size</option>
-            <option value="startup">Startup (1-10 employees)</option>
-            <option value="small">Small (11-50 employees)</option>
-            <option value="medium">Medium (51-200 employees)</option>
-            <option value="large">Large (201-1000 employees)</option>
-            <option value="enterprise">Enterprise (1000+ employees)</option>
-          </select>
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Industry Sector *
+        </label>
+        <select
+          required
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={formData.industry || ''}
+          onChange={(e) => setFormData({...formData, industry: e.target.value})}
+        >
+          <option value="">Select your industry</option>
+          <option value="manufacturing">Manufacturing</option>
+          <option value="retail">Retail & E-commerce</option>
+          <option value="services">Professional Services</option>
+          <option value="technology">Technology</option>
+          <option value="healthcare">Healthcare</option>
+          <option value="education">Education</option>
+          <option value="hospitality">Hospitality</option>
+          <option value="construction">Construction</option>
+          <option value="agriculture">Agriculture</option>
+          <option value="other">Other</option>
+        </select>
       </div>
 
       <div>

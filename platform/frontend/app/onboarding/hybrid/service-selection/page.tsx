@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '../../../../design_system/components/Button';
 
 export default function HybridServiceSelectionPage() {
   const router = useRouter();
@@ -136,19 +137,19 @@ export default function HybridServiceSelectionPage() {
           </p>
           
           <div className="flex justify-center space-x-4">
-            <button 
+            <Button 
               onClick={handleSkipForNow}
-              className="px-6 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              variant="secondary"
             >
               Skip for Now
-            </button>
-            <button 
+            </Button>
+            <Button 
               onClick={handleContinue}
               disabled={isLoading || selectedServices.length === 0}
-              className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="primary"
             >
               {isLoading ? 'Setting up...' : `Continue with ${selectedServices.length} service${selectedServices.length !== 1 ? 's' : ''}`}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

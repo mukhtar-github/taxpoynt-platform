@@ -36,6 +36,12 @@ export {
   type TaxPoyntButtonProps
 } from './components/TaxPoyntButton';
 
+// Footer
+export {
+  Footer,
+  type FooterProps
+} from './components/Footer';
+
 // Inputs
 export {
   TaxPoyntInput,

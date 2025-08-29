@@ -51,6 +51,7 @@ export default function TaxpayerManagementPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadTaxpayerData();
@@ -64,15 +65,18 @@ export default function TaxpayerManagementPage() {
         apiClient.get<APIResponse<Taxpayer[]>>('/api/v1/app/taxpayers')
       ]);
       
-      if (metricsResponse.success && metricsResponse.data) {
+      if (metricsResponse.success && metricsResponse.data && 
+          taxpayersResponse.success && taxpayersResponse.data) {
         setMetrics(metricsResponse.data);
-      }
-      if (taxpayersResponse.success && taxpayersResponse.data) {
         setTaxpayers(taxpayersResponse.data);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load taxpayer data:', error);
+      console.error('Failed to load taxpayer data, using demo data:', error);
       // Fallback to demo data
+      setIsDemo(true);
       setMetrics({
         total: 1247,
         active: 1180,
@@ -226,7 +230,14 @@ export default function TaxpayerManagementPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Taxpayer Management</h1>
-            <p className="text-gray-600">Manage taxpayer onboarding and e-invoicing compliance</p>
+            <p className="text-gray-600">
+              Manage taxpayer onboarding and e-invoicing compliance
+              {isDemo && (
+                <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                  Demo Data
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-4">
             <TaxPoyntButton

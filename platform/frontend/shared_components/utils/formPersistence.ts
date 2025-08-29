@@ -4,6 +4,7 @@
  * 
  * Handles automatic form data persistence across page refreshes and form navigation.
  * Uses sessionStorage for temporary data and localStorage for long-term persistence.
+ * Includes cross-form data sharing and visual indicators for pre-filled fields.
  */
 
 export interface FormPersistenceOptions {
@@ -15,6 +16,15 @@ export interface FormPersistenceOptions {
   excludeFields?: string[];
   /** Auto-save interval in milliseconds */
   autoSaveInterval?: number;
+  /** Enable cross-form data sharing */
+  enableCrossFormSharing?: boolean;
+}
+
+export interface FormFieldState {
+  value: any;
+  isPreFilled: boolean;
+  source: 'user_input' | 'persisted' | 'shared' | 'default';
+  timestamp: number;
 }
 
 export class FormPersistenceManager {
@@ -26,6 +36,7 @@ export class FormPersistenceManager {
       persistent: false,
       excludeFields: ['password', 'confirmPassword', 'token'],
       autoSaveInterval: 2000, // 2 seconds
+      enableCrossFormSharing: true,
       ...options
     };
   }
@@ -35,7 +46,7 @@ export class FormPersistenceManager {
    */
   private getStorage(): Storage {
     if (typeof window === 'undefined') {
-      // SSR fallback
+      // SSR fallback - return a mock storage object
       return {
         getItem: () => null,
         setItem: () => {},
@@ -46,7 +57,10 @@ export class FormPersistenceManager {
       };
     }
     
-    return this.options.persistent ? localStorage : sessionStorage;
+    if (this.options.persistent) {
+      return window.localStorage;
+    }
+    return window.sessionStorage;
   }
 
   /**
@@ -57,11 +71,18 @@ export class FormPersistenceManager {
       const storage = this.getStorage();
       const filteredData = this.filterExcludedFields(formData);
       
-      storage.setItem(this.options.storageKey, JSON.stringify({
+      const dataToStore = {
         data: filteredData,
         timestamp: Date.now(),
-        version: '1.0'
-      }));
+        formId: this.options.storageKey
+      };
+      
+      storage.setItem(this.options.storageKey, JSON.stringify(dataToStore));
+      
+      // If cross-form sharing is enabled, also save to shared storage
+      if (this.options.enableCrossFormSharing) {
+        this.saveToSharedStorage(filteredData);
+      }
       
       console.log(`💾 Form data saved to ${this.options.persistent ? 'localStorage' : 'sessionStorage'}:`, this.options.storageKey);
     } catch (error) {
@@ -103,7 +124,7 @@ export class FormPersistenceManager {
     try {
       const storage = this.getStorage();
       storage.removeItem(this.options.storageKey);
-      console.log(`🗑️  Form data cleared from storage:`, this.options.storageKey);
+      console.log('🗑️ Form data cleared:', this.options.storageKey);
     } catch (error) {
       console.warn('Failed to clear form data:', error);
     }
@@ -116,11 +137,11 @@ export class FormPersistenceManager {
     if (this.autoSaveTimer) {
       clearInterval(this.autoSaveTimer);
     }
-
+    
     this.autoSaveTimer = setInterval(() => {
-      const formData = getFormData();
-      if (formData && Object.keys(formData).length > 0) {
-        this.saveFormData(formData);
+      const currentData = getFormData();
+      if (Object.keys(currentData).length > 0) {
+        this.saveFormData(currentData);
       }
     }, this.options.autoSaveInterval);
   }
@@ -136,7 +157,7 @@ export class FormPersistenceManager {
   }
 
   /**
-   * Filter out excluded fields
+   * Filter out excluded fields from data
    */
   private filterExcludedFields(data: Record<string, any>): Record<string, any> {
     const filtered = { ...data };
@@ -149,22 +170,115 @@ export class FormPersistenceManager {
   }
 
   /**
+   * Save data to shared storage for cross-form access
+   */
+  private saveToSharedStorage(data: Record<string, any>): void {
+    try {
+      const sharedKey = 'taxpoynt_shared_form_data';
+      const currentShared = this.getFromSharedStorage();
+      const merged = { ...currentShared, ...data };
+      
+      sessionStorage.setItem(sharedKey, JSON.stringify({
+        data: merged,
+        timestamp: Date.now(),
+        lastUpdatedBy: this.options.storageKey
+      }));
+      
+      console.log('🔗 Data saved to shared storage for cross-form access');
+    } catch (error) {
+      console.warn('Failed to save to shared storage:', error);
+    }
+  }
+
+  /**
+   * Get data from shared storage
+   */
+  private getFromSharedStorage(): Record<string, any> {
+    try {
+      const sharedKey = 'taxpoynt_shared_form_data';
+      const stored = sessionStorage.getItem(sharedKey);
+      
+      if (!stored) return {};
+      
+      const parsed = JSON.parse(stored);
+      
+      // Clear if older than 24 hours
+      if (Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000) {
+        sessionStorage.removeItem(sharedKey);
+        return {};
+      }
+      
+      return parsed.data || {};
+    } catch (error) {
+      console.warn('Failed to load from shared storage:', error);
+      return {};
+    }
+  }
+
+  /**
    * Merge saved data with current form data, preserving current values
    */
   mergeWithSavedData(currentData: Record<string, any>): Record<string, any> {
     const savedData = this.loadFormData();
-    if (!savedData) return currentData;
+    const sharedData = this.getFromSharedStorage();
+    
+    if (!savedData && Object.keys(sharedData).length === 0) {
+      return currentData;
+    }
 
-    // Only fill empty fields from saved data
+    // Merge priority: current data > saved data > shared data
     const merged = { ...currentData };
     
-    Object.keys(savedData).forEach(key => {
+    // First, fill from shared data (lowest priority)
+    Object.keys(sharedData).forEach(key => {
       if (!merged[key] || merged[key] === '') {
-        merged[key] = savedData[key];
+        merged[key] = sharedData[key];
       }
     });
+    
+    // Then, fill from saved data (higher priority)
+    if (savedData) {
+      Object.keys(savedData).forEach(key => {
+        if (!merged[key] || merged[key] === '') {
+          merged[key] = savedData[key];
+        }
+      });
+    }
 
     return merged;
+  }
+
+  /**
+   * Get field state information for visual indicators
+   */
+  getFieldState(fieldName: string, currentValue: any): FormFieldState {
+    const savedData = this.loadFormData();
+    const sharedData = this.getFromSharedStorage();
+    
+    if (savedData && savedData[fieldName] && savedData[fieldName] === currentValue) {
+      return {
+        value: currentValue,
+        isPreFilled: true,
+        source: 'persisted',
+        timestamp: Date.now()
+      };
+    }
+    
+    if (sharedData && sharedData[fieldName] && sharedData[fieldName] === currentValue) {
+      return {
+        value: currentValue,
+        isPreFilled: true,
+        source: 'shared',
+        timestamp: Date.now()
+      };
+    }
+    
+    return {
+      value: currentValue,
+      isPreFilled: false,
+      source: 'user_input',
+      timestamp: Date.now()
+    };
   }
 }
 
@@ -179,6 +293,7 @@ export function useFormPersistence(options: FormPersistenceOptions) {
     loadFormData: () => manager.loadFormData(),
     clearFormData: () => manager.clearFormData(),
     mergeWithSavedData: (currentData: Record<string, any>) => manager.mergeWithSavedData(currentData),
+    getFieldState: (fieldName: string, currentValue: any) => manager.getFieldState(fieldName, currentValue),
     startAutoSave: (getFormData: () => Record<string, any>) => manager.startAutoSave(getFormData),
     stopAutoSave: () => manager.stopAutoSave()
   };
@@ -200,11 +315,14 @@ export class CrossFormDataManager {
     phone?: string;
     business_name?: string;
     business_type?: string;
+    companyType?: string;
+    companySize?: string;
     rc_number?: string;
     tin?: string;
     address?: string;
     state?: string;
     lga?: string;
+    industry?: string;
   }): void {
     try {
       if (typeof window === 'undefined') return;
@@ -254,26 +372,59 @@ export class CrossFormDataManager {
   static clearSharedData(): void {
     try {
       if (typeof window === 'undefined') return;
+      
       sessionStorage.removeItem(this.SHARED_DATA_KEY);
+      console.log('🗑️ Shared form data cleared');
     } catch (error) {
       console.warn('Failed to clear shared form data:', error);
     }
   }
 
   /**
-   * Auto-populate form with shared data (only empty fields)
+   * Check if a field has shared data
    */
-  static populateForm(currentFormData: Record<string, any>): Record<string, any> {
+  static hasSharedData(fieldName: string): boolean {
     const sharedData = this.getSharedData();
-    const populated = { ...currentFormData };
+    return sharedData[fieldName] && sharedData[fieldName] !== '';
+  }
 
-    // Only populate empty fields
-    Object.keys(sharedData).forEach(key => {
-      if (!populated[key] || populated[key] === '') {
-        populated[key] = sharedData[key];
-      }
-    });
+  /**
+   * Get shared data for a specific field
+   */
+  static getSharedField(fieldName: string): any {
+    const sharedData = this.getSharedData();
+    return sharedData[fieldName] || '';
+  }
+}
 
-    return populated;
+/**
+ * Utility to get visual styling for pre-filled fields
+ */
+export function getPreFilledFieldStyles(isPreFilled: boolean, source: string): string {
+  if (!isPreFilled) return '';
+  
+  const baseStyles = 'bg-gray-50 border-gray-300 text-gray-600';
+  
+  switch (source) {
+    case 'persisted':
+      return `${baseStyles} border-l-4 border-l-blue-400`;
+    case 'shared':
+      return `${baseStyles} border-l-4 border-l-green-400`;
+    default:
+      return baseStyles;
+  }
+}
+
+/**
+ * Utility to get helper text for pre-filled fields
+ */
+export function getPreFilledHelperText(source: string): string {
+  switch (source) {
+    case 'persisted':
+      return 'Previously entered data';
+    case 'shared':
+      return 'Data from other forms';
+    default:
+      return '';
   }
 }

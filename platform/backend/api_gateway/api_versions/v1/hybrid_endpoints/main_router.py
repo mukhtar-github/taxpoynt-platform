@@ -21,6 +21,9 @@ from .cross_role_endpoints import create_cross_role_router
 from .shared_resources_endpoints import create_shared_resources_router
 from .orchestration_endpoints import create_orchestration_router
 from .monitoring_endpoints import create_monitoring_router
+from .dashboard_endpoints import create_dashboard_router
+from .workflow_endpoints import create_workflow_router
+from .onboarding_endpoints import create_onboarding_router
 from .ai_endpoints import create_ai_router
 
 logger = logging.getLogger(__name__)
@@ -95,9 +98,35 @@ class HybridRouterV1:
         )
         self.router.include_router(monitoring_router)
         
+        # Dashboard Routes
+        dashboard_router = create_dashboard_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(dashboard_router)
+        
+        # Workflow Routes
+        workflow_router = create_workflow_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(workflow_router)
+        
+        # Onboarding Routes
+        onboarding_router = create_onboarding_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(onboarding_router)
+        
         # AI Service Routes
         ai_router = create_ai_router()
         self.router.include_router(ai_router)
+        
+        logger.info("Hybrid sub-routers included successfully: dashboard, workflows, onboarding")
     
     def _setup_routes(self):
         """Configure general hybrid v1 routes"""

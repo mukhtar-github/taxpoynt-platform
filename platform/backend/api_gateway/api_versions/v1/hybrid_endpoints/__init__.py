@@ -19,6 +19,9 @@ from .cross_role_endpoints import create_cross_role_router
 from .shared_resources_endpoints import create_shared_resources_router
 from .orchestration_endpoints import create_orchestration_router
 from .monitoring_endpoints import create_monitoring_router
+from .dashboard_endpoints import create_dashboard_router
+from .workflow_endpoints import create_workflow_router
+from .onboarding_endpoints import create_onboarding_router
 from .main_router import create_hybrid_v1_router
 
 __all__ = [
@@ -26,5 +29,8 @@ __all__ = [
     "create_shared_resources_router",
     "create_orchestration_router",
     "create_monitoring_router",
+    "create_dashboard_router",
+    "create_workflow_router",
+    "create_onboarding_router",
     "create_hybrid_v1_router"
 ]

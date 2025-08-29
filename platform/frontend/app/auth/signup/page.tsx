@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { StreamlinedRegistration } from '../../../business_interface/auth/StreamlinedRegistration';
 import { authService } from '../../../shared_components/services/auth';
 import { ServiceOnboardingRouter } from '../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { secureLogger } from '../../../shared_components/utils/secureLogger';
 
 interface StreamlinedRegistrationData {
   first_name: string;
@@ -39,9 +40,11 @@ function SignUpPageContent() {
     setError('');
 
     try {
-      console.log('🚀 Processing streamlined registration:', {
-        ...registrationData,
-        password: '***hidden***'
+      secureLogger.userAction('Starting streamlined registration', { 
+        service_package: registrationData.service_package,
+        terms_accepted: registrationData.terms_accepted,
+        privacy_accepted: registrationData.privacy_accepted,
+        trial_started: registrationData.trial_started
       });
 
       // Transform streamlined data to full registration format expected by backend
@@ -60,26 +63,16 @@ function SignUpPageContent() {
         // to avoid backend validation issues and will be collected during onboarding
       };
 
-      console.log('📋 Full registration data being sent:', {
-        ...fullRegistrationData,
-        password: '***hidden***'
+      secureLogger.formData('Registration data prepared for backend', {
+        service_package: fullRegistrationData.service_package,
+        terms_accepted: fullRegistrationData.terms_accepted,
+        privacy_accepted: fullRegistrationData.privacy_accepted
       });
-
-      // Additional debug logging to see exact field values
-      console.log('🔍 Field by field validation:');
-      console.log('  email:', fullRegistrationData.email, '(length:', fullRegistrationData.email.length, ')');
-      console.log('  first_name:', fullRegistrationData.first_name, '(length:', fullRegistrationData.first_name.length, ')');
-      console.log('  last_name:', fullRegistrationData.last_name, '(length:', fullRegistrationData.last_name.length, ')');
-      console.log('  business_name:', fullRegistrationData.business_name, '(length:', fullRegistrationData.business_name.length, ')');
-      console.log('  service_package:', fullRegistrationData.service_package);
-      console.log('  terms_accepted:', fullRegistrationData.terms_accepted);
-      console.log('  privacy_accepted:', fullRegistrationData.privacy_accepted);
 
       // Register with complete data using auth service
       const authResponse = await authService.register(fullRegistrationData);
       
-      console.log('✅ Streamlined registration successful:', {
-        user: authResponse.user.email,
+      secureLogger.success('Registration successful', {
         service_package: authResponse.user.service_package,
         trial_active: registrationData.trial_started
       });
@@ -89,7 +82,7 @@ function SignUpPageContent() {
       setRegistrationComplete(true);
       
     } catch (err) {
-      console.error('❌ Streamlined registration failed:', err);
+      secureLogger.error('Registration failed', err);
       const errorMessage = authService.handleAuthError(err);
       setError(errorMessage);
     } finally {

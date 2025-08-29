@@ -23,6 +23,12 @@ from .invoice_submission_endpoints import create_invoice_submission_router
 from .compliance_validation_endpoints import create_compliance_validation_router
 from .certificate_management_endpoints import create_certificate_management_router
 from .grant_management_endpoints import create_grant_management_router
+from .security_management_endpoints import create_security_management_router
+from .validation_management_endpoints import create_validation_management_router
+from .transmission_management_endpoints import create_transmission_management_router
+from .tracking_management_endpoints import create_tracking_management_router
+from .report_generation_endpoints import create_report_generation_router
+from .dashboard_data_endpoints import create_dashboard_data_router
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +119,54 @@ class APPRouterV1:
             self.message_router
         )
         self.router.include_router(grant_router)
+        
+        # Security Management Routes
+        security_router = create_security_management_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(security_router)
+        
+        # Validation Management Routes
+        validation_router = create_validation_management_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(validation_router)
+        
+        # Transmission Management Routes
+        transmission_router = create_transmission_management_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(transmission_router)
+        
+        # Tracking Management Routes
+        tracking_router = create_tracking_management_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(tracking_router)
+        
+        # Report Generation Routes
+        report_router = create_report_generation_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(report_router)
+        
+        # Dashboard Data Routes (root level endpoints)
+        dashboard_router = create_dashboard_data_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(dashboard_router)
     
     def _setup_routes(self):
         """Configure general APP v1 routes"""

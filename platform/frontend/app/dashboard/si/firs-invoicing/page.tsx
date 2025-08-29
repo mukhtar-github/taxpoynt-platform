@@ -35,6 +35,7 @@ export default function FIRSInvoicingHub() {
   const [selectedTransactions, setSelectedTransactions] = useState<ReconciledTransaction[]>([]);
   const [invoiceTemplates, setInvoiceTemplates] = useState<InvoiceTemplate[]>([]);
   const [generationInProgress, setGenerationInProgress] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   // Mock data for demo
   const mockTemplates: InvoiceTemplate[] = [
@@ -112,10 +113,46 @@ export default function FIRSInvoicingHub() {
     }
 
     setUser(currentUser);
-    setSelectedTransactions(mockTransactions);
-    setInvoiceTemplates(mockTemplates);
-    setIsLoading(false);
+    loadFIRSInvoicingData();
   }, [router]);
+
+  const loadFIRSInvoicingData = async () => {
+    try {
+      setIsLoading(true);
+      const authToken = localStorage.getItem('taxpoynt_auth_token');
+      if (!authToken) return;
+
+      // Fetch real data from SI endpoints
+      const [templatesResponse, transactionsResponse] = await Promise.all([
+        fetch('/api/v1/si/invoices/templates', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch('/api/v1/si/reconciliation/transactions', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+      ]);
+
+      if (templatesResponse.ok && transactionsResponse.ok) {
+        const [templatesData, transactionsData] = await Promise.all([
+          templatesResponse.json(),
+          transactionsResponse.json()
+        ]);
+
+        setInvoiceTemplates(templatesData.templates || mockTemplates);
+        setSelectedTransactions(transactionsData.transactions || mockTransactions);
+        setIsDemo(false);
+      } else {
+        throw new Error('API responses not successful');
+      }
+    } catch (error) {
+      console.error('Failed to load FIRS invoicing data, using demo data:', error);
+      setIsDemo(true);
+      setInvoiceTemplates(mockTemplates);
+      setSelectedTransactions(mockTransactions);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleTransactionSelect = (transactionId: string) => {
     setSelectedTransactions(prev => 
@@ -209,6 +246,11 @@ export default function FIRSInvoicingHub() {
               </h1>
               <p className="text-xl text-slate-600">
                 Generate FIRS-compliant invoices from auto-reconciled transaction data (APP handles submission to FIRS)
+                {isDemo && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                    Demo Data
+                  </span>
+                )}
               </p>
             </div>
             

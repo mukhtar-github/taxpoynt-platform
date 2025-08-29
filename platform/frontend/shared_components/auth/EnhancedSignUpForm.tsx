@@ -4,23 +4,17 @@
  * Modern sign-up form using our refined design system
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { TYPOGRAPHY_STYLES, ACCESSIBILITY_PATTERNS } from '../../design_system/style-utilities';
+import { useFormPersistence, CrossFormDataManager } from '../utils/formPersistence';
 
 export interface SignUpFormProps {
-  onSignUp: (userData: {
-    email: string;
-    password: string;
-    confirmPassword: string;
-    companyName: string;
-    fullName: string;
-    role: string;
-    acceptTerms: boolean;
-  }) => Promise<void>;
-  isLoading?: boolean;
+  onSignUp: (data: any) => Promise<void>;
+  className?: string;
   error?: string;
+  isLoading?: boolean;
 }
 
 export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({ 
@@ -28,11 +22,25 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
   isLoading = false, 
   error 
 }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    email: string;
+    password: string;
+    confirmPassword: string;
+    companyName: string;
+    companyType: string;
+    companySize: string;
+    fullName: string;
+    role: string;
+    acceptTerms: boolean;
+    subscribeNewsletter: boolean;
+    [key: string]: any;
+  }>({
     email: '',
     password: '',
     confirmPassword: '',
     companyName: '',
+    companyType: '',
+    companySize: '',
     fullName: '',
     role: 'system_integrator',
     acceptTerms: false,
@@ -41,6 +49,60 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
 
   const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong'>('weak');
+
+  // Form persistence setup
+  const formPersistence = useFormPersistence({
+    storageKey: 'taxpoynt_enhanced_signup',
+    persistent: false, // Use sessionStorage for privacy
+    excludeFields: ['password', 'confirmPassword', 'acceptTerms'],
+    enableCrossFormSharing: true,
+    autoSaveInterval: 3000 // Save every 3 seconds
+  });
+
+  // Initialize form with persistence and shared data
+  useEffect(() => {
+    // Load saved form data and merge with shared data
+    const savedData = formPersistence.loadFormData();
+    const sharedData = CrossFormDataManager.getSharedData();
+    
+    if (savedData || Object.keys(sharedData).length > 0) {
+      const mergedData = {
+        ...formData,
+        ...sharedData,
+        ...savedData,
+        // Never restore sensitive fields
+        password: '',
+        confirmPassword: '',
+        // Preserve existing consent state
+        acceptTerms: savedData?.acceptTerms || formData.acceptTerms
+      };
+      setFormData(mergedData);
+      console.log('📝 Enhanced signup form restored from saved data');
+    }
+
+    // Start auto-save
+    formPersistence.startAutoSave(() => formData);
+
+    // Cleanup on unmount
+    return () => {
+      formPersistence.stopAutoSave();
+    };
+  }, []);
+
+  // Save form data when it changes
+  useEffect(() => {
+    if (Object.keys(formData).some(key => formData[key] !== '')) {
+      // Save shared data for cross-form population
+      CrossFormDataManager.saveSharedData({
+        email: formData.email,
+        business_name: formData.companyName,
+        business_type: formData.companyType,
+        companySize: formData.companySize,
+        first_name: formData.fullName.split(' ')[0] || '',
+        last_name: formData.fullName.split(' ').slice(1).join(' ') || ''
+      });
+    }
+  }, [formData]);
 
   const validateForm = () => {
     const errors: {[key: string]: string} = {};
@@ -69,6 +131,16 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
     // Company name validation
     if (!formData.companyName.trim()) {
       errors.companyName = 'Company name is required';
+    }
+    
+    // Company type validation
+    if (!formData.companyType.trim()) {
+      errors.companyType = 'Company type is required';
+    }
+    
+    // Company size validation
+    if (!formData.companySize.trim()) {
+      errors.companySize = 'Company size is required';
     }
     
     // Full name validation
@@ -244,6 +316,81 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
               {fieldErrors.companyName}
             </div>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label 
+              htmlFor="signup-company-type" 
+              className="block text-sm font-bold text-slate-800 mb-2"
+              style={TYPOGRAPHY_STYLES.optimizedText}
+            >
+              Company Type *
+            </label>
+            <select
+              id="signup-company-type"
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={formData.companyType}
+              onChange={(e) => {
+                setFormData({ ...formData, companyType: e.target.value });
+                if (fieldErrors.companyType) {
+                  setFieldErrors({ ...fieldErrors, companyType: '' });
+                }
+              }}
+              disabled={isLoading}
+            >
+              <option value="">Select company type</option>
+              <option value="sole_proprietorship">Sole Proprietorship</option>
+              <option value="partnership">Partnership</option>
+              <option value="limited_company">Limited Company</option>
+              <option value="public_company">Public Company</option>
+              <option value="non_profit">Non-Profit</option>
+              <option value="cooperative">Cooperative</option>
+            </select>
+            {fieldErrors.companyType && (
+              <div className="mt-2 text-sm text-red-600 flex items-center">
+                <span className="mr-1">❌</span>
+                {fieldErrors.companyType}
+              </div>
+            )}
+          </div>
+          
+          <div>
+            <label 
+              htmlFor="signup-company-size" 
+              className="block text-sm font-bold text-slate-800 mb-2"
+              style={TYPOGRAPHY_STYLES.optimizedText}
+            >
+              Company Size *
+            </label>
+            <select
+              id="signup-company-size"
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={formData.companySize}
+              onChange={(e) => {
+                setFormData({ ...formData, companySize: e.target.value });
+                if (fieldErrors.companySize) {
+                  setFieldErrors({ ...fieldErrors, companySize: '' });
+                }
+              }}
+              disabled={isLoading}
+            >
+              <option value="">Select company size</option>
+              <option value="startup">Startup (1-10 employees)</option>
+              <option value="small">Small (11-50 employees)</option>
+              <option value="medium">Medium (51-200 employees)</option>
+              <option value="large">Large (201-1000 employees)</option>
+              <option value="enterprise">Enterprise (1000+ employees)</option>
+            </select>
+            {fieldErrors.companySize && (
+              <div className="mt-2 text-sm text-red-600 flex items-center">
+                <span className="mr-1">❌</span>
+                {fieldErrors.companySize}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

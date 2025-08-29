@@ -49,6 +49,7 @@ export default function APPFIRSPage() {
   });
   const [credentialsError, setCredentialsError] = useState<string>('');
   const [testingConnection, setTestingConnection] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -79,9 +80,13 @@ export default function APPFIRSPage() {
           environment: response.data.environment || 'sandbox',
           webhook_url: response.data.webhook_url || ''
         });
+        setIsDemo(false);
+      } else {
+        setIsDemo(true);
       }
     } catch (error) {
-      console.error('Failed to load FIRS status:', error);
+      console.error('Failed to load FIRS status, using demo data:', error);
+      setIsDemo(true);
       // Set demo data for now
       setConnectionStatus({
         status: 'connected',
@@ -217,6 +222,11 @@ export default function APPFIRSPage() {
               </h1>
               <p className="text-xl text-slate-600">
                 Manage your connection to the Federal Inland Revenue Service
+                {isDemo && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                    Demo Data
+                  </span>
+                )}
               </p>
             </div>
             

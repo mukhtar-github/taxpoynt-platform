@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '../../../shared_components/services/auth';
-import { EnhancedHybridInterface } from '../../../hybrid_interface/EnhancedHybridInterface';
+import { EnhancedHybridInterfaceWithAPI } from '../../../hybrid_interface/EnhancedHybridInterfaceWithAPI';
 
 export default function HybridDashboard() {
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function HybridDashboard() {
   }
 
   return (
-    <EnhancedHybridInterface 
+    <EnhancedHybridInterfaceWithAPI 
       userName={`${user.first_name} ${user.last_name}`}
       userEmail={user.email}
     />

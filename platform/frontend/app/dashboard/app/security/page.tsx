@@ -36,6 +36,7 @@ export default function SecurityCenterPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<any>(null);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadSecurityMetrics();
@@ -47,10 +48,14 @@ export default function SecurityCenterPage() {
       const response = await apiClient.get<APIResponse<SecurityMetrics>>('/api/v1/app/security/metrics');
       if (response.success && response.data) {
         setMetrics(response.data);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load security metrics:', error);
+      console.error('Failed to load security metrics, using demo data:', error);
       // Fallback to demo data
+      setIsDemo(true);
       setMetrics({
         score: 96,
         threats: 0,
@@ -130,7 +135,14 @@ export default function SecurityCenterPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Security Center</h1>
-            <p className="text-gray-600">Monitor security status and run compliance scans</p>
+            <p className="text-gray-600">
+              Monitor security status and run compliance scans
+              {isDemo && (
+                <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                  Demo Data
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-4">
             <TaxPoyntButton

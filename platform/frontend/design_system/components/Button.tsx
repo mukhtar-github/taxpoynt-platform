@@ -43,15 +43,15 @@ const buttonVariants = cva(
         
         // Secondary - Professional enterprise
         secondary: [
-          'bg-white text-gray-900 border border-gray-300',
-          'hover:bg-gray-50 hover:border-gray-400',
+          'bg-white text-gray-800 border border-gray-300',
+          'hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400',
           'focus-visible:ring-gray-500',
           'shadow-gray-500/10'
         ],
         
         // Ghost - Minimal elegance
         ghost: [
-          'text-gray-700 hover:text-gray-900',
+          'text-gray-800 hover:text-gray-900',
           'hover:bg-gray-100',
           'focus-visible:ring-gray-500',
           'border-transparent shadow-none'
@@ -59,8 +59,8 @@ const buttonVariants = cva(
         
         // Outline - Clean precision
         outline: [
-          'text-gray-700 border border-gray-300',
-          'hover:bg-gray-50 hover:text-gray-900',
+          'text-gray-800 border border-gray-300',
+          'hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400',
           'focus-visible:ring-gray-500',
           'bg-transparent shadow-none'
         ],

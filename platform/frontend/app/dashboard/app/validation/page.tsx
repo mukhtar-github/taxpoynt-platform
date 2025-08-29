@@ -47,6 +47,7 @@ export default function DataValidationPage() {
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadValidationData();
@@ -60,15 +61,18 @@ export default function DataValidationPage() {
         apiClient.get<APIResponse<ValidationResult[]>>('/api/v1/app/validation/recent-results')
       ]);
       
-      if (metricsResponse.success && metricsResponse.data) {
+      if (metricsResponse.success && metricsResponse.data && 
+          resultsResponse.success && resultsResponse.data) {
         setMetrics(metricsResponse.data);
-      }
-      if (resultsResponse.success && resultsResponse.data) {
         setValidationResults(resultsResponse.data);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load validation data:', error);
+      console.error('Failed to load validation data, using demo data:', error);
       // Fallback to demo data
+      setIsDemo(true);
       setMetrics({
         totalValidated: 1247,
         passRate: 99.8,
@@ -198,7 +202,14 @@ export default function DataValidationPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Data Validation Center</h1>
-            <p className="text-gray-600">Validate invoice data before FIRS transmission</p>
+            <p className="text-gray-600">
+              Validate invoice data before FIRS transmission
+              {isDemo && (
+                <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                  Demo Data
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-4">
             <TaxPoyntButton

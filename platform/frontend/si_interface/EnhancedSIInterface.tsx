@@ -32,6 +32,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [isDemo, setIsDemo] = useState(false);
 
   // Enhanced metrics with real financial integration data
   const metrics = {
@@ -226,6 +227,9 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
             })
         );
 
+        // Check if we have real data from APIs
+        const hasRealData = results.some(result => result !== null);
+        
         setDashboardData({
           banking: results[0],
           transactions: results[1],
@@ -236,6 +240,8 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
           crmConnections: results[6],
           posConnections: results[7]
         });
+        
+        setIsDemo(!hasRealData);
 
       } catch (error) {
         console.error('Failed to load SI dashboard data:', error);
@@ -287,6 +293,11 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                 style={TYPOGRAPHY_STYLES.optimizedText}
               >
                 Manage business system integrations and automated e-invoicing workflows
+                {isDemo && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                    Demo Data
+                  </span>
+                )}
               </p>
             </div>
             

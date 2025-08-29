@@ -32,6 +32,7 @@ export default function BusinessSystemsManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [connectedSystems, setConnectedSystems] = useState<ConnectedSystem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isDemo, setIsDemo] = useState(false);
 
   // Mock comprehensive business systems data
   const mockSystems: ConnectedSystem[] = [
@@ -195,11 +196,25 @@ export default function BusinessSystemsManagementPage() {
   const loadConnectedSystems = async () => {
     setIsLoading(true);
     try {
-      // In a real implementation, this would fetch from API
-      // For now, use mock data
-      setConnectedSystems(mockSystems);
+      const authToken = localStorage.getItem('taxpoynt_auth_token');
+      if (!authToken) return;
+
+      // Fetch real data from SI business systems endpoint
+      const response = await fetch('/api/v1/si/integrations/business-systems', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setConnectedSystems(data.systems || mockSystems);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response not successful');
+      }
     } catch (error) {
-      console.error('Failed to load connected systems:', error);
+      console.error('Failed to load connected systems, using demo data:', error);
+      setIsDemo(true);
+      setConnectedSystems(mockSystems);
     } finally {
       setIsLoading(false);
     }
@@ -275,6 +290,11 @@ export default function BusinessSystemsManagementPage() {
               </h1>
               <p className="text-xl text-slate-600">
                 Monitor and manage all your connected business system integrations
+                {isDemo && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                    Demo Data
+                  </span>
+                )}
               </p>
             </div>
             

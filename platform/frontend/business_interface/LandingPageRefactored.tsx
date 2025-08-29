@@ -16,9 +16,9 @@ import {
   BeforeAfterSection,
   PricingSection,
   FinalCTASection,
-  TestimonialsSection,
-  FooterSection
+  TestimonialsSection
 } from './components';
+import { Footer } from '../design_system';
 import { TYPOGRAPHY_STYLES } from '../design_system/style-utilities';
 
 // Note: Since we now have all components, we can import them directly
@@ -123,7 +123,7 @@ export const LandingPageRefactored: React.FC = () => {
       <FinalCTASection />
 
       {/* Footer - No transition needed */}
-      <FooterSection />
+      <Footer variant="landing" />
 
       {/* Skip to top button for accessibility */}
       <button

@@ -38,6 +38,7 @@ export default function TransmissionHistoryPage() {
   const [dateRange, setDateRange] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadTransmissionHistory();
@@ -57,10 +58,14 @@ export default function TransmissionHistoryPage() {
       
       if (response.success && response.data) {
         setTransmissions(response.data);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load transmission history:', error);
+      console.error('Failed to load transmission history, using demo data:', error);
       // Fallback to demo data
+      setIsDemo(true);
       setTransmissions([
         {
           id: 'TX-2024-001',

@@ -50,6 +50,7 @@ export default function StatusTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadTrackingData();
@@ -66,15 +67,18 @@ export default function StatusTrackingPage() {
         apiClient.get<APIResponse<TransmissionStatus[]>>('/api/v1/app/tracking/transmissions')
       ]);
       
-      if (metricsResponse.success && metricsResponse.data) {
+      if (metricsResponse.success && metricsResponse.data && 
+          transmissionsResponse.success && transmissionsResponse.data) {
         setMetrics(metricsResponse.data);
-      }
-      if (transmissionsResponse.success && transmissionsResponse.data) {
         setTransmissions(transmissionsResponse.data);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load tracking data:', error);
+      console.error('Failed to load tracking data, using demo data:', error);
       // Fallback to demo data
+      setIsDemo(true);
       setMetrics({
         totalTransmissions: 456,
         processing: 23,
@@ -203,7 +207,14 @@ export default function StatusTrackingPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Status Tracking</h1>
-            <p className="text-gray-600">Monitor invoice transmission status and FIRS responses</p>
+            <p className="text-gray-600">
+              Monitor invoice transmission status and FIRS responses
+              {isDemo && (
+                <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                  Demo Data
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-4">
             <TaxPoyntButton

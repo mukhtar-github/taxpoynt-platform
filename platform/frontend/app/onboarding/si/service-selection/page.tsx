@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '../../../../design_system/components/Button';
 
 export default function SIServiceSelectionPage() {
   const router = useRouter();
@@ -190,26 +191,22 @@ export default function SIServiceSelectionPage() {
 
         {/* Action buttons */}
         <div className="flex justify-between items-center">
-          <button
+          <Button
             onClick={handleSkipForNow}
-            className="px-6 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            variant="outline"
+            size="sm"
           >
             Skip for Now
-          </button>
+          </Button>
           
-          <button
+          <Button
             onClick={handleContinue}
             disabled={!selectedIntegration || isLoading}
-            className={`
-              px-8 py-2 rounded-md font-medium transition-all duration-200
-              ${selectedIntegration && !isLoading
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-            `}
+            variant="primary"
+            size="md"
           >
             {isLoading ? 'Setting up...' : 'Continue Setup'}
-          </button>
+          </Button>
         </div>
 
         {/* Help text */}

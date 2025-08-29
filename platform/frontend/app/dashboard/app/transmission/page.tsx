@@ -43,6 +43,7 @@ export default function APPTransmissionPage() {
   const [batches, setBatches] = useState<TransmissionBatch[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [transmissionStatus, setTransmissionStatus] = useState<'idle' | 'validating' | 'transmitting' | 'success' | 'error'>('idle');
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -66,17 +67,18 @@ export default function APPTransmissionPage() {
       
       // Load pending invoices
       const invoicesResponse = await apiClient.get<APIResponse>('/api/v1/app/invoices/pending');
-      if (invoicesResponse.success) {
-        setInvoices(invoicesResponse.data.invoices || []);
-      }
-
-      // Load recent batches
       const batchesResponse = await apiClient.get<APIResponse>('/api/v1/app/transmission/batches');
-      if (batchesResponse.success) {
+      
+      if (invoicesResponse.success && batchesResponse.success) {
+        setInvoices(invoicesResponse.data.invoices || []);
         setBatches(batchesResponse.data.batches || []);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load data, using demo data:', error);
+      setIsDemo(true);
       // Set sample data for demonstration
       setInvoices([
         {
@@ -256,6 +258,11 @@ export default function APPTransmissionPage() {
               </h1>
               <p className="text-xl text-slate-600">
                 Submit validated invoices to FIRS and monitor transmission status
+                {isDemo && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                    Demo Data
+                  </span>
+                )}
               </p>
             </div>
             

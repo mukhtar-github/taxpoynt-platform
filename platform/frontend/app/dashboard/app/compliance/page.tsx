@@ -40,6 +40,7 @@ export default function ComplianceReportsPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState('audit');
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadComplianceMetrics();
@@ -51,10 +52,14 @@ export default function ComplianceReportsPage() {
       const response = await apiClient.get<APIResponse<ComplianceMetrics>>('/api/v1/app/compliance/metrics');
       if (response.success && response.data) {
         setMetrics(response.data);
+        setIsDemo(false);
+      } else {
+        throw new Error('API response unsuccessful');
       }
     } catch (error) {
-      console.error('Failed to load compliance metrics:', error);
+      console.error('Failed to load compliance metrics, using demo data:', error);
       // Fallback to demo data
+      setIsDemo(true);
       setMetrics({
         totalReports: 145,
         pendingReports: 3,
@@ -166,7 +171,14 @@ export default function ComplianceReportsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Compliance Reports</h1>
-            <p className="text-gray-600">Generate and manage regulatory compliance documentation</p>
+            <p className="text-gray-600">
+              Generate and manage regulatory compliance documentation
+              {isDemo && (
+                <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                  Demo Data
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-4">
             <TaxPoyntButton
