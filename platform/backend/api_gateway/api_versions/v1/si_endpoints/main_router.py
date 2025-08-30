@@ -316,6 +316,28 @@ class SIRouterV1:
         )
         self.router.include_router(sdk_management_router, tags=["SDK Management"])
         
+        # Financial System Integration Routes
+        banking_router = create_banking_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(banking_router, tags=["Banking Integrations V1"])
+        
+        payment_processor_router = create_payment_processor_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(payment_processor_router, tags=["Payment Processors V1"])
+        
+        validation_router = create_validation_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(validation_router, tags=["Financial Validation V1"])
+        
         logger.info("SI sub-routers included successfully")
     
     async def _require_si_role(self, request: Request) -> HTTPRoutingContext:

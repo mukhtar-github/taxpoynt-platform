@@ -172,7 +172,7 @@ export const MonoBankingDashboard: React.FC = () => {
             name: detectionResult?.organizationId || 'Unknown',
             email: 'admin@organization.com'
           },
-          redirect_url: `${window.location.origin}/si/banking/callback`,
+          redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
           meta: {
             ref: `taxpoynt_${Date.now()}`,
             bank_code: bankCode
