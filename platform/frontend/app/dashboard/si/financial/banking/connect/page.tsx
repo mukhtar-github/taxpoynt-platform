@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import MonoBankingDashboard from '../../../../../si_interface/components/financial_systems/banking_integration/MonoBankingDashboard';
+import MonoBankingDashboard from '@/si_interface/components/financial_systems/banking_integration/MonoBankingDashboard';
 
 export default function BankingConnectPage() {
   const router = useRouter();
