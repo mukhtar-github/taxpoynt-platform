@@ -10,6 +10,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from './Button';
+import { Logo } from './Logo';
 
 export interface FooterProps {
   className?: string;
@@ -105,10 +106,20 @@ export const Footer: React.FC<FooterProps> = ({
             {/* Logo & Brand */}
             <div className="flex items-center space-x-4 mb-8">
               <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                  <span className="text-white font-bold text-xl">T</span>
+                {/* Real TaxPoynt Logo */}
+                <div className="w-14 h-14 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25 border border-gray-700/50">
+                  <img 
+                    src="/logo.svg" 
+                    alt="TaxPoynt Logo" 
+                    className="w-8 h-8"
+                  />
                 </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                {/* FIRS Certification Badge */}
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900 flex items-center justify-center">
+                  <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
               </div>
               <div>
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
@@ -283,10 +294,12 @@ export const Footer: React.FC<FooterProps> = ({
             <div className="bg-gradient-to-br from-blue-600/10 via-purple-600/5 to-green-600/10 rounded-2xl p-8 border border-gray-800/50 backdrop-blur-sm">
               <div className="text-center">
                 <div className="flex items-center justify-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.828 7l6.172 6.172M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4l5 5v5.172" />
-                    </svg>
+                  <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-gray-800 rounded-full flex items-center justify-center border border-gray-600/50">
+                    <img 
+                      src="/logo.svg" 
+                      alt="TaxPoynt Logo" 
+                      className="w-5 h-5"
+                    />
                   </div>
                   <h3 className="text-xl font-bold text-white">Stay Ahead of Compliance</h3>
                 </div>
