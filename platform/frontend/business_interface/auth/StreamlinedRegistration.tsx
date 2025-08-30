@@ -336,7 +336,7 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
         features: ['FIRS Integration', 'Invoice Validation', 'Compliance Monitoring', 'Tax Reporting'],
         icon: '📄',
         color: 'green',
-        popular: true
+        popular: false
       },
       {
         id: 'hybrid',
