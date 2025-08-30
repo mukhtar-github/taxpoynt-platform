@@ -71,7 +71,7 @@ class SDK(BaseModel):
     rating = Column(Numeric(3, 2), default=0.0)
     status = Column(Enum(SDKStatus), default=SDKStatus.BETA)
     is_active = Column(Boolean, default=True, index=True)
-    metadata = Column(JSON, nullable=True)  # Additional flexible metadata
+    additional_metadata = Column(JSON, nullable=True)  # Additional flexible metadata
     
     # Relationships
     versions = relationship("SDKVersion", back_populates="sdk", cascade="all, delete-orphan")
@@ -111,7 +111,7 @@ class SDKVersion(BaseModel):
     checksum = Column(String(64), nullable=False)
     is_stable = Column(Boolean, default=False, index=True)
     is_active = Column(Boolean, default=True, index=True)
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     sdk = relationship("SDK", back_populates="versions")
@@ -142,7 +142,7 @@ class SDKDownload(BaseModel):
     ip_address = Column(String(45), nullable=True)  # IPv6 compatible
     user_agent = Column(Text, nullable=True)
     download_method = Column(String(50), default="web")  # web, api, cli
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     sdk = relationship("SDK", back_populates="downloads")
@@ -171,7 +171,7 @@ class SDKUsageLog(BaseModel):
     response_size = Column(Integer, nullable=True)  # bytes
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     sdk = relationship("SDK", back_populates="usage_logs")
@@ -197,7 +197,7 @@ class SandboxScenario(BaseModel):
     is_active = Column(Boolean, default=True, index=True)
     category = Column(String(50), nullable=True, index=True)
     difficulty = Column(String(20), default="beginner")  # beginner, intermediate, advanced
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     test_results = relationship("SandboxTestResult", back_populates="scenario", cascade="all, delete-orphan")
@@ -223,7 +223,7 @@ class SandboxTestResult(BaseModel):
     error_message = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     scenario = relationship("SandboxScenario", back_populates="test_results")
@@ -245,7 +245,7 @@ class SDKDocumentation(BaseModel):
     content = Column(JSON, nullable=False)
     version = Column(String(20), nullable=False)
     is_published = Column(Boolean, default=False, index=True)
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     sdk = relationship("SDK", back_populates="documentation")
@@ -267,7 +267,7 @@ class SDKFeedback(BaseModel):
     comments = Column(Text, nullable=True)
     is_public = Column(Boolean, default=True, index=True)
     is_resolved = Column(Boolean, default=False, index=True)
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     sdk = relationship("SDK", back_populates="feedback")
@@ -293,7 +293,7 @@ class SDKAnalytics(BaseModel):
     error_rate = Column(Numeric(5, 4), default=0.0)  # percentage
     top_features = Column(JSON, nullable=True)
     top_organizations = Column(JSON, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)
     
     # Relationships
     sdk = relationship("SDK")
