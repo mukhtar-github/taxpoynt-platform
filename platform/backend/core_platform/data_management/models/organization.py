@@ -83,6 +83,7 @@ class Organization(BaseModel):
     integration_preferences = Column(JSON, nullable=True)  # User preferences
     
     # Relationships
+    users = relationship("User", foreign_keys="[User.organization_id]", back_populates="organization")
     organization_users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
     integrations = relationship("Integration", back_populates="organization", cascade="all, delete-orphan")
     firs_submissions = relationship("FIRSSubmission", back_populates="organization", cascade="all, delete-orphan")

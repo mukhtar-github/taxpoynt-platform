@@ -85,7 +85,11 @@ class User(BaseModel):
     privacy_accepted_at = Column(DateTime(timezone=True), nullable=True)
     data_usage_consents = Column(String, nullable=True)  # JSON string of consents
     
+    # Organization relationship (primary organization for user)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
+    
     # Relationships  
+    organization = relationship("Organization", foreign_keys="[User.organization_id]", back_populates="users")
     organization_users = relationship("OrganizationUser", foreign_keys="[OrganizationUser.user_id]", back_populates="user", cascade="all, delete-orphan")
     service_access = relationship("UserServiceAccess", foreign_keys="[UserServiceAccess.user_id]", back_populates="user", cascade="all, delete-orphan")
     

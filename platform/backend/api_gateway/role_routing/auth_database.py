@@ -73,7 +73,7 @@ class AuthDatabaseManager:
                 "hybrid": UserRole.HYBRID_USER
             }
             
-            # Create User instance
+            # Create User instance with organization_id
             user = User(
                 email=user_data["email"],
                 hashed_password=user_data["hashed_password"],
@@ -82,6 +82,7 @@ class AuthDatabaseManager:
                 phone=user_data.get("phone"),
                 role=service_role_mapping.get(user_data["service_package"], UserRole.SI_USER),
                 service_package=user_data["service_package"],
+                organization_id=user_data.get("organization_id"),
                 is_active=True,
                 is_email_verified=False,
                 terms_accepted_at=user_data.get("terms_accepted_at"),
@@ -104,7 +105,7 @@ class AuthDatabaseManager:
                 "service_package": user.service_package,
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
-                "organization_id": str(user_data.get("organization_id")) if user_data.get("organization_id") else None,
+                "organization_id": str(user.organization_id) if user.organization_id else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
                 "last_login": None,
@@ -194,7 +195,7 @@ class AuthDatabaseManager:
                 "service_package": user.service_package,
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
-                "organization_id": None,  # TODO: Add relationship
+                "organization_id": str(user.organization_id) if user.organization_id else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
                 "last_login": None,
@@ -225,7 +226,7 @@ class AuthDatabaseManager:
                 "service_package": user.service_package,
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
-                "organization_id": None,  # TODO: Add relationship
+                "organization_id": str(user.organization_id) if user.organization_id else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
                 "last_login": None,

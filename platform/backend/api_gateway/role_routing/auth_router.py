@@ -673,15 +673,28 @@ def create_auth_router(
     @router.get("/health")
     async def auth_health_check():
         """Authentication service health check"""
-        return JSONResponse(content={
-            "status": "healthy",
-            "service": "authentication",
-            "timestamp": datetime.utcnow().isoformat(),
-            "statistics": {
-                "total_users": len(users_db),
-                "total_organizations": len(organizations_db),
-                "active_users": len([u for u in users_db.values() if u.get("is_active", False)])
-            }
-        })
+        try:
+            # Test database connection
+            db = get_auth_database()
+            db_status = "connected"
+            
+            return JSONResponse(content={
+                "status": "healthy",
+                "service": "authentication",
+                "timestamp": datetime.utcnow().isoformat(),
+                "database_status": db_status,
+                "database_url_type": "PostgreSQL" if "postgresql://" in db.database_url else "SQLite"
+            })
+        except Exception as e:
+            logger.error(f"Auth health check failed: {e}")
+            return JSONResponse(
+                content={
+                    "status": "unhealthy",
+                    "service": "authentication", 
+                    "error": str(e),
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                status_code=503
+            )
     
     return router
