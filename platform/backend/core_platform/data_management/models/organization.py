@@ -82,6 +82,13 @@ class Organization(BaseModel):
     service_packages = Column(JSON, nullable=True)  # Services subscribed to
     integration_preferences = Column(JSON, nullable=True)  # User preferences
     
+    # Soft delete and data lifecycle management
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=True), nullable=True)  # User who deleted this org
+    deletion_reason = Column(String(255), nullable=True)
+    scheduled_hard_delete_at = Column(DateTime(timezone=True), nullable=True)
+    
     # Relationships
     users = relationship("User", foreign_keys="[User.organization_id]", back_populates="organization")
     organization_users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
@@ -117,6 +124,33 @@ class Organization(BaseModel):
         if self.service_packages and isinstance(self.service_packages, list):
             return self.service_packages
         return []
+    
+    def soft_delete(self, deleted_by_user_id: str = None, reason: str = None) -> None:
+        """Soft delete the organization."""
+        from datetime import datetime, timezone
+        self.is_deleted = True
+        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_by = deleted_by_user_id
+        self.deletion_reason = reason
+        self.status = OrganizationStatus.SUSPENDED
+        
+    def restore(self) -> None:
+        """Restore a soft-deleted organization."""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.deletion_reason = None
+        self.status = OrganizationStatus.ACTIVE
+        
+    def schedule_hard_delete(self, days_from_now: int = 2190) -> None:  # 6 years for tax data
+        """Schedule organization data for hard deletion (for compliance)."""
+        from datetime import datetime, timezone, timedelta
+        self.scheduled_hard_delete_at = datetime.now(timezone.utc) + timedelta(days=days_from_now)
+        
+    @property
+    def is_manageable(self) -> bool:
+        """Check if organization can be managed (not deleted and active)."""
+        return not self.is_deleted and self.status == OrganizationStatus.ACTIVE
 
 class OrganizationUser(BaseModel):
     """Many-to-many relationship between users and organizations."""

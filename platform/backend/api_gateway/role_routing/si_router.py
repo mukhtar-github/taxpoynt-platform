@@ -448,6 +448,19 @@ class SIServicesRouter:
 def create_si_router(role_detector: HTTPRoleDetector,
                     permission_guard: APIPermissionGuard,
                     message_router: MessageRouter) -> APIRouter:
-    """Factory function to create SI Services Router"""
+    """Factory function to create SI Services Router with all sub-routers"""
+    
+    # Create main SI router
     si_router = SIServicesRouter(role_detector, permission_guard, message_router)
-    return si_router.router
+    main_router = si_router.router
+    
+    # Import and include banking endpoints
+    try:
+        from ..api_versions.v1.si_endpoints.financial_endpoints.banking_endpoints import create_banking_router
+        banking_router = create_banking_router(role_detector, permission_guard, message_router)
+        main_router.include_router(banking_router, prefix="/si", tags=["SI Banking Integration"])
+        logger.info("✅ Banking endpoints connected to SI router")
+    except ImportError as e:
+        logger.warning(f"⚠️  Could not import banking endpoints: {e}")
+    
+    return main_router

@@ -23,6 +23,7 @@ from .models import (
     BankingConnection, BankAccount, BankTransaction, BankingWebhook,
     BankingSyncLog, BankingCredentials, BankingProvider
 )
+from ..config.environment import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -40,28 +41,30 @@ class DatabaseInitializer:
     """
     
     def __init__(self):
-        self.database_url = os.getenv("DATABASE_URL")
-        self.environment = os.getenv("ENVIRONMENT", "production")
+        self.config = get_config()
+        self.database_config = self.config.get_database_config()
+        self.database_url = self.database_config["url"]
+        self.environment = self.config.environment.value
         self.engine = None
         self.SessionLocal = None
         self.is_initialized = False
         
-        # Database configuration
+        # Database configuration from environment config
         self.engine_kwargs = {
-            "echo": self.environment == "development",
-            "pool_pre_ping": True,
+            "pool_size": self.database_config["pool_size"],
+            "max_overflow": self.database_config["max_overflow"],
+            "echo": self.database_config["echo"],
+            "pool_pre_ping": self.database_config["pool_pre_ping"],
             "pool_recycle": 300,
         }
         
-        # If no DATABASE_URL, use SQLite for development
+        # Validate database URL exists
         if not self.database_url:
-            db_path = Path(__file__).parent.parent.parent.parent.parent / "taxpoynt.db"
-            self.database_url = f"sqlite:///{db_path}"
-            self.engine_kwargs.update({
-                "poolclass": StaticPool,
-                "connect_args": {"check_same_thread": False}
-            })
-            logger.warning("No DATABASE_URL configured, using SQLite for development")
+            error_msg = f"No database URL configured for {self.environment} environment"
+            logger.error(error_msg)
+            if self.environment == "development":
+                logger.info("💡 To set up local development database, run: docker-compose -f docker-compose.dev.yml up -d")
+            raise ValueError(error_msg)
     
     async def initialize_database(self) -> Dict[str, Any]:
         """

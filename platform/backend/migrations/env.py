@@ -8,36 +8,66 @@ from sqlalchemy import pool
 from alembic import context
 
 # Add the project root to Python path for imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
-# Import our models and Base
-from core_platform.data_management.models.base import Base
-from core_platform.data_management.models.user import User, UserServiceAccess
-from core_platform.data_management.models.organization import Organization, OrganizationUser  
-from core_platform.data_management.models.integration import Integration, IntegrationCredentials
-from core_platform.data_management.models.firs_submission import FIRSSubmission
-from core_platform.data_management.models.banking import (
-    BankingConnection, BankAccount, BankTransaction, 
-    BankingWebhook, BankingSyncLog, BankingCredentials
-)
-from core_platform.data_management.models.business_systems import (
-    ERPConnection, ERPSyncLog, CRMConnection, CRMSyncLog,
-    POSConnection, POSTransactionLog, Certificate,
-    DocumentTemplate, DocumentGenerationLog, IRNGeneration,
-    Taxpayer, WebhookEvent, AnalyticsReport, AuditLog, ComplianceCheck
-)
+# Import configuration system first (minimal imports to avoid dependency issues)
+try:
+    from core_platform.config.environment import get_config
+    config_manager = get_config()
+    database_url = config_manager.get_database_url()
+except ImportError as e:
+    # Fallback to environment variable if config system isn't available
+    print(f"Warning: Could not import config system, using fallback: {e}")
+    database_url = os.getenv("DATABASE_URL")
+
+# Import models with error handling
+try:
+    from core_platform.data_management.models.base import Base
+    from core_platform.data_management.models.user import User, UserServiceAccess
+    from core_platform.data_management.models.organization import Organization, OrganizationUser  
+    from core_platform.data_management.models.integration import Integration, IntegrationCredentials
+    from core_platform.data_management.models.firs_submission import FIRSSubmission
+    
+    # Import banking models if available
+    try:
+        from core_platform.data_management.models.banking import (
+            BankingConnection, BankAccount, BankTransaction, 
+            BankingWebhook, BankingSyncLog, BankingCredentials
+        )
+    except ImportError:
+        print("Warning: Banking models not available for migration")
+    
+    # Import business system models if available
+    try:
+        from core_platform.data_management.models.business_systems import (
+            ERPConnection, ERPSyncLog, CRMConnection, CRMSyncLog,
+            POSConnection, POSTransactionLog, Certificate,
+            DocumentTemplate, DocumentGenerationLog, IRNGeneration,
+            Taxpayer, WebhookEvent, AnalyticsReport, AuditLog, ComplianceCheck
+        )
+    except ImportError:
+        print("Warning: Business system models not available for migration")
+        
+except ImportError as e:
+    print(f"Error importing models for migration: {e}")
+    # Create a minimal Base for migration purposes
+    from sqlalchemy.ext.declarative import declarative_base
+    Base = declarative_base()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set the SQLAlchemy URL from environment variable for Railway PostgreSQL
-database_url = os.getenv("DATABASE_URL")
+# Set the SQLAlchemy URL using environment-aware configuration
 if database_url:
     # Handle Railway's postgres:// URL format (convert to postgresql://)
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     config.set_main_option("sqlalchemy.url", database_url)
+else:
+    # Fallback to .ini file configuration
+    print("Warning: No database URL configured, using alembic.ini default")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

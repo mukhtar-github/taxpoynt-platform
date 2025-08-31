@@ -79,6 +79,7 @@ from .permission_guard import APIPermissionGuard
 from .si_router import SIServicesRouter
 from .app_router import APPServicesRouter  
 from .hybrid_router import HybridServicesRouter
+from .admin_router import create_admin_router
 
 __all__ = [
     # Existing integrations
@@ -97,5 +98,6 @@ __all__ = [
     'APIPermissionGuard',
     'SIAPIRouter',
     'APPAPIRouter',
-    'HybridAPIRouter'
+    'HybridAPIRouter',
+    'create_admin_router'
 ]

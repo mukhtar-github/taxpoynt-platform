@@ -32,6 +32,7 @@ from .si_router import create_si_router
 from .app_router import create_app_router
 from .hybrid_router import create_hybrid_router
 from .auth_router import create_auth_router
+from .admin_router import create_admin_router
 
 # Phase 4 Performance Infrastructure
 from core_platform.data_management.cache_manager import CacheManager, CacheConfig
@@ -157,6 +158,9 @@ class TaxPoyntAPIGateway:
             self.message_router
         )
         
+        # Create admin router (platform administration)
+        admin_router = create_admin_router()
+        
         # Include routers in main app
         self.app.include_router(
             si_router,
@@ -181,6 +185,13 @@ class TaxPoyntAPIGateway:
             auth_router,
             prefix="/api/v1",
             tags=["Authentication"]
+        )
+        
+        # Include admin router (platform administration)
+        self.app.include_router(
+            admin_router,
+            prefix="/api/v1",
+            tags=["Platform Administration"]
         )
         
         # Add root level routes

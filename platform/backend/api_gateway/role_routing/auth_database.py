@@ -6,7 +6,7 @@ Replaces in-memory storage with proper database operations.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -50,13 +50,85 @@ class AuthDatabaseManager:
         self._create_tables()
     
     def _create_tables(self):
-        """Create tables using existing models."""
+        """Create tables using existing models and handle migrations."""
         try:
+            # Create all tables (this is safe for existing tables)
             BaseModel.metadata.create_all(bind=self.engine)
-            logger.info("Database tables created successfully")
+            
+            # Handle organization_id column migration
+            self._migrate_organization_id_column()
+            
+            logger.info("Database tables created/migrated successfully")
         except Exception as e:
             logger.error(f"Error creating database tables: {e}")
             raise
+    
+    def _migrate_organization_id_column(self):
+        """Add all new columns to users and organizations tables if they don't exist."""
+        try:
+            with self.engine.connect() as conn:
+                # Define all new columns for users table
+                user_migrations = [
+                    ("organization_id", "UUID"),
+                    ("is_deleted", "BOOLEAN DEFAULT FALSE"),
+                    ("deleted_at", "TIMESTAMP WITH TIME ZONE"),
+                    ("deleted_by", "UUID"),
+                    ("deletion_reason", "VARCHAR(255)"),
+                    ("scheduled_hard_delete_at", "TIMESTAMP WITH TIME ZONE"),
+                    ("last_activity_at", "TIMESTAMP WITH TIME ZONE DEFAULT NOW()")
+                ]
+                
+                # Define all new columns for organizations table  
+                org_migrations = [
+                    ("is_deleted", "BOOLEAN DEFAULT FALSE"),
+                    ("deleted_at", "TIMESTAMP WITH TIME ZONE"),
+                    ("deleted_by", "UUID"),
+                    ("deletion_reason", "VARCHAR(255)"),
+                    ("scheduled_hard_delete_at", "TIMESTAMP WITH TIME ZONE")
+                ]
+                
+                # Migrate users table
+                self._migrate_table_columns(conn, "users", user_migrations)
+                
+                # Migrate organizations table
+                self._migrate_table_columns(conn, "organizations", org_migrations)
+                
+                # Create indexes
+                indexes = [
+                    "CREATE INDEX IF NOT EXISTS ix_users_organization_id ON users(organization_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_users_is_deleted ON users(is_deleted)",
+                    "CREATE INDEX IF NOT EXISTS ix_organizations_is_deleted ON organizations(is_deleted)"
+                ]
+                
+                for index_sql in indexes:
+                    try:
+                        conn.execute(index_sql)
+                    except Exception as idx_e:
+                        logger.warning(f"Could not create index: {idx_e}")
+                
+                conn.commit()
+                logger.info("✅ Database migration completed successfully")
+                    
+        except Exception as e:
+            # If we're using SQLite or the columns already exist, it's fine
+            logger.warning(f"Could not complete database migration (this is normal for SQLite): {e}")
+    
+    def _migrate_table_columns(self, conn, table_name: str, columns: list):
+        """Helper method to migrate columns for a specific table."""
+        for column_name, column_type in columns:
+            try:
+                # Check if column exists
+                result = conn.execute(
+                    f"SELECT column_name FROM information_schema.columns WHERE table_name='{table_name}' AND column_name='{column_name}'"
+                ).fetchone()
+                
+                if not result:
+                    logger.info(f"Adding {column_name} column to {table_name} table...")
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+                    logger.info(f"✅ Added {column_name} to {table_name}")
+                    
+            except Exception as e:
+                logger.warning(f"Could not add {column_name} to {table_name}: {e}")
     
     def get_session(self) -> Session:
         """Get database session."""
@@ -176,11 +248,17 @@ class AuthDatabaseManager:
         finally:
             session.close()
     
-    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+    def get_user_by_email(self, email: str, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
         """Get user by email using existing User model."""
         session = self.get_session()
         try:
-            user = session.query(User).filter(User.email == email).first()
+            query = session.query(User).filter(User.email == email)
+            
+            # By default, exclude soft-deleted users
+            if not include_deleted:
+                query = query.filter(User.is_deleted == False)
+                
+            user = query.first()
             if not user:
                 return None
             
@@ -207,11 +285,17 @@ class AuthDatabaseManager:
         finally:
             session.close()
     
-    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+    def get_user_by_id(self, user_id: str, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
         """Get user by ID using existing User model."""
         session = self.get_session()
         try:
-            user = session.query(User).filter(User.id == user_id).first()
+            query = session.query(User).filter(User.id == user_id)
+            
+            # By default, exclude soft-deleted users
+            if not include_deleted:
+                query = query.filter(User.is_deleted == False)
+                
+            user = query.first()
             if not user:
                 return None
             
@@ -293,6 +377,79 @@ class AuthDatabaseManager:
         except Exception as e:
             session.rollback()
             logger.error(f"Error updating organization owner: {e}")
+        finally:
+            session.close()
+    
+    def get_all_users(self, include_deleted: bool = False, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get all users with pagination (for admin dashboard)."""
+        session = self.get_session()
+        try:
+            query = session.query(User)
+            
+            if not include_deleted:
+                query = query.filter(User.is_deleted == False)
+                
+            users = query.offset(offset).limit(limit).all()
+            
+            return [{
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role.value,
+                "service_package": user.service_package,
+                "is_active": user.is_active,
+                "is_deleted": user.is_deleted,
+                "organization_id": str(user.organization_id) if user.organization_id else None,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "last_login": user.last_login.isoformat() if user.last_login else None
+            } for user in users]
+            
+        except Exception as e:
+            logger.error(f"Error getting all users: {e}")
+            raise
+        finally:
+            session.close()
+    
+    def soft_delete_user(self, user_id: str, deleted_by_user_id: str, reason: str = None) -> bool:
+        """Soft delete a user (admin function)."""
+        session = self.get_session()
+        try:
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                return False
+                
+            user.soft_delete(deleted_by_user_id, reason)
+            session.commit()
+            
+            logger.info(f"User {user_id} soft deleted by {deleted_by_user_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error soft deleting user: {e}")
+            raise
+        finally:
+            session.close()
+    
+    def restore_user(self, user_id: str) -> bool:
+        """Restore a soft-deleted user (admin function)."""
+        session = self.get_session()
+        try:
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user or not user.is_deleted:
+                return False
+                
+            user.restore()
+            session.commit()
+            
+            logger.info(f"User {user_id} restored")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error restoring user: {e}")
+            raise
         finally:
             session.close()
 

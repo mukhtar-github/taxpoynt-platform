@@ -34,6 +34,7 @@ except ImportError:
 from .models import HTTPRoutingContext
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
+from .auth_database import get_auth_database
 
 logger = logging.getLogger(__name__)
 
@@ -670,6 +671,80 @@ def create_auth_router(
                 detail="Failed to revoke user tokens"
             )
 
+    @router.get("/role")
+    async def get_user_role(credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Get current user role - simplified endpoint for frontend compatibility"""
+        try:
+            # Extract and verify token
+            token = credentials.credentials
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            
+            user_id = payload.get("user_id")
+            role = payload.get("role", "system_integrator")
+            
+            return JSONResponse(content={
+                "role": role,
+                "user_id": user_id,
+                "permissions": get_role_permissions(role),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        except JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token"
+            )
+        except Exception as e:
+            logger.error(f"Get user role failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get user role"
+            )
+
+    @router.get("/session/role")
+    async def detect_role_from_session(credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Detect user role from current session - alternative endpoint"""
+        try:
+            # Extract and verify token
+            token = credentials.credentials
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            
+            user_id = payload.get("user_id")
+            role = payload.get("role", "system_integrator")
+            organization_id = payload.get("organization_id")
+            
+            # Get full user data
+            user = get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            return JSONResponse(content={
+                "detected_role": role,
+                "user_id": user_id,
+                "organization_id": organization_id,
+                "service_package": user.get("service_package", "si"),
+                "permissions": get_role_permissions(role),
+                "is_active": user.get("is_active", True),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        except JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token"
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Role detection from session failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to detect role from session"
+            )
+
     @router.get("/health")
     async def auth_health_check():
         """Authentication service health check"""
@@ -696,5 +771,49 @@ def create_auth_router(
                 },
                 status_code=503
             )
+
+    # Helper functions using existing infrastructure
+    def hash_password(password: str) -> str:
+        """Hash password using existing bcrypt context"""
+        return pwd_context.hash(password)
+    
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        """Verify password using existing bcrypt context"""
+        return pwd_context.verify(plain_password, hashed_password)
+    
+    def determine_user_role(service_package: str) -> str:
+        """Determine user role from service package"""
+        role_mapping = {
+            "si": "system_integrator",
+            "app": "access_point_provider", 
+            "hybrid": "hybrid"
+        }
+        return role_mapping.get(service_package, "system_integrator")
+    
+    def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by ID using existing database manager"""
+        db = get_auth_database()
+        return db.get_user_by_id(user_id)
+    
+    def get_role_permissions(role: str) -> List[str]:
+        """Get permissions for role using existing permission system"""
+        # Use the existing role detector and permission guard
+        role_detector = HTTPRoleDetector()
+        permission_mappings = {
+            "system_integrator": [
+                "business_systems.read", "business_systems.write", 
+                "integration.manage", "organization.manage", "webhook.manage"
+            ],
+            "access_point_provider": [
+                "firs.read", "firs.write", "taxpayer.manage", 
+                "compliance.read", "einvoice.issue", "einvoice.validate"
+            ],
+            "hybrid": [
+                "business_systems.read", "business_systems.write", "integration.manage", 
+                "organization.manage", "webhook.manage", "firs.read", "firs.write",
+                "taxpayer.manage", "compliance.read", "einvoice.issue", "einvoice.validate"
+            ]
+        }
+        return permission_mappings.get(role, [])
     
     return router

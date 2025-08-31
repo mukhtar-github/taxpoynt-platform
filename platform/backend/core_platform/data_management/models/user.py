@@ -6,7 +6,7 @@ User authentication and role management models for the platform.
 
 import uuid
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, String, Enum, DateTime, func, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -88,6 +88,14 @@ class User(BaseModel):
     # Organization relationship (primary organization for user)
     organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
     
+    # Soft delete and data lifecycle management
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    deletion_reason = Column(String(255), nullable=True)
+    scheduled_hard_delete_at = Column(DateTime(timezone=True), nullable=True)  # For GDPR/NDPR compliance
+    last_activity_at = Column(DateTime(timezone=True), nullable=True, default=func.now())
+    
     # Relationships  
     organization = relationship("Organization", foreign_keys="[User.organization_id]", back_populates="users")
     organization_users = relationship("OrganizationUser", foreign_keys="[OrganizationUser.user_id]", back_populates="user", cascade="all, delete-orphan")
@@ -131,6 +139,36 @@ class User(BaseModel):
             AccessLevel.ADMIN: 3
         }
         return level_hierarchy[user_level] >= level_hierarchy[required_level]
+    
+    def soft_delete(self, deleted_by_user_id: str = None, reason: str = None) -> None:
+        """Soft delete the user account."""
+        self.is_deleted = True
+        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_by = deleted_by_user_id
+        self.deletion_reason = reason
+        self.is_active = False
+        
+    def restore(self) -> None:
+        """Restore a soft-deleted user account."""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.deletion_reason = None
+        self.is_active = True
+        
+    def schedule_hard_delete(self, days_from_now: int = 30) -> None:
+        """Schedule user data for hard deletion (for compliance)."""
+        from datetime import timedelta
+        self.scheduled_hard_delete_at = datetime.now(timezone.utc) + timedelta(days=days_from_now)
+        
+    def update_last_activity(self) -> None:
+        """Update the last activity timestamp."""
+        self.last_activity_at = datetime.now(timezone.utc)
+    
+    @property
+    def is_manageable(self) -> bool:
+        """Check if user can be managed (not deleted and active)."""
+        return not self.is_deleted and self.is_active
 
 class UserServiceAccess(BaseModel):
     """User access control for specific services."""

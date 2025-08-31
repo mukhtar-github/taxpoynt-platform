@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: taxpoynt_postgres_dev
+    environment:
+      POSTGRES_DB: taxpoynt_platform
+      POSTGRES_USER: taxpoynt_user
+      POSTGRES_PASSWORD: taxpoynt_dev_pass
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"  # Use 5433 to avoid conflicts with system PostgreSQL
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./platform/backend/scripts/init_dev_db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - taxpoynt_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxpoynt_user -d taxpoynt_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: taxpoynt_redis_dev
+    ports:
+      - "6380:6379"  # Use 6380 to avoid conflicts with system Redis
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - taxpoynt_dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  taxpoynt_dev:
+    driver: bridge
