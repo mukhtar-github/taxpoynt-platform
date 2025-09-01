@@ -76,10 +76,12 @@ from .models import (
 )
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
-from .si_router import SIServicesRouter
-from .app_router import APPServicesRouter  
-from .hybrid_router import HybridServicesRouter
+from .si_router import SIServicesRouter, create_si_router
+from .app_router import APPServicesRouter, create_app_router
+from .hybrid_router import HybridServicesRouter, create_hybrid_router
 from .admin_router import create_admin_router
+from .auth_router import create_auth_router
+from .gateway import TaxPoyntAPIGateway
 
 __all__ = [
     # Existing integrations
@@ -96,8 +98,15 @@ __all__ = [
     'RoutePermission',
     'HTTPRoleDetector',
     'APIPermissionGuard',
-    'SIAPIRouter',
-    'APPAPIRouter',
-    'HybridAPIRouter',
-    'create_admin_router'
+    'SIServicesRouter',
+    'APPServicesRouter',
+    'HybridServicesRouter',
+    'create_admin_router',
+    'create_auth_router',
+    'create_si_router',
+    'create_app_router',
+    'create_hybrid_router',
+    
+    # Main API Gateway
+    'TaxPoyntAPIGateway'
 ]

@@ -348,3 +348,30 @@ HTTPRequestHandler = Callable[[Request], Union[Response, Dict[str, Any]]]
 RouteMiddleware = Callable[[Request, Callable], Response]
 RequestTransformer = Callable[[Request, HTTPRoutingContext], Request]
 ResponseTransformer = Callable[[Response, HTTPRoutingContext], Response]
+
+# Export all public classes and enums
+__all__ = [
+    # Enums
+    'PlatformRole',
+    'RoleScope', 
+    'ServiceRole',
+    'HTTPMethod',
+    'RouteType',
+    'PermissionLevel',
+    'RoutingSecurityLevel',
+    
+    # Data Classes
+    'HTTPRoutingContext',
+    'APIEndpointRule', 
+    'RoleBasedRoute',
+    'RequestAnalysis',
+    'RoutePermission',
+    'RouteMetrics',
+    'APIGatewayConfig',
+    
+    # Type aliases
+    'HTTPRequestHandler',
+    'RouteMiddleware', 
+    'RequestTransformer',
+    'ResponseTransformer'
+]
