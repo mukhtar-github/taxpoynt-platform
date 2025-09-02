@@ -120,6 +120,9 @@ from .repository_base import (
 
 logger = logging.getLogger(__name__)
 
+# Backward compatibility alias
+DatabaseAbstraction = DatabaseAbstractionLayer
+
 
 @dataclass
 class DataManagementConfig:
@@ -530,13 +533,15 @@ __all__ = [
     
     # Database abstraction
     "DatabaseAbstractionLayer",
-    "DatabaseAbstractionFactory",
+    "DatabaseAbstractionFactory", 
     "DatabaseEngine",
     "DatabaseError",
     "ConnectionError",
     "QueryError",
     "create_database_layer",
     "get_database_layer",
+    # Alias for backward compatibility
+    "DatabaseAbstraction",
     
     # Multi-tenant management
     "MultiTenantManager",

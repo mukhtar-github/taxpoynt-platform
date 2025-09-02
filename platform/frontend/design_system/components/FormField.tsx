@@ -5,6 +5,8 @@
  * Shows visual cues when fields are pre-filled from other forms
  */
 
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { 
   getPreFilledFieldStyles, 
