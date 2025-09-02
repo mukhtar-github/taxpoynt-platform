@@ -7,7 +7,7 @@ import logging
 import base64
 import json
 import secrets
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, urljoin
 

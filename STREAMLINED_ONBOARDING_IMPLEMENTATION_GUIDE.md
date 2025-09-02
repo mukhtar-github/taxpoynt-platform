@@ -13,7 +13,7 @@ After analyzing your detailed requirements and the TaxPoynt platform codebase, I
 
 **What We Collect:**
 1. **Personal Info**: Name, email, password
-2. **Basic Business**: Business name only  
+2. **Basic Business**: Business name only
 3. **Service Choice**: SI, APP, or Hybrid (with clear explanations)
 4. **Consent**: Terms & Privacy (essential only)
 

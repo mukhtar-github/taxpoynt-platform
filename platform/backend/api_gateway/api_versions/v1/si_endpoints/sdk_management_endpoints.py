@@ -29,7 +29,7 @@ from core_platform.data_management.models import (
     DEMO_SDK_DATA, DEMO_SCENARIOS
 )
 from core_platform.services.sdk_management_service import SDKManagementService
-from core_platform.data_management.database_init import get_database_session
+from core_platform.data_management.database_init import get_db_session
 from ..version_models import V1ResponseModel, V1ErrorModel  # pyright: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     
     def get_sdk_service() -> SDKManagementService:
         """Get SDK management service with database session."""
-        db_session = get_database_session()
+        db_session = get_db_session()
         return SDKManagementService(db_session)
     
     @router.get("/catalog", response_model=V1ResponseModel)

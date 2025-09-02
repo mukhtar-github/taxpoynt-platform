@@ -22,10 +22,38 @@ import uuid
 import base64
 import logging
 
-from core.models.invoice import Invoice, InvoiceItem
-from core.exceptions import FormattingError, ValidationError
-from core.utils.qr_generator import QRCodeGenerator
-from core.utils.digital_signature import DigitalSigner
+from core_platform.models.invoice import Invoice, InvoiceItem
+from core_platform.models.exceptions import ValidationError
+
+# Create a FormattingError that inherits from ValidationError
+class FormattingError(ValidationError):
+    """Raised when FIRS formatting fails."""
+    
+    def __init__(self, message: str, invoice_id: str = None, format_stage: str = None):
+        super().__init__(message, "firs_formatting", {"invoice_id": invoice_id, "format_stage": format_stage}, "formatting_error")
+
+# Create placeholder classes for optional components
+class QRCodeGenerator:
+    """Placeholder QR code generator."""
+    
+    def __init__(self):
+        pass
+    
+    async def generate_qr_code(self, data: dict) -> str:
+        """Generate QR code data."""
+        # This is a placeholder - in production, this would generate actual QR codes
+        return f"QR_CODE_DATA:{hash(str(data))}"
+
+class DigitalSigner:
+    """Placeholder digital signer."""
+    
+    def __init__(self):
+        pass
+    
+    async def sign_data(self, data: dict) -> str:
+        """Generate digital signature."""
+        # This is a placeholder - in production, this would create actual digital signatures
+        return f"DIGITAL_SIGNATURE:{hash(str(data))}"
 
 logger = logging.getLogger(__name__)
 

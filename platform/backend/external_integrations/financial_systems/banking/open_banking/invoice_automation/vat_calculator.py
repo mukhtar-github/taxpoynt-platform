@@ -20,7 +20,14 @@ from enum import Enum
 import logging
 from datetime import datetime
 
-from core.exceptions import VATCalculationError, ValidationError
+from core_platform.models.exceptions import ValidationError
+
+# Create a VATCalculationError that inherits from ValidationError
+class VATCalculationError(ValidationError):
+    """Raised when VAT calculation fails."""
+    
+    def __init__(self, message: str, vat_rate: float = None, amount: float = None):
+        super().__init__(message, "vat_calculation", {"vat_rate": vat_rate, "amount": amount}, "calculation_error")
 
 logger = logging.getLogger(__name__)
 

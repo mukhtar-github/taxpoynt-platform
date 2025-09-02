@@ -57,8 +57,8 @@ class PaymentTransaction(FinancialTransaction):
     """Payment processor transaction model"""
     
     # Payment-specific fields
-    payment_status: PaymentStatus
-    payment_channel: PaymentChannel
+    payment_status: PaymentStatus = PaymentStatus.PENDING
+    payment_channel: PaymentChannel = PaymentChannel.CARD
     payment_type: PaymentType = PaymentType.ONE_TIME
     
     # Customer information

@@ -22,7 +22,7 @@ from datetime import datetime, time, timedelta
 import re
 import logging
 
-from external_integrations.connector_framework.base_banking_connector import BankTransaction
+from core_platform.models.transaction import BankTransaction
 
 logger = logging.getLogger(__name__)
 

@@ -22,9 +22,9 @@ import json
 import logging
 from collections import defaultdict
 
-from external_integrations.connector_framework.base_banking_connector import BankTransaction
-from core_platform.data_management import DatabaseAbstraction
-from core_platform.messaging import CacheManager
+from core_platform.models.transaction import BankTransaction
+from core_platform.data_management import DatabaseAbstractionLayer
+from core_platform.data_management import CacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ class DuplicateDetector:
     
     def __init__(
         self,
-        database: DatabaseAbstraction,
+        database: DatabaseAbstractionLayer,
         cache_manager: CacheManager,
         detection_rules: Optional[List[DetectionRule]] = None,
         strategy: DuplicateStrategy = DuplicateStrategy.HASH_BASED
@@ -816,7 +816,7 @@ class DuplicateDetector:
 
 
 def create_duplicate_detector(
-    database: DatabaseAbstraction,
+    database: DatabaseAbstractionLayer,
     cache_manager: CacheManager,
     strategy: DuplicateStrategy = DuplicateStrategy.HASH_BASED,
     detection_rules: Optional[List[DetectionRule]] = None

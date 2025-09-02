@@ -22,7 +22,7 @@ from datetime import datetime
 import json
 import logging
 
-from core.models.invoice import Invoice, InvoiceItem, CustomerInfo
+from core_platform.models.invoice import Invoice, InvoiceItem, CustomerInfo
 
 logger = logging.getLogger(__name__)
 

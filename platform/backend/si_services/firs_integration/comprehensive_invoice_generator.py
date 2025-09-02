@@ -20,45 +20,46 @@ from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
-from platform.backend.core_platform.data_management.models.firs_submission import (
+# Fixed imports - use relative imports instead of platform.backend
+from core_platform.data_management.models.firs_submission import (
     FIRSSubmission, SubmissionStatus, ValidationStatus
 )
-from platform.backend.external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import (
+from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import (
     FIRSFormatter, FormattingResult
 )
 # Conditional imports for connectors (graceful failure for missing connectors)
 try:
-    from platform.backend.external_integrations.business_systems.erp.sap_connector import SAPConnector
+    from external_integrations.business_systems.erp.sap_connector import SAPConnector
 except ImportError:
     SAPConnector = None
 
 try:
-    from platform.backend.external_integrations.business_systems.erp.odoo_connector import OdooConnector
+    from external_integrations.business_systems.erp.odoo_connector import OdooConnector
 except ImportError:
     OdooConnector = None
 
 try:
-    from platform.backend.external_integrations.business_systems.crm.salesforce_connector import SalesforceConnector
+    from external_integrations.business_systems.crm.salesforce_connector import SalesforceConnector
 except ImportError:
     SalesforceConnector = None
 
 try:
-    from platform.backend.external_integrations.business_systems.pos.square_connector import SquareConnector
+    from external_integrations.business_systems.pos.square_connector import SquareConnector
 except ImportError:
     SquareConnector = None
 
 try:
-    from platform.backend.external_integrations.business_systems.ecommerce.shopify_connector import ShopifyConnector
+    from external_integrations.business_systems.ecommerce.shopify_connector import ShopifyConnector
 except ImportError:
     ShopifyConnector = None
 
 try:
-    from platform.backend.external_integrations.financial_systems.banking.mono_connector import MonoConnector
+    from external_integrations.financial_systems.banking.mono_connector import MonoConnector
 except ImportError:
     MonoConnector = None
 
 try:
-    from platform.backend.external_integrations.financial_systems.payments.paystack_connector import PaystackConnector
+    from external_integrations.financial_systems.payments.paystack_connector import PaystackConnector
 except ImportError:
     PaystackConnector = None
 

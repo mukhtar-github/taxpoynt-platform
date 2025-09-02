@@ -10,21 +10,36 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from pydantic import BaseModel, validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from platform.backend.core_platform.database.session import get_async_db_session
-from platform.backend.api_gateway.role_routing.auth_router import get_current_user
-from platform.backend.api_gateway.api_versions.v1.response_models import V1ResponseModel
-from platform.backend.si_services.firs_integration.comprehensive_invoice_generator import (
+# Fixed imports - use relative imports instead of platform.backend
+from core_platform.data_management.connection_pool import get_db_session
+from api_gateway.role_routing.models import HTTPRoutingContext
+from .version_models import V1ResponseModel
+from si_services.firs_integration.comprehensive_invoice_generator import (
     ComprehensiveFIRSInvoiceGenerator,
     FIRSInvoiceGenerationRequest,
     DataSourceType
 )
-from platform.backend.external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import FIRSFormatter
+from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import FIRSFormatter
 
 logger = logging.getLogger(__name__)
+
+# Simple authentication dependency
+async def get_current_user_context(request: Request) -> HTTPRoutingContext:
+    """Simple authentication dependency that returns a mock context for now"""
+    # This is a placeholder - in production, this would verify JWT tokens
+    # and return proper user context
+    from api_gateway.role_routing.role_detector import HTTPRoleDetector
+    from api_gateway.role_routing.permission_guard import APIPermissionGuard
+    
+    role_detector = HTTPRoleDetector()
+    permission_guard = APIPermissionGuard()
+    
+    context = await role_detector.detect_role_context(request)
+    return context
 
 
 # Request/Response Models
@@ -119,8 +134,8 @@ def create_firs_invoice_router() -> APIRouter:
         description="Retrieve all connected business and financial systems available for invoice generation"
     )
     async def get_connected_sources(
-        current_user = Depends(get_current_user),
-        db: AsyncSession = Depends(get_async_db_session)
+        current_user = Depends(get_current_user_context),
+        db: AsyncSession = Depends(get_db_session)
     ):
         """Get all connected data sources for the organization."""
         try:
@@ -230,8 +245,8 @@ def create_firs_invoice_router() -> APIRouter:
     )
     async def search_business_transactions(
         filters: TransactionFilterRequest,
-        current_user = Depends(get_current_user),
-        db: AsyncSession = Depends(get_async_db_session)
+        current_user = Depends(get_current_user_context),
+        db: AsyncSession = Depends(get_db_session)
     ):
         """Search business transactions across all connected systems."""
         try:
@@ -324,8 +339,8 @@ def create_firs_invoice_router() -> APIRouter:
     )
     async def generate_firs_invoices(
         request: FIRSInvoiceGenerationRequestAPI,
-        current_user = Depends(get_current_user),
-        db: AsyncSession = Depends(get_async_db_session)
+        current_user = Depends(get_current_user_context),
+        db: AsyncSession = Depends(get_db_session)
     ):
         """Generate FIRS-compliant invoices from business transaction data."""
         try:
@@ -421,8 +436,8 @@ def create_firs_invoice_router() -> APIRouter:
         description="Get sample invoice data for testing FIRS generation"
     )
     async def get_sample_invoice_data(
-        current_user = Depends(get_current_user),
-        db: AsyncSession = Depends(get_async_db_session)
+        current_user = Depends(get_current_user_context),
+        db: AsyncSession = Depends(get_db_session)
     ):
         """Get sample invoice data for testing FIRS generation."""
         try:

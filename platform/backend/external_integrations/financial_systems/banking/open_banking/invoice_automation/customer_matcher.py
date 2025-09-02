@@ -21,10 +21,61 @@ import logging
 from decimal import Decimal
 from datetime import datetime
 
-from core.models.customer import CustomerInfo
-from core.models.transaction import BankTransaction
-from core.utils.text_matching import fuzzy_match, normalize_text
-from core.cache.redis_cache import RedisCache
+from core_platform.models.invoice import CustomerInfo
+from core_platform.models.transaction import BankTransaction
+from core_platform.cache import CacheService
+from difflib import SequenceMatcher
+
+def fuzzy_match(text1: str, text2: str, threshold: float = 0.8) -> float:
+    """
+    Calculate fuzzy similarity between two text strings using SequenceMatcher.
+    
+    Args:
+        text1: First text string
+        text2: Second text string
+        threshold: Minimum similarity threshold
+        
+    Returns:
+        Similarity score between 0.0 and 1.0
+    """
+    if not text1 or not text2:
+        return 0.0
+    
+    # Normalize texts
+    text1_norm = normalize_text(text1)
+    text2_norm = normalize_text(text2)
+    
+    # Exact match
+    if text1_norm == text2_norm:
+        return 1.0
+    
+    # Calculate sequence similarity
+    similarity = SequenceMatcher(None, text1_norm, text2_norm).ratio()
+    
+    return similarity if similarity >= threshold else 0.0
+
+def normalize_text(text: str) -> str:
+    """
+    Normalize text for matching by removing special characters and normalizing case.
+    
+    Args:
+        text: Text to normalize
+        
+    Returns:
+        Normalized text string
+    """
+    if not text:
+        return ""
+    
+    # Remove special characters and normalize whitespace
+    normalized = re.sub(r'[^\w\s]', '', text)
+    # Convert to lowercase and remove extra whitespace
+    normalized = ' '.join(normalized.lower().split())
+    
+    return normalized
+
+# Use the platform's CacheService instead of a custom RedisCache
+# This will be handled in the CustomerMatcher initialization
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +121,7 @@ class CustomerMatcher:
     def __init__(
         self,
         customer_database: Any,  # Customer data source
-        cache: Optional[RedisCache] = None,
+        cache: Optional[CacheService] = None,
         default_rules: Optional[List[MatchingRule]] = None
     ):
         self.customer_database = customer_database
