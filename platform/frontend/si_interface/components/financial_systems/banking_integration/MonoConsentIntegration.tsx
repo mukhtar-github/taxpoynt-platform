@@ -247,7 +247,7 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
             email: 'user@business.com' // This would come from user context
           },
           scope: grantedScopes.join(' '), // Join scopes for Mono
-          redirect_url: `${window.location.origin}/si/banking/callback`,
+          redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
           meta: {
             ref: `taxpoynt_consent_${Date.now()}`,
             consents_granted: Object.keys(consentState.mono).filter(k => consentState.mono[k]),

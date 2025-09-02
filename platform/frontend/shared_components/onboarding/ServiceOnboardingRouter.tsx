@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '../services/auth';
+import { onboardingApi, OnboardingState } from '../services/onboardingApi';
 import { Logo } from '../../design_system/components/Logo';
 
 interface ServiceOnboardingRouterProps {
@@ -16,7 +17,7 @@ interface ServiceOnboardingRouterProps {
   onboardingStep?: string;
 }
 
-interface OnboardingState {
+interface LegacyOnboardingState {
   hasStarted: boolean;
   currentStep: string;
   completedSteps: string[];
@@ -35,23 +36,64 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
   useEffect(() => {
     const initializeOnboarding = async () => {
       try {
-        // Check if user has existing onboarding state
-        const savedState = localStorage.getItem(`onboarding_${userId}`);
-        let state: OnboardingState;
+        console.log('🚀 Initializing onboarding with backend sync...');
+        
+        // Try to get onboarding state from backend first, fallback to localStorage
+        let state: OnboardingState | null = null;
+        
+        try {
+          state = await onboardingApi.getOnboardingState();
+          console.log('✅ Got onboarding state from backend:', state);
+        } catch (backendError) {
+          console.warn('⚠️ Backend unavailable, using localStorage fallback:', backendError);
+          
+          // Fallback to localStorage
+          const savedState = localStorage.getItem(`onboarding_${userId}`);
+          if (savedState) {
+            const legacyState = JSON.parse(savedState) as LegacyOnboardingState;
+            // Convert legacy format to new format
+            state = {
+              user_id: userId,
+              current_step: legacyState.currentStep || 'service_introduction',
+              completed_steps: legacyState.completedSteps || [],
+              has_started: legacyState.hasStarted ?? true,
+              is_complete: legacyState.completedSteps?.includes('onboarding_complete') ?? false,
+              last_active_date: legacyState.lastActiveDate || new Date().toISOString(),
+              metadata: { service_package: userServicePackage },
+              created_at: legacyState.lastActiveDate || new Date().toISOString(),
+              updated_at: legacyState.lastActiveDate || new Date().toISOString()
+            };
+            console.log('📋 Resuming onboarding from localStorage:', state);
+          }
+        }
 
-        if (savedState) {
-          state = JSON.parse(savedState);
-          console.log('📋 Resuming onboarding:', state);
-        } else {
-          // Initialize new onboarding
-          state = {
-            hasStarted: true,
-            currentStep: 'service_introduction',
-            completedSteps: [],
-            lastActiveDate: new Date().toISOString()
-          };
-          localStorage.setItem(`onboarding_${userId}`, JSON.stringify(state));
-          console.log('🚀 Starting new onboarding for service:', userServicePackage);
+        // If no state exists, initialize new onboarding
+        if (!state) {
+          try {
+            state = await onboardingApi.updateOnboardingState({
+              current_step: 'service_introduction',
+              completed_steps: [],
+              metadata: { 
+                service_package: userServicePackage,
+                initialization_source: 'frontend'
+              }
+            });
+            console.log('🚀 Started new onboarding:', state);
+          } catch (updateError) {
+            console.warn('⚠️ Failed to create backend state, using local fallback');
+            // Complete fallback - create local state
+            state = {
+              user_id: userId,
+              current_step: 'service_introduction',
+              completed_steps: [],
+              has_started: true,
+              is_complete: false,
+              last_active_date: new Date().toISOString(),
+              metadata: { service_package: userServicePackage },
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+          }
         }
 
         setOnboardingState(state);
@@ -84,17 +126,17 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     // Determine specific onboarding step based on service and current state
     switch (servicePackage) {
       case 'si':
-        if (state.currentStep === 'service_introduction' || !state.hasStarted) {
+        if (state.current_step === 'service_introduction' || !state.has_started) {
           router.push(`${baseRoutes.si}/integration-choice`);
-        } else if (state.currentStep === 'integration_choice') {
+        } else if (state.current_step === 'integration_choice') {
           router.push(`${baseRoutes.si}/integration-choice`);
-        } else if (state.currentStep === 'business_systems_setup') {
+        } else if (state.current_step === 'business_systems_setup') {
           router.push(`${baseRoutes.si}/business-systems-setup`);
-        } else if (state.currentStep === 'financial_systems_setup') {
+        } else if (state.current_step === 'financial_systems_setup') {
           router.push(`${baseRoutes.si}/financial-systems-setup`);
-        } else if (state.currentStep === 'reconciliation_setup') {
+        } else if (state.current_step === 'reconciliation_setup') {
           router.push(`${baseRoutes.si}/reconciliation-setup`);
-        } else if (state.completedSteps.includes('onboarding_complete')) {
+        } else if (state.completed_steps.includes('onboarding_complete')) {
           router.push('/dashboard/si');
         } else {
           // Default to integration choice
@@ -103,11 +145,11 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
         break;
 
       case 'app':
-        if (state.currentStep === 'service_introduction' || !state.hasStarted) {
+        if (state.current_step === 'service_introduction' || !state.has_started) {
           router.push(`${baseRoutes.app}/business-verification`);
-        } else if (state.currentStep === 'invoice_processing_setup') {
+        } else if (state.current_step === 'invoice_processing_setup') {
           router.push(`${baseRoutes.app}/invoice-processing-setup`);
-        } else if (state.completedSteps.includes('onboarding_complete')) {
+        } else if (state.completed_steps.includes('onboarding_complete')) {
           router.push('/dashboard/app');
         } else {
           // Default to business verification
@@ -116,11 +158,11 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
         break;
 
       case 'hybrid':
-        if (state.currentStep === 'service_introduction' || !state.hasStarted) {
+        if (state.current_step === 'service_introduction' || !state.has_started) {
           router.push(`${baseRoutes.hybrid}/service-selection`);
-        } else if (state.currentStep === 'combined_setup') {
+        } else if (state.current_step === 'combined_setup') {
           router.push(`${baseRoutes.hybrid}/combined-setup`);
-        } else if (state.completedSteps.includes('onboarding_complete')) {
+        } else if (state.completed_steps.includes('onboarding_complete')) {
           router.push('/dashboard/hybrid');
         } else {
           // Default to service selection
@@ -134,20 +176,42 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     }
   };
 
-  const updateOnboardingState = (step: string, completed: boolean = false) => {
+  const updateOnboardingState = async (step: string, completed: boolean = false) => {
     if (!onboardingState || !userId) return;
 
-    const updatedState: OnboardingState = {
-      ...onboardingState,
-      currentStep: step,
-      completedSteps: completed 
-        ? [...onboardingState.completedSteps, step]
-        : onboardingState.completedSteps,
-      lastActiveDate: new Date().toISOString()
-    };
+    try {
+      const completedSteps = completed 
+        ? [...onboardingState.completed_steps, step]
+        : onboardingState.completed_steps;
 
-    setOnboardingState(updatedState);
-    localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updatedState));
+      const updatedState = await onboardingApi.updateOnboardingState({
+        current_step: step,
+        completed_steps: completedSteps,
+        metadata: {
+          ...onboardingState.metadata,
+          step_updated_at: new Date().toISOString()
+        }
+      });
+
+      setOnboardingState(updatedState);
+      console.log('✅ Onboarding state updated:', updatedState);
+    } catch (error) {
+      console.error('❌ Failed to update onboarding state:', error);
+      
+      // Fallback to localStorage update
+      const updatedState: OnboardingState = {
+        ...onboardingState,
+        current_step: step,
+        completed_steps: completed 
+          ? [...onboardingState.completed_steps, step]
+          : onboardingState.completed_steps,
+        last_active_date: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      setOnboardingState(updatedState);
+      localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updatedState));
+    }
   };
 
   const getServiceDisplayName = (servicePackage: string): string => {
@@ -210,63 +274,133 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
 
 export default ServiceOnboardingRouter;
 
-// Utility functions for onboarding state management
+// Legacy utility functions for backward compatibility
+// New code should use onboardingApi and OnboardingStateManager from services/onboardingApi.ts
 export const OnboardingStateManager = {
   /**
-   * Get current onboarding state for user
+   * Get current onboarding state for user (with backend sync)
+   * @deprecated Use onboardingApi.getOnboardingState() instead
    */
-  getOnboardingState: (userId: string): OnboardingState | null => {
+  getOnboardingState: async (userId: string): Promise<OnboardingState | null> => {
     try {
-      const saved = localStorage.getItem(`onboarding_${userId}`);
-      return saved ? JSON.parse(saved) : null;
+      return await onboardingApi.getOnboardingState();
     } catch (error) {
       console.error('Failed to get onboarding state:', error);
-      return null;
+      // Fallback to localStorage
+      try {
+        const saved = localStorage.getItem(`onboarding_${userId}`);
+        if (!saved) return null;
+        
+        const legacy = JSON.parse(saved);
+        // Convert legacy format to new format
+        return {
+          user_id: userId,
+          current_step: legacy.currentStep || 'service_introduction',
+          completed_steps: legacy.completedSteps || [],
+          has_started: legacy.hasStarted ?? true,
+          is_complete: legacy.completedSteps?.includes('onboarding_complete') ?? false,
+          last_active_date: legacy.lastActiveDate || new Date().toISOString(),
+          metadata: legacy.metadata || {},
+          created_at: legacy.lastActiveDate || new Date().toISOString(),
+          updated_at: legacy.lastActiveDate || new Date().toISOString()
+        };
+      } catch (legacyError) {
+        console.error('Failed to get legacy onboarding state:', legacyError);
+        return null;
+      }
     }
   },
 
   /**
-   * Update onboarding step
+   * Update onboarding step (with backend sync)
+   * @deprecated Use onboardingApi.updateOnboardingState() instead
    */
-  updateStep: (userId: string, step: string, completed: boolean = false): void => {
+  updateStep: async (userId: string, step: string, completed: boolean = false): Promise<void> => {
     try {
-      const current = OnboardingStateManager.getOnboardingState(userId);
-      if (!current) return;
+      const current = await onboardingApi.getOnboardingState();
+      const completedSteps = completed && current
+        ? [...current.completed_steps, step]
+        : current?.completed_steps || [];
 
-      const updated: OnboardingState = {
-        ...current,
-        currentStep: step,
-        completedSteps: completed 
-          ? [...current.completedSteps, step]
-          : current.completedSteps,
-        lastActiveDate: new Date().toISOString()
-      };
-
-      localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updated));
+      await onboardingApi.updateOnboardingState({
+        current_step: step,
+        completed_steps: completedSteps,
+        metadata: { step_updated_at: new Date().toISOString() }
+      });
     } catch (error) {
-      console.error('Failed to update onboarding state:', error);
+      console.error('Failed to update onboarding step:', error);
+      // Fallback to localStorage
+      try {
+        const saved = localStorage.getItem(`onboarding_${userId}`);
+        const current = saved ? JSON.parse(saved) : null;
+        
+        if (current) {
+          const updated = {
+            ...current,
+            currentStep: step,
+            completedSteps: completed 
+              ? [...(current.completedSteps || []), step]
+              : current.completedSteps || [],
+            lastActiveDate: new Date().toISOString()
+          };
+          localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updated));
+        }
+      } catch (legacyError) {
+        console.error('Failed to update legacy onboarding state:', legacyError);
+      }
     }
   },
 
   /**
-   * Mark onboarding as complete
+   * Mark onboarding as complete (with backend sync)
+   * @deprecated Use onboardingApi.completeOnboarding() instead
    */
-  completeOnboarding: (userId: string): void => {
-    OnboardingStateManager.updateStep(userId, 'onboarding_complete', true);
+  completeOnboarding: async (userId: string): Promise<void> => {
+    try {
+      await onboardingApi.completeOnboarding({
+        completion_source: 'legacy_manager',
+        completed_at: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to complete onboarding:', error);
+      // Fallback to updateStep
+      await OnboardingStateManager.updateStep(userId, 'onboarding_complete', true);
+    }
   },
 
   /**
-   * Check if onboarding is complete
+   * Check if onboarding is complete (with backend sync)
+   * @deprecated Use onboardingApi.getOnboardingState() instead
    */
-  isOnboardingComplete: (userId: string): boolean => {
-    const state = OnboardingStateManager.getOnboardingState(userId);
-    return state?.completedSteps.includes('onboarding_complete') || false;
+  isOnboardingComplete: async (userId: string): Promise<boolean> => {
+    try {
+      const state = await onboardingApi.getOnboardingState();
+      return state?.is_complete || false;
+    } catch (error) {
+      console.error('Failed to check onboarding completion:', error);
+      // Fallback to localStorage
+      try {
+        const saved = localStorage.getItem(`onboarding_${userId}`);
+        const state = saved ? JSON.parse(saved) : null;
+        return state?.completedSteps?.includes('onboarding_complete') || false;
+      } catch (legacyError) {
+        console.error('Failed to check legacy onboarding completion:', legacyError);
+        return false;
+      }
+    }
   },
 
   /**
-   * Reset onboarding state (for testing or re-onboarding)
+   * Reset onboarding state (with backend sync)
+   * @deprecated Use onboardingApi.resetOnboardingState() instead
    */
-  resetOnboarding: (userId: string): void => {
-    localStorage.removeItem(`onboarding_${userId}`);
+  resetOnboarding: async (userId: string): Promise<void> => {
+    try {
+      await onboardingApi.resetOnboardingState();
+    } catch (error) {
+      console.error('Failed to reset onboarding state:', error);
+      // Fallback to localStorage
+      localStorage.removeItem(`onboarding_${userId}`);
+    }
   }
 };

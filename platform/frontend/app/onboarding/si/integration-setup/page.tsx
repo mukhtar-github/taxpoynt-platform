@@ -17,7 +17,9 @@ export default function SIIntegrationSetupPage() {
       console.log('SI Onboarding completed:', onboardingData);
       
       // Redirect to SI dashboard after successful onboarding
-      router.push('/dashboard/si');
+      const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
+      const currentUser = { role: 'system_integrator' }; // Get from auth service in real implementation
+      router.push(getPostOnboardingUrl(currentUser));
       
     } catch (error) {
       console.error('Onboarding failed:', error);
@@ -30,7 +32,9 @@ export default function SIIntegrationSetupPage() {
   const handleSkipForNow = () => {
     // Allow user to skip onboarding and go directly to dashboard
     // They can complete it later from the dashboard
-    router.push('/dashboard/si');
+    const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
+    const currentUser = { role: 'system_integrator' }; // Get from auth service in real implementation
+    router.push(getPostOnboardingUrl(currentUser));
   };
 
   return (

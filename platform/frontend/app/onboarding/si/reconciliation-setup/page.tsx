@@ -181,7 +181,8 @@ export default function ReconciliationSetupPage() {
       OnboardingStateManager.completeOnboarding(user.id);
 
       // Navigate to dashboard
-      router.push('/dashboard/si');
+      const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
+      router.push(getPostOnboardingUrl(user));
       
     } catch (error) {
       console.error('Reconciliation setup failed:', error);
@@ -193,7 +194,8 @@ export default function ReconciliationSetupPage() {
 
   const handleSkip = () => {
     OnboardingStateManager.completeOnboarding(user?.id);
-    router.push('/dashboard/si');
+    const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
+    router.push(getPostOnboardingUrl(user));
   };
 
   const getRuleCategoryColor = (category: string) => {

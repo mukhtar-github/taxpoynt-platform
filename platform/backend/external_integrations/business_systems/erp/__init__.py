@@ -9,11 +9,15 @@ from external_integrations.connector_framework import BaseERPConnector, GenericE
 from .odoo import OdooConnector
 from .sap import SAPConnector
 from .oracle import OracleERPConnector
+from .dynamics import DynamicsERPConnector
+from .netsuite import NetSuiteERPConnector
 
 __all__ = [
     "BaseERPConnector",
     "GenericERPConnector", 
     "OdooConnector",
     "SAPConnector",
-    "OracleERPConnector"
+    "OracleERPConnector",
+    "DynamicsERPConnector",
+    "NetSuiteERPConnector"
 ]

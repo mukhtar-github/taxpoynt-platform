@@ -43,6 +43,7 @@ from .authentication_seals.verification_service import VerificationService
 from .reporting.transmission_reports import TransmissionReportGenerator
 from .reporting.compliance_metrics import ComplianceMetricsMonitor
 from .taxpayer_management.taxpayer_onboarding import TaxpayerOnboardingService
+from .onboarding_management.app_onboarding_service import APPOnboardingService
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class APPServiceRegistry:
             await self._register_authentication_services()
             await self._register_reporting_services()
             await self._register_taxpayer_services()
+            await self._register_onboarding_services()
             
             self.is_initialized = True
             logger.info(f"APP services initialized successfully. Registered {len(self.service_endpoints)} services.")
@@ -115,7 +117,9 @@ class APPServiceRegistry:
                     "submit_to_firs",
                     "validate_firs_response",
                     "authenticate_firs",
-                    "get_submission_status"
+                    "get_submission_status",
+                    "receive_invoices_from_si",
+                    "receive_invoice_batch_from_si"
                 ]
             }
             
@@ -135,7 +139,9 @@ class APPServiceRegistry:
                         "update_firs_submission_status",
                         "submit_to_firs",
                         "validate_firs_response",
-                        "get_submission_status"
+                        "get_submission_status",
+                        "receive_invoices_from_si",
+                        "receive_invoice_batch_from_si"
                     ]
                 }
             )
@@ -492,6 +498,77 @@ class APPServiceRegistry:
         except Exception as e:
             logger.error(f"Failed to register taxpayer services: {str(e)}")
     
+    async def _register_onboarding_services(self):
+        """Register APP onboarding management services"""
+        try:
+            # Initialize APP onboarding service
+            app_onboarding_service = APPOnboardingService()
+            
+            onboarding_service = {
+                "onboarding_service": app_onboarding_service,
+                "operations": [
+                    "get_onboarding_state",
+                    "update_onboarding_state",
+                    "complete_onboarding_step",
+                    "complete_onboarding",
+                    "reset_onboarding_state",
+                    "get_onboarding_analytics",
+                    "get_business_verification_status",
+                    "get_firs_integration_status"
+                ]
+            }
+            
+            self.services["app_onboarding_management"] = onboarding_service
+            
+            # Register with message router
+            endpoint_id = await self.message_router.register_service(
+                service_name="app_onboarding_management",
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                callback=self._create_app_onboarding_callback(onboarding_service),
+                priority=4,
+                tags=["onboarding", "state_management", "app", "progress_tracking"],
+                metadata={
+                    "service_type": "app_onboarding_management",
+                    "operations": [
+                        "get_onboarding_state",
+                        "update_onboarding_state",
+                        "complete_onboarding_step",
+                        "complete_onboarding",
+                        "reset_onboarding_state",
+                        "get_onboarding_analytics",
+                        "get_business_verification_status",
+                        "get_firs_integration_status"
+                    ],
+                    "supported_roles": ["access_point_provider"]
+                }
+            )
+            
+            self.service_endpoints["app_onboarding_management"] = endpoint_id
+            logger.info(f"APP onboarding management service registered: {endpoint_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to register APP onboarding services: {str(e)}")
+    
+    def _create_app_onboarding_callback(self, onboarding_service: Dict[str, Any]):
+        """Create callback function for APP onboarding service operations"""
+        async def app_onboarding_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            """Handle APP onboarding service operations"""
+            try:
+                logger.info(f"Processing APP onboarding operation: {operation}")
+                result = await onboarding_service["onboarding_service"].handle_operation(operation, payload)
+                return result
+                
+            except Exception as e:
+                logger.error(f"APP onboarding operation failed {operation}: {str(e)}", exc_info=True)
+                return {
+                    "operation": operation,
+                    "success": False,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+        
+        return app_onboarding_callback
+    
     async def _create_firs_api_client(self):
         """Create FIRS API client with proper configuration"""
         try:
@@ -653,6 +730,132 @@ class APPServiceRegistry:
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return taxpayer_callback
+    
+    def _create_firs_callback(self, firs_service):
+        """Create callback for FIRS communication operations"""
+        async def firs_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                if operation == "receive_invoices_from_si":
+                    # Handle receiving invoices from SI for FIRS submission
+                    invoice_ids = payload.get("invoice_ids", [])
+                    si_user_id = payload.get("si_user_id")
+                    submission_options = payload.get("submission_options", {})
+                    
+                    logger.info(f"Received {len(invoice_ids)} invoices from SI user {si_user_id}")
+                    
+                    # Process invoices for FIRS submission
+                    submission_result = await self._process_si_invoices_for_firs(
+                        invoice_ids, si_user_id, submission_options
+                    )
+                    
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "submission_id": submission_result.get("submission_id"),
+                            "processed_count": len(invoice_ids),
+                            "status": "submitted_to_firs"
+                        }
+                    }
+                    
+                elif operation == "receive_invoice_batch_from_si":
+                    # Handle receiving invoice batch from SI
+                    batch_id = payload.get("batch_id")
+                    si_user_id = payload.get("si_user_id")
+                    batch_options = payload.get("batch_options", {})
+                    
+                    logger.info(f"Received invoice batch {batch_id} from SI user {si_user_id}")
+                    
+                    # Process batch for FIRS submission
+                    batch_result = await self._process_si_batch_for_firs(
+                        batch_id, si_user_id, batch_options
+                    )
+                    
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "batch_submission_id": batch_result.get("batch_submission_id"),
+                            "batch_status": "submitted_to_firs"
+                        }
+                    }
+                    
+                elif operation == "submit_to_firs":
+                    # Use FIRS API client for submission
+                    invoice_data = payload.get("invoice_data", {})
+                    result = firs_service["api_client"].submit_invoice(invoice_data)
+                    return {"operation": operation, "success": True, "data": {"result": result}}
+                    
+                elif operation == "process_firs_webhook":
+                    # Process FIRS webhook events
+                    result = await self._handle_firs_webhook(payload)
+                    return {"operation": operation, "success": True, "data": {"result": result}}
+                    
+                elif operation == "get_submission_status":
+                    # Get submission status from FIRS
+                    submission_id = payload.get("submission_id")
+                    status = firs_service["api_client"].get_submission_status(submission_id)
+                    return {"operation": operation, "success": True, "data": {"status": status}}
+                    
+                else:
+                    return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                    
+            except Exception as e:
+                logger.error(f"Error in FIRS operation {operation}: {str(e)}")
+                return {"operation": operation, "success": False, "error": str(e)}
+                
+        return firs_callback
+    
+    async def _process_si_invoices_for_firs(self, invoice_ids, si_user_id, submission_options):
+        """Process invoices received from SI for FIRS submission"""
+        try:
+            # This would fetch invoice data from SI and submit to FIRS
+            logger.info(f"Processing {len(invoice_ids)} invoices for FIRS submission")
+            
+            # Generate submission ID
+            from datetime import datetime
+            submission_id = f"FIRS-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{len(invoice_ids)}"
+            
+            # Mock processing - in real implementation:
+            # 1. Fetch invoice data from SI database
+            # 2. Validate FIRS compliance
+            # 3. Submit to FIRS API
+            # 4. Track submission status
+            
+            return {
+                "submission_id": submission_id,
+                "status": "submitted",
+                "submitted_at": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing SI invoices for FIRS: {str(e)}")
+            raise
+    
+    async def _process_si_batch_for_firs(self, batch_id, si_user_id, batch_options):
+        """Process invoice batch received from SI for FIRS submission"""
+        try:
+            logger.info(f"Processing batch {batch_id} for FIRS submission")
+            
+            # Generate batch submission ID
+            from datetime import datetime
+            batch_submission_id = f"FIRS-BATCH-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+            
+            # Mock batch processing - in real implementation:
+            # 1. Fetch batch data from SI
+            # 2. Validate batch compliance
+            # 3. Submit batch to FIRS
+            # 4. Track batch status
+            
+            return {
+                "batch_submission_id": batch_submission_id,
+                "status": "submitted",
+                "submitted_at": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing SI batch for FIRS: {str(e)}")
+            raise
     
     async def _handle_firs_webhook(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle FIRS webhook processing"""

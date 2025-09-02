@@ -29,6 +29,7 @@ from .transmission_management_endpoints import create_transmission_management_ro
 from .tracking_management_endpoints import create_tracking_management_router
 from .report_generation_endpoints import create_report_generation_router
 from .dashboard_data_endpoints import create_dashboard_data_router
+from .onboarding_endpoints import create_app_onboarding_router
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,14 @@ class APPRouterV1:
             self.message_router
         )
         self.router.include_router(dashboard_router)
+        
+        # APP Onboarding Routes
+        onboarding_router = create_app_onboarding_router(
+            self.role_detector, 
+            self.permission_guard, 
+            self.message_router
+        )
+        self.router.include_router(onboarding_router)
     
     def _setup_routes(self):
         """Configure general APP v1 routes"""

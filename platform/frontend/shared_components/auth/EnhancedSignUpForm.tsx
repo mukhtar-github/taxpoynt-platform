@@ -30,7 +30,7 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
     companyType: string;
     companySize: string;
     fullName: string;
-    role: string;
+    service_package: string;
     acceptTerms: boolean;
     subscribeNewsletter: boolean;
     [key: string]: any;
@@ -42,7 +42,7 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
     companyType: '',
     companySize: '',
     fullName: '',
-    role: 'system_integrator',
+    service_package: 'si',
     acceptTerms: false,
     subscribeNewsletter: true
   });
@@ -219,21 +219,21 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
         <div className="grid grid-cols-1 gap-3">
           {[
             { 
-              value: 'system_integrator', 
+              value: 'si', 
               label: 'System Integrator (SI)', 
               description: 'Connect multiple business systems',
               icon: '🔗',
               popular: true
             },
             { 
-              value: 'access_point_provider', 
+              value: 'app', 
               label: 'Access Point Provider (APP)', 
               description: 'Direct FIRS communication',
               icon: '🏛️',
               popular: false
             },
             { 
-              value: 'hybrid_user', 
+              value: 'hybrid', 
               label: 'Hybrid Solution', 
               description: 'Best of both worlds',
               icon: '⚡',
@@ -243,17 +243,17 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
             <label
               key={roleOption.value}
               className={`relative flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                formData.role === roleOption.value
+                formData.service_package === roleOption.value
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
               <input
                 type="radio"
-                name="role"
+                name="service_package"
                 value={roleOption.value}
-                checked={formData.role === roleOption.value}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                checked={formData.service_package === roleOption.value}
+                onChange={(e) => setFormData({ ...formData, service_package: e.target.value })}
                 className="sr-only"
               />
               <div className="flex items-center w-full">
@@ -270,11 +270,11 @@ export const EnhancedSignUpForm: React.FC<SignUpFormProps> = ({
                   <div className="text-sm text-slate-600">{roleOption.description}</div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  formData.role === roleOption.value
+                  formData.service_package === roleOption.value
                     ? 'border-blue-500 bg-blue-500'
                     : 'border-gray-300'
                 }`}>
-                  {formData.role === roleOption.value && (
+                  {formData.service_package === roleOption.value && (
                     <div className="w-2 h-2 bg-white rounded-full"></div>
                   )}
                 </div>

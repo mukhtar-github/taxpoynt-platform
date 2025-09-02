@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
 
@@ -24,8 +24,8 @@ interface SetupStep {
 
 export default function CompleteIntegrationSetupPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const { user, isAuthenticated, isSystemIntegrator, isLoading } = useUserContext({ requireAuth: true });
+  const [isProcessing, setIsProcessing] = useState(false);
   const [setupSteps, setSetupSteps] = useState<SetupStep[]>([
     {
       id: 'business_systems',
@@ -62,25 +62,26 @@ export default function CompleteIntegrationSetupPage() {
   ]);
 
   useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
+    if (isLoading) return;
+    
+    if (!isAuthenticated) {
       router.push('/auth/signin');
       return;
     }
 
-    if (currentUser.role !== 'system_integrator') {
+    if (!isSystemIntegrator()) {
       router.push('/dashboard');
       return;
     }
 
-    setUser(currentUser);
-    
-    // Update onboarding state
-    OnboardingStateManager.updateStep(currentUser.id, 'complete_integration_setup');
-  }, [router]);
+    if (user) {
+      // Update onboarding state
+      OnboardingStateManager.updateStep(user.id, 'complete_integration_setup');
+    }
+  }, [isLoading, isAuthenticated, isSystemIntegrator, user, router]);
 
   const handleStepAction = async (step: SetupStep) => {
-    setIsLoading(true);
+    setIsProcessing(true);
     
     try {
       console.log('🚀 Starting step:', step.id);
@@ -91,21 +92,26 @@ export default function CompleteIntegrationSetupPage() {
       ));
       
       // Save progress
-      OnboardingStateManager.updateStep(user.id, step.id, true);
+      if (user) {
+        OnboardingStateManager.updateStep(user.id, step.id, true);
+      }
       
       // Navigate to step
       router.push(step.route);
       
     } catch (error) {
       console.error('Step navigation failed:', error);
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
   const handleSkipForNow = () => {
-    // Mark onboarding as complete and go to dashboard
-    OnboardingStateManager.completeOnboarding(user?.id);
-    router.push('/dashboard/si');
+    if (user) {
+      // Mark onboarding as complete and go to dashboard
+      OnboardingStateManager.completeOnboarding(user.id);
+      const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
+      router.push(getPostOnboardingUrl(user));
+    }
   };
 
   const getStatusIcon = (status: string) => {

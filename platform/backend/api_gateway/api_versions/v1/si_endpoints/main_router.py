@@ -6,6 +6,7 @@ Consolidates all SI-specific functionality into a single versioned router.
 Professional business system integration architecture.
 """
 import logging
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
@@ -36,6 +37,7 @@ from .transaction_endpoints import create_transaction_router
 from .compliance_endpoints import create_compliance_router
 from .firs_invoice_endpoints import create_firs_invoice_router
 from .sdk_management_endpoints import create_sdk_management_router
+from .onboarding_endpoints import create_onboarding_router
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +229,27 @@ class SIRouterV1:
             dependencies=[Depends(self._require_si_role)]
         )
         
+        # SI → APP Invoice Forwarding (CRITICAL BRIDGE)
+        self.router.add_api_route(
+            "/invoices/forward-to-app",
+            self.forward_invoices_to_app,
+            methods=["POST"],
+            summary="Forward generated invoices to APP for FIRS submission",
+            description="Send SI-generated invoices to APP for FIRS transmission",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_si_role)]
+        )
+        
+        self.router.add_api_route(
+            "/invoices/batch/forward-to-app",
+            self.forward_invoice_batch_to_app,
+            methods=["POST"],
+            summary="Forward invoice batch to APP for FIRS submission",
+            description="Send batch of SI-generated invoices to APP for FIRS transmission",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_si_role)]
+        )
+        
         self.router.add_api_route(
             "/invoices/batch/{batch_id}",
             self.get_invoice_batch_status,
@@ -337,6 +360,14 @@ class SIRouterV1:
             self.message_router
         )
         self.router.include_router(validation_router, tags=["Financial Validation V1"])
+        
+        # Onboarding Management Routes
+        onboarding_router = create_onboarding_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(onboarding_router, tags=["Onboarding Management V1"])
         
         logger.info("SI sub-routers included successfully")
     
@@ -615,6 +646,97 @@ class SIRouterV1:
     async def get_integration_status(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
         """Get integration status - placeholder"""
         return self._create_v1_response({"integrations": []}, "integration_status_retrieved")
+    
+    # CRITICAL BRIDGE: SI → APP Invoice Forwarding
+    async def forward_invoices_to_app(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+        """
+        Forward generated invoices to APP for FIRS submission.
+        
+        This is the critical bridge between SI (invoice generation) and APP (FIRS submission).
+        Uses the existing APP FIRS communication service infrastructure.
+        """
+        try:
+            body = await request.json()
+            
+            # Validate required fields
+            required_fields = ["invoice_ids"]
+            missing_fields = [field for field in required_fields if field not in body]
+            if missing_fields:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required fields: {', '.join(missing_fields)}"
+                )
+            
+            # Route to APP FIRS service using existing infrastructure
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="receive_invoices_from_si",
+                payload={
+                    "invoice_ids": body["invoice_ids"],
+                    "si_user_id": context.user_id,
+                    "submission_options": body.get("submission_options", {
+                        "environment": "sandbox",
+                        "auto_submit": True,
+                        "validate_first": True
+                    })
+                }
+            )
+            
+            return self._create_v1_response(result, "invoices_forwarded_to_app")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error forwarding invoices to APP: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to forward invoices to APP"
+            )
+    
+    async def forward_invoice_batch_to_app(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+        """
+        Forward invoice batch to APP for FIRS submission.
+        
+        Uses the existing APP FIRS communication service infrastructure.
+        """
+        try:
+            body = await request.json()
+            
+            # Validate required fields
+            required_fields = ["batch_id"]
+            missing_fields = [field for field in required_fields if field not in body]
+            if missing_fields:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required fields: {', '.join(missing_fields)}"
+                )
+            
+            # Route to APP FIRS service using existing infrastructure
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="receive_invoice_batch_from_si",
+                payload={
+                    "batch_id": body["batch_id"],
+                    "si_user_id": context.user_id,
+                    "batch_options": body.get("batch_options", {
+                        "environment": "sandbox",
+                        "auto_submit": True,
+                        "validate_batch": True,
+                        "batch_size": body.get("batch_size", 50)
+                    })
+                }
+            )
+            
+            return self._create_v1_response(result, "invoice_batch_forwarded_to_app")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error forwarding invoice batch to APP: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to forward invoice batch to APP"
+            )
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
         """Create standardized v1 response format"""

@@ -27,6 +27,7 @@ from core_platform.messaging.message_router import MessageRouter, ServiceRole
 # Import SI services
 from .banking_integration.banking_service import SIBankingService
 from .banking_integration.mono_integration_service import MonoIntegrationService
+from .onboarding_management.onboarding_service import SIOnboardingService
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ class SIServiceRegistry:
             
             # Initialize all SI services
             await self._register_banking_services()
+            await self._register_onboarding_services()
             await self._register_erp_services()
             await self._register_certificate_services()
             await self._register_document_services()
@@ -96,6 +98,8 @@ class SIServiceRegistry:
                     "service_type": "banking_integration",
                     "operations": [
                         "create_mono_widget_link",
+                        "process_mono_callback",
+                        "process_banking_callback",
                         "list_open_banking_connections",
                         "create_open_banking_connection",
                         "get_open_banking_connection",
@@ -119,6 +123,41 @@ class SIServiceRegistry:
             logger.error(f"Failed to register banking services: {str(e)}")
             raise
     
+    async def _register_onboarding_services(self):
+        """Register onboarding management services"""
+        try:
+            # Initialize onboarding service
+            onboarding_service = SIOnboardingService()
+            self.services["onboarding"] = onboarding_service
+            
+            # Register with message router
+            endpoint_id = await self.message_router.register_service(
+                service_name="onboarding_management",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_onboarding_callback(onboarding_service),
+                priority=4,
+                tags=["onboarding", "state_management", "progress_tracking"],
+                metadata={
+                    "service_type": "onboarding_management",
+                    "operations": [
+                        "get_onboarding_state",
+                        "update_onboarding_state",
+                        "complete_onboarding_step",
+                        "complete_onboarding",
+                        "reset_onboarding_state",
+                        "get_onboarding_analytics"
+                    ],
+                    "supported_roles": ["system_integrator", "access_point_provider", "hybrid_user"]
+                }
+            )
+            
+            self.service_endpoints["onboarding_management"] = endpoint_id
+            logger.info(f"Onboarding service registered: {endpoint_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to register onboarding services: {str(e)}")
+            raise
+    
     def _create_banking_callback(self, banking_service: SIBankingService):
         """Create callback function for banking service operations"""
         async def banking_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -140,6 +179,26 @@ class SIServiceRegistry:
                 }
         
         return banking_callback
+    
+    def _create_onboarding_callback(self, onboarding_service: SIOnboardingService):
+        """Create callback function for onboarding service operations"""
+        async def onboarding_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            """Handle onboarding service operations"""
+            try:
+                logger.info(f"Processing onboarding operation: {operation}")
+                result = await onboarding_service.handle_operation(operation, payload)
+                return result
+                
+            except Exception as e:
+                logger.error(f"Onboarding operation failed {operation}: {str(e)}", exc_info=True)
+                return {
+                    "operation": operation,
+                    "success": False,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+        
+        return onboarding_callback
     
     async def _register_erp_services(self):
         """Register ERP integration services"""

@@ -244,13 +244,8 @@ class AuthService {
    * Get redirect URL based on user role
    */
   getDashboardRedirectUrl(role: string): string {
-    const roleRedirects: Record<string, string> = {
-      'system_integrator': '/dashboard/si',
-      'access_point_provider': '/dashboard/app',
-      'hybrid_user': '/dashboard/hybrid',
-    };
-
-    return roleRedirects[role] || '/dashboard';
+    const { getDashboardUrl } = require('../utils/dashboardRouting');
+    return getDashboardUrl({ role } as any);
   }
 
   /**

@@ -86,6 +86,26 @@ class BankingEndpointsV1:
             status_code=201
         )
         
+        # Mono callback endpoint for handling account linking completion
+        self.router.add_api_route(
+            "/open-banking/mono/callback",
+            self.handle_mono_callback,
+            methods=["POST"],
+            summary="Handle Mono banking callback",
+            description="Process Mono banking account linking callback after user completes authentication",
+            response_model=V1ResponseModel
+        )
+        
+        # Alternative callback endpoint for compatibility with existing frontend calls
+        self.router.add_api_route(
+            "/open-banking/callback",
+            self.handle_banking_callback,
+            methods=["POST"],
+            summary="Handle generic banking callback",
+            description="Process banking account linking callback from any provider",
+            response_model=V1ResponseModel
+        )
+        
         self.router.add_api_route(
             "/open-banking",
             self.create_open_banking_connection,
@@ -273,6 +293,76 @@ class BankingEndpointsV1:
         except Exception as e:
             logger.error(f"Error creating Mono widget link in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to create Mono widget link")
+
+    async def handle_mono_callback(self,
+                                   request: Request,
+                                   context: HTTPRoutingContext = Depends(lambda: None)):
+        """Handle Mono banking callback after account linking completion"""
+        try:
+            body = await request.json()
+            
+            # Log callback for debugging
+            logger.info(f"Received Mono callback: {body}")
+            
+            # Validate required callback fields
+            required_fields = ["code"]  # Mono returns authorization code
+            missing_fields = [field for field in required_fields if field not in body]
+            if missing_fields:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required callback fields: {', '.join(missing_fields)}"
+                )
+            
+            # Route the callback to the appropriate service
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="process_mono_callback",
+                payload={
+                    "callback_data": body,
+                    "si_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, "mono_callback_processed")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error processing Mono callback in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to process Mono callback")
+
+    async def handle_banking_callback(self,
+                                      request: Request,
+                                      context: HTTPRoutingContext = Depends(lambda: None)):
+        """Handle generic banking callback from any provider"""
+        try:
+            body = await request.json()
+            
+            # Log callback for debugging
+            logger.info(f"Received banking callback: {body}")
+            
+            # Determine provider from callback data or headers
+            provider = body.get("provider", "mono")  # Default to mono for backward compatibility
+            
+            # Route the callback to the appropriate service based on provider
+            operation = f"process_{provider}_callback"
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation=operation,
+                payload={
+                    "callback_data": body,
+                    "provider": provider,
+                    "si_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            
+            return self._create_v1_response(result, f"{provider}_callback_processed")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error processing banking callback in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to process banking callback")
 
     async def create_open_banking_connection(self, 
                                            request: Request,

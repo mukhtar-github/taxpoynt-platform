@@ -26,6 +26,9 @@ class ConnectorTemplate(Enum):
     GENERIC_SOAP = "generic_soap"
     ODOO_ERP = "odoo_erp"
     SAP_ODATA = "sap_odata"
+    ORACLE_ERP = "oracle_erp"
+    DYNAMICS_ERP = "dynamics_erp"
+    NETSUITE_ERP = "netsuite_erp"
     SALESFORCE_CRM = "salesforce_crm"
     QUICKBOOKS = "quickbooks"
     FIRS_API = "firs_api"
@@ -162,6 +165,83 @@ class ConnectorFactory:
                     "odata_version": "v2"
                 },
                 connector_class_path="taxpoynt_platform.external_integrations.connector_framework.protocol_adapters.odata_adapter.ODataConnector"
+            ),
+            ConnectorTemplate(
+                template_id="oracle_erp",
+                name="Oracle ERP Cloud Connector",
+                description="Oracle ERP Cloud connector using REST API",
+                connector_type=ConnectorType.ERP,
+                protocol_type=ProtocolType.REST,
+                authentication_type=AuthenticationType.OAUTH2,
+                default_endpoints={
+                    "auth": "/oauth/token",
+                    "financials": "/fscmRestApi/resources/latest",
+                    "reporting": "/analytics/saw.dll"
+                },
+                default_headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                required_config_fields=["base_url", "client_id", "client_secret"],
+                optional_config_fields=["scope", "tenant", "environment"],
+                default_settings={
+                    "timeout": 60,
+                    "data_format": "json",
+                    "api_version": "latest"
+                },
+                connector_class_path="taxpoynt_platform.external_integrations.business_systems.erp.oracle.connector.OracleERPConnector"
+            ),
+            ConnectorTemplate(
+                template_id="dynamics_erp",
+                name="Microsoft Dynamics 365 ERP",
+                description="Microsoft Dynamics 365 Business Central/Finance connector",
+                connector_type=ConnectorType.ERP,
+                protocol_type=ProtocolType.REST,
+                authentication_type=AuthenticationType.OAUTH2,
+                default_endpoints={
+                    "auth": "/oauth2/v2.0/token",
+                    "api": "/api/v1.0",
+                    "business_central": "/businesscentral"
+                },
+                default_headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                required_config_fields=["tenant_id", "client_id", "client_secret", "base_url"],
+                optional_config_fields=["scope", "environment", "company_id"],
+                default_settings={
+                    "timeout": 60,
+                    "data_format": "json",
+                    "api_version": "v1.0",
+                    "environment": "production"
+                },
+                connector_class_path="taxpoynt_platform.external_integrations.business_systems.erp.dynamics.connector.DynamicsERPConnector"
+            ),
+            ConnectorTemplate(
+                template_id="netsuite_erp",
+                name="NetSuite ERP Connector",
+                description="NetSuite ERP connector using REST API and SuiteQL",
+                connector_type=ConnectorType.ERP,
+                protocol_type=ProtocolType.REST,
+                authentication_type=AuthenticationType.CUSTOM_TOKEN,
+                default_endpoints={
+                    "rest": "/services/rest",
+                    "suiteql": "/services/rest/query/v1/suiteql",
+                    "records": "/services/rest/record/v1"
+                },
+                default_headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                required_config_fields=["account_id", "consumer_key", "consumer_secret", "token_id", "token_secret"],
+                optional_config_fields=["signature_method", "api_version", "realm"],
+                default_settings={
+                    "timeout": 60,
+                    "data_format": "json",
+                    "api_version": "v1",
+                    "signature_method": "HMAC-SHA256"
+                },
+                connector_class_path="taxpoynt_platform.external_integrations.business_systems.erp.netsuite.connector.NetSuiteERPConnector"
             ),
             ConnectorTemplate(
                 template_id="firs_api",

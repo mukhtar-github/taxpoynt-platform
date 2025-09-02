@@ -2,31 +2,65 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { useBankingErrorRecovery, BankingError } from '../../../../shared_components/services/bankingErrorRecovery';
+import { getPostBankingUrl } from '../../../../shared_components/utils/dashboardRouting';
 import { TaxPoyntButton } from '../../../../design_system';
+import { OnboardingProgressIndicator } from '../../../../shared_components/onboarding/OnboardingProgressIndicator';
+import { BankingConnectionLoader, OnboardingStepLoader } from '../../../../shared_components/loading/OnboardingLoadingStates';
+import { useOnboardingProgress } from '../../../../shared_components/hooks/useOnboardingProgress';
 
 export default function BankingCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const { user, isAuthenticated, isLoading } = useUserContext({ requireAuth: true });
+  const { handleError, attemptRecovery, createUserMessage } = useBankingErrorRecovery();
+  const { progressState, completeStep, updateProgress, isUpdating } = useOnboardingProgress();
+  const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'retrying'>('processing');
   const [message, setMessage] = useState('Processing your bank connection...');
-  const [user, setUser] = useState<any>(null);
+  const [currentError, setCurrentError] = useState<BankingError | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [connectionStage, setConnectionStage] = useState<'initializing' | 'connecting' | 'authenticating' | 'verifying' | 'complete'>('initializing');
 
   useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
+    if (isLoading) return;
+    
+    if (!isAuthenticated) {
       router.push('/auth/signin');
       return;
     }
-    setUser(currentUser);
     
-    // Process the Mono callback
-    processBankingCallback();
-  }, []);
+    if (user) {
+      // Process the Mono callback
+      processBankingCallback();
+    }
+  }, [isLoading, isAuthenticated, user]);
+
+  const handleAutoRetry = async () => {
+    setIsRetrying(true);
+    setRetryCount(prev => prev + 1);
+    setStatus('processing');
+    setMessage('Retrying connection...');
+    setCurrentError(null);
+    
+    setTimeout(() => {
+      processBankingCallback();
+      setIsRetrying(false);
+    }, 1000);
+  };
+
+  const handleFallback = () => {
+    router.push('/onboarding/si/manual-banking-setup');
+  };
 
   const processBankingCallback = async () => {
     try {
+      // Set initial stage
+      setConnectionStage('initializing');
+      await updateProgress('banking_connected', false);
+      
       // Get parameters from URL
       const code = searchParams.get('code');
       const state = searchParams.get('state');
@@ -54,6 +88,14 @@ export default function BankingCallbackPage() {
         return;
       }
 
+      // Progress to connecting stage
+      setConnectionStage('connecting');
+      setMessage('Connecting to your bank...');
+
+      // Progress to authenticating stage
+      setConnectionStage('authenticating');
+      setMessage('Authenticating with your bank...');
+      
       // Exchange code for access token and account information
       const response = await fetch('/api/v1/si/banking/open-banking/mono/callback', {
         method: 'POST',
@@ -69,24 +111,36 @@ export default function BankingCallbackPage() {
       });
 
       if (!response.ok) {
-        // If API fails, simulate success for demo
-        console.warn('Banking API not available, simulating success');
-        simulateSuccessfulConnection();
-        return;
+        const errorText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorText || 'Banking callback processing failed'}`);
       }
 
+      // Progress to verifying stage
+      setConnectionStage('verifying');
+      setMessage('Verifying account details...');
+      
       const data = await response.json();
       
       if (data.success) {
+        // Progress to complete stage
+        setConnectionStage('complete');
         setStatus('success');
         setMessage(`Successfully connected ${data.data?.accounts?.length || 1} bank account(s)!`);
         
-        // Update onboarding state
-        OnboardingStateManager.updateStep(user.id, 'banking_connected', true);
+        // Update onboarding state with progress tracking
+        if (user) {
+          await completeStep('banking_connected', {
+            provider: 'mono',
+            accountCount: data.data?.accounts?.length || 1,
+            connectionTimestamp: new Date().toISOString()
+          });
+        }
         
-        // Auto-redirect to reconciliation setup after 3 seconds
+        // Auto-redirect to next step after 3 seconds
         setTimeout(() => {
-          router.push('/onboarding/si/reconciliation-setup');
+          if (user) {
+            router.push(getPostBankingUrl(user));
+          }
         }, 3000);
         
       } else {
@@ -95,32 +149,36 @@ export default function BankingCallbackPage() {
 
     } catch (error) {
       console.error('Banking callback processing failed:', error);
-      // Simulate success for demo purposes
-      simulateSuccessfulConnection();
+      
+      // Use error recovery service to classify and handle the error
+      const bankingError = handleError(error, { 
+        provider: 'mono',
+        context: 'callback_processing',
+        retryCount
+      });
+      
+      setStatus('error');
+      setCurrentError(bankingError);
+      setMessage(bankingError.userMessage);
+      
+      // Log detailed error information
+      console.error('Banking Error Details:', {
+        error: bankingError,
+        originalError: error,
+        retryCount,
+        canRetry: bankingError.retryable && retryCount < 3
+      });
     }
   };
 
-  const simulateSuccessfulConnection = () => {
-    setStatus('success');
-    setMessage('Demo: Bank account successfully connected! Redirecting to dashboard...');
-    
-    // Update onboarding state
-    if (user) {
-      OnboardingStateManager.updateStep(user.id, 'banking_connected', true);
-      OnboardingStateManager.completeOnboarding(user.id);
-    }
-    
-    // Auto-redirect to reconciliation setup after 3 seconds
-    setTimeout(() => {
-      router.push('/onboarding/si/reconciliation-setup');
-    }, 3000);
-  };
+
 
   const handleContinue = () => {
     if (user) {
       OnboardingStateManager.updateStep(user.id, 'reconciliation_setup');
+      const { getPostBankingUrl } = require('../../../../shared_components/utils/dashboardRouting');
+      router.push(getPostBankingUrl(user));
     }
-    router.push('/onboarding/si/reconciliation-setup');
   };
 
   const handleRetry = () => {
@@ -173,17 +231,57 @@ export default function BankingCallbackPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md w-full mx-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Progress Indicator - Compact version in top section */}
+        {progressState && (
+          <div className="mb-8">
+            <OnboardingProgressIndicator
+              currentStep={progressState.currentStep}
+              completedSteps={progressState.completedSteps}
+              userRole="si"
+              isLoading={isUpdating || status === 'processing'}
+              showTimeEstimate={true}
+              compact={true}
+              className="max-w-md mx-auto"
+            />
+          </div>
+        )}
+
+        {/* Step Loading Indicator for Errors */}
+        {status === 'error' && currentError && (
+          <div className="mb-8">
+            <OnboardingStepLoader
+              currentStep="banking_connected"
+              isLoading={false}
+              hasError={true}
+              errorMessage={currentError.userMessage}
+              onRetry={currentError.retryable ? handleAutoRetry : undefined}
+              className="max-w-md mx-auto"
+            />
+          </div>
+        )}
+
+        {/* Main Banking Connection Status */}
+        <div className="flex items-center justify-center">
+          <div className="max-w-md w-full mx-4">
         <div className={`${getBackgroundColor()} border-2 ${
           status === 'processing' ? 'border-blue-200' :
           status === 'success' ? 'border-green-200' :
           'border-red-200'
         } rounded-2xl p-8 text-center`}>
           
-          {/* Status Icon */}
+          {/* Banking Connection Loader or Status Icon */}
           <div className="mb-6">
-            {getStatusIcon()}
+            {status === 'processing' ? (
+              <BankingConnectionLoader 
+                stage={connectionStage}
+                providerName="Mono"
+                className="bg-transparent border-0 p-0"
+              />
+            ) : (
+              getStatusIcon()
+            )}
           </div>
 
           {/* Title */}
@@ -236,13 +334,26 @@ export default function BankingCallbackPage() {
             
             {status === 'error' && (
               <div className="space-y-3">
+                {/* Show retry option if error is retryable and under retry limit */}
+                {currentError?.retryable && retryCount < 3 && (
+                  <TaxPoyntButton
+                    onClick={handleAutoRetry}
+                    className="w-full"
+                    variant="primary"
+                    disabled={isRetrying}
+                  >
+                    {isRetrying ? 'Retrying...' : `Retry Connection (${retryCount + 1}/3)`}
+                  </TaxPoyntButton>
+                )}
+                
                 <TaxPoyntButton
-                  variant="primary"
+                  variant={currentError?.retryable && retryCount < 3 ? "secondary" : "primary"}
                   onClick={handleRetry}
                   className="w-full"
                 >
-                  Try Again
+                  Restart Banking Setup
                 </TaxPoyntButton>
+                
                 <TaxPoyntButton
                   variant="secondary"
                   onClick={() => router.push('/dashboard/si')}
@@ -250,6 +361,24 @@ export default function BankingCallbackPage() {
                 >
                   Skip for Now
                 </TaxPoyntButton>
+                
+                {/* Show error suggestions if available */}
+                {currentError && (
+                  <div className="mt-4 text-left">
+                    <details className="bg-white border border-red-200 rounded-lg p-4">
+                      <summary className="font-semibold text-red-800 cursor-pointer">
+                        Troubleshooting Tips
+                      </summary>
+                      <div className="mt-2 text-sm text-gray-600">
+                        <ul className="list-disc list-inside space-y-1">
+                          {currentError.suggestedActions.map((action, index) => (
+                            <li key={index}>{action}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </details>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -262,6 +391,8 @@ export default function BankingCallbackPage() {
                 Contact Support
               </button>
             </p>
+          </div>
+        </div>
           </div>
         </div>
       </div>

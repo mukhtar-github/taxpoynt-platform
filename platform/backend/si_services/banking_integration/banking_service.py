@@ -69,6 +69,10 @@ class SIBankingService:
             # Route to appropriate handler
             if operation == "create_mono_widget_link":
                 return await self._handle_create_mono_widget_link(si_id, payload)
+            elif operation == "process_mono_callback":
+                return await self._handle_process_mono_callback(si_id, payload)
+            elif operation.startswith("process_") and operation.endswith("_callback"):
+                return await self._handle_generic_banking_callback(si_id, payload, operation)
             elif operation == "list_open_banking_connections":
                 return await self._handle_list_open_banking_connections(si_id, payload)
             elif operation == "create_open_banking_connection":
@@ -110,6 +114,49 @@ class SIBankingService:
             "operation": "create_mono_widget_link",
             "success": True,
             "data": result,
+            "si_id": si_id
+        }
+    
+    async def _handle_process_mono_callback(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle Mono banking callback processing"""
+        callback_data = payload.get("callback_data")
+        if not callback_data:
+            raise ValueError("Callback data is required")
+            
+        result = await self.mono_service.process_mono_callback(si_id, callback_data)
+        
+        return {
+            "operation": "process_mono_callback",
+            "success": result.get("success", False),
+            "data": result,
+            "si_id": si_id
+        }
+    
+    async def _handle_generic_banking_callback(self, si_id: str, payload: Dict[str, Any], operation: str) -> Dict[str, Any]:
+        """Handle generic banking callback from any provider"""
+        callback_data = payload.get("callback_data")
+        provider = payload.get("provider", "mono")
+        
+        if not callback_data:
+            raise ValueError("Callback data is required")
+        
+        # Route to appropriate provider service
+        if provider == "mono":
+            result = await self.mono_service.process_mono_callback(si_id, callback_data)
+        else:
+            # For future providers, add routing logic here
+            result = {
+                "success": False,
+                "error": "unsupported_provider",
+                "message": f"Provider '{provider}' not supported yet",
+                "si_id": si_id
+            }
+        
+        return {
+            "operation": operation,
+            "success": result.get("success", False),
+            "data": result,
+            "provider": provider,
             "si_id": si_id
         }
     

@@ -141,6 +141,103 @@ class MonoIntegrationService:
             logger.error(f"Unexpected error creating Mono widget link for SI {si_id}: {str(e)}", exc_info=True)
             raise RuntimeError(f"Widget link creation failed: {str(e)}")
     
+    async def process_mono_callback(self, si_id: str, callback_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process Mono banking callback after user completes account linking.
+        
+        Args:
+            si_id: System Integrator ID
+            callback_data: Callback data from Mono
+            
+        Returns:
+            Dict with processed callback results and linked accounts
+        """
+        try:
+            logger.info(f"Processing Mono callback for SI: {si_id}")
+            
+            # Extract callback parameters
+            auth_code = callback_data.get("code")
+            state = callback_data.get("state")
+            error = callback_data.get("error")
+            
+            # Handle error callbacks
+            if error:
+                logger.error(f"Mono callback error for SI {si_id}: {error}")
+                return {
+                    "success": False,
+                    "error": error,
+                    "message": f"Banking connection failed: {error}",
+                    "si_id": si_id
+                }
+            
+            # Validate required parameters
+            if not auth_code:
+                raise ValueError("Missing authorization code in callback")
+            
+            # Get connector and process the callback
+            connector = await self.get_connector()
+            
+            # Exchange authorization code for account access
+            account_linking_result = await connector.complete_account_linking(
+                authorization_code=auth_code,
+                state_parameter=state,
+                si_id=si_id
+            )
+            
+            logger.info(f"Mono account linking completed for SI {si_id}: {account_linking_result.account_id}")
+            
+            return {
+                "success": True,
+                "message": "Banking accounts successfully linked",
+                "data": {
+                    "account_id": account_linking_result.account_id,
+                    "account_name": account_linking_result.account_name,
+                    "bank_name": account_linking_result.bank_name,
+                    "account_type": account_linking_result.account_type,
+                    "linked_at": account_linking_result.linked_at.isoformat(),
+                    "accounts": [account_linking_result.to_dict()],  # For frontend compatibility
+                    "provider": "mono"
+                },
+                "si_id": si_id,
+                "callback_processed_at": datetime.utcnow().isoformat()
+            }
+            
+        except MonoValidationError as e:
+            logger.error(f"Mono validation error in callback for SI {si_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": "validation_error",
+                "message": f"Invalid callback data: {str(e)}",
+                "si_id": si_id
+            }
+            
+        except MonoAuthenticationError as e:
+            logger.error(f"Mono authentication error in callback for SI {si_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": "authentication_error", 
+                "message": f"Banking authentication failed: {str(e)}",
+                "si_id": si_id
+            }
+            
+        except MonoConnectionError as e:
+            logger.error(f"Mono connection error in callback for SI {si_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": "connection_error",
+                "message": f"Banking service connection failed: {str(e)}",
+                "si_id": si_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Unexpected error processing Mono callback for SI {si_id}: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": "processing_error",
+                "message": f"Callback processing failed: {str(e)}",
+                "si_id": si_id
+            }
+    
     async def list_open_banking_connections(self, si_id: str, filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         List Open Banking connections for a System Integrator.

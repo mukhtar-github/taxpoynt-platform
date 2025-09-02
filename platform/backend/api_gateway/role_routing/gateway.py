@@ -7,7 +7,7 @@ system to provide unified HTTP access to TaxPoynt platform services.
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, Request, HTTPException, status, Depends
+from fastapi import FastAPI, Request, HTTPException, status, Depends, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -194,8 +194,50 @@ class TaxPoyntAPIGateway:
             tags=["Platform Administration"]
         )
         
+        # Include webhook router (publicly accessible, no authentication)
+        webhook_router = self._create_webhook_router()
+        self.app.include_router(
+            webhook_router,
+            prefix="/api/v1/webhooks",
+            tags=["External Webhooks"]
+        )
+        
         # Add root level routes
         self._setup_root_routes()
+    
+    def _create_webhook_router(self) -> APIRouter:
+        """
+        Create combined webhook router for all external webhooks.
+        
+        Returns:
+            APIRouter: Combined webhook router with all webhook endpoints
+        """
+        from ..api_versions.v1.webhook_endpoints import (
+            create_mono_webhook_router,
+            create_firs_webhook_router
+        )
+        
+        # Create main webhook router (no authentication required)
+        webhook_router = APIRouter(tags=["External Webhooks"])
+        
+        # Include Mono webhook endpoints
+        mono_webhook_router = create_mono_webhook_router(self.message_router)
+        webhook_router.include_router(
+            mono_webhook_router,
+            prefix="/mono",
+            tags=["Mono Open Banking Webhooks"]
+        )
+        
+        # Include FIRS webhook endpoints  
+        firs_webhook_router = create_firs_webhook_router(self.message_router)
+        webhook_router.include_router(
+            firs_webhook_router,
+            prefix="/firs",
+            tags=["FIRS Compliance Webhooks"]
+        )
+        
+        logger.info("✅ Webhook router created with Mono and FIRS endpoints")
+        return webhook_router
     
     def _setup_root_routes(self):
         """Setup root level API routes"""
@@ -220,6 +262,9 @@ class TaxPoyntAPIGateway:
                     "system_integrator": "/api/v1/si",
                     "access_point_provider": "/api/v1/app",
                     "hybrid_services": "/api/v1/common",
+                    "webhooks": "/api/v1/webhooks",
+                    "mono_webhooks": "/api/v1/webhooks/mono",
+                    "firs_webhooks": "/api/v1/webhooks/firs",
                     "documentation": "/docs",
                     "health": "/health (cached)",
                     "metrics": "/metrics (cached)"
