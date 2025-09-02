@@ -11,36 +11,36 @@ import { cva, type VariantProps } from 'class-variance-authority';
 // Complete button variants system from legacy
 const taxPoyntButtonVariants = cva(
   // Base styles - Enhanced with mobile-first + Nigerian optimizations
-  "inline-flex items-center justify-center font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95",
+  "inline-flex items-center justify-center font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95",
   {
     variants: {
       variant: {
-        // Primary - Main CTA buttons (landing page, auth)
-        primary: "bg-primary text-white hover:bg-primary/90 shadow-sm hover:shadow-md font-semibold",
+        // Primary - Main CTA buttons (landing page, auth) - FIXED: Using proper brand.primary
+        primary: "bg-brand-primary text-white hover:bg-brand-primary/90 shadow-sm hover:shadow-md font-semibold",
         
-        // Secondary - Supporting actions
-        secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 border border-gray-300 font-medium",
+        // Secondary - Supporting actions (Improved contrast for Skip buttons)
+        secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-400 font-medium shadow-sm hover:shadow-md",
         
         // Destructive - Delete/remove actions  
-        destructive: "bg-error text-white hover:bg-error/90 shadow-sm hover:shadow-md font-semibold",
+        destructive: "bg-semantic-error text-white hover:bg-semantic-error/90 shadow-sm hover:shadow-md font-semibold",
         
-        // Outline - Secondary CTAs (landing page "Learn More")
-        outline: "border-2 border-gray-300 bg-transparent hover:bg-gray-50 text-gray-700 font-medium hover:border-primary hover:text-primary",
+        // Outline - Secondary CTAs (landing page "Learn More") - FIXED: Using proper brand.primary
+        outline: "border-2 border-gray-300 bg-transparent hover:bg-gray-50 text-gray-700 font-medium hover:border-brand-primary hover:text-brand-primary",
         
         // Ghost - Minimal actions (navigation, dropdowns)
         ghost: "hover:bg-gray-100 text-gray-700 hover:text-gray-900",
         
-        // Link - Text links that look like buttons
-        link: "text-primary underline-offset-4 hover:underline font-medium hover:text-primary/80",
+        // Link - Text links that look like buttons - FIXED: Using proper brand.primary
+        link: "text-brand-primary underline-offset-4 hover:underline font-medium hover:text-brand-primary/80",
 
         // Success - Positive actions (dashboards)
-        success: "bg-success text-white hover:bg-success/90 shadow-sm hover:shadow-md font-semibold",
+        success: "bg-semantic-success text-white hover:bg-semantic-success/90 shadow-sm hover:shadow-md font-semibold",
 
         // Warning - Caution actions (dashboards)  
-        warning: "bg-warning text-white hover:bg-warning/90 shadow-sm hover:shadow-md font-semibold",
+        warning: "bg-semantic-warning text-white hover:bg-semantic-warning/90 shadow-sm hover:shadow-md font-semibold",
 
         // Nigerian Green - Special branding (landing page hero)
-        nigerian: "bg-nigerian-green text-white hover:bg-nigerian-green-dark shadow-sm hover:shadow-md font-semibold",
+        nigerian: "bg-nigeria-green text-white hover:bg-nigeria-forest shadow-sm hover:shadow-md font-semibold",
       },
       size: {
         // Small - Dashboard actions, mobile secondary

@@ -80,7 +80,7 @@ class OnboardingApiClient {
    */
   private async getAuthHeaders(): Promise<Record<string, string>> {
     try {
-      const token = authService.getStoredToken();
+      const token = authService.getToken();
       if (!token) {
         throw new Error('No authentication token available');
       }

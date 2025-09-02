@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authService } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
+import { SkipForNowButton, useMobileOptimization } from '../../../../shared_components/onboarding';
 
 interface FinancialIntegration {
   id: string;
@@ -415,14 +416,14 @@ export default function FinancialSystemsSetupPage() {
 
         {/* Action Buttons */}
         <div className="flex justify-center space-x-4">
-          <TaxPoyntButton
-            variant="secondary"
+          <SkipForNowButton
             onClick={handleSkipForNow}
             disabled={isLoading}
-            className="px-8"
-          >
-            Skip for Now
-          </TaxPoyntButton>
+            text="Skip for Now"
+            description="You can set up financial integrations later from your dashboard"
+            estimatedTime="5-10 minutes"
+            analyticsEvent="si_financial_systems_skipped"
+          />
         </div>
 
         {/* Help Section */}

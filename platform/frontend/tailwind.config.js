@@ -19,6 +19,10 @@ module.exports = {
           light: '#F0FDF4',       // Light green background
         },
         
+        // Backward compatibility for legacy components
+        primary: '#008751',       // Fallback for components still using 'primary'
+        secondary: '#0054B0',     // Fallback for components still using 'secondary'
+        
         // Nigerian Colors (for compliance/FIRS theming)
         nigeria: {
           green: '#008751',       // Primary Nigerian green

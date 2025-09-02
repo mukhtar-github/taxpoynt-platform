@@ -82,6 +82,12 @@ export {
   type NavItem
 } from './components/TaxPoyntNavigation';
 
+// Form Field Component
+export {
+  FormField,
+  type FormFieldProps
+} from './components/FormField';
+
 // Logo components removed - using real logo.svg directly
 
 // ========================================

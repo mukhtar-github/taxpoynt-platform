@@ -31,7 +31,9 @@ interface OnboardingProgressProps {
   userRole: 'si' | 'app' | 'hybrid';
   isLoading?: boolean;
   showTimeEstimate?: boolean;
+  showRemainingTime?: boolean;
   compact?: boolean;
+  mobileOptimized?: boolean;
   className?: string;
 }
 
@@ -205,7 +207,9 @@ export const OnboardingProgressIndicator: React.FC<OnboardingProgressProps> = ({
   userRole,
   isLoading = false,
   showTimeEstimate = true,
+  showRemainingTime = false,
   compact = false,
+  mobileOptimized = true,
   className = ''
 }) => {
   const steps = ONBOARDING_STEPS[userRole] || [];
@@ -298,12 +302,19 @@ export const OnboardingProgressIndicator: React.FC<OnboardingProgressProps> = ({
         </div>
         
         {showTimeEstimate && (
-          <div className="flex items-center text-xs text-gray-500">
-            <Clock className="h-3 w-3 mr-1" />
-            {progressData.remainingTime > 0 ? (
-              `${formatTime(progressData.remainingTime)} remaining`
-            ) : (
-              'Complete!'
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center">
+              <Clock className="h-3 w-3 mr-1" />
+              {progressData.remainingTime > 0 ? (
+                `${formatTime(progressData.remainingTime)} remaining`
+              ) : (
+                'Complete!'
+              )}
+            </div>
+            {showRemainingTime && progressData.totalTime > 0 && (
+              <span className="text-gray-400">
+                Total: {formatTime(progressData.totalTime)}
+              </span>
             )}
           </div>
         )}

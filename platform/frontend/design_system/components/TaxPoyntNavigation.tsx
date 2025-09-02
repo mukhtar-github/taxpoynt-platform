@@ -42,9 +42,9 @@ const navItemVariants = cva(
   {
     variants: {
       variant: {
-        default: "text-gray-700 hover:text-primary hover:bg-gray-100",
+        default: "text-gray-700 hover:text-brand-primary hover:bg-gray-100",
         dark: "text-gray-300 hover:text-white hover:bg-gray-800",
-        active: "text-primary bg-primary/10",
+        active: "text-brand-primary bg-brand-primary/10",
         activeDark: "text-white bg-gray-800",
       }
     },
@@ -182,7 +182,7 @@ const TaxPoyntNavigation = forwardRef<HTMLElement, TaxPoyntNavigationProps>(
                               <Link
                                 key={child.name}
                                 href={child.href}
-                                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary"
+                                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-brand-primary"
                               >
                                 {child.icon && <child.icon className="w-4 h-4 mr-3" />}
                                 {child.name}
@@ -307,7 +307,7 @@ const TaxPoyntNavigation = forwardRef<HTMLElement, TaxPoyntNavigationProps>(
                       <>
                         <button
                           onClick={() => handleDropdownToggle(item.name)}
-                          className="flex items-center justify-between w-full px-3 py-2 text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-50 rounded-md"
+                          className="flex items-center justify-between w-full px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-primary hover:bg-gray-50 rounded-md"
                         >
                           <span className="flex items-center">
                             {item.icon && <item.icon className="mr-3 h-5 w-5" />}
@@ -324,7 +324,7 @@ const TaxPoyntNavigation = forwardRef<HTMLElement, TaxPoyntNavigationProps>(
                               <Link
                                 key={child.name}
                                 href={child.href}
-                                className="flex items-center px-3 py-2 text-base font-medium text-gray-600 hover:text-primary hover:bg-gray-50 rounded-md"
+                                className="flex items-center px-3 py-2 text-base font-medium text-gray-600 hover:text-brand-primary hover:bg-gray-50 rounded-md"
                               >
                                 {child.icon && <child.icon className="mr-3 h-5 w-5" />}
                                 {child.name}
@@ -336,7 +336,7 @@ const TaxPoyntNavigation = forwardRef<HTMLElement, TaxPoyntNavigationProps>(
                     ) : (
                       <Link
                         href={item.href}
-                        className="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-50 rounded-md"
+                        className="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-primary hover:bg-gray-50 rounded-md"
                       >
                         {item.icon && <item.icon className="mr-3 h-5 w-5" />}
                         {item.name}

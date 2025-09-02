@@ -95,7 +95,7 @@ export const useUserContext = (options: UseUserContextOptions = {}): UserContext
       setError(null);
 
       // Check if user is authenticated
-      const token = authService.getStoredToken();
+      const token = authService.getToken();
       if (!token) {
         setUser(null);
         if (requireAuth) {
@@ -167,7 +167,7 @@ export const useUserContext = (options: UseUserContextOptions = {}): UserContext
 
   // Derived state
   const isAuthenticated = useMemo(() => {
-    return !!(user && authService.getStoredToken());
+    return !!(user && authService.getToken());
   }, [user]);
 
   const organizationId = useMemo(() => {

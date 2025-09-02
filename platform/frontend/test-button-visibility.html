@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaxPoynt Button Visibility Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            primary: '#008751',
+                            secondary: '#0054B0',
+                            accent: '#F97316',
+                            light: '#F0FDF4',
+                        },
+                        primary: '#008751',
+                        secondary: '#0054B0',
+                        nigeria: {
+                            green: '#008751',
+                            emerald: '#00A86B',
+                            forest: '#006341',
+                        },
+                        semantic: {
+                            success: '#10B981',
+                            warning: '#F59E0B',
+                            error: '#EF4444',
+                            info: '#3B82F6',
+                        },
+                        roles: {
+                            si: '#0054B0',
+                            app: '#008751',
+                            hybrid: '#6366F1',
+                            admin: '#7C3AED',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .button-test {
+            @apply inline-flex items-center justify-center font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 h-10 px-4 text-base rounded-lg min-w-[80px];
+        }
+        .btn-primary { @apply bg-brand-primary text-white hover:bg-brand-primary/90 shadow-sm hover:shadow-md font-semibold; }
+        .btn-secondary { @apply bg-gray-100 text-gray-900 hover:bg-gray-200 border border-gray-300 font-medium; }
+        .btn-outline { @apply border-2 border-gray-300 bg-transparent hover:bg-gray-50 text-gray-700 font-medium hover:border-brand-primary hover:text-brand-primary; }
+        .btn-success { @apply bg-semantic-success text-white hover:bg-semantic-success/90 shadow-sm hover:shadow-md font-semibold; }
+        .btn-nigerian { @apply bg-nigeria-green text-white hover:bg-nigeria-forest shadow-sm hover:shadow-md font-semibold; }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">TaxPoynt Button Visibility Test</h1>
+        
+        <!-- Primary CTA Buttons -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Primary CTA Buttons (Fixed)</h2>
+            <div class="flex flex-wrap gap-4 mb-4">
+                <button class="button-test btn-primary">Continue Setup</button>
+                <button class="button-test btn-primary">Next Step</button>
+                <button class="button-test btn-primary">Complete Registration</button>
+                <button class="button-test btn-primary">Start Free Trial</button>
+            </div>
+            <p class="text-sm text-green-700 bg-green-50 p-3 rounded">
+                ✅ <strong>FIXED:</strong> These buttons now use <code>bg-brand-primary (#008751)</code> with proper visibility
+            </p>
+        </section>
+
+        <!-- Onboarding Flow Buttons -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Onboarding Flow Buttons</h2>
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex justify-between items-center">
+                    <button class="button-test btn-secondary">Back</button>
+                    <div class="flex space-x-3">
+                        <button class="button-test btn-outline">Skip for Now</button>
+                        <button class="button-test btn-primary">Continue</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Different Button Variants -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">All Button Variants</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <button class="button-test btn-primary">Primary</button>
+                <button class="button-test btn-secondary">Secondary</button>
+                <button class="button-test btn-outline">Outline</button>
+                <button class="button-test btn-success">Success</button>
+                <button class="button-test btn-nigerian">Nigerian</button>
+                <button class="button-test bg-semantic-warning text-white hover:bg-semantic-warning/90 shadow-sm hover:shadow-md font-semibold">Warning</button>
+            </div>
+        </section>
+
+        <!-- Role-Based Buttons -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Role-Based Buttons</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button class="button-test bg-roles-si text-white hover:bg-roles-si/90 shadow-sm hover:shadow-md font-semibold">SI Role</button>
+                <button class="button-test bg-roles-app text-white hover:bg-roles-app/90 shadow-sm hover:shadow-md font-semibold">APP Role</button>
+                <button class="button-test bg-roles-hybrid text-white hover:bg-roles-hybrid/90 shadow-sm hover:shadow-md font-semibold">Hybrid Role</button>
+                <button class="button-test bg-roles-admin text-white hover:bg-roles-admin/90 shadow-sm hover:shadow-md font-semibold">Admin Role</button>
+            </div>
+        </section>
+
+        <!-- Contrast Testing -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Contrast Testing</h2>
+            <div class="space-y-4">
+                <!-- Light Background -->
+                <div class="bg-white p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-2">On White Background:</p>
+                    <button class="button-test btn-primary mr-3">Primary Button</button>
+                    <button class="button-test btn-outline">Outline Button</button>
+                </div>
+                
+                <!-- Gray Background -->
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-2">On Gray Background:</p>
+                    <button class="button-test btn-primary mr-3">Primary Button</button>
+                    <button class="button-test btn-outline">Outline Button</button>
+                </div>
+                
+                <!-- Dark Background -->
+                <div class="bg-gray-800 p-4 rounded-lg">
+                    <p class="text-sm text-gray-300 mb-2">On Dark Background:</p>
+                    <button class="button-test btn-primary mr-3">Primary Button</button>
+                    <button class="button-test bg-white text-gray-800 hover:bg-gray-100 border border-white">Light Button</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Accessibility Testing -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Accessibility & Focus States</h2>
+            <div class="space-y-4">
+                <p class="text-sm text-gray-600">Tab through these buttons to test focus visibility:</p>
+                <div class="flex flex-wrap gap-3">
+                    <button class="button-test btn-primary focus:ring-4 focus:ring-brand-primary/50">Focusable 1</button>
+                    <button class="button-test btn-secondary focus:ring-4 focus:ring-blue-500/50">Focusable 2</button>
+                    <button class="button-test btn-outline focus:ring-4 focus:ring-brand-primary/50">Focusable 3</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fix Summary -->
+        <section class="bg-green-50 border border-green-200 rounded-lg p-6">
+            <h2 class="text-lg font-semibold text-green-900 mb-3">🎉 Button Visibility Issues Fixed!</h2>
+            <div class="space-y-2 text-sm text-green-800">
+                <p><strong>Problem:</strong> Buttons were using undefined <code>bg-primary</code> and <code>text-primary</code> classes</p>
+                <p><strong>Root Cause:</strong> Tailwind config defined <code>brand.primary</code> but components used <code>primary</code></p>
+                <p><strong>Solution:</strong></p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>Updated TaxPoyntButton component to use <code>bg-brand-primary</code></li>
+                    <li>Fixed TaxPoyntNavigation component hover states</li>
+                    <li>Added backward compatibility fallback in Tailwind config</li>
+                    <li>Improved focus ring visibility with proper colors</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Add some interactive testing
+        document.addEventListener('DOMContentLoaded', function() {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 150);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

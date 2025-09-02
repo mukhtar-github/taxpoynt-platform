@@ -214,7 +214,7 @@ export const OnboardingResumeManager: React.FC<OnboardingResumeProps> = ({
     // Navigate to appropriate step URL
     if (!user || !resumeSession) return;
 
-    const role = resumeSession.userRole;
+    const role = resumeSession.userRole as 'si' | 'app' | 'hybrid';
     const stepUrl = UrlBuilder.onboardingStepUrl(role, stepId);
     router.push(stepUrl);
   }, [user, resumeSession, router, onResume]);

@@ -27,7 +27,7 @@ import {
   Download,
   Filter,
   Calendar,
-  Refresh
+  RefreshCw
 } from 'lucide-react';
 
 interface DashboardMetrics {
@@ -213,7 +213,7 @@ export const OnboardingAnalyticsDashboard: React.FC<DashboardProps> = ({
             onClick={loadAnalyticsData}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            <Refresh className="h-4 w-4 mr-2" />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </button>
         </div>
@@ -246,7 +246,7 @@ export const OnboardingAnalyticsDashboard: React.FC<DashboardProps> = ({
               onClick={() => setFilters(prev => ({ ...prev }))} // Trigger refresh
               className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
             >
-              <Refresh className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </button>
             

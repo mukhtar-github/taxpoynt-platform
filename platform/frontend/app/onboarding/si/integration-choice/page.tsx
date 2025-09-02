@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { authService } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
+import { SkipWithTimeButton } from '../../../../shared_components/onboarding';
 
 interface IntegrationChoice {
   id: string;
@@ -241,14 +242,13 @@ export default function SIIntegrationChoicePage() {
 
         {/* Action Buttons */}
         <div className="flex justify-center">
-          <TaxPoyntButton
-            variant="secondary"
+          <SkipWithTimeButton
             onClick={handleSkipForNow}
             disabled={isLoading}
-            className="px-8"
-          >
-            Skip Setup for Now
-          </TaxPoyntButton>
+            text="Skip Setup for Now"
+            estimatedTime="15-20 minutes"
+            analyticsEvent="si_integration_choice_skipped"
+          />
         </div>
         
         {/* Instruction Text */}

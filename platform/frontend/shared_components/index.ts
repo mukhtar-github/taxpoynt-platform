@@ -35,6 +35,12 @@ export * from './navigation';
 // Services (API Integration)
 export * from './services';
 
+// Onboarding Components and Services
+export * from './onboarding';
+
+// Utilities
+export * from './utils';
+
 // Aggregate export for all components  
 const SharedComponents = {
   // Component aggregates would go here when needed
