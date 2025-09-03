@@ -380,15 +380,21 @@ export const mobileOptimizer = new MobileOnboardingOptimizer();
 
 // Utility functions for React components
 export const useMobileOptimization = () => {
+  const capabilities = mobileOptimizer.getCapabilities();
+  
   return {
-    capabilities: mobileOptimizer.getCapabilities(),
+    capabilities: capabilities,
     config: mobileOptimizer.getConfig(),
     getResponsiveClasses: mobileOptimizer.getResponsiveClasses.bind(mobileOptimizer),
     shouldUseSimplifiedLayout: mobileOptimizer.shouldUseSimplifiedLayout.bind(mobileOptimizer),
     getTouchTargetSize: mobileOptimizer.getTouchTargetSize.bind(mobileOptimizer),
     getFormConfig: mobileOptimizer.getFormConfig.bind(mobileOptimizer),
     isMobileViewport: mobileOptimizer.isMobileViewport.bind(mobileOptimizer),
-    getGridClasses: mobileOptimizer.getGridClasses.bind(mobileOptimizer)
+    getGridClasses: mobileOptimizer.getGridClasses.bind(mobileOptimizer),
+    
+    // Add missing properties that components are expecting
+    isMobile: capabilities?.isMobile || false,
+    mobileBreakpoint: 768 // Tailwind md breakpoint
   };
 };
 

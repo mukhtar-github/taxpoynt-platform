@@ -9,9 +9,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
+import { 
+  OnboardingProgressIndicator, 
+  SkipForNowButton, 
+  useMobileOptimization 
+} from '../../../../shared_components/onboarding';
 
 interface BusinessVerificationData {
   business_type: string;
@@ -29,7 +34,8 @@ interface BusinessVerificationData {
 
 export default function APPBusinessVerificationPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, loading: userLoading } = useUserContext();
+  const { isMobile, mobileBreakpoint } = useMobileOptimization();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<BusinessVerificationData>({
     business_type: '',
@@ -47,22 +53,21 @@ export default function APPBusinessVerificationPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
+    if (userLoading) return;
+    
+    if (!user) {
       router.push('/auth/signin');
       return;
     }
 
-    if (currentUser.role !== 'access_point_provider') {
+    if (user.role !== 'access_point_provider') {
       router.push('/dashboard');
       return;
     }
-
-    setUser(currentUser);
     
     // Update onboarding state
-    OnboardingStateManager.updateStep(currentUser.id, 'business_verification');
-  }, [router]);
+    OnboardingStateManager.updateStep(user.id, 'business_verification');
+  }, [user, userLoading, router]);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -95,7 +100,9 @@ export default function APPBusinessVerificationPage() {
       // TODO: Call API to update user profile with business details
       
       // Update onboarding state
-      OnboardingStateManager.updateStep(user.id, 'business_verification', true);
+      if (user?.id) {
+        OnboardingStateManager.updateStep(user.id, 'business_verification', true);
+      }
       
       // Route to invoice processing setup
       router.push('/onboarding/app/invoice-processing-setup');
@@ -109,7 +116,9 @@ export default function APPBusinessVerificationPage() {
 
   const handleSkipForNow = () => {
     // Mark onboarding as complete and go to dashboard
-    OnboardingStateManager.completeOnboarding(user?.id);
+    if (user?.id) {
+      OnboardingStateManager.completeOnboarding(user.id);
+    }
     router.push('/dashboard/app');
   };
 
@@ -153,7 +162,7 @@ export default function APPBusinessVerificationPage() {
     'Over ₦500 million'
   ];
 
-  if (!user) {
+  if (userLoading || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
@@ -164,12 +173,19 @@ export default function APPBusinessVerificationPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Progress Indicator */}
+        <OnboardingProgressIndicator 
+          currentStep="business_verification"
+          completedSteps={[]}
+          userRole="app"
+        />
+        
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold text-gray-900 mb-4`}>
             Business Verification 🏢
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className={`${isMobile ? 'text-base' : 'text-xl'} text-gray-600 max-w-3xl mx-auto`}>
             Complete your business verification to enable FIRS integration and invoice processing.
             This information is required for tax compliance.
           </p>
@@ -177,7 +193,7 @@ export default function APPBusinessVerificationPage() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
             <div className="flex items-center justify-center text-green-800 text-sm">
               <span className="mr-2">👋</span>
-              <span>Welcome, {user.first_name}! Let's verify your <strong>Access Point Provider</strong> business details.</span>
+              <span>Welcome, {user?.first_name || 'there'}! Let's verify your <strong>Access Point Provider</strong> business details.</span>
             </div>
           </div>
         </div>
@@ -363,14 +379,13 @@ export default function APPBusinessVerificationPage() {
               Continue to FIRS Setup
             </TaxPoyntButton>
             
-            <TaxPoyntButton
-              variant="secondary"
-              onClick={handleSkipForNow}
+            <SkipForNowButton
+              onSkip={handleSkipForNow}
               disabled={isLoading}
+              skipText="Complete Later"
+              warningText="You can complete business verification from your dashboard anytime"
               className="flex-1 max-w-xs"
-            >
-              Complete Later
-            </TaxPoyntButton>
+            />
           </div>
 
           {/* Help Text */}

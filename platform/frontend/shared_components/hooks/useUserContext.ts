@@ -23,6 +23,8 @@ export interface User {
   role: 'system_integrator' | 'access_point_provider' | 'hybrid_user';
   service_package: 'si' | 'app' | 'hybrid';
   organization_id?: string;
+  first_name?: string; // Add as direct property for easier access
+  last_name?: string;   // Add as direct property for easier access
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -44,6 +46,7 @@ export interface UserContext {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  loading: boolean; // Alias for isLoading for backward compatibility
   error: string | null;
   
   // Role checking functions
@@ -279,6 +282,7 @@ export const useUserContext = (options: UseUserContextOptions = {}): UserContext
     user,
     isAuthenticated,
     isLoading,
+    loading: isLoading, // Alias for backward compatibility
     error,
     
     // Role checking

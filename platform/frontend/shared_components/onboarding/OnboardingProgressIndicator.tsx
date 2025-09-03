@@ -26,7 +26,7 @@ interface OnboardingStep {
 }
 
 interface OnboardingProgressProps {
-  currentStep: string;
+  currentStep: string | number;
   completedSteps: string[];
   userRole: 'si' | 'app' | 'hybrid';
   isLoading?: boolean;
@@ -215,7 +215,9 @@ export const OnboardingProgressIndicator: React.FC<OnboardingProgressProps> = ({
   const steps = ONBOARDING_STEPS[userRole] || [];
   
   const progressData = useMemo(() => {
-    const currentStepIndex = steps.findIndex(step => step.id === currentStep);
+    // Handle both string and number currentStep
+    const currentStepStr = typeof currentStep === 'number' ? steps[currentStep - 1]?.id || '' : currentStep;
+    const currentStepIndex = steps.findIndex(step => step.id === currentStepStr);
     const completedCount = completedSteps.length;
     const totalSteps = steps.length;
     const progressPercentage = Math.round((completedCount / totalSteps) * 100);
@@ -245,7 +247,8 @@ export const OnboardingProgressIndicator: React.FC<OnboardingProgressProps> = ({
 
   const getStepStatus = (step: OnboardingStep, index: number): 'completed' | 'current' | 'upcoming' | 'blocked' => {
     if (completedSteps.includes(step.id)) return 'completed';
-    if (step.id === currentStep) return 'current';
+    const currentStepStr = typeof currentStep === 'number' ? steps[currentStep - 1]?.id || '' : currentStep;
+    if (step.id === currentStepStr) return 'current';
     
     // Check if dependencies are met
     if (step.dependencies) {
@@ -257,7 +260,8 @@ export const OnboardingProgressIndicator: React.FC<OnboardingProgressProps> = ({
   };
 
   const getStepIcon = (step: OnboardingStep, status: string) => {
-    if (isLoading && step.id === currentStep) {
+    const currentStepStr = typeof currentStep === 'number' ? steps[currentStep - 1]?.id || '' : currentStep;
+    if (isLoading && step.id === currentStepStr) {
       return (
         <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
       );

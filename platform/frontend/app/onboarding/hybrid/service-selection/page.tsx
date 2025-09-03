@@ -1,13 +1,35 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '../../../../design_system/components/Button';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
+import { TaxPoyntButton } from '../../../../design_system';
+import { 
+  OnboardingProgressIndicator, 
+  SkipForNowButton, 
+  useMobileOptimization 
+} from '../../../../shared_components/onboarding';
 
 export default function HybridServiceSelectionPage() {
   const router = useRouter();
+  const { user, loading: userLoading } = useUserContext();
+  const { isMobile, mobileBreakpoint } = useMobileOptimization();
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (userLoading) return;
+    
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+
+    if (user.role !== 'hybrid_user') {
+      router.push('/dashboard');
+      return;
+    }
+  }, [user, userLoading, router]);
 
   const services = [
     {
@@ -68,14 +90,29 @@ export default function HybridServiceSelectionPage() {
     router.push('/dashboard/hybrid');
   };
 
+  if (userLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto py-8 px-4">
+        {/* Progress Indicator */}
+        <OnboardingProgressIndicator 
+          currentStep="service_selection"
+          completedSteps={[]}
+          userRole="hybrid"
+        />
+        
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-900`}>
             Choose Your Services
           </h1>
-          <p className="mt-2 text-lg text-gray-600">
+          <p className={`mt-2 ${isMobile ? 'text-base' : 'text-lg'} text-gray-600`}>
             As a Hybrid user, you can access both System Integration and Invoice Processing services
           </p>
         </div>
@@ -137,19 +174,19 @@ export default function HybridServiceSelectionPage() {
           </p>
           
           <div className="flex justify-center space-x-4">
-            <Button 
-              onClick={handleSkipForNow}
-              variant="secondary"
-            >
-              Skip for Now
-            </Button>
-            <Button 
+            <SkipForNowButton
+              onSkip={handleSkipForNow}
+              skipText="Skip for Now"
+              warningText="You can configure services from your dashboard anytime"
+            />
+            <TaxPoyntButton 
               onClick={handleContinue}
               disabled={isLoading || selectedServices.length === 0}
               variant="primary"
+              loading={isLoading}
             >
               {isLoading ? 'Setting up...' : `Continue with ${selectedServices.length} service${selectedServices.length !== 1 ? 's' : ''}`}
-            </Button>
+            </TaxPoyntButton>
           </div>
         </div>
       </div>

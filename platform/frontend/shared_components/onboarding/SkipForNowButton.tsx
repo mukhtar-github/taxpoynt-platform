@@ -19,7 +19,8 @@ import { TaxPoyntButton } from '../../design_system/components/TaxPoyntButton';
 import { ArrowRight, Clock } from 'lucide-react';
 
 interface SkipForNowButtonProps {
-  onClick: () => void;
+  onClick?: () => void;
+  onSkip?: () => void; // Alternative prop name for onClick
   disabled?: boolean;
   loading?: boolean;
   text?: string;
@@ -31,10 +32,13 @@ interface SkipForNowButtonProps {
   className?: string;
   analyticsEvent?: string; // For tracking skip events
   estimatedTime?: string; // e.g., "5 minutes" - shows what they're skipping
+  skipText?: string; // Alternative text prop
+  warningText?: string; // Warning message prop
 }
 
 export const SkipForNowButton: React.FC<SkipForNowButtonProps> = ({
   onClick,
+  onSkip,
   disabled = false,
   loading = false,
   text = "Skip for Now",
@@ -45,7 +49,9 @@ export const SkipForNowButton: React.FC<SkipForNowButtonProps> = ({
   fullWidth = false,
   className = "",
   analyticsEvent,
-  estimatedTime
+  estimatedTime,
+  skipText,
+  warningText
 }) => {
 
   const handleClick = () => {
@@ -55,8 +61,16 @@ export const SkipForNowButton: React.FC<SkipForNowButtonProps> = ({
       console.log('📊 Skip button clicked:', analyticsEvent);
     }
     
-    onClick();
+    // Use onSkip if provided, otherwise use onClick
+    if (onSkip) {
+      onSkip();
+    } else if (onClick) {
+      onClick();
+    }
   };
+
+  // Use skipText if provided, otherwise use text
+  const buttonText = skipText || text;
 
   const buttonContent = (
     <>
@@ -65,7 +79,7 @@ export const SkipForNowButton: React.FC<SkipForNowButtonProps> = ({
       ) : showIcon ? (
         <ArrowRight className="h-4 w-4 mr-2" />
       ) : null}
-      {loading ? 'Please wait...' : text}
+      {loading ? 'Please wait...' : buttonText}
     </>
   );
 
@@ -82,7 +96,7 @@ export const SkipForNowButton: React.FC<SkipForNowButtonProps> = ({
           ${variant === 'secondary' ? 'hover:shadow-md' : ''}
           ${size === 'touch' ? 'min-h-[44px]' : ''}
         `}
-        aria-label={description ? `${text}: ${description}` : text}
+        aria-label={description ? `${buttonText}: ${description}` : buttonText}
       >
         {buttonContent}
       </TaxPoyntButton>

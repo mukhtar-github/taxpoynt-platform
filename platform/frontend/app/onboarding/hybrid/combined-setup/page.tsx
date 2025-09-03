@@ -2,10 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { AuthLayout } from '../../../../shared_components/auth/AuthLayout';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
-import { authService } from '../../../../shared_components/services/auth';
+import { 
+  OnboardingProgressIndicator, 
+  SkipForNowButton, 
+  useMobileOptimization 
+} from '../../../../shared_components/onboarding';
 
 interface CombinedSetupData {
   // Business Information
@@ -34,7 +39,8 @@ interface CombinedSetupData {
 
 export default function HybridCombinedSetupPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, loading: userLoading } = useUserContext();
+  const { isMobile, mobileBreakpoint } = useMobileOptimization();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [setupData, setSetupData] = useState<CombinedSetupData>({
@@ -56,27 +62,26 @@ export default function HybridCombinedSetupPage() {
   });
 
   useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
+    if (userLoading) return;
+    
+    if (!user) {
       router.push('/auth/signin');
       return;
     }
 
-    if (currentUser.role !== 'hybrid_user') {
+    if (user.role !== 'hybrid_user') {
       router.push('/dashboard');
       return;
     }
-
-    setUser(currentUser);
     
     // Pre-populate business name if available
-    if ((currentUser as any).business_name) {
+    if ((user as any).business_name) {
       setSetupData(prev => ({
         ...prev,
-        business_name: (currentUser as any).business_name
+        business_name: (user as any).business_name
       }));
     }
-  }, [router]);
+  }, [user, userLoading, router]);
 
   const updateSetupData = (field: keyof CombinedSetupData, value: any) => {
     setSetupData(prev => ({
@@ -145,19 +150,25 @@ export default function HybridCombinedSetupPage() {
 
       if (response.ok) {
         // Mark onboarding as complete
-        OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
+        if (user?.id) {
+          OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
+        }
         
         // Redirect to Hybrid dashboard
         router.push('/dashboard/hybrid');
       } else {
         console.warn('Setup API not available, using demo completion');
-        OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
+        if (user?.id) {
+          OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
+        }
         router.push('/dashboard/hybrid');
       }
     } catch (error) {
       console.error('Setup completion failed:', error);
       // Demo completion fallback
-      OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
+      if (user?.id) {
+        OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
+      }
       router.push('/dashboard/hybrid');
     } finally {
       setIsLoading(false);
@@ -193,7 +204,7 @@ export default function HybridCombinedSetupPage() {
     { id: 'compliance_monitoring', name: 'Compliance Monitoring', description: 'Track regulatory status' }
   ];
 
-  if (!user) {
+  if (userLoading || !user) {
     return (
       <AuthLayout title="Loading" subtitle="Setting up your workspace">
         <div className="text-center">
@@ -207,48 +218,21 @@ export default function HybridCombinedSetupPage() {
   return (
     <AuthLayout title="Complete Your Hybrid Setup" subtitle="Configure your comprehensive SI + APP solution">
       <div className="max-w-4xl mx-auto">
+        {/* Enhanced Progress Indicator */}
+        <OnboardingProgressIndicator 
+          currentStep={currentStep.toString()}
+          completedSteps={[]}
+          userRole="hybrid"
+        />
+        
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-900`}>
             Complete Your Hybrid Setup
           </h1>
-          <p className="mt-2 text-lg text-gray-600">
+          <p className={`mt-2 ${isMobile ? 'text-base' : 'text-lg'} text-gray-600`}>
             Configure your comprehensive SI + APP solution
           </p>
-          
-          {/* Progress Indicator */}
-          <div className="flex justify-center mt-6">
-            <div className="flex items-center space-x-4">
-              {[1, 2, 3, 4].map((step) => (
-                <React.Fragment key={step}>
-                  <div className={`
-                    w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                    ${currentStep >= step 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-gray-200 text-gray-600'
-                    }
-                  `}>
-                    {step}
-                  </div>
-                  {step < 4 && (
-                    <div className={`
-                      w-12 h-0.5 
-                      ${currentStep > step ? 'bg-purple-600' : 'bg-gray-200'}
-                    `}></div>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-          
-          <div className="mt-4 text-sm text-gray-600">
-            Step {currentStep} of 4: {
-              currentStep === 1 ? 'Business Information' :
-              currentStep === 2 ? 'SI Configuration' :
-              currentStep === 3 ? 'APP Configuration' :
-              'Compliance & Consent'
-            }
-          </div>
         </div>
 
         {/* Step Content */}

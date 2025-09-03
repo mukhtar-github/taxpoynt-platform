@@ -2,9 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
+import { 
+  OnboardingProgressIndicator, 
+  SkipForNowButton, 
+  useMobileOptimization 
+} from '../../../../shared_components/onboarding';
 import { TaxPoyntAPIClient } from '../../../../shared_components/api/client';
 import { APIResponse } from '../../../../si_interface/types';
 import { secureConfig, validateConfig } from '../../../../shared_components/utils/secureConfig';
@@ -25,7 +30,8 @@ interface FIRSSetupData {
 
 export default function APPInvoiceProcessingSetupPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, loading: userLoading } = useUserContext();
+  const { isMobile, mobileBreakpoint } = useMobileOptimization();
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
@@ -44,20 +50,20 @@ export default function APPInvoiceProcessingSetupPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
+    if (userLoading) return;
+    
+    if (!user) {
       router.push('/auth/signin');
       return;
     }
 
-    if (currentUser.role !== 'access_point_provider') {
+    if (user.role !== 'access_point_provider') {
       router.push('/dashboard');
       return;
     }
 
-    setUser(currentUser);
-    OnboardingStateManager.updateStep(currentUser.id, 'invoice_processing_setup');
-  }, [router]);
+    OnboardingStateManager.updateStep(user.id, 'invoice_processing_setup');
+  }, [user, userLoading, router]);
 
   const validateStep = (step: number): boolean => {
     const errors: Record<string, string> = {};
@@ -143,14 +149,16 @@ export default function APPInvoiceProcessingSetupPage() {
       // Save FIRS configuration
       await apiClient.post<APIResponse>('/api/v1/app/setup/firs-configuration', {
         ...sanitizedSetupData,
-        user_id: user.id
+        user_id: user?.id || ''
       });
       
       // Mark onboarding as complete
-      OnboardingStateManager.completeOnboarding(user.id);
+      if (user?.id) {
+        OnboardingStateManager.completeOnboarding(user.id);
+      }
       
       secureLogger.userAction('APP Invoice Processing setup completed successfully', { 
-        user_id: user.id,
+        user_id: user?.id || '',
         environment: setupData.environment 
       });
       router.push('/dashboard/app');
@@ -164,7 +172,9 @@ export default function APPInvoiceProcessingSetupPage() {
   };
 
   const handleSkipForNow = () => {
-    OnboardingStateManager.completeOnboarding(user?.id);
+    if (user?.id) {
+      OnboardingStateManager.completeOnboarding(user.id);
+    }
     router.push('/dashboard/app');
   };
 
@@ -192,7 +202,7 @@ export default function APPInvoiceProcessingSetupPage() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
             <div className="flex items-center justify-center text-green-800 text-sm">
               <span className="mr-2">✨</span>
-              <span>Welcome, {user.first_name}! Setting up your <strong>APP</strong> invoice processing environment.</span>
+              <span>Welcome, {user?.first_name || 'there'}! Setting up your <strong>APP</strong> invoice processing environment.</span>
             </div>
           </div>
         </div>
