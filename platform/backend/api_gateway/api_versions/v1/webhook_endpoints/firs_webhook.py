@@ -57,7 +57,7 @@ class FIRSWebhookEndpoints:
         self.webhook_secret = "yRLXTUtWIU2OlMyKOBAWEVmjIop1xJe5ULPJLYoJpyA"  # From .env
         
         # Initialize webhook receiver and callback manager
-        self.webhook_receiver = WebhookReceiver()
+        self.webhook_receiver = WebhookReceiver(self.webhook_secret)
         self.callback_manager = CallbackManager()
         
         self._setup_routes()
