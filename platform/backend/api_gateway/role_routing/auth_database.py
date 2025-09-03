@@ -145,7 +145,18 @@ class AuthDatabaseManager:
                 "hybrid": UserRole.HYBRID_USER
             }
             
-            # Create User instance with organization_id
+            # Create User instance with proper type conversion
+            import uuid
+            from datetime import datetime
+            
+            # Convert organization_id to UUID if it's a string
+            org_id = user_data.get("organization_id")
+            if org_id and isinstance(org_id, str):
+                try:
+                    org_id = uuid.UUID(org_id)
+                except ValueError:
+                    org_id = None
+            
             user = User(
                 email=user_data["email"],
                 hashed_password=user_data["hashed_password"],
@@ -154,7 +165,7 @@ class AuthDatabaseManager:
                 phone=user_data.get("phone"),
                 role=service_role_mapping.get(user_data["service_package"], UserRole.SI_USER),
                 service_package=user_data["service_package"],
-                organization_id=user_data.get("organization_id"),
+                organization_id=org_id,
                 is_active=True,
                 is_email_verified=False,
                 terms_accepted_at=user_data.get("terms_accepted_at"),
@@ -194,6 +205,16 @@ class AuthDatabaseManager:
         """Create a new organization using existing Organization model."""
         session = self.get_session()
         try:
+            # Convert owner_id to UUID if it's a string
+            owner_id = org_data.get("owner_id")
+            if owner_id and isinstance(owner_id, str):
+                try:
+                    owner_id = uuid.UUID(owner_id)
+                except ValueError:
+                    owner_id = None
+            else:
+                owner_id = None
+            
             # Map business type string to enum if provided
             business_type = None
             if org_data.get("business_type"):
