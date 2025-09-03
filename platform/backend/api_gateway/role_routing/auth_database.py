@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 from datetime import datetime, timezone
 
 # Import existing models
@@ -96,13 +97,15 @@ class AuthDatabaseManager:
                 # Create indexes
                 indexes = [
                     "CREATE INDEX IF NOT EXISTS ix_users_organization_id ON users(organization_id)",
-                    "CREATE INDEX IF NOT EXISTS ix_users_is_deleted ON users(is_deleted)",
+                    "CREATE INDEX IF NOT EXISTS ix_users_is_deleted ON users(is_deleted)", 
                     "CREATE INDEX IF NOT EXISTS ix_organizations_is_deleted ON organizations(is_deleted)"
                 ]
                 
                 for index_sql in indexes:
                     try:
-                        conn.execute(index_sql)
+                        conn.execute(text(index_sql))
+                        conn.commit()
+                        logger.debug(f"Created index: {index_sql}")
                     except Exception as idx_e:
                         logger.warning(f"Could not create index: {idx_e}")
                 
@@ -117,18 +120,63 @@ class AuthDatabaseManager:
         """Helper method to migrate columns for a specific table."""
         for column_name, column_type in columns:
             try:
-                # Check if column exists
-                result = conn.execute(
-                    f"SELECT column_name FROM information_schema.columns WHERE table_name='{table_name}' AND column_name='{column_name}'"
-                ).fetchone()
+                # Check if column exists (database-agnostic approach)
+                if self._column_exists(conn, table_name, column_name):
+                    logger.debug(f"Column {column_name} already exists in {table_name}")
+                    continue
                 
-                if not result:
-                    logger.info(f"Adding {column_name} column to {table_name} table...")
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
-                    logger.info(f"✅ Added {column_name} to {table_name}")
+                # Add column if it doesn't exist
+                logger.info(f"Adding {column_name} column to {table_name} table...")
+                
+                # Convert PostgreSQL types to SQLite types if needed
+                sqlite_type = self._convert_to_sqlite_type(column_type)
+                
+                conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {sqlite_type}"))
+                conn.commit()
+                
+                # For SQLite, set a default value for timestamp columns after creation
+                if "sqlite" in self.database_url.lower() and column_name == "last_activity_at":
+                    conn.execute(text(f"UPDATE {table_name} SET {column_name} = CURRENT_TIMESTAMP WHERE {column_name} IS NULL"))
+                    conn.commit()
+                
+                logger.info(f"✅ Added {column_name} to {table_name}")
                     
             except Exception as e:
                 logger.warning(f"Could not add {column_name} to {table_name}: {e}")
+    
+    def _column_exists(self, conn, table_name: str, column_name: str) -> bool:
+        """Check if a column exists in a table (database-agnostic)."""
+        try:
+            if "sqlite" in self.database_url.lower():
+                # For SQLite, use PRAGMA table_info
+                result = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+                return any(row[1] == column_name for row in result)
+            else:
+                # For PostgreSQL, use information_schema
+                result = conn.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name=:table AND column_name=:column"),
+                    {"table": table_name, "column": column_name}
+                ).fetchone()
+                return result is not None
+        except Exception as e:
+            logger.debug(f"Error checking column existence: {e}")
+            return False
+    
+    def _convert_to_sqlite_type(self, pg_type: str) -> str:
+        """Convert PostgreSQL column types to SQLite types."""
+        if "sqlite" not in self.database_url.lower():
+            return pg_type
+            
+        # Convert PostgreSQL types to SQLite equivalents
+        type_mappings = {
+            "UUID": "TEXT",
+            "BOOLEAN DEFAULT FALSE": "INTEGER DEFAULT 0",
+            "TIMESTAMP WITH TIME ZONE": "DATETIME",
+            "TIMESTAMP WITH TIME ZONE DEFAULT NOW()": "DATETIME",  # Remove default for SQLite
+            "VARCHAR(255)": "TEXT"
+        }
+        
+        return type_mappings.get(pg_type, pg_type)
     
     def get_session(self) -> Session:
         """Get database session."""
