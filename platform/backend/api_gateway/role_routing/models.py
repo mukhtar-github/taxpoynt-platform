@@ -128,6 +128,7 @@ class HTTPRoutingContext:
     correlation_id: Optional[str] = None
     request_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
+    is_authenticated: bool = False  # Add missing authentication flag
     
     def has_role(self, role: PlatformRole) -> bool:
         """Check if context has the specified platform role"""

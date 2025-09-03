@@ -323,7 +323,8 @@ class HTTPRoleDetector:
                 api_key=auth_info.get("api_key"),
                 client_ip=self._get_client_ip(request),
                 user_agent=request.headers.get("user-agent"),
-                correlation_id=request.headers.get("x-correlation-id") or request.headers.get("x-request-id")
+                correlation_id=request.headers.get("x-correlation-id") or request.headers.get("x-request-id"),
+                is_authenticated=self._check_authentication_status(request, auth_info, analysis)
             )
             
             # Set detected roles
@@ -596,6 +597,35 @@ class HTTPRoleDetector:
         auth_info["user_id"] = request.headers.get("x-user-id")
         
         return {k: v for k, v in auth_info.items() if v is not None}
+
+    def _check_authentication_status(self, request: Request, auth_info: Dict[str, Any], analysis: RequestAnalysis) -> bool:
+        """Check if the request is authenticated based on available authentication information."""
+        
+        # Check for JWT token in Authorization header
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer ") and len(auth_header) > 7:
+            token = auth_header[7:]
+            # Basic token validation (non-empty and reasonable length)
+            if len(token) > 20:  # JWT tokens are typically much longer
+                return True
+        
+        # Check for API key authentication
+        if auth_info.get("api_key"):
+            return True
+            
+        # Check for session-based authentication
+        if auth_info.get("session_id") and auth_info.get("user_id"):
+            return True
+            
+        # Check if we have user_id from any source (indicates successful auth)
+        if auth_info.get("user_id"):
+            return True
+            
+        # For development/testing purposes, check if we have analysis indicating authentication
+        if hasattr(analysis, 'has_authentication') and analysis.has_authentication:
+            return True
+            
+        return False
 
     def _get_client_ip(self, request: Request) -> Optional[str]:
         """Extract client IP address from request."""

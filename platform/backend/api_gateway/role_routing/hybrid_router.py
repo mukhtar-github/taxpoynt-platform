@@ -224,7 +224,7 @@ class HybridServicesRouter:
         """Dependency to ensure Administrator role access"""
         context = await self.role_detector.detect_role_context(request)
         
-        if not context.has_role(PlatformRole.ADMINISTRATOR):
+        if not context.has_role(PlatformRole.PLATFORM_ADMIN):
             logger.warning(f"Admin endpoint access denied for context: {context}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -445,16 +445,18 @@ class HybridServicesRouter:
             raise HTTPException(status_code=500, detail="Failed to check integrations health")
     
     # Reporting Routes
-    async def get_dashboard_data(self, request: Request, context: HTTPRoutingContext = Depends(_require_authenticated)):
+    async def get_dashboard_data(self, request: Request):
         """Get dashboard data appropriate for user role"""
         try:
+            # Get context from the dependency that was called in route registration
+            context = await self._require_authenticated(request)
             service_role = self._get_primary_service_role(context)
             result = await self.message_router.route_message(
                 service_role=service_role,
                 operation="get_dashboard_data",
                 payload={
                     "user_id": context.user_id,
-                    "role": context.primary_role,
+                    "role": context.platform_role,
                     "filters": request.query_params
                 }
             )
@@ -532,14 +534,14 @@ class HybridServicesRouter:
             return ServiceRole.SYSTEM_INTEGRATOR
         elif context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
             return ServiceRole.ACCESS_POINT_PROVIDER
-        elif context.has_role(PlatformRole.ADMINISTRATOR):
+        elif context.has_role(PlatformRole.PLATFORM_ADMIN):
             return ServiceRole.ADMINISTRATOR
         else:
             return ServiceRole.SYSTEM_INTEGRATOR  # Default
     
     def _filter_profile_data(self, data: Dict[str, Any], context: HTTPRoutingContext) -> Dict[str, Any]:
         """Filter profile data based on user role"""
-        if context.has_role(PlatformRole.ADMINISTRATOR):
+        if context.has_role(PlatformRole.PLATFORM_ADMIN):
             return data  # Admins see everything
         
         # Remove sensitive fields for non-admin users
@@ -556,7 +558,7 @@ class HybridServicesRouter:
         role_keywords = {
             PlatformRole.SYSTEM_INTEGRATOR: ['integration', 'organization', 'transaction'],
             PlatformRole.ACCESS_POINT_PROVIDER: ['firs', 'taxpayer', 'compliance', 'invoice'],
-            PlatformRole.ADMINISTRATOR: ['system', 'user', 'audit', 'security']
+            PlatformRole.PLATFORM_ADMIN: ['system', 'user', 'audit', 'security']
         }
         
         relevant_keywords = role_keywords.get(context.primary_role, [])
@@ -571,7 +573,7 @@ class HybridServicesRouter:
     
     def _filter_organization_search(self, data: Dict[str, Any], context: HTTPRoutingContext) -> Dict[str, Any]:
         """Filter organization search results based on user role and permissions"""
-        if context.has_role(PlatformRole.ADMINISTRATOR):
+        if context.has_role(PlatformRole.PLATFORM_ADMIN):
             return data  # Admins see all organizations
         
         # Filter based on user's associated organizations
@@ -587,7 +589,7 @@ class HybridServicesRouter:
     
     def _filter_organization_info(self, data: Dict[str, Any], context: HTTPRoutingContext) -> Dict[str, Any]:
         """Filter organization info based on role"""
-        if context.has_role(PlatformRole.ADMINISTRATOR):
+        if context.has_role(PlatformRole.PLATFORM_ADMIN):
             return data
         
         # Remove sensitive organization data for non-admin users
@@ -597,7 +599,7 @@ class HybridServicesRouter:
     
     def _filter_transaction_summary(self, data: Dict[str, Any], context: HTTPRoutingContext) -> Dict[str, Any]:
         """Filter transaction summary based on role"""
-        if context.has_role(PlatformRole.ADMINISTRATOR):
+        if context.has_role(PlatformRole.PLATFORM_ADMIN):
             return data
         
         # SI sees transaction processing data, APP sees compliance data
@@ -612,7 +614,7 @@ class HybridServicesRouter:
     
     def _filter_integration_status(self, data: Dict[str, Any], context: HTTPRoutingContext) -> Dict[str, Any]:
         """Filter integration status based on role"""
-        if context.has_role(PlatformRole.ADMINISTRATOR):
+        if context.has_role(PlatformRole.PLATFORM_ADMIN):
             return data
         
         # Show only relevant integrations for each role
@@ -656,7 +658,7 @@ class HybridServicesRouter:
                     'firs_connection': data.get('firs_connection', {})
                 }
             }
-        elif context.has_role(PlatformRole.ADMINISTRATOR):
+        elif context.has_role(PlatformRole.PLATFORM_ADMIN):
             # Admin dashboard shows comprehensive system overview
             return {
                 'widgets': ['system_health', 'user_metrics', 'audit_summary'],
