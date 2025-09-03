@@ -102,10 +102,10 @@ class APPServiceRegistry:
             # Initialize FIRS services with real implementations
             firs_api_client = await self._create_firs_api_client()
             auth_handler = FIRSAuthenticationHandler(
-                client_id="your_firs_client_id",  # From .env
-                client_secret="your_firs_client_secret",  # From .env
-                api_key="36dc0109-5fab-4433-80c3-84d9cef792a2",  # From .env
-                environment="sandbox"
+                client_id=os.getenv("FIRS_CLIENT_ID", "your_firs_client_id"),
+                client_secret=os.getenv("FIRS_CLIENT_SECRET", "your_firs_client_secret"),
+                api_key=os.getenv("FIRS_SANDBOX_API_KEY", "36dc0109-5fab-4433-80c3-84d9cef792a2"),
+                environment=os.getenv("FIRS_ENVIRONMENT", "sandbox")
             )
             
             firs_service = {
@@ -157,7 +157,7 @@ class APPServiceRegistry:
         try:
             # Initialize webhook services with real implementations
             webhook_receiver = WebhookReceiver(
-                webhook_secret="yRLXTUtWIU2OlMyKOBAWEVmjIop1xJe5ULPJLYoJpyA",  # From .env
+                webhook_secret=os.getenv("FIRS_WEBHOOK_SECRET", "yRLXTUtWIU2OlMyKOBAWEVmjIop1xJe5ULPJLYoJpyA"),
                 max_concurrent_processing=10
             )
             event_processor = EventProcessor()

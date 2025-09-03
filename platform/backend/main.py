@@ -25,6 +25,18 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Load .env file from project root
+project_root = Path(__file__).parent.parent.parent
+env_file = project_root / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
+    print(f"✅ Loaded environment variables from {env_file}")
+else:
+    print(f"⚠️ .env file not found at {env_file}")
+
 # Environment configuration with Railway optimization
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 DEBUG = ENVIRONMENT == "development"
@@ -32,8 +44,7 @@ PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
 RAILWAY_DEPLOYMENT = os.getenv("RAILWAY_DEPLOYMENT_ID") is not None
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
+# Add project root to path  
 sys.path.append(str(project_root))
 
 # Health check middleware for robust startup detection
