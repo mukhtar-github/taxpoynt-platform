@@ -5,12 +5,22 @@ SQLAlchemy models for banking integration data persistence.
 Supports Mono, Stitch, and Unified Banking providers.
 """
 
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Numeric, ForeignKey, Enum, JSON
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from .base import BaseModel
 import uuid
 from enum import Enum as PyEnum
+import os
+
+# Cross-database compatible JSON type
+def get_json_type():
+    """Return appropriate JSON type based on database"""
+    db_url = os.getenv('DATABASE_URL', '')
+    if 'postgresql' in db_url.lower():
+        return JSONB
+    else:
+        return JSON
 
 
 class BankingProvider(str, PyEnum):
@@ -73,7 +83,7 @@ class BankingConnection(BaseModel):
     token_expires_at = Column(DateTime(timezone=True), nullable=True)
     
     # Connection metadata
-    connection_metadata = Column(JSONB, default={})
+    connection_metadata = Column(get_json_type(), default={})
     last_sync_at = Column(DateTime(timezone=True), nullable=True)
     sync_frequency_hours = Column(Integer, default=24)
     
@@ -110,7 +120,7 @@ class BankAccount(BaseModel):
     last_balance_update = Column(DateTime(timezone=True), nullable=True)
     
     # Account metadata
-    account_metadata = Column(JSONB, default={})
+    account_metadata = Column(get_json_type(), default={})
     
     # Relationships
     connection = relationship("BankingConnection", back_populates="accounts")
@@ -152,7 +162,7 @@ class BankTransaction(BaseModel):
     counterparty_bank = Column(String(255), nullable=True)
     
     # Transaction metadata
-    transaction_metadata = Column(JSONB, default={})
+    transaction_metadata = Column(get_json_type(), default={})
     
     # Processing status
     is_processed = Column(Boolean, default=False)
@@ -179,7 +189,7 @@ class BankingWebhook(BaseModel):
     event_type = Column(String(100), nullable=False)
     
     # Webhook data
-    webhook_data = Column(JSONB, nullable=False)
+    webhook_data = Column(get_json_type(), nullable=False)
     raw_payload = Column(Text, nullable=True)
     
     # Processing status
@@ -220,10 +230,10 @@ class BankingSyncLog(BaseModel):
     
     # Error information
     error_message = Column(Text, nullable=True)
-    error_details = Column(JSONB, default={})
+    error_details = Column(get_json_type(), default={})
     
     # Sync metadata
-    sync_metadata = Column(JSONB, default={})
+    sync_metadata = Column(get_json_type(), default={})
 
 
 class BankingCredentials(BaseModel):
@@ -252,4 +262,4 @@ class BankingCredentials(BaseModel):
     validation_status = Column(String(20), nullable=True)  # valid, invalid, pending
     
     # Credential metadata
-    credentials_metadata = Column(JSONB, default={})
+    credentials_metadata = Column(get_json_type(), default={})

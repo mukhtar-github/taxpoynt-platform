@@ -145,6 +145,13 @@ class FrontendRoleDetector {
         }
       }
 
+      // Check if user is authenticated before trying to fetch from API
+      const token = this.getAuthToken();
+      if (!token) {
+        console.log('No auth token found in session, skipping API role fetch');
+        return null;
+      }
+
       // Fallback to API call
       return await this.fetchRolesFromAPI();
       
@@ -159,16 +166,29 @@ class FrontendRoleDetector {
    */
   private async fetchRolesFromAPI(): Promise<RoleDetectionResult | null> {
     try {
+      const token = this.getAuthToken();
+      
+      // If no token is available, don't attempt the API call
+      if (!token) {
+        console.log('No auth token available, skipping role fetch from API');
+        return null;
+      }
+
       const response = await fetch('/api/v1/auth/user-roles', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+          'Authorization': `Bearer ${token}`
         },
         credentials: 'include'
       });
 
       if (!response.ok) {
+        // Don't log 401/403 as errors during registration flow
+        if (response.status === 401 || response.status === 403) {
+          console.log(`Role fetch returned ${response.status}, likely not authenticated yet`);
+          return null;
+        }
         throw new Error(`API request failed: ${response.status}`);
       }
 
@@ -375,8 +395,20 @@ export const RoleDetectorProvider: React.FC<RoleDetectorProviderProps> = ({
         result = await detector.detectRolesFromSession();
       }
 
+      // If no result, create a default guest/unauthenticated state instead of throwing error
       if (!result) {
-        throw new Error('Unable to detect user roles');
+        console.log('No roles detected, using fallback role');
+        result = {
+          primaryRole: fallbackRole,
+          allRoles: [],
+          activePermissions: [],
+          canSwitchRoles: false,
+          availableRoles: [fallbackRole],
+          isHybridUser: false,
+          currentScope: RoleScope.TENANT,
+          organizationId: undefined,
+          tenantId: undefined
+        };
       }
 
       setDetectionResult(result);
@@ -385,8 +417,23 @@ export const RoleDetectorProvider: React.FC<RoleDetectorProviderProps> = ({
       sessionStorage.setItem('taxpoynt_user_roles', JSON.stringify(result));
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Role detection failed');
-      console.error('Role detection error:', err);
+      // Don't set error state for expected authentication failures during registration
+      console.log('Role detection did not complete, using fallback role');
+      
+      // Create fallback result instead of error
+      const fallbackResult = {
+        primaryRole: fallbackRole,
+        allRoles: [],
+        activePermissions: [],
+        canSwitchRoles: false,
+        availableRoles: [fallbackRole],
+        isHybridUser: false,
+        currentScope: RoleScope.TENANT,
+        organizationId: undefined,
+        tenantId: undefined
+      };
+      
+      setDetectionResult(fallbackResult);
     } finally {
       setIsLoading(false);
     }

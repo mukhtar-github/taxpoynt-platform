@@ -24,6 +24,16 @@ from sqlalchemy.orm import relationship
 from .base import BaseModel
 import uuid
 from enum import Enum as PyEnum
+import os
+
+# Cross-database compatible JSON type
+def get_json_type():
+    """Return appropriate JSON type based on database"""
+    db_url = os.getenv('DATABASE_URL', '')
+    if 'postgresql' in db_url.lower():
+        return JSONB
+    else:
+        return JSON
 
 
 # ==============================================================================
@@ -172,7 +182,7 @@ class ERPConnection(BaseModel):
     
     # Configuration
     sync_frequency_hours = Column(Integer, default=24)
-    sync_configuration = Column(JSONB, default={})
+    sync_configuration = Column(get_json_type(), default={})
     
     # Authentication reference
     credentials_id = Column(UUID(as_uuid=True), ForeignKey("integration_credentials.id"), nullable=True)
@@ -206,10 +216,10 @@ class ERPSyncLog(BaseModel):
     
     # Error handling
     error_message = Column(Text, nullable=True)
-    error_details = Column(JSONB, default={})
+    error_details = Column(get_json_type(), default={})
     
     # Sync metadata
-    sync_metadata = Column(JSONB, default={})
+    sync_metadata = Column(get_json_type(), default={})
     
     # Relationships
     connection = relationship("ERPConnection", back_populates="sync_logs")
@@ -238,7 +248,7 @@ class CRMConnection(BaseModel):
     last_sync_at = Column(DateTime(timezone=True), nullable=True)
     
     # Configuration
-    sync_configuration = Column(JSONB, default={})
+    sync_configuration = Column(get_json_type(), default={})
     
     # Authentication reference
     credentials_id = Column(UUID(as_uuid=True), ForeignKey("integration_credentials.id"), nullable=True)
@@ -297,7 +307,7 @@ class POSConnection(BaseModel):
     last_transaction_sync = Column(DateTime(timezone=True), nullable=True)
     
     # Configuration
-    sync_configuration = Column(JSONB, default={})
+    sync_configuration = Column(get_json_type(), default={})
     
     # Authentication reference
     credentials_id = Column(UUID(as_uuid=True), ForeignKey("integration_credentials.id"), nullable=True)
@@ -327,7 +337,7 @@ class POSTransactionLog(BaseModel):
     invoice_reference = Column(String(255), nullable=True)
     
     # Metadata
-    transaction_metadata = Column(JSONB, default={})
+    transaction_metadata = Column(get_json_type(), default={})
     
     # Relationships
     connection = relationship("POSConnection", back_populates="transaction_logs")
@@ -364,7 +374,7 @@ class Certificate(BaseModel):
     usage_count = Column(Integer, default=0)
     
     # Certificate metadata
-    certificate_metadata = Column(JSONB, default={})
+    certificate_metadata = Column(get_json_type(), default={})
 
 
 # ==============================================================================
@@ -384,8 +394,8 @@ class DocumentTemplate(BaseModel):
     template_version = Column(String(50), default="1.0")
     
     # Template content
-    template_data = Column(JSONB, nullable=False)  # Template structure
-    style_configuration = Column(JSONB, default={})  # Styling rules
+    template_data = Column(get_json_type(), nullable=False)  # Template structure
+    style_configuration = Column(get_json_type(), default={})  # Styling rules
     
     # Status
     is_active = Column(Boolean, default=True)
@@ -418,7 +428,7 @@ class DocumentGenerationLog(BaseModel):
     storage_path = Column(String(500), nullable=True)
     
     # Processing metadata
-    generation_metadata = Column(JSONB, default={})
+    generation_metadata = Column(get_json_type(), default={})
     error_details = Column(Text, nullable=True)
 
 
@@ -440,7 +450,7 @@ class IRNGeneration(BaseModel):
     
     # QR code
     qr_code_data = Column(Text, nullable=True)  # Base64 encoded QR code
-    qr_code_metadata = Column(JSONB, default={})
+    qr_code_metadata = Column(get_json_type(), default={})
     
     # Generation status
     generation_status = Column(Enum(SyncStatus), nullable=False)
@@ -452,7 +462,7 @@ class IRNGeneration(BaseModel):
     
     # Validation
     validation_status = Column(String(50), nullable=True)
-    validation_details = Column(JSONB, default={})
+    validation_details = Column(get_json_type(), default={})
 
 
 # ==============================================================================
@@ -492,7 +502,7 @@ class Taxpayer(BaseModel):
     compliance_level = Column(String(50), nullable=True)
     
     # Metadata
-    taxpayer_metadata = Column(JSONB, default={})
+    taxpayer_metadata = Column(get_json_type(), default={})
     last_updated_from_firs = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -512,9 +522,9 @@ class WebhookEvent(BaseModel):
     webhook_id = Column(String(255), nullable=True)  # External webhook ID
     
     # Event data
-    event_data = Column(JSONB, nullable=False)
+    event_data = Column(get_json_type(), nullable=False)
     raw_payload = Column(Text, nullable=True)
-    headers = Column(JSONB, default={})
+    headers = Column(get_json_type(), default={})
     
     # Processing status
     processing_status = Column(Enum(SyncStatus), default=SyncStatus.PENDING)
@@ -523,7 +533,7 @@ class WebhookEvent(BaseModel):
     
     # Error handling
     error_message = Column(Text, nullable=True)
-    error_details = Column(JSONB, default={})
+    error_details = Column(get_json_type(), default={})
     
     # Security
     signature_valid = Column(Boolean, nullable=True)
@@ -547,8 +557,8 @@ class AnalyticsReport(BaseModel):
     report_period = Column(String(50), nullable=True)  # daily, weekly, monthly
     
     # Report data
-    report_data = Column(JSONB, nullable=False)
-    summary_metrics = Column(JSONB, default={})
+    report_data = Column(get_json_type(), nullable=False)
+    summary_metrics = Column(get_json_type(), default={})
     
     # Generation details
     generated_by = Column(UUID(as_uuid=True), nullable=True)  # User ID
@@ -557,7 +567,7 @@ class AnalyticsReport(BaseModel):
     
     # Access control
     is_public = Column(Boolean, default=False)
-    access_roles = Column(JSONB, default=[])  # Roles that can access
+    access_roles = Column(get_json_type(), default=[])  # Roles that can access
     
     # File storage
     file_path = Column(String(500), nullable=True)
@@ -589,9 +599,9 @@ class AuditLog(BaseModel):
     target_id = Column(String(255), nullable=True)
     
     # Event data
-    event_data = Column(JSONB, default={})
-    old_values = Column(JSONB, default={})
-    new_values = Column(JSONB, default={})
+    event_data = Column(get_json_type(), default={})
+    old_values = Column(get_json_type(), default={})
+    new_values = Column(get_json_type(), default={})
     
     # Context
     session_id = Column(String(255), nullable=True)
@@ -619,8 +629,8 @@ class ComplianceCheck(BaseModel):
     score = Column(Numeric(5, 2), nullable=True)  # Compliance score 0-100
     
     # Check data
-    check_results = Column(JSONB, nullable=False)
-    recommendations = Column(JSONB, default=[])
+    check_results = Column(get_json_type(), nullable=False)
+    recommendations = Column(get_json_type(), default=[])
     
     # Execution details
     checked_at = Column(DateTime(timezone=True), nullable=False)
