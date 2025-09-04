@@ -134,7 +134,9 @@ class AuthService {
 
   getToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(this.tokenKey);
+    // Use the same secure token storage as API client
+    const { secureTokenStorage } = require('../utils/secureTokenStorage');
+    return secureTokenStorage.getToken();
   }
 
   getStoredUser(): User | null {
