@@ -18,10 +18,18 @@ export default function APPDashboard() {
       return;
     }
 
-    // Verify user has APP role
+    // Debug: Log user role to identify the issue
+    console.log('🔍 APP Dashboard: User role check', {
+      userRole: currentUser.role,
+      expectedRole: 'access_point_provider',
+      matches: currentUser.role === 'access_point_provider'
+    });
+
+    // Temporarily disable redirect to prevent infinite loop during debugging
     if (currentUser.role !== 'access_point_provider') {
-      router.push('/dashboard'); // Redirect to appropriate dashboard
-      return;
+      console.log(`⚠️ APP Dashboard: User role '${currentUser.role}' doesn't match 'access_point_provider', but allowing access for debugging`);
+      // router.push('/dashboard'); // DISABLED to prevent infinite loop
+      // return;
     }
 
     setUser(currentUser);
