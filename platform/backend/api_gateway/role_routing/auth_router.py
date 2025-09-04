@@ -157,6 +157,19 @@ def determine_user_role(service_package: str) -> str:
     }
     return role_mapping.get(service_package, "system_integrator")
 
+def convert_db_role_to_frontend_role(db_role: str) -> str:
+    """Convert database UserRole enum value to frontend-expected role string"""
+    role_conversion = {
+        "si_user": "system_integrator",
+        "app_user": "access_point_provider", 
+        "hybrid_user": "hybrid_user",
+        "business_owner": "business_owner",
+        "business_admin": "business_admin",
+        "business_user": "business_user",
+        "platform_admin": "platform_admin"
+    }
+    return role_conversion.get(db_role, db_role)
+
 def create_auth_router(
     role_detector: HTTPRoleDetector,
     permission_guard: APIPermissionGuard,
@@ -335,7 +348,7 @@ def create_auth_router(
             token_data = {
                 "sub": user["email"],
                 "user_id": user["id"],
-                "role": user["role"],
+                "role": convert_db_role_to_frontend_role(user["role"]),
                 "organization_id": user["organization_id"],
                 "service_package": user["service_package"]
             }
@@ -369,7 +382,7 @@ def create_auth_router(
                 first_name=user["first_name"],
                 last_name=user["last_name"],
                 phone=user["phone"],
-                role=user["role"],
+                role=convert_db_role_to_frontend_role(user["role"]),
                 service_package=user["service_package"],
                 is_email_verified=user["is_email_verified"],
                 organization=organization_response
@@ -445,7 +458,7 @@ def create_auth_router(
                 first_name=user["first_name"],
                 last_name=user["last_name"],
                 phone=user["phone"],
-                role=user["role"],
+                role=convert_db_role_to_frontend_role(user["role"]),
                 service_package=user["service_package"],
                 is_email_verified=user["is_email_verified"],
                 organization=organization_response
@@ -786,7 +799,7 @@ def create_auth_router(
         role_mapping = {
             "si": "system_integrator",
             "app": "access_point_provider", 
-            "hybrid": "hybrid"
+            "hybrid": "hybrid_user"
         }
         return role_mapping.get(service_package, "system_integrator")
     
