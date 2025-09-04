@@ -376,21 +376,10 @@ def create_auth_router(
                 service_packages=organization["service_packages"]
             )
             
-            # Debug: Log role conversion process
+            # Convert database role enum to frontend-expected string
             db_role = user["role"]
-            logger.info(f"🔍 Login Role Debug - User: {user['email']}")
-            logger.info(f"   Raw database role: {db_role} (type: {type(db_role)})")
-            logger.info(f"   Role as string: {str(db_role)}")
-            logger.info(f"   Service package: {user['service_package']}")
-            
-            # Handle enum vs string conversion
-            role_str = str(db_role) if hasattr(db_role, 'value') else db_role
-            if hasattr(db_role, 'value'):
-                role_str = db_role.value
-                logger.info(f"   Enum value: {role_str}")
-            
+            role_str = db_role.value if hasattr(db_role, 'value') else db_role
             frontend_role = convert_db_role_to_frontend_role(role_str)
-            logger.info(f"   Final frontend role: {frontend_role}")
             
             user_response = UserResponse(
                 id=user["id"],

@@ -11,44 +11,26 @@ export default function DashboardRedirect() {
 
   useEffect(() => {
     const redirectToDashboard = () => {
-      console.log('🔍 Dashboard: Starting authentication check');
-      
       const user = authService.getStoredUser();
-      const isAuth = authService.isAuthenticated();
-      const token = authService.getToken();
       
-      console.log('🔍 Dashboard: Auth state', {
-        hasUser: !!user,
-        userRole: user?.role,
-        isAuthenticated: isAuth,
-        hasToken: !!token,
-        tokenLength: token?.length || 0
-      });
-      
-      if (!user || !isAuth) {
-        console.log('🚨 Dashboard: Not authenticated, redirecting to signin');
+      if (!user || !authService.isAuthenticated()) {
         router.push('/auth/signin');
         return;
       }
 
       // Redirect based on user role
-      console.log(`🎯 Dashboard: Redirecting user with role '${user.role}'`);
-      
       switch (user.role) {
         case 'system_integrator':
-          console.log('➡️ Dashboard: Redirecting to SI dashboard');
           router.push('/dashboard/si');
           break;
         case 'access_point_provider':
-          console.log('➡️ Dashboard: Redirecting to APP dashboard');
           router.push('/dashboard/app');
           break;
         case 'hybrid_user':
-          console.log('➡️ Dashboard: Redirecting to Hybrid dashboard');
           router.push('/dashboard/hybrid');
           break;
         default:
-          console.log(`⚠️ Dashboard: Unknown role '${user.role}', defaulting to APP dashboard`);
+          // Default to APP dashboard for unknown roles
           router.push('/dashboard/app');
       }
     };
