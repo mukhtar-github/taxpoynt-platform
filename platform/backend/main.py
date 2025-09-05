@@ -248,6 +248,9 @@ def create_taxpoynt_app() -> FastAPI:
     gateway = TaxPoyntAPIGateway(config, role_manager, temp_message_router)
     app = gateway.get_app()
     
+    # Store gateway reference for later message router updates
+    app._taxpoynt_gateway = gateway
+    
     # CRITICAL: Add CORS middleware FIRST to handle preflight requests properly
     # This ensures CORS headers are added before any other middleware can interfere
     from fastapi.middleware.cors import CORSMiddleware
@@ -538,6 +541,29 @@ async def initialize_services():
         # Register services with Redis message router
         if hasattr(app.state, 'redis_message_router') and app.state.redis_message_router:
             logger.info("🔄 Registering platform services with Redis Message Router...")
+            
+            # CRITICAL: Update API gateway to use the real Redis message router
+            logger.info("🔄 Updating API Gateway to use production Redis Message Router...")
+            try:
+                # The gateway reference should be available in the app state if we store it
+                # Let's update the app.state to store the gateway reference during creation
+                if hasattr(app, '_taxpoynt_gateway'):
+                    app._taxpoynt_gateway.update_message_router(app.state.redis_message_router)
+                else:
+                    # Fallback: Update through route endpoints
+                    logger.info("🔍 Fallback: Updating message router through route endpoints...")
+                    updated_count = 0
+                    for route in app.routes:
+                        if hasattr(route, 'endpoint') and hasattr(route.endpoint, '__self__'):
+                            endpoint_instance = route.endpoint.__self__
+                            if hasattr(endpoint_instance, 'message_router'):
+                                endpoint_instance.message_router = app.state.redis_message_router
+                                updated_count += 1
+                    logger.info(f"✅ Updated message router for {updated_count} endpoints via fallback method")
+                
+                logger.info("✅ API Gateway message router updated to production Redis router")
+            except Exception as e:
+                logger.error(f"❌ Failed to update API Gateway message router: {e}")
             
             # Register SI services
             try:

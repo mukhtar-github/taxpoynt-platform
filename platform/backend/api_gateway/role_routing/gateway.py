@@ -569,6 +569,25 @@ class TaxPoyntAPIGateway:
         self.app.openapi = self.get_custom_openapi
         return self.app
     
+    def update_message_router(self, message_router):
+        """Update the message router after initialization"""
+        logger.info(f"🔄 Updating API Gateway message router: {type(message_router).__name__}")
+        self.message_router = message_router
+        
+        # Update message router in all created routers
+        for router_name, router in [
+            ("si_router", getattr(self, '_si_router', None)),
+            ("app_router", getattr(self, '_app_router', None)),  
+            ("hybrid_router", getattr(self, '_hybrid_router', None)),
+            ("auth_router", getattr(self, '_auth_router', None)),
+            ("admin_router", getattr(self, '_admin_router', None))
+        ]:
+            if router and hasattr(router, 'message_router'):
+                router.message_router = message_router
+                logger.info(f"✅ Updated message router for {router_name}")
+        
+        logger.info("✅ API Gateway message router update completed")
+    
     async def cleanup(self):
         """Cleanup Phase 4 performance infrastructure."""
         try:
