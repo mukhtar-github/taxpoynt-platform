@@ -463,4 +463,13 @@ def create_si_router(role_detector: HTTPRoleDetector,
     except ImportError as e:
         logger.warning(f"⚠️  Could not import banking endpoints: {e}")
     
+    # Import and include onboarding endpoints
+    try:
+        from ..api_versions.v1.si_endpoints.onboarding_endpoints import create_onboarding_router
+        onboarding_router = create_onboarding_router(role_detector, permission_guard, message_router)
+        main_router.include_router(onboarding_router, prefix="/si", tags=["SI Onboarding Management"])
+        logger.info("✅ Onboarding endpoints connected to SI router")
+    except ImportError as e:
+        logger.warning(f"⚠️  Could not import onboarding endpoints: {e}")
+    
     return main_router

@@ -110,7 +110,8 @@ class SIServiceRegistry:
                         "get_banking_accounts",
                         "get_account_balance",
                         "test_banking_connection",
-                        "get_banking_connection_health"
+                        "get_banking_connection_health",
+                        "get_banking_statistics"
                     ],
                     "providers": ["mono", "stitch", "unified_banking"]
                 }

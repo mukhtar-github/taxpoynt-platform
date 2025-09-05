@@ -626,8 +626,9 @@ class BankingEndpointsV1:
                         "active": 0
                     },
                     "health": {
-                        "overall": "healthy",
-                        "connection_success_rate": "100%"
+                        "overall": "ready",
+                        "connection_success_rate": "N/A",
+                        "status": "No banking connections configured"
                     }
                 }
                 return self._create_v1_response(fallback_stats, "banking_stats_retrieved")

@@ -95,6 +95,8 @@ class SIBankingService:
                 return await self._handle_test_banking_connection(si_id, payload)
             elif operation == "get_banking_connection_health":
                 return await self._handle_get_banking_connection_health(si_id, payload)
+            elif operation == "get_banking_statistics":
+                return await self._handle_get_banking_statistics(si_id, payload)
             else:
                 raise ValueError(f"Unknown banking operation: {operation}")
                 
@@ -355,6 +357,48 @@ class SIBankingService:
             "data": result,
             "si_id": si_id
         }
+    
+    async def _handle_get_banking_statistics(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle getting banking integration statistics"""
+        try:
+            # Get stats from Mono service
+            # In a real implementation, you'd aggregate data from connected accounts
+            result = {
+                "connections": {
+                    "total": 0,
+                    "active": 0,
+                    "mono": 0,
+                    "stitch": 0,
+                    "other": 0
+                },
+                "transactions": {
+                    "total": 0,
+                    "this_month": 0,
+                    "volume": 0
+                },
+                "accounts": {
+                    "connected": 0,
+                    "active": 0
+                },
+                "health": {
+                    "overall": "ready",
+                    "connection_success_rate": "N/A",
+                    "status": "No banking connections configured"
+                },
+                "si_id": si_id,
+                "generated_at": "2024-12-31T00:00:00Z"
+            }
+            
+            return {
+                "operation": "get_banking_statistics",
+                "success": True,
+                "data": result,
+                "si_id": si_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting banking statistics for SI {si_id}: {str(e)}")
+            raise RuntimeError(f"Failed to get banking statistics: {str(e)}")
     
     async def health_check(self) -> Dict[str, Any]:
         """Perform health check on banking service"""

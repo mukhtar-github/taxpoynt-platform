@@ -58,6 +58,8 @@ class MonoIntegrationService:
             secret_key=os.getenv("MONO_SECRET_KEY", "test_sk_qhztoaaq7hzcbew22tap"),
             app_id=os.getenv("MONO_APP_ID", "app_test_sandbox_taxpoynt"),
             environment=os.getenv("MONO_ENVIRONMENT", "sandbox"),
+            public_key=os.getenv("MONO_PUBLIC_KEY"),
+            webhook_url=os.getenv("MONO_WEBHOOK_URL"),
             webhook_secret=os.getenv("MONO_WEBHOOK_SECRET", "sec_O62WW0RY6TP8ZGOPNILU"),
             enable_webhook_verification=os.getenv("MONO_VERIFY_WEBHOOKS", "true").lower() == "true",
             auto_invoice_generation=os.getenv("MONO_AUTO_INVOICE", "false").lower() == "true",

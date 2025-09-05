@@ -69,6 +69,8 @@ class MonoConfig:
     secret_key: str
     app_id: str
     environment: str = "sandbox"  # "sandbox" or "production"
+    public_key: Optional[str] = None
+    webhook_url: Optional[str] = None
     webhook_secret: Optional[str] = None
     enable_webhook_verification: bool = True
     max_concurrent_requests: int = 3

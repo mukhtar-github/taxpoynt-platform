@@ -139,16 +139,23 @@ class OnboardingEndpointsV1:
             self.endpoint_stats["get_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="get_onboarding_state",
-                payload={
-                    "user_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
+            # Provide mock onboarding state while message router is being set up
+            mock_result = {
+                "current_step": "welcome",
+                "completed_steps": [],
+                "progress": 0,
+                "total_steps": 5,
+                "steps": {
+                    "welcome": {"status": "current", "title": "Welcome to TaxPoynt"},
+                    "business_info": {"status": "pending", "title": "Business Information"},
+                    "banking_setup": {"status": "pending", "title": "Banking Integration"},
+                    "testing": {"status": "pending", "title": "Test Integration"},
+                    "complete": {"status": "pending", "title": "Go Live"}
+                },
+                "next_action": "Complete business information setup"
+            }
             
-            return self._create_v1_response(result, "onboarding_state_retrieved")
+            return self._create_v1_response(mock_result, "onboarding_state_retrieved")
         except HTTPException:
             raise
         except Exception as e:
