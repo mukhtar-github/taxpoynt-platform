@@ -468,39 +468,105 @@ class RedisMessageRouter(MessageRouter):
     async def _setup_default_routing_rules(self):
         """Setup default routing rules for the platform"""
         default_rules = [
+            # API Gateway to SI Banking Operations
+            RoutingRule(
+                rule_id="api_gateway_to_si_banking",
+                name="API Gateway to SI Banking Operations",
+                description="Route API Gateway banking operations to SI banking services",
+                source_pattern="api_gateway",
+                target_pattern="banking_integration",
+                message_pattern="banking_*",
+                source_role=ServiceRole.CORE,
+                target_role=ServiceRole.SYSTEM_INTEGRATOR,
+                strategy=RoutingStrategy.PRIORITY,
+                priority=0,  # Highest priority
+                conditions={
+                    "operation_patterns": [
+                        "create_mono_widget_link",
+                        "process_mono_callback", 
+                        "list_open_banking_connections",
+                        "create_open_banking_connection",
+                        "get_open_banking_connection",
+                        "update_open_banking_connection",
+                        "delete_open_banking_connection",
+                        "get_banking_transactions",
+                        "sync_banking_transactions",
+                        "get_banking_accounts",
+                        "get_account_balance",
+                        "test_banking_connection",
+                        "get_banking_connection_health",
+                        "get_banking_statistics"
+                    ]
+                }
+            ),
+            
+            # API Gateway to SI General Operations
+            RoutingRule(
+                rule_id="api_gateway_to_si_general",
+                name="API Gateway to SI General Operations", 
+                description="Route API Gateway operations to SI services",
+                source_pattern="api_gateway",
+                target_pattern="*",
+                message_pattern="*",
+                source_role=ServiceRole.CORE,
+                target_role=ServiceRole.SYSTEM_INTEGRATOR,
+                strategy=RoutingStrategy.LOAD_BALANCED,
+                priority=1
+            ),
+            
             # SI to APP communication
             RoutingRule(
+                rule_id="si_to_app_communication",
+                name="SI to APP Communication",
+                description="Route SI operations to APP services",
+                source_pattern="*",
+                target_pattern="*", 
+                message_pattern="*",
                 source_role=ServiceRole.SYSTEM_INTEGRATOR,
                 target_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 strategy=RoutingStrategy.LOAD_BALANCED,
-                message_types=[MessageType.EVENT, MessageType.COMMAND],
                 priority=1
             ),
             
             # APP to SI communication
             RoutingRule(
+                rule_id="app_to_si_communication",
+                name="APP to SI Communication",
+                description="Route APP responses to SI services",
+                source_pattern="*",
+                target_pattern="*",
+                message_pattern="*", 
                 source_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 target_role=ServiceRole.SYSTEM_INTEGRATOR,
                 strategy=RoutingStrategy.BROADCAST,
-                message_types=[MessageType.NOTIFICATION, MessageType.RESPONSE],
                 priority=1
             ),
             
             # Hybrid service coordination
             RoutingRule(
+                rule_id="hybrid_service_coordination",
+                name="Hybrid Service Coordination",
+                description="Route hybrid coordinator operations",
+                source_pattern="*",
+                target_pattern="*",
+                message_pattern="*",
                 source_role=ServiceRole.HYBRID_COORDINATOR,
                 target_role=ServiceRole.HYBRID,
                 strategy=RoutingStrategy.ROUND_ROBIN,
-                message_types=[MessageType.COMMAND, MessageType.QUERY],
                 priority=2
             ),
             
             # Core platform alerts
             RoutingRule(
+                rule_id="core_platform_alerts",
+                name="Core Platform Alerts",
+                description="Broadcast core platform alerts",
+                source_pattern="*",
+                target_pattern="*", 
+                message_pattern="alert_*",
                 source_role=ServiceRole.CORE,
                 target_role=None,  # Broadcast to all
                 strategy=RoutingStrategy.BROADCAST,
-                message_types=[MessageType.ALERT],
                 priority=3
             )
         ]
