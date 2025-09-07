@@ -348,8 +348,15 @@ class FrontendRoleDetector {
   }
 
   private getAuthToken(): string {
-    // Get auth token from localStorage, cookies, or context
-    return localStorage.getItem('taxpoynt_auth_token') || '';
+    // Get auth token from secure token storage (consistent with API client)
+    try {
+      // Import the secure token storage utility
+      const { secureTokenStorage } = require('../shared_components/utils/secureTokenStorage');
+      return secureTokenStorage.getToken() || '';
+    } catch (error) {
+      // Fallback to localStorage for backward compatibility
+      return localStorage.getItem('taxpoynt_auth_token') || '';
+    }
   }
 }
 

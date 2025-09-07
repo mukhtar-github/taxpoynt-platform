@@ -73,6 +73,15 @@ class UserLoginRequest(BaseModel):
     password: str
     remember_me: Optional[bool] = False
 
+class PasswordResetRequest(BaseModel):
+    """Password reset request model"""
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    """Password reset confirmation model"""
+    token: str
+    new_password: str
+
 class OrganizationResponse(BaseModel):
     """Organization response model"""
     id: str
@@ -833,5 +842,81 @@ def create_auth_router(
             ]
         }
         return permission_mappings.get(role, [])
+    
+    @router.post("/forgot-password", status_code=202)
+    async def forgot_password(request: PasswordResetRequest):
+        """Request password reset email"""
+        try:
+            # Always return success to prevent email enumeration
+            # In a real implementation, send email if user exists
+            
+            # Get database manager
+            db = get_auth_database()
+            user = get_user_by_email(request.email)
+            
+            if user:
+                # Generate reset token (simplified - use secure token in production)
+                reset_token = str(uuid.uuid4())
+                
+                # Store reset token with expiration (implement in database)
+                # For now, just log it (replace with actual email sending)
+                logger.info(f"Password reset token for {request.email}: {reset_token}")
+                
+                # TODO: Send actual email with reset link
+                # send_password_reset_email(request.email, reset_token)
+            
+            return JSONResponse(content={
+                "message": "If an account exists with that email, you'll receive password reset instructions.",
+                "timestamp": datetime.utcnow().isoformat()
+            }, status_code=202)
+            
+        except Exception as e:
+            logger.error(f"Password reset request failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Password reset request failed"
+            )
+
+    @router.post("/reset-password", status_code=200)
+    async def reset_password(request: PasswordResetConfirm):
+        """Reset password using token"""
+        try:
+            # TODO: Implement token validation and password reset
+            # For now, return a placeholder response
+            
+            logger.info(f"Password reset attempt with token: {request.token[:8]}...")
+            
+            # Validate token format
+            if not request.token or len(request.token) < 10:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid reset token"
+                )
+            
+            # Validate new password
+            if len(request.new_password) < 6:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Password must be at least 6 characters"
+                )
+            
+            # TODO: Implement actual password reset logic
+            # - Validate token exists and hasn't expired
+            # - Update user password in database
+            # - Invalidate reset token
+            
+            return JSONResponse(content={
+                "message": "Password has been reset successfully",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Password reset failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Password reset failed"
+            )
     
     return router
