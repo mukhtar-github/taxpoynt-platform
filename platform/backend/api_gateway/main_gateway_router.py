@@ -436,7 +436,7 @@ class MainGatewayRouter:
                 "Update taxpayer management workflows",
                 "Review compliance validation changes"
             ],
-            PlatformRole.ADMINISTRATOR: [
+            PlatformRole.PLATFORM_ADMIN: [
                 "Review all role-based changes",
                 "Update access control configurations",
                 "Plan staged migration for users",
@@ -465,7 +465,7 @@ class MainGatewayRouter:
                 f"/api/{version}/app/certificates",
                 f"/api/{version}/app/grants"
             ],
-            PlatformRole.ADMINISTRATOR: [
+            PlatformRole.PLATFORM_ADMIN: [
                 f"/api/{version}/si/*",
                 f"/api/{version}/app/*",
                 f"/api/{version}/hybrid/*",
@@ -492,7 +492,7 @@ class MainGatewayRouter:
                 "Certificate management and security",
                 "Grant tracking and performance metrics"
             ],
-            PlatformRole.ADMINISTRATOR: [
+            PlatformRole.PLATFORM_ADMIN: [
                 "Full platform administration",
                 "All role capabilities access",
                 "Cross-role hybrid functionality",

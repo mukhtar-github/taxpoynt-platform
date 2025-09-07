@@ -492,7 +492,7 @@ class HybridServicesRouter:
         """Get comprehensive system status (admin only)"""
         try:
             result = await self.message_router.route_message(
-                service_role=ServiceRole.ADMINISTRATOR,
+                service_role=ServiceRole.CORE,
                 operation="get_system_status",
                 payload={"admin_id": context.user_id}
             )
@@ -505,7 +505,7 @@ class HybridServicesRouter:
         """List platform users (admin only)"""
         try:
             result = await self.message_router.route_message(
-                service_role=ServiceRole.ADMINISTRATOR,
+                service_role=ServiceRole.CORE,
                 operation="list_platform_users",
                 payload={"admin_id": context.user_id, "filters": request.query_params}
             )
@@ -518,7 +518,7 @@ class HybridServicesRouter:
         """Get audit logs (admin only)"""
         try:
             result = await self.message_router.route_message(
-                service_role=ServiceRole.ADMINISTRATOR,
+                service_role=ServiceRole.CORE,
                 operation="get_audit_logs",
                 payload={"admin_id": context.user_id, "filters": request.query_params}
             )
@@ -535,7 +535,7 @@ class HybridServicesRouter:
         elif context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
             return ServiceRole.ACCESS_POINT_PROVIDER
         elif context.has_role(PlatformRole.PLATFORM_ADMIN):
-            return ServiceRole.ADMINISTRATOR
+            return ServiceRole.CORE
         else:
             return ServiceRole.SYSTEM_INTEGRATOR  # Default
     

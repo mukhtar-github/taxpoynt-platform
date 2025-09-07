@@ -120,7 +120,7 @@ class MonitoringEndpointsV1:
         allowed_roles = {
             PlatformRole.SYSTEM_INTEGRATOR,
             PlatformRole.ACCESS_POINT_PROVIDER,
-            PlatformRole.ADMINISTRATOR
+            PlatformRole.PLATFORM_ADMIN
         }
         
         if not any(context.has_role(role) for role in allowed_roles):
@@ -252,8 +252,8 @@ class MonitoringEndpointsV1:
             return ServiceRole.SYSTEM_INTEGRATOR
         elif context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
             return ServiceRole.ACCESS_POINT_PROVIDER
-        elif context.has_role(PlatformRole.ADMINISTRATOR):
-            return ServiceRole.ADMINISTRATOR
+        elif context.has_role(PlatformRole.PLATFORM_ADMIN):
+            return ServiceRole.CORE
         else:
             return ServiceRole.SYSTEM_INTEGRATOR  # Default
     

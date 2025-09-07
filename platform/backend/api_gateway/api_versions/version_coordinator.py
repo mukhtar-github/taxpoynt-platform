@@ -58,7 +58,7 @@ class APIVersionInfo:
             self.supported_roles = {
                 PlatformRole.SYSTEM_INTEGRATOR,
                 PlatformRole.ACCESS_POINT_PROVIDER,
-                PlatformRole.ADMINISTRATOR
+                PlatformRole.PLATFORM_ADMIN
             }
     
     @property
@@ -138,7 +138,7 @@ class APIVersionCoordinator:
             supported_roles={
                 PlatformRole.SYSTEM_INTEGRATOR,
                 PlatformRole.ACCESS_POINT_PROVIDER,
-                PlatformRole.ADMINISTRATOR
+                PlatformRole.PLATFORM_ADMIN
             }
         )
         
@@ -177,7 +177,7 @@ class APIVersionCoordinator:
             supported_roles={
                 PlatformRole.SYSTEM_INTEGRATOR,
                 PlatformRole.ACCESS_POINT_PROVIDER,
-                PlatformRole.ADMINISTRATOR
+                PlatformRole.PLATFORM_ADMIN
             }
         )
         

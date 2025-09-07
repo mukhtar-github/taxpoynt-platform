@@ -86,7 +86,7 @@ class OrchestrationEndpointsV1:
         
         # Require admin or both SI and APP roles
         has_access = (
-            context.has_role(PlatformRole.ADMINISTRATOR) or
+            context.has_role(PlatformRole.PLATFORM_ADMIN) or
             (context.has_role(PlatformRole.SYSTEM_INTEGRATOR) and 
              context.has_role(PlatformRole.ACCESS_POINT_PROVIDER))
         )

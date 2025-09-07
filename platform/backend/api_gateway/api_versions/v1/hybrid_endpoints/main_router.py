@@ -200,7 +200,7 @@ class HybridRouterV1:
         allowed_roles = {
             PlatformRole.SYSTEM_INTEGRATOR,
             PlatformRole.ACCESS_POINT_PROVIDER,
-            PlatformRole.ADMINISTRATOR
+            PlatformRole.PLATFORM_ADMIN
         }
         
         if not any(context.has_role(role) for role in allowed_roles):
@@ -337,7 +337,7 @@ class HybridRouterV1:
             
             if (context.has_role(PlatformRole.SYSTEM_INTEGRATOR) and 
                 context.has_role(PlatformRole.ACCESS_POINT_PROVIDER)) or \
-               context.has_role(PlatformRole.ADMINISTRATOR):
+               context.has_role(PlatformRole.PLATFORM_ADMIN):
                 advanced_capabilities.update({
                     "cross_role_operations": {
                         "description": "End-to-end processing spanning SI and APP roles",
@@ -370,7 +370,7 @@ class HybridRouterV1:
             
             # Check if user has access to coordinate the specified roles
             has_coordination_access = (
-                context.has_role(PlatformRole.ADMINISTRATOR) or
+                context.has_role(PlatformRole.PLATFORM_ADMIN) or
                 all(context.has_role(PlatformRole(role)) for role in required_roles)
             )
             
@@ -401,7 +401,7 @@ class HybridRouterV1:
             # Cross-role operations
             if (context.has_role(PlatformRole.SYSTEM_INTEGRATOR) and 
                 context.has_role(PlatformRole.ACCESS_POINT_PROVIDER)) or \
-               context.has_role(PlatformRole.ADMINISTRATOR):
+               context.has_role(PlatformRole.PLATFORM_ADMIN):
                 available_operations.extend([
                     "initiate_end_to_end_processing",
                     "coordinate_compliance_validation",
@@ -410,7 +410,7 @@ class HybridRouterV1:
                 ])
             
             # Admin-only operations
-            if context.has_role(PlatformRole.ADMINISTRATOR):
+            if context.has_role(PlatformRole.PLATFORM_ADMIN):
                 available_operations.extend([
                     "manage_system_configuration",
                     "access_all_monitoring_data",
@@ -421,7 +421,7 @@ class HybridRouterV1:
                 "available_operations": available_operations,
                 "total_operations": len(available_operations),
                 "user_roles": [role.value for role in context.roles],
-                "access_level": "administrator" if context.has_role(PlatformRole.ADMINISTRATOR) else "standard"
+                "access_level": "administrator" if context.has_role(PlatformRole.PLATFORM_ADMIN) else "standard"
             }
             
             return self._create_v1_response(result, "available_operations_retrieved")

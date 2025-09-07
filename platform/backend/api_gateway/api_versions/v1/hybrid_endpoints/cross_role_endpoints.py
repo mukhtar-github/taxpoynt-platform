@@ -241,7 +241,7 @@ class CrossRoleEndpointsV1:
             
             # Check if user has access to all required roles (either directly or through admin)
             has_required_access = (
-                context.has_role(PlatformRole.ADMINISTRATOR) or
+                context.has_role(PlatformRole.PLATFORM_ADMIN) or
                 all(context.has_role(role) for role in required_roles)
             )
             
@@ -277,7 +277,7 @@ class CrossRoleEndpointsV1:
         allowed_roles = {
             PlatformRole.SYSTEM_INTEGRATOR,
             PlatformRole.ACCESS_POINT_PROVIDER,
-            PlatformRole.ADMINISTRATOR
+            PlatformRole.PLATFORM_ADMIN
         }
         
         if not any(context.has_role(role) for role in allowed_roles):
@@ -313,7 +313,7 @@ class CrossRoleEndpointsV1:
                 
                 # Check if user has access to this capability
                 has_access = (
-                    context.has_role(PlatformRole.ADMINISTRATOR) or
+                    context.has_role(PlatformRole.PLATFORM_ADMIN) or
                     all(context.has_role(role) for role in required_roles)
                 )
                 
