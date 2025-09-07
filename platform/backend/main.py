@@ -244,7 +244,7 @@ def create_taxpoynt_app() -> FastAPI:
     temp_message_router = get_redis_message_router()
     
     # Create version coordinator
-    version_coordinator = APIVersionCoordinator()
+    version_coordinator = APIVersionCoordinator(temp_message_router)
     
     # Create main gateway router
     main_router = create_main_gateway_router(
