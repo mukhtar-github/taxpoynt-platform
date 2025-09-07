@@ -17,6 +17,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRoleDetector } from '../../../../role_management';
+import { secureTokenStorage } from '../../../../shared_components/utils/secureTokenStorage';
 
 // Types based on backend Mono integration
 interface MonoAccount {
@@ -86,16 +87,21 @@ export const MonoBankingDashboard: React.FC = () => {
     
     try {
       // Fetch from SI banking endpoints
+      const authHeader = secureTokenStorage.getAuthorizationHeader();
+      if (!authHeader) {
+        throw new Error('Authentication required');
+      }
+
       const [accountsRes, statsRes] = await Promise.all([
         fetch('/api/v1/si/banking/open-banking', {
           headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json'
           }
         }),
         fetch('/api/v1/si/banking/stats', {
           headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json'
           }
         })
@@ -126,9 +132,14 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const loadTransactions = async (accountId: string) => {
     try {
+      const authHeader = secureTokenStorage.getAuthorizationHeader();
+      if (!authHeader) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch(`/api/v1/si/banking/open-banking/${accountId}/transactions?limit=50`, {
         headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+          'Authorization': authHeader,
           'Content-Type': 'application/json'
         }
       });
@@ -147,10 +158,15 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const initiateAccountLinking = async () => {
     try {
+      const authHeader = secureTokenStorage.getAuthorizationHeader();
+      if (!authHeader) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch('/api/v1/si/banking/open-banking/mono/link', {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+          'Authorization': authHeader,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -184,10 +200,15 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const syncAccount = async (accountId: string) => {
     try {
+      const authHeader = secureTokenStorage.getAuthorizationHeader();
+      if (!authHeader) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch(`/api/v1/si/banking/open-banking/${accountId}/sync`, {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+          'Authorization': authHeader,
           'Content-Type': 'application/json'
         }
       });
@@ -209,10 +230,15 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const generateInvoiceFromTransaction = async (transactionId: string) => {
     try {
+      const authHeader = secureTokenStorage.getAuthorizationHeader();
+      if (!authHeader) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch('/api/v1/si/banking/transactions/generate-invoice', {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
+          'Authorization': authHeader,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
