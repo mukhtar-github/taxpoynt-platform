@@ -9,8 +9,8 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
 
-from ..core_platform.authentication.role_manager import PlatformRole
-from ..core_platform.messaging.message_router import ServiceRole, MessageRouter
+from core_platform.authentication.role_manager import PlatformRole
+from core_platform.messaging.message_router import ServiceRole, MessageRouter
 from .role_routing.models import HTTPRoutingContext
 from .role_routing.role_detector import HTTPRoleDetector
 from .role_routing.permission_guard import APIPermissionGuard
