@@ -246,14 +246,6 @@ def create_taxpoynt_app() -> FastAPI:
     # Create version coordinator
     version_coordinator = APIVersionCoordinator(temp_message_router)
     
-    # Create main gateway router
-    main_router = create_main_gateway_router(
-        role_detector=HTTPRoleDetector(),
-        permission_guard=APIPermissionGuard(),
-        message_router=temp_message_router,
-        version_coordinator=version_coordinator
-    )
-    
     # Create FastAPI app with main router
     app = FastAPI(
         title="TaxPoynt Platform API",
@@ -261,6 +253,17 @@ def create_taxpoynt_app() -> FastAPI:
         version="1.0.0",
         docs_url="/docs" if DEBUG else None,
         redoc_url="/redoc" if DEBUG else None
+    )
+    
+    # Create permission guard with app
+    permission_guard = APIPermissionGuard(app)
+    
+    # Create main gateway router
+    main_router = create_main_gateway_router(
+        role_detector=HTTPRoleDetector(),
+        permission_guard=permission_guard,
+        message_router=temp_message_router,
+        version_coordinator=version_coordinator
     )
     
     # Include main router
