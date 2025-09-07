@@ -64,19 +64,6 @@ interface BankingConnectionStats {
   lastSyncTime: Date;
 }
 
-// Nigerian Banks supported by Mono
-const SUPPORTED_BANKS = [
-  { code: '044', name: 'Access Bank', logo: '🏦' },
-  { code: '014', name: 'Afribank', logo: '🏛️' },
-  { code: '030', name: 'Heritage Bank', logo: '🏢' },
-  { code: '058', name: 'GTBank', logo: '💎' },
-  { code: '032', name: 'Union Bank', logo: '🏪' },
-  { code: '011', name: 'First Bank', logo: '🏛️' },
-  { code: '221', name: 'Stanbic IBTC', logo: '⭐' },
-  { code: '068', name: 'Standard Chartered', logo: '🌟' },
-  { code: '035', name: 'Wema Bank', logo: '💚' },
-  { code: '057', name: 'Zenith Bank', logo: '🔵' }
-];
 
 export const MonoBankingDashboard: React.FC = () => {
   const { detectionResult } = useRoleDetector();
@@ -86,7 +73,6 @@ export const MonoBankingDashboard: React.FC = () => {
   const [stats, setStats] = useState<BankingConnectionStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
-  const [showLinkAccount, setShowLinkAccount] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load banking data
@@ -159,7 +145,7 @@ export const MonoBankingDashboard: React.FC = () => {
     }
   };
 
-  const initiateAccountLinking = async (bankCode: string) => {
+  const initiateAccountLinking = async () => {
     try {
       const response = await fetch('/api/v1/si/banking/open-banking/mono/link', {
         method: 'POST',
@@ -172,10 +158,10 @@ export const MonoBankingDashboard: React.FC = () => {
             name: detectionResult?.organizationId || 'Unknown',
             email: 'admin@organization.com'
           },
+          scope: ['identity', 'accounts', 'transactions'],
           redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
           meta: {
-            ref: `taxpoynt_${Date.now()}`,
-            bank_code: bankCode
+            ref: `taxpoynt_${Date.now()}`
           }
         })
       });
@@ -302,7 +288,7 @@ export const MonoBankingDashboard: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowLinkAccount(true)}
+          onClick={() => initiateAccountLinking()}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
         >
           Link New Account
@@ -551,50 +537,6 @@ export const MonoBankingDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Link Account Modal */}
-      {showLinkAccount && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Link Nigerian Bank Account
-              </h3>
-              <button
-                onClick={() => setShowLinkAccount(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <p className="text-gray-600 mb-6">
-              Select your bank to connect via Mono Open Banking. Your data is secure and encrypted.
-            </p>
-            
-            <div className="grid grid-cols-2 gap-3">
-              {SUPPORTED_BANKS.map((bank) => (
-                <button
-                  key={bank.code}
-                  onClick={() => {
-                    initiateAccountLinking(bank.code);
-                    setShowLinkAccount(false);
-                  }}
-                  className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                >
-                  <span className="text-2xl mr-3">{bank.logo}</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {bank.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-            
-            <div className="mt-6 text-xs text-gray-500">
-              <p>🔒 Powered by Mono • Bank-grade security • CBN licensed</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
