@@ -13,16 +13,17 @@ import '../styles/globals.css';
  */
 function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
-    // Register service worker for PWA functionality
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registered successfully:', registration);
-        })
-        .catch((error) => {
-          console.log('Service Worker registration failed:', error);
-        });
-    }
+    // Service worker disabled due to chrome-extension cache conflicts
+    // PWA functionality can be re-enabled later if needed
+    // if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+    //   navigator.serviceWorker.register('/sw.js')
+    //     .then((registration) => {
+    //       console.log('Service Worker registered successfully:', registration);
+    //     })
+    //     .catch((error) => {
+    //       console.log('Service Worker registration failed:', error);
+    //     });
+    // }
     
     // Add PWA manifest link
     const link = document.createElement('link');
