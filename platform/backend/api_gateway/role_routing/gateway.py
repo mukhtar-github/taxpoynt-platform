@@ -28,7 +28,6 @@ from core_platform.messaging.message_router import ServiceRole, MessageRouter
 from .models import HTTPRoutingContext, APIGatewayConfig, RoutingSecurityLevel
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
-from .si_router import create_si_router
 from .app_router import create_app_router
 from .hybrid_router import create_hybrid_router
 from .auth_router import create_auth_router
@@ -133,11 +132,7 @@ class TaxPoyntAPIGateway:
         """Setup role-based routers"""
         
         # Create specialized routers
-        si_router = create_si_router(
-            self.role_detector, 
-            self.permission_guard, 
-            self.message_router
-        )
+        # Note: Legacy SI router removed - using main API Gateway instead
         
         app_router = create_app_router(
             self.role_detector, 
@@ -162,11 +157,7 @@ class TaxPoyntAPIGateway:
         admin_router = create_admin_router()
         
         # Include routers in main app
-        self.app.include_router(
-            si_router,
-            prefix="/api/v1",
-            tags=["System Integrator Services"]
-        )
+        # Note: Legacy SI router removed - using main API Gateway instead
         
         self.app.include_router(
             app_router,
@@ -576,7 +567,7 @@ class TaxPoyntAPIGateway:
         
         # Update message router in all created routers
         for router_name, router in [
-            ("si_router", getattr(self, '_si_router', None)),
+            # Note: Legacy si_router removed - using main API Gateway instead
             ("app_router", getattr(self, '_app_router', None)),  
             ("hybrid_router", getattr(self, '_hybrid_router', None)),
             ("auth_router", getattr(self, '_auth_router', None)),

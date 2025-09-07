@@ -13,7 +13,6 @@ routing, authentication, and access control for all platform services.
 
 from .role_routing import (
     TaxPoyntAPIGateway,
-    create_si_router,
     create_app_router,
     create_hybrid_router,
     create_auth_router
@@ -21,7 +20,6 @@ from .role_routing import (
 
 __all__ = [
     "TaxPoyntAPIGateway",
-    "create_si_router", 
     "create_app_router",
     "create_hybrid_router",
     "create_auth_router"

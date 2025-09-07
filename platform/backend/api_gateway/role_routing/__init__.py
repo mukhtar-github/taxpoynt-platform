@@ -76,7 +76,6 @@ from .models import (
 )
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
-from .si_router import SIServicesRouter, create_si_router
 from .app_router import APPServicesRouter, create_app_router
 from .hybrid_router import HybridServicesRouter, create_hybrid_router
 from .admin_router import create_admin_router
@@ -98,12 +97,10 @@ __all__ = [
     'RoutePermission',
     'HTTPRoleDetector',
     'APIPermissionGuard',
-    'SIServicesRouter',
     'APPServicesRouter',
     'HybridServicesRouter',
     'create_admin_router',
     'create_auth_router',
-    'create_si_router',
     'create_app_router',
     'create_hybrid_router',
     

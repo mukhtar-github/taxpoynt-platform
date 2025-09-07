@@ -101,10 +101,11 @@ logger = logging.getLogger(__name__)
 # Try to import API Gateway components
 try:
     from api_gateway.role_routing.models import APIGatewayConfig, RoutingSecurityLevel
-    from api_gateway.role_routing.gateway import TaxPoyntAPIGateway
     from api_gateway.role_routing.role_detector import HTTPRoleDetector
     from api_gateway.role_routing.permission_guard import APIPermissionGuard
     from api_gateway.role_routing.auth_router import create_auth_router
+    from api_gateway.main_gateway_router import create_main_gateway_router
+    from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
     
     # Core platform components (production ready)
     from core_platform.authentication.role_manager import RoleManager
@@ -203,15 +204,27 @@ def create_taxpoynt_app() -> FastAPI:
     logger.info("🚀 Initializing TaxPoynt Platform with Production Architecture")
     
     # Create gateway configuration
-    allowed_origins = [
-        "https://web-production-ea5ad.up.railway.app",  # Railway production
-        "https://app-staging.taxpoynt.com",
-        "https://app.taxpoynt.com",
-        "https://taxpoynt.com",  # Main domain
-        "https://www.taxpoynt.com",  # WWW subdomain - Vercel frontend
-        "http://localhost:3000",
-        "http://localhost:3001"  # Frontend dev port
-    ] if not DEBUG else ["*"]
+    config = APIGatewayConfig(
+        host="0.0.0.0",
+        port=PORT,
+        cors_enabled=True,
+        cors_origins=[
+            "https://web-production-ea5ad.up.railway.app",  # Railway production
+            "https://app-staging.taxpoynt.com",
+            "https://app.taxpoynt.com",
+            "https://taxpoynt.com",  # Main domain
+            "https://www.taxpoynt.com",  # WWW subdomain - Vercel frontend
+            "http://localhost:3000",
+            "http://localhost:3001"  # Frontend dev port
+        ] if not DEBUG else ["*"],
+        trusted_hosts=None,
+        security=RoutingSecurityLevel.STANDARD,
+        jwt_secret_key="SECURE_JWT_MANAGED_BY_JWT_MANAGER",
+        jwt_expiration_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
+        enable_request_logging=True,
+        enable_metrics=True,
+        log_level="INFO" if not DEBUG else "DEBUG"
+    )
     
     # Initialize secure JWT manager (no hardcoded secrets)
     from core_platform.security import initialize_jwt_manager, get_jwt_manager
@@ -244,23 +257,42 @@ def create_taxpoynt_app() -> FastAPI:
     from core_platform.messaging import get_redis_message_router
     temp_message_router = get_redis_message_router()
     
-    # Create API gateway
-    gateway = TaxPoyntAPIGateway(config, role_manager, temp_message_router)
-    app = gateway.get_app()
+    # Create version coordinator
+    version_coordinator = APIVersionCoordinator()
+    
+    # Create main gateway router
+    main_router = create_main_gateway_router(
+        role_detector=HTTPRoleDetector(),
+        permission_guard=APIPermissionGuard(),
+        message_router=temp_message_router,
+        version_coordinator=version_coordinator
+    )
+    
+    # Create FastAPI app with main router
+    app = FastAPI(
+        title="TaxPoynt Platform API",
+        description="TaxPoynt E-Invoice Platform API",
+        version="1.0.0",
+        docs_url="/docs" if DEBUG else None,
+        redoc_url="/redoc" if DEBUG else None
+    )
+    
+    # Include main router
+    app.include_router(main_router)
     
     # Store gateway reference for later message router updates
-    app._taxpoynt_gateway = gateway
+    app._taxpoynt_gateway = main_router
     
     # CRITICAL: Add CORS middleware FIRST to handle preflight requests properly
     # This ensures CORS headers are added before any other middleware can interfere
     from fastapi.middleware.cors import CORSMiddleware
     
-    logger.info(f"🌐 CORS Configuration - Allowed Origins: {allowed_origins}")
+    logger.info(f"🌐 CORS Configuration - Allowed Origins: {config.cors_origins}")
     logger.info(f"🔄 CORS Debug Mode: {DEBUG}")
     
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
+        allow_origins=config.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allow_headers=["*"],
