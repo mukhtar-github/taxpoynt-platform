@@ -235,20 +235,6 @@ def create_taxpoynt_app() -> FastAPI:
     rate_limiter = initialize_rate_limiter()
     security_headers = initialize_security_headers()
     
-    config = APIGatewayConfig(
-        host="0.0.0.0",
-        port=PORT,
-        cors_enabled=True,
-        cors_origins=allowed_origins,
-        trusted_hosts=None,  # Disable for production - Railway handles host validation
-        security=RoutingSecurityLevel.STANDARD,
-        jwt_secret_key="SECURE_JWT_MANAGED_BY_JWT_MANAGER",  # Placeholder - actual security handled by JWT Manager
-        jwt_expiration_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")),  # Reduced from 1440 to 60 minutes
-        enable_request_logging=True,
-        enable_metrics=True,
-        log_level="INFO" if not DEBUG else "DEBUG"
-    )
-    
     # Create core platform components
     role_manager = create_role_manager()
     
