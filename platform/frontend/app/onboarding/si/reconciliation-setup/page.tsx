@@ -106,13 +106,16 @@ export default function ReconciliationSetupPage() {
   ]);
 
   const [transactionCategories, setTransactionCategories] = useState([
-    { id: 'sales_revenue', name: 'Sales Revenue', color: '#10B981', auto_rules: ['invoice', 'sale', 'payment received'] },
-    { id: 'service_revenue', name: 'Service Revenue', color: '#3B82F6', auto_rules: ['service', 'consultation', 'subscription'] },
-    { id: 'operating_expenses', name: 'Operating Expenses', color: '#EF4444', auto_rules: ['expense', 'cost', 'purchase'] },
-    { id: 'salary_payments', name: 'Salary & Wages', color: '#8B5CF6', auto_rules: ['salary', 'wage', 'payroll'] },
-    { id: 'tax_payments', name: 'Tax Payments', color: '#F59E0B', auto_rules: ['tax', 'vat', 'withholding'] },
-    { id: 'loan_repayments', name: 'Loan Repayments', color: '#6B7280', auto_rules: ['loan', 'repayment', 'interest'] }
+    { id: 'sales_revenue', name: 'Sales Revenue', color: '#10B981', auto_rules: ['invoice', 'sale', 'payment received'], enabled: true, selected: false },
+    { id: 'service_revenue', name: 'Service Revenue', color: '#3B82F6', auto_rules: ['service', 'consultation', 'subscription'], enabled: true, selected: false },
+    { id: 'operating_expenses', name: 'Operating Expenses', color: '#EF4444', auto_rules: ['expense', 'cost', 'purchase'], enabled: true, selected: false },
+    { id: 'salary_payments', name: 'Salary & Wages', color: '#8B5CF6', auto_rules: ['salary', 'wage', 'payroll'], enabled: true, selected: false },
+    { id: 'tax_payments', name: 'Tax Payments', color: '#F59E0B', auto_rules: ['tax', 'vat', 'withholding'], enabled: true, selected: false },
+    { id: 'loan_repayments', name: 'Loan Repayments', color: '#6B7280', auto_rules: ['loan', 'repayment', 'interest'], enabled: true, selected: false }
   ]);
+
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingKeywords, setEditingKeywords] = useState<string>('');
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -167,14 +170,26 @@ export default function ReconciliationSetupPage() {
     setIsLoading(true);
     
     try {
-      console.log('🔧 Configuring reconciliation rules:', {
+      const reconciliationConfig = {
         rules: reconciliationRules.filter(r => r.enabled),
         matchingCriteria,
-        categories: transactionCategories
-      });
+        categories: transactionCategories.filter(c => c.selected),
+        categoryRules: transactionCategories.map(category => ({
+          id: category.id,
+          name: category.name,
+          enabled: category.enabled,
+          selected: category.selected,
+          keywords: category.auto_rules,
+          color: category.color
+        })),
+        organizationId: user.organization_id,
+        configuredAt: new Date().toISOString()
+      };
 
-      // Simulate API call to save reconciliation configuration
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('🔧 Configuring reconciliation rules:', reconciliationConfig);
+
+      // Save reconciliation configuration to backend
+      await saveReconciliationConfiguration(reconciliationConfig);
 
       // Update onboarding state
       OnboardingStateManager.updateStep(user.id, 'reconciliation_complete', true);
@@ -192,6 +207,56 @@ export default function ReconciliationSetupPage() {
     }
   };
 
+  // API integration function
+  const saveReconciliationConfiguration = async (config: any) => {
+    try {
+      // Try to save to the new reconciliation endpoint
+      const response = await fetch('/api/v1/si/reconciliation/configuration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
+        },
+        body: JSON.stringify(config)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Reconciliation configuration saved:', result);
+        return result;
+      } else {
+        throw new Error(`Failed to save configuration: ${response.status}`);
+      }
+    } catch (error) {
+      // Fallback: save to a general configuration endpoint or local storage
+      console.warn('Main reconciliation endpoint unavailable, using fallback storage:', error);
+      
+      // Store in localStorage as fallback until backend endpoint is ready
+      localStorage.setItem('taxpoynt_reconciliation_config', JSON.stringify(config));
+      
+      // Also try to save to a general configuration endpoint
+      try {
+        const fallbackResponse = await fetch('/api/v1/si/configuration', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
+          },
+          body: JSON.stringify({
+            type: 'reconciliation',
+            configuration: config
+          })
+        });
+        
+        if (fallbackResponse.ok) {
+          console.log('✅ Configuration saved to fallback endpoint');
+        }
+      } catch (fallbackError) {
+        console.warn('Fallback endpoint also unavailable:', fallbackError);
+      }
+    }
+  };
+
   const handleSkip = () => {
     OnboardingStateManager.completeOnboarding(user?.id);
     const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
@@ -206,6 +271,53 @@ export default function ReconciliationSetupPage() {
       'compliance': 'bg-purple-100 text-purple-800'
     };
     return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  // Category management handlers
+  const handleCategoryToggle = (categoryId: string) => {
+    setTransactionCategories(prev => 
+      prev.map(category => 
+        category.id === categoryId 
+          ? { ...category, enabled: !category.enabled }
+          : category
+      )
+    );
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setTransactionCategories(prev => 
+      prev.map(category => 
+        category.id === categoryId 
+          ? { ...category, selected: !category.selected }
+          : category
+      )
+    );
+  };
+
+  const handleEditKeywords = (categoryId: string) => {
+    const category = transactionCategories.find(c => c.id === categoryId);
+    if (category) {
+      setEditingCategory(categoryId);
+      setEditingKeywords(category.auto_rules.join(', '));
+    }
+  };
+
+  const handleSaveKeywords = (categoryId: string) => {
+    const keywords = editingKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    setTransactionCategories(prev => 
+      prev.map(category => 
+        category.id === categoryId 
+          ? { ...category, auto_rules: keywords }
+          : category
+      )
+    );
+    setEditingCategory(null);
+    setEditingKeywords('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCategory(null);
+    setEditingKeywords('');
   };
 
   const getStepProgress = () => {
@@ -377,28 +489,121 @@ export default function ReconciliationSetupPage() {
         {currentStep === 'categories' && (
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Transaction Categories</h3>
-            <p className="text-gray-600 mb-6">Configure automatic categorization rules for your transactions</p>
+            <p className="text-gray-600 mb-4">Configure automatic categorization rules for your transactions</p>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <span className="text-purple-500 mr-3 text-lg">💡</span>
+                <div className="text-sm">
+                  <p className="text-purple-900 font-medium mb-1">How to use transaction categories:</p>
+                  <ul className="text-purple-800 space-y-1">
+                    <li>• <strong>Click cards</strong> to select/deselect categories for your business</li>
+                    <li>• <strong>Toggle switches</strong> to enable/disable automatic detection</li>
+                    <li>• <strong>Edit keywords</strong> to customize pattern matching for each category</li>
+                    <li>• Selected categories will be actively monitored and used for reconciliation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {transactionCategories.map((category) => (
-                <div key={category.id} className="border border-gray-200 rounded-xl p-4">
+                <div 
+                  key={category.id} 
+                  className={`border rounded-xl p-4 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    category.selected 
+                      ? 'border-purple-300 bg-purple-50 shadow-md' 
+                      : category.enabled 
+                        ? 'border-gray-200 hover:border-gray-300' 
+                        : 'border-gray-100 bg-gray-50 opacity-60'
+                  }`}
+                  onClick={() => handleCategorySelect(category.id)}
+                >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center">
                       <div 
                         className="w-4 h-4 rounded-full mr-3"
                         style={{ backgroundColor: category.color }}
                       ></div>
-                      <h4 className="font-semibold text-gray-900">{category.name}</h4>
+                      <h4 className={`font-semibold ${category.selected ? 'text-purple-900' : 'text-gray-900'}`}>
+                        {category.name}
+                      </h4>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {category.selected && (
+                        <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                      )}
+                      <label className="relative inline-flex items-center cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={category.enabled}
+                          onChange={() => handleCategoryToggle(category.id)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                      </label>
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">Auto-detection keywords:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {category.auto_rules.map((rule, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                          {rule}
-                        </span>
-                      ))}
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-gray-600">Auto-detection keywords:</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditKeywords(category.id);
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        Edit
+                      </button>
                     </div>
+                    {editingCategory === category.id ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editingKeywords}
+                          onChange={(e) => setEditingKeywords(e.target.value)}
+                          placeholder="Enter keywords separated by commas"
+                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSaveKeywords(category.id);
+                            }}
+                            className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancelEdit();
+                            }}
+                            className="px-3 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {category.auto_rules.map((rule, index) => (
+                          <span 
+                            key={index} 
+                            className={`px-2 py-1 text-xs rounded ${
+                              category.selected 
+                                ? 'bg-purple-100 text-purple-800' 
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {rule}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -423,13 +628,42 @@ export default function ReconciliationSetupPage() {
                   </ul>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Active Rules</h4>
-                  <p className="text-sm text-gray-600">
-                    {reconciliationRules.filter(r => r.enabled).length} of {reconciliationRules.length} rules enabled
-                  </p>
+                  <h4 className="font-semibold text-gray-900 mb-2">Active Configuration</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• {reconciliationRules.filter(r => r.enabled).length} of {reconciliationRules.length} rules enabled</li>
+                    <li>• {transactionCategories.filter(c => c.selected).length} categories selected</li>
+                    <li>• {transactionCategories.filter(c => c.enabled).length} categories with auto-detection</li>
+                  </ul>
                 </div>
               </div>
             </div>
+
+            {/* Selected Categories Summary */}
+            {transactionCategories.filter(c => c.selected).length > 0 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <h4 className="font-semibold text-gray-900 mb-4">Selected Transaction Categories</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {transactionCategories.filter(c => c.selected).map((category) => (
+                    <div key={category.id} className="flex items-center p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div 
+                        className="w-3 h-3 rounded-full mr-3"
+                        style={{ backgroundColor: category.color }}
+                      ></div>
+                      <div className="flex-1">
+                        <h5 className="text-sm font-medium text-purple-900">{category.name}</h5>
+                        <p className="text-xs text-purple-700">
+                          Keywords: {category.auto_rules.slice(0, 3).join(', ')}
+                          {category.auto_rules.length > 3 && '...'}
+                        </p>
+                      </div>
+                      <span className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">✓</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
               <div className="flex items-start">

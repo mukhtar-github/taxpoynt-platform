@@ -361,6 +361,19 @@ class SIRouterV1:
         )
         self.router.include_router(validation_router, tags=["Financial Validation V1"])
         
+        # Auto-Reconciliation Routes
+        try:
+            from ..reconciliation_endpoints import create_reconciliation_router
+            reconciliation_router = create_reconciliation_router(
+                self.role_detector,
+                self.permission_guard,
+                self.message_router
+            )
+            self.router.include_router(reconciliation_router, tags=["Auto-Reconciliation V1"])
+            logger.info("✅ Auto-Reconciliation endpoints connected to SI router")
+        except ImportError as e:
+            logger.warning(f"⚠️  Could not import reconciliation endpoints: {e}")
+        
         # Onboarding Management Routes
         onboarding_router = create_onboarding_router(
             self.role_detector,
