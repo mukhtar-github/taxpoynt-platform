@@ -105,7 +105,8 @@ class ProductionJWTManager:
         encryption_key = os.getenv("ENCRYPTION_KEY")
         if encryption_key:
             try:
-                return base64.urlsafe_b64decode(encryption_key)
+                # Fernet expects a base64-encoded key as bytes
+                return encryption_key.encode()
             except Exception:
                 logger.error("Invalid ENCRYPTION_KEY format in environment")
         

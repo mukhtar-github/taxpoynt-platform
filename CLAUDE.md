@@ -96,7 +96,7 @@ taxpoynt-platform/
 │   ├── frontend/          # Role-based UI interfaces
 │   ├── backend/           # Microservices architecture
 │   └── tests/             # Consolidated testing suite
-├── legacy/                # Reference systems (preserved)
+├── archive/legacy/         # Reference systems (preserved)
 │   ├── frontend/          # Previous Next.js implementation
 │   └── backend/           # Previous FastAPI implementation
 ├── docs/                  # Organized documentation
@@ -113,7 +113,7 @@ taxpoynt-platform/
 ### Development Principles
 1. **Root Level Discipline**: Only essential deployment and documentation files
 2. **Platform Focus**: All active development in `/platform/`  
-3. **Legacy Preservation**: Reference implementations in `/legacy/`
+3. **Legacy Preservation**: Reference implementations in `/archive/legacy/`
 4. **Documentation Organization**: Categorized by business function
 5. **Testing Consolidation**: All test types in `/platform/tests/`
 
