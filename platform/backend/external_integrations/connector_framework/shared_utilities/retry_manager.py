@@ -405,7 +405,8 @@ class RetryManager:
             attempt = RetryAttempt(
                 attempt_number=attempt_number,
                 timestamp=datetime.utcnow(),
-                delay_seconds=0.0
+                delay_seconds=0.0,
+                outcome=RetryOutcome.RETRY  # Initial state, will be updated based on result
             )
             
             try:

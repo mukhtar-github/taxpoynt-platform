@@ -16,7 +16,7 @@ from core_platform.data_management.database_init import get_db_session
 from core_platform.models.recovery import RecoverySession, RecoveryAction, RecoveryResult
 from core_platform.cache import CacheService
 from core_platform.events import EventBus
-from core_platform.monitoring import MetricsCollector
+from core_platform.monitoring.metrics_aggregator import HealthMonitorCollector
 from core_platform.notifications import NotificationService
 
 logger = logging.getLogger(__name__)
@@ -172,7 +172,7 @@ class RecoveryOrchestrator:
         """Initialize recovery orchestrator service"""
         self.cache = CacheService()
         self.event_bus = EventBus()
-        self.metrics_collector = MetricsCollector()
+        self.metrics_collector = HealthMonitorCollector()
         self.notification_service = NotificationService()
         self.logger = logging.getLogger(__name__)
         
