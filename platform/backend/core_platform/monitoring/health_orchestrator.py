@@ -404,9 +404,18 @@ class HealthOrchestrator:
         if asyncio.iscoroutinefunction(health_check.check_function):
             return await health_check.check_function()
         else:
-            # Run synchronous function in thread pool
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, health_check.check_function)
+            # Try to execute the function - it might return a coroutine
+            try:
+                result = health_check.check_function()
+                # Check if the result is a coroutine
+                if asyncio.iscoroutine(result):
+                    return await result
+                else:
+                    return result
+            except Exception as e:
+                # If synchronous execution fails, try in thread pool
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, health_check.check_function)
     
     # === Service Health Aggregation ===
     
