@@ -62,13 +62,9 @@ except ImportError:
         HYBRID = "hybrid"
         CORE = "core"
     
-    class MessageRouter:
-        def __init__(self):
-            pass
-            
-        async def route_message(self, service_role, operation, payload):
-            """Fallback route_message method"""
-            return {"status": "success", "message": f"Mock response for {operation}", "data": payload}
+    # MessageRouter should be imported from core_platform.messaging
+    # If not available, this indicates a configuration issue that should be addressed
+    from core_platform.messaging.message_router import MessageRouter
 
 from .models import (
     HTTPRoutingContext, APIEndpointRule, RoleBasedRoute,

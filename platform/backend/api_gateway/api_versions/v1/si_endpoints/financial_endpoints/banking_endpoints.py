@@ -606,32 +606,9 @@ class BankingEndpointsV1:
                 }
             )
             
-            # Provide fallback stats if the message router returns empty
-            if not result or not result.get("data"):
-                fallback_stats = {
-                    "connections": {
-                        "total": 0,
-                        "active": 0,
-                        "mono": 0,
-                        "stitch": 0,
-                        "other": 0
-                    },
-                    "transactions": {
-                        "total": 0,
-                        "this_month": 0,
-                        "volume": 0
-                    },
-                    "accounts": {
-                        "connected": 0,
-                        "active": 0
-                    },
-                    "health": {
-                        "overall": "ready",
-                        "connection_success_rate": "N/A",
-                        "status": "No banking connections configured"
-                    }
-                }
-                return self._create_v1_response(fallback_stats, "banking_stats_retrieved")
+            # Return the actual result from the message router
+            if not result:
+                raise HTTPException(status_code=503, detail="Banking statistics service unavailable")
             
             return self._create_v1_response(result, "banking_stats_retrieved")
         except Exception as e:
