@@ -1396,12 +1396,12 @@ class RecoveryOrchestrator:
     async def _register_event_handlers(self):
         """Register event handlers"""
         try:
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "error.recovery_plan_created",
                 self._handle_recovery_plan_created
             )
             
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "error.escalation_required",
                 self._handle_escalation_required
             )

@@ -232,6 +232,24 @@ class EventBus:
         
         self.logger.info("EventBus stopped")
     
+    async def emit(self, event_type: str, data: Dict[str, Any], 
+                   priority: EventPriority = EventPriority.NORMAL,
+                   source: str = "", correlation_id: Optional[str] = None) -> str:
+        """
+        Emit an event (alias for publish_event for compatibility)
+        
+        Args:
+            event_type: Type of event to emit
+            data: Event data
+            priority: Event priority level
+            source: Source identifier
+            correlation_id: Correlation ID for request tracking
+            
+        Returns:
+            Event ID
+        """
+        return await self.publish_event(event_type, data, priority, source, correlation_id)
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get event bus statistics"""
         return {

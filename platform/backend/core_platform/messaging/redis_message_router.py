@@ -157,8 +157,28 @@ class RedisMessageRouter(MessageRouter):
             endpoints_data = await self.redis.hgetall(self.service_endpoints_key)
             for service_id, endpoint_json in endpoints_data.items():
                 endpoint_dict = json.loads(endpoint_json)
-                # Convert string back to enum
-                endpoint_dict["role"] = ServiceRole(endpoint_dict["role"])
+                # Convert string back to enum and fix field names
+                if "role" in endpoint_dict:
+                    endpoint_dict["service_role"] = ServiceRole(endpoint_dict.pop("role"))
+                elif "service_role" in endpoint_dict:
+                    endpoint_dict["service_role"] = ServiceRole(endpoint_dict["service_role"])
+                    
+                # Fix other field name mismatches if they exist
+                if "service_id" in endpoint_dict and "endpoint_id" not in endpoint_dict:
+                    endpoint_dict["endpoint_id"] = endpoint_dict.pop("service_id")
+                if "name" in endpoint_dict and "service_name" not in endpoint_dict:
+                    endpoint_dict["service_name"] = endpoint_dict.pop("name")
+                if "last_seen" in endpoint_dict and "last_activity" not in endpoint_dict:
+                    last_seen_str = endpoint_dict.pop("last_seen")
+                    if last_seen_str:
+                        endpoint_dict["last_activity"] = datetime.fromisoformat(last_seen_str)
+                elif "last_activity" in endpoint_dict and isinstance(endpoint_dict["last_activity"], str):
+                    endpoint_dict["last_activity"] = datetime.fromisoformat(endpoint_dict["last_activity"])
+                if "status" in endpoint_dict and "health_status" not in endpoint_dict:
+                    endpoint_dict["health_status"] = endpoint_dict.pop("status")
+                if "is_healthy" in endpoint_dict and "active" not in endpoint_dict:
+                    endpoint_dict["active"] = endpoint_dict.pop("is_healthy")
+                    
                 self.service_endpoints[service_id] = ServiceEndpoint(**endpoint_dict)
             
             # Load role mappings
@@ -224,10 +244,10 @@ class RedisMessageRouter(MessageRouter):
                 # Check service health
                 for service_id, endpoint in self.service_endpoints.items():
                     # Basic health check - could be enhanced with actual HTTP checks
-                    last_seen = endpoint.last_seen or datetime.now(timezone.utc)
-                    if (datetime.now(timezone.utc) - last_seen).total_seconds() > 300:
-                        endpoint.is_healthy = False
-                        endpoint.status = "unhealthy"
+                    last_activity = endpoint.last_activity or datetime.now(timezone.utc)
+                    if (datetime.now(timezone.utc) - last_activity).total_seconds() > 300:
+                        endpoint.active = False
+                        endpoint.health_status = "unhealthy"
                         await self._persist_service_endpoint(service_id, endpoint)
                 
                 await asyncio.sleep(60)  # Health check every minute
@@ -299,9 +319,9 @@ class RedisMessageRouter(MessageRouter):
             # Create endpoint from individual parameters
             from .message_router import ServiceEndpoint
             endpoint = ServiceEndpoint(
-                service_id=service_id,
-                name=service_name or service_id,
-                role=service_role,
+                endpoint_id=service_id,
+                service_name=service_name or service_id,
+                service_role=service_role,
                 callback=callback,
                 priority=priority,
                 tags=tags or [],
@@ -315,24 +335,24 @@ class RedisMessageRouter(MessageRouter):
         self.service_endpoints[service_id] = endpoint
         
         # Add to role mapping
-        if endpoint.role not in self.role_mappings:
-            self.role_mappings[endpoint.role] = []
-        if service_id not in self.role_mappings[endpoint.role]:
-            self.role_mappings[endpoint.role].append(service_id)
+        if endpoint.service_role not in self.role_mappings:
+            self.role_mappings[endpoint.service_role] = []
+        if service_id not in self.role_mappings[endpoint.service_role]:
+            self.role_mappings[endpoint.service_role].append(service_id)
         
         # Persist to Redis
         await self._persist_service_endpoint(service_id, endpoint)
         await self._persist_role_mappings()
         
-        logger.info(f"Registered service {service_id} with role {endpoint.role}")
+        logger.info(f"Registered service {service_id} with role {endpoint.service_role}")
         return service_id
     
     async def _persist_service_endpoint(self, service_id: str, endpoint: ServiceEndpoint):
         """Persist service endpoint to Redis"""
         endpoint_dict = asdict(endpoint)
         # Convert enum to string for JSON serialization
-        endpoint_dict["role"] = endpoint.role.value
-        endpoint_dict["last_seen"] = endpoint.last_seen.isoformat() if endpoint.last_seen else None
+        endpoint_dict["service_role"] = endpoint.service_role.value
+        endpoint_dict["last_activity"] = endpoint.last_activity.isoformat() if endpoint.last_activity else None
         
         await self.redis.hset(
             self.service_endpoints_key,

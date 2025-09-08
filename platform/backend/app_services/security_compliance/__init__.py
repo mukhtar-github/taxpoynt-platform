@@ -215,7 +215,7 @@ __all__ = [
 # Convenience factory functions for complete security compliance suite
 async def create_security_compliance_suite(tls_config: Optional[TLSConfiguration] = None,
                                           encryption_config: Optional[EncryptionConfig] = None,
-                                          audit_log_directory: str = "audit_logs",
+                                          log_directory: str = "audit_logs",
                                           jwt_secret: Optional[str] = None,
                                           detection_window: int = 300):
     """
@@ -224,7 +224,7 @@ async def create_security_compliance_suite(tls_config: Optional[TLSConfiguration
     Args:
         tls_config: TLS configuration
         encryption_config: Encryption configuration
-        audit_log_directory: Audit log directory
+        log_directory: Audit log directory
         jwt_secret: JWT secret for access control
         detection_window: Threat detection window
         
@@ -239,7 +239,7 @@ async def create_security_compliance_suite(tls_config: Optional[TLSConfiguration
     encryption_service = create_encryption_service(encryption_config)
     
     # Create audit logger
-    audit_logger = create_audit_logger(audit_log_directory)
+    audit_logger = create_audit_logger(log_directory)
     await audit_logger.start()
     
     # Create access controller

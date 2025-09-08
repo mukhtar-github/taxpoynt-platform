@@ -363,7 +363,7 @@ class SIRouterV1:
         
         # Auto-Reconciliation Routes
         try:
-            from ..reconciliation_endpoints import create_reconciliation_router
+            from .reconciliation_endpoints import create_reconciliation_router
             reconciliation_router = create_reconciliation_router(
                 self.role_detector,
                 self.permission_guard,

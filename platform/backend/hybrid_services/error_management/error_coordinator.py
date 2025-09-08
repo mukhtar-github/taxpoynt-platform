@@ -1068,12 +1068,12 @@ class ErrorCoordinator:
     async def _register_event_handlers(self):
         """Register event handlers"""
         try:
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "service.operation_failed",
                 self._handle_service_operation_failed
             )
             
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "integration.failure",
                 self._handle_integration_failure
             )

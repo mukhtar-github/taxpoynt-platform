@@ -17,6 +17,7 @@ Services Registered:
 
 import logging
 import asyncio
+import os
 from typing import Dict, Any, Optional
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
@@ -329,7 +330,7 @@ class APPServiceRegistry:
         try:
             # Initialize security services
             encryption_service = EncryptionService()
-            audit_logger = AuditLogger(audit_log_directory="audit_logs")
+            audit_logger = AuditLogger(log_directory="audit_logs")
             
             security_service = {
                 "encryption_service": encryption_service,

@@ -1443,17 +1443,17 @@ class EscalationManager:
     async def _register_event_handlers(self):
         """Register event handlers"""
         try:
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "error.pattern_escalation",
                 self._handle_pattern_escalation
             )
             
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "error.escalation_required",
                 self._handle_escalation_required
             )
             
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "recovery.execution_failed",
                 self._handle_recovery_failure
             )

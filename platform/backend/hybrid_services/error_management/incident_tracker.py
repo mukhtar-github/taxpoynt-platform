@@ -1358,17 +1358,17 @@ class IncidentTracker:
     async def _register_event_handlers(self):
         """Register event handlers"""
         try:
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "error.occurred",
                 self._handle_error_occurred
             )
             
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "escalation.created",
                 self._handle_escalation_created
             )
             
-            await self.event_bus.subscribe(
+            self.event_bus.subscribe(
                 "recovery.execution_completed",
                 self._handle_recovery_completed
             )
