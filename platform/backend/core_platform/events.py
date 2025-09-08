@@ -72,6 +72,21 @@ class EventBus:
         
         self.logger.info("EventBus initialized")
     
+    async def initialize(self) -> bool:
+        """
+        Initialize the EventBus asynchronously.
+        
+        Returns:
+            True if initialization successful, False otherwise
+        """
+        try:
+            self._running = True
+            self.logger.info("EventBus initialized asynchronously")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to initialize EventBus: {e}")
+            return False
+    
     def subscribe(self, event_type: str, handler: Callable) -> None:
         """
         Subscribe to events of a specific type

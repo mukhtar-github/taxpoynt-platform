@@ -279,8 +279,38 @@ class RedisMessageRouter(MessageRouter):
         except Exception as e:
             logger.error(f"Stats update error: {e}")
     
-    async def register_service(self, service_id: str, endpoint: ServiceEndpoint):
+    async def register_service(
+        self, 
+        service_name: str = None,
+        service_id: str = None, 
+        endpoint: ServiceEndpoint = None,
+        service_role: ServiceRole = None,
+        callback: callable = None,
+        priority: int = 0,
+        tags: List[str] = None,
+        metadata: Dict[str, Any] = None
+    ):
         """Register a service endpoint with Redis persistence"""
+        # Handle backward compatibility
+        if service_name and not service_id:
+            service_id = service_name
+        
+        if endpoint is None and service_role:
+            # Create endpoint from individual parameters
+            from .message_router import ServiceEndpoint
+            endpoint = ServiceEndpoint(
+                service_id=service_id,
+                name=service_name or service_id,
+                role=service_role,
+                callback=callback,
+                priority=priority,
+                tags=tags or [],
+                metadata=metadata or {}
+            )
+        
+        if not service_id or not endpoint:
+            raise ValueError("Either service_id and endpoint, or service_name and service_role must be provided")
+        
         # Update local state
         self.service_endpoints[service_id] = endpoint
         
@@ -295,6 +325,7 @@ class RedisMessageRouter(MessageRouter):
         await self._persist_role_mappings()
         
         logger.info(f"Registered service {service_id} with role {endpoint.role}")
+        return service_id
     
     async def _persist_service_endpoint(self, service_id: str, endpoint: ServiceEndpoint):
         """Persist service endpoint to Redis"""

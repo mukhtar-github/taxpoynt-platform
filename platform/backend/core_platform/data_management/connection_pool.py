@@ -366,6 +366,14 @@ class ProductionConnectionPool:
         
         return test_results
     
+    @contextmanager  
+    def get_session(self, read_only: bool = False):
+        """Get database session (read or write)"""
+        if read_only:
+            return self.get_read_session()
+        else:
+            return self.get_write_session()
+    
     @contextmanager
     def get_write_session(self):
         """Get database session for write operations (primary database)"""

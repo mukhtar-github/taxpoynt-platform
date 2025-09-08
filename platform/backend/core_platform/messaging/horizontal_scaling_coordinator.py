@@ -306,8 +306,8 @@ class HorizontalScalingCoordinator:
                         
                         # Update instance metrics
                         metrics = self.instance_metrics[instance_id]
-                        metrics.messages_per_second = self._calculate_messages_per_second(local_stats)
-                        metrics.routing_latency_ms = self._calculate_routing_latency(local_stats)
+                        metrics.messages_per_second = await self._calculate_messages_per_second(local_stats)
+                        metrics.routing_latency_ms = await self._calculate_routing_latency(local_stats)
                         metrics.error_rate = self._calculate_error_rate(local_stats)
                         metrics.uptime_seconds = local_stats.get("instance_uptime", 0)
                         metrics.last_heartbeat = datetime.now(timezone.utc)
