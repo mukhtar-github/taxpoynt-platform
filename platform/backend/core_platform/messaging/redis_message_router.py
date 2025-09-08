@@ -332,7 +332,7 @@ class RedisMessageRouter(MessageRouter):
         rule_dict["source_role"] = rule.source_role.value
         rule_dict["target_role"] = rule.target_role.value if rule.target_role else None
         rule_dict["strategy"] = rule.strategy.value
-        rule_dict["message_types"] = [mt.value for mt in rule.message_types] if rule.message_types else []
+        rule_dict["message_pattern"] = rule.message_pattern if hasattr(rule, 'message_pattern') else ""
         
         await self.redis.hset(
             self.routing_rules_key,

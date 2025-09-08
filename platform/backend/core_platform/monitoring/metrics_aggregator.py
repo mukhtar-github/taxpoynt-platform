@@ -463,6 +463,36 @@ class MetricsAggregator:
         
         return real_time_data
     
+    async def get_current_metrics(self) -> List[Dict[str, Any]]:
+        """Get current metrics for Prometheus integration"""
+        try:
+            # Get recent metrics (last 1 minute)
+            end_time = datetime.utcnow()
+            start_time = end_time - timedelta(minutes=1)
+            
+            recent_metrics = self._filter_metrics(
+                time_range={"start": start_time, "end": end_time}
+            )
+            
+            # Convert to dict format for Prometheus
+            current_metrics = []
+            for metric in recent_metrics:
+                metric_dict = {
+                    "name": metric.name,
+                    "value": metric.value,
+                    "timestamp": metric.timestamp,
+                    "service_role": metric.service_role.value,
+                    "service_name": metric.service_name,
+                    "metric_type": metric.metric_type.value,
+                    "tags": metric.tags or {}
+                }
+                current_metrics.append(metric_dict)
+            
+            return current_metrics
+        except Exception as e:
+            logger.error(f"Error getting current metrics: {e}")
+            return []
+    
     # === Analysis and Insights ===
     
     def analyze_metric_trends(

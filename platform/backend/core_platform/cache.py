@@ -50,6 +50,31 @@ class CacheService:
             self._cache_manager = initialize_cache_manager(default_config)
             logger.info("Initialized cache service with default configuration")
     
+    async def initialize(self) -> bool:
+        """
+        Initialize the cache service asynchronously.
+        
+        Returns:
+            True if initialization successful, False otherwise
+        """
+        try:
+            if self._cache_manager is None:
+                # Initialize with default configuration
+                default_config = CacheConfig(
+                    default_ttl_seconds=3600,  # 1 hour
+                    max_memory_cache_size=1000,
+                    enable_compression=True,
+                    serialization_format=SerializationFormat.JSON,
+                    cache_strategy=CacheStrategy.WRITE_THROUGH,
+                    enable_metrics=True
+                )
+                self._cache_manager = initialize_cache_manager(default_config)
+                logger.info("Cache service initialized asynchronously")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize cache service: {e}")
+            return False
+    
     def get(self, key: str, default: Any = None) -> Any:
         """
         Get value from cache.
