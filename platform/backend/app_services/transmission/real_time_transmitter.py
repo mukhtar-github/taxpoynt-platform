@@ -610,19 +610,22 @@ class RealTimeTransmitter:
         except Exception as e:
             logger.error(f"WebSocket error for {connection_id}: {e}")
         finally:
-            # Clean up connection
-            if connection_id in self._active_connections:
+            # Clean up connection - check if connection_id is defined and in active connections
+            if 'connection_id' in locals() and connection_id in self._active_connections:
                 del self._active_connections[connection_id]
-            
-            # Send disconnection event
-            await self._send_event(RealTimeEvent(
-                event_id=str(uuid.uuid4()),
-                event_type=EventType.STREAM_DISCONNECTED,
-                request_id="",
-                document_id="",
-                timestamp=datetime.utcnow(),
-                data={'connection_id': connection_id}
-            ))
+                
+                # Send disconnection event only if connection_id is available
+                try:
+                    await self._send_event(RealTimeEvent(
+                        event_id=str(uuid.uuid4()),
+                        event_type=EventType.STREAM_DISCONNECTED,
+                        request_id="",
+                        document_id="",
+                        timestamp=datetime.utcnow(),
+                        data={'connection_id': connection_id}
+                    ))
+                except Exception as event_error:
+                    logger.error(f"Failed to send disconnection event: {event_error}")
     
     async def _handle_websocket_message(self, connection: StreamConnection, data: Dict[str, Any]):
         """Handle WebSocket message from client"""

@@ -209,7 +209,7 @@ class PaymentProcessorEndpointsV1:
         )
         
         self.router.add_api_route(
-            f"{prefix}/connections/{connection_id}",
+            f"{prefix}/connections/{{connection_id}}",
             self._create_payment_get_handler(processor, region),
             methods=["GET"],
             summary=f"Get {processor} connection",
@@ -218,7 +218,7 @@ class PaymentProcessorEndpointsV1:
         )
         
         self.router.add_api_route(
-            f"{prefix}/connections/{connection_id}",
+            f"{prefix}/connections/{{connection_id}}",
             self._create_payment_update_handler(processor, region),
             methods=["PUT"],
             summary=f"Update {processor} connection",
@@ -227,7 +227,7 @@ class PaymentProcessorEndpointsV1:
         )
         
         self.router.add_api_route(
-            f"{prefix}/connections/{connection_id}",
+            f"{prefix}/connections/{{connection_id}}",
             self._create_payment_delete_handler(processor, region),
             methods=["DELETE"],
             summary=f"Delete {processor} connection",
