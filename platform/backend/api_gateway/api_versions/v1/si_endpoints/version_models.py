@@ -3,18 +3,19 @@ Version 1 Response Models
 ========================
 Standardized response models for API v1 endpoints.
 """
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, TypeVar, Generic
 from pydantic import BaseModel, Field
 from datetime import datetime
 
+T = TypeVar('T')
 
-class V1ResponseModel(BaseModel):
+class V1ResponseModel(BaseModel, Generic[T]):
     """Standard v1 response format"""
     success: bool = True
     action: str = Field(..., description="Action that was performed")
     api_version: str = Field(default="v1", description="API version")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
-    data: Dict[str, Any] = Field(..., description="Response data")
+    data: T = Field(..., description="Response data")
     meta: Optional[Dict[str, Any]] = Field(default=None, description="Metadata")
 
 
