@@ -193,7 +193,7 @@ async def create_production_messaging():
     )
     messaging_circuit_breaker = CircuitBreaker("messaging_infrastructure", circuit_breaker_config)
     
-    return await messaging_circuit_breaker.call_async(
+    return await messaging_circuit_breaker.call(
         initialize_production_messaging_infrastructure
     )
 

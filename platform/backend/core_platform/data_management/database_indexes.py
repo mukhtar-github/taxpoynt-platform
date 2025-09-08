@@ -522,13 +522,13 @@ class DatabaseIndexManager:
                 if index_type == "GIN":
                     # GIN indexes for JSONB columns
                     create_query = text(f"""
-                        CREATE INDEX CONCURRENTLY IF NOT EXISTS {index_name} 
+                        CREATE INDEX IF NOT EXISTS {index_name} 
                         ON {table_name} USING GIN ({columns_str})
                     """)
                 else:
                     # Regular BTREE indexes
                     create_query = text(f"""
-                        CREATE INDEX CONCURRENTLY IF NOT EXISTS {index_name} 
+                        CREATE INDEX IF NOT EXISTS {index_name} 
                         ON {table_name} ({columns_str})
                     """)
                 
