@@ -100,30 +100,30 @@ logger = logging.getLogger(__name__)
 
 # Try to import API Gateway components
 try:
-    from backend.api_gateway.role_routing.models import APIGatewayConfig, RoutingSecurityLevel
-    from backend.api_gateway.role_routing.role_detector import HTTPRoleDetector
-    from backend.api_gateway.role_routing.permission_guard import APIPermissionGuard
-    from backend.api_gateway.role_routing.auth_router import create_auth_router
-    from backend.api_gateway.main_gateway_router import create_main_gateway_router
-    from backend.api_gateway.api_versions.version_coordinator import APIVersionCoordinator
+    from api_gateway.role_routing.models import APIGatewayConfig, RoutingSecurityLevel
+    from api_gateway.role_routing.role_detector import HTTPRoleDetector
+    from api_gateway.role_routing.permission_guard import APIPermissionGuard
+    from api_gateway.role_routing.auth_router import create_auth_router
+    from api_gateway.main_gateway_router import create_main_gateway_router
+    from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
     
     # Core platform components (production ready)
-    from backend.core_platform.authentication.role_manager import RoleManager
-    from backend.core_platform.messaging.redis_message_router import get_redis_message_router, RedisMessageRouter
-    from backend.core_platform.messaging.message_router import ServiceRole
+    from core_platform.authentication.role_manager import RoleManager
+    from core_platform.messaging.redis_message_router import get_redis_message_router, RedisMessageRouter
+    from core_platform.messaging.message_router import ServiceRole
     
     # Phase 6: Enterprise Fault Tolerance Infrastructure
-    from backend.hybrid_services.error_management import (
+    from hybrid_services.error_management import (
         create_error_management_services,
         initialize_error_management_services,
         handle_platform_error,
         cleanup_error_management_services
     )
-    from backend.external_integrations.connector_framework.shared_utilities.retry_manager import (
+    from external_integrations.connector_framework.shared_utilities.retry_manager import (
         RetryManager, RetryConfig, RetryStrategy
     )
-    from backend.core_platform.messaging.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-    from backend.core_platform.messaging.dead_letter_handler import DeadLetterHandler, FailureReason, RecoveryAction
+    from core_platform.messaging.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+    from core_platform.messaging.dead_letter_handler import DeadLetterHandler, FailureReason, RecoveryAction
     
     logger = logging.getLogger(__name__)
     logger.info("✅ Successfully imported TaxPoynt Production Architecture")
