@@ -76,6 +76,12 @@ from .insight_generator import (
     create_insight_generator
 )
 
+from .analytics_processor import (
+    AnalyticsProcessor,
+    AdvancedAnalyticsEngine,
+    BusinessIntelligenceService
+)
+
 __version__ = "1.0.0"
 
 __all__ = [

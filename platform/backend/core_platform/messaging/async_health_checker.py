@@ -343,10 +343,11 @@ class AsyncHealthCheckManager:
             }
             
             # Store in Redis
-            await self.redis.hset(self.health_key, mapping={
-                k: str(v) if not isinstance(v, dict) else str(v) 
-                for k, v in health_data.items()
-            })
+            await self.redis.hset(
+                self.health_key,
+                mapping={k: ("" if v is None else (str(v) if not isinstance(v, dict) else json.dumps(v)))
+                         for k, v in health_data.items()}
+            )
             await self.redis.expire(self.health_key, 300)  # 5 min TTL
             
             # Store detailed metrics
@@ -365,7 +366,9 @@ class AsyncHealthCheckManager:
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 
-                await self.redis.hset(f"{self.metrics_key}:{service_name}", mapping=metrics_data)
+                # Coerce None values to empty strings and serialize as strings for HSET
+                safe_metrics = {k: ("" if v is None else str(v)) for k, v in metrics_data.items()}
+                await self.redis.hset(f"{self.metrics_key}:{service_name}", mapping=safe_metrics)
                 await self.redis.expire(f"{self.metrics_key}:{service_name}", 3600)  # 1 hour TTL
             
         except Exception as e:
@@ -533,11 +536,12 @@ async def setup_default_health_checks(manager: AsyncHealthCheckManager):
     # Database health check
     async def check_database():
         try:
-            from core_platform.data_management.connection_pool import get_connection_pool
-            pool = get_connection_pool()
-            async with pool.get_session() as session:
-                result = await session.execute("SELECT 1")
-                return "Database connection healthy"
+            # Use synchronous context manager inside async function (short/cheap call)
+            from core_platform.data_management.connection_pool import get_db_session
+            from sqlalchemy import text
+            with get_db_session() as session:
+                session.execute(text("SELECT 1"))
+            return "Database connection healthy"
         except Exception as e:
             raise Exception(f"Database check failed: {e}")
     

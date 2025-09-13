@@ -16,9 +16,9 @@ import statistics
 
 from core_platform.data_management.database_init import get_db_session
 from core_platform.models.reports import ReportDefinition, ReportExecution, ReportOutput
-from core_platform.cache import CacheService
+from core_platform.data_management.cache_manager import CacheManager, CacheConfig
 from core_platform.events import EventBus
-from core_platform.monitoring import MetricsCollector
+from si_services.integration_management.metrics_collector import MetricsCollector
 from core_platform.notifications import NotificationService
 from core_platform.storage import FileStorage
 
@@ -158,7 +158,7 @@ class CrossRoleReporting:
     def __init__(self, unified_metrics: UnifiedMetrics = None):
         """Initialize cross-role reporting service"""
         self.unified_metrics = unified_metrics or UnifiedMetrics()
-        self.cache = CacheService()
+        self.cache = CacheManager(CacheConfig())
         self.event_bus = EventBus()
         self.metrics_collector = MetricsCollector()
         self.notification_service = NotificationService()

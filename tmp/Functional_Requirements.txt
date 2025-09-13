@@ -1,0 +1,28 @@
+           Functional Requirements
+           Requirements
+           The functional requirements define expectations for the implementation of the new e-
+           Collections model and have been ranked in order of priority as follows:
+
+             Level of Priority
+                                     Description
+             (MoSCoW)
+
+             Must have               Proposed solution must have this requirement to meet the business needs.
+
+                                     Proposed solution should have this requirement, if possible, but project
+             Should have
+                                     success does not rely on it.
+
+                                     Proposed solution could have this requirement if it does not affect anything
+             Could have
+                                     else in the project.
+
+                                     Would like to have this requirement later on the proposed solution, but it
+             Won’t have
+                                     won’t be delivered this time.
+
+
+
+
+Functional Requirements                                                                                             1
+

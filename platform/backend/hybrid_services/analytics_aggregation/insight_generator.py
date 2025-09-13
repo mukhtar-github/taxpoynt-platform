@@ -15,9 +15,9 @@ import math
 
 from core_platform.data_management.database_init import get_db_session
 from core_platform.models.insights import BusinessInsight, InsightRule, InsightExecution, InsightReport
-from core_platform.cache import CacheService
+from core_platform.data_management.cache_manager import CacheManager, CacheConfig
 from core_platform.events import EventBus
-from core_platform.monitoring import MetricsCollector
+from si_services.integration_management.metrics_collector import MetricsCollector
 from core_platform.notifications import NotificationService
 from core_platform.ai import AIService
 
@@ -192,7 +192,7 @@ class InsightGenerator:
         self.trend_analyzer = trend_analyzer or TrendAnalyzer()
         self.cross_role_reporting = cross_role_reporting or CrossRoleReporting()
         
-        self.cache = CacheService()
+        self.cache = CacheManager(CacheConfig())
         self.event_bus = EventBus()
         self.metrics_collector = MetricsCollector()
         self.notification_service = NotificationService()

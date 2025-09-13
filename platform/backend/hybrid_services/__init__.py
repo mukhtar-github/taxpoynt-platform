@@ -60,6 +60,15 @@ from .workflow_orchestration.e2e_workflow_engine import E2EWorkflowEngine
 logger = logging.getLogger(__name__)
 
 
+# Import the real implementations from their appropriate directories
+from .analytics_aggregation.analytics_processor import AnalyticsProcessor, AdvancedAnalyticsEngine, BusinessIntelligenceService
+from .compliance_coordination.compliance_monitor import CrossRoleComplianceMonitor
+from .configuration_management.dynamic_config_manager import DynamicConfigManager
+from .error_management.unified_error_handler import UnifiedErrorHandler
+from .service_access_control.unified_rbac import UnifiedRBAC
+from .workflow_orchestration.business_process_engine import BusinessProcessEngine
+
+
 class HybridServiceRegistry:
     """
     Registry for all Hybrid services that handles initialization and message router registration.

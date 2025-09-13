@@ -15,10 +15,11 @@ import statistics
 # Fixed imports to use actual existing modules
 from core_platform.data_management.database_init import get_db_session
 from core_platform.models.metrics import MetricRecord, MetricAggregation, MetricSnapshot
-from core_platform.data_management.cache_manager import CacheManager
+from core_platform.data_management.cache_manager import CacheManager, CacheConfig
 from core_platform.events import EventBus
 from core_platform.monitoring.prometheus_integration import PrometheusIntegration
 from core_platform.notifications import NotificationService
+from si_services.integration_management.metrics_collector import MetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ class UnifiedMetrics:
     
     def __init__(self):
         """Initialize unified metrics service"""
-        self.cache = CacheService()
+        self.cache = CacheManager(CacheConfig())
         self.event_bus = EventBus()
         self.metrics_collector = MetricsCollector()
         self.notification_service = NotificationService()

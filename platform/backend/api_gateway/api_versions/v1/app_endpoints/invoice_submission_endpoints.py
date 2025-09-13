@@ -42,9 +42,22 @@ class InvoiceSubmissionEndpointsV1:
         self.permission_guard = permission_guard
         self.message_router = message_router
         self.router = APIRouter(prefix="/invoices", tags=["Invoice Submission V1"])
-        
+
         self._setup_routes()
         logger.info("Invoice Submission Endpoints V1 initialized")
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        """Local guard to enforce APP role and permissions for v1 routes."""
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup invoice submission routes"""
@@ -56,7 +69,8 @@ class InvoiceSubmissionEndpointsV1:
             methods=["POST"],
             summary="Generate FIRS-compliant invoice",
             description="Generate invoice compliant with FIRS requirements",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
         )
         
         self.router.add_api_route(
@@ -75,7 +89,8 @@ class InvoiceSubmissionEndpointsV1:
             methods=["POST"],
             summary="Submit invoice to FIRS",
             description="Submit generated invoice to FIRS systems",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
         )
         
         self.router.add_api_route(
@@ -135,7 +150,7 @@ class InvoiceSubmissionEndpointsV1:
         )
     
     # Invoice Generation Endpoints
-    async def generate_firs_compliant_invoice(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_firs_compliant_invoice(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Generate FIRS-compliant invoice"""
         try:
             body = await request.json()
@@ -166,7 +181,7 @@ class InvoiceSubmissionEndpointsV1:
             logger.error(f"Error generating FIRS-compliant invoice in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to generate FIRS-compliant invoice")
     
-    async def generate_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Generate invoice batch"""
         try:
             body = await request.json()
@@ -187,7 +202,7 @@ class InvoiceSubmissionEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to generate invoice batch")
     
     # Invoice Submission Endpoints
-    async def submit_invoice(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_invoice(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice to FIRS"""
         try:
             body = await request.json()
@@ -207,7 +222,7 @@ class InvoiceSubmissionEndpointsV1:
             logger.error(f"Error submitting invoice in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to submit invoice")
     
-    async def submit_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice batch to FIRS"""
         try:
             body = await request.json()
@@ -228,7 +243,7 @@ class InvoiceSubmissionEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to submit invoice batch")
     
     # Submission Status Endpoints
-    async def get_submission_status(self, submission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_submission_status(self, submission_id: str, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get submission status"""
         try:
             result = await self.message_router.route_message(
@@ -252,7 +267,7 @@ class InvoiceSubmissionEndpointsV1:
                              taxpayer_id: Optional[str] = Query(None, description="Filter by taxpayer"),
                              start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                              end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                             context: HTTPRoutingContext = Depends(lambda: None)):
+                             context: HTTPRoutingContext = Depends(_require_app_role)):
         """List invoice submissions"""
         try:
             result = await self.message_router.route_message(
@@ -276,7 +291,7 @@ class InvoiceSubmissionEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to list submissions")
     
     # Invoice Management Endpoints
-    async def get_invoice(self, invoice_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_invoice(self, invoice_id: str, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get invoice details"""
         try:
             result = await self.message_router.route_message(
@@ -299,7 +314,7 @@ class InvoiceSubmissionEndpointsV1:
             logger.error(f"Error getting invoice {invoice_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get invoice")
     
-    async def cancel_invoice_submission(self, invoice_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def cancel_invoice_submission(self, invoice_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Cancel invoice submission"""
         try:
             result = await self.message_router.route_message(
@@ -317,7 +332,7 @@ class InvoiceSubmissionEndpointsV1:
             logger.error(f"Error cancelling invoice submission {invoice_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to cancel invoice submission")
     
-    async def resubmit_invoice(self, invoice_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def resubmit_invoice(self, invoice_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Resubmit invoice"""
         try:
             body = await request.json()

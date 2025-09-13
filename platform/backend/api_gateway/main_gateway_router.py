@@ -156,7 +156,44 @@ class MainGatewayRouter:
             description="Check health of API Gateway and all versions",
             tags=["Gateway Management"]
         )
-        
+
+    def update_message_router(self, new_message_router: MessageRouter) -> None:
+        """Update the message router used by version/role routers.
+
+        This allows the application (after startup) to swap the temporary
+        message router for the production Redis-backed router without
+        rebuilding the whole routing tree. It propagates the new router to
+        any class-based endpoint instances that hold a `message_router`
+        attribute (e.g., SI/APP/Hybrid routers).
+        """
+        # Update gateway-level references
+        try:
+            self.message_router = new_message_router
+            # Keep the version coordinator in sync
+            if hasattr(self.version_coordinator, "message_router"):
+                self.version_coordinator.message_router = new_message_router
+            logger.info("MainGatewayRouter message router updated")
+        except Exception as e:
+            logger.error(f"Failed to update message router: {e}")
+
+        # Propagate to nested routers' handler instances
+        updated_count = 0
+        try:
+            for route in getattr(self.router, "routes", []):
+                endpoint = getattr(route, "endpoint", None)
+                instance = getattr(endpoint, "__self__", None)
+                if instance is not None and hasattr(instance, "message_router"):
+                    try:
+                        setattr(instance, "message_router", new_message_router)
+                        updated_count += 1
+                    except Exception:
+                        # Keep going; best-effort propagation
+                        pass
+            if updated_count:
+                logger.info(f"Propagated new message router to {updated_count} endpoint handler(s)")
+        except Exception as e:
+            logger.warning(f"Partial propagation of message router failed: {e}")
+
         self.router.add_api_route(
             "/status",
             self.get_gateway_status,
@@ -503,17 +540,46 @@ class MainGatewayRouter:
         return capabilities.get(role, [])
 
 
+def create_main_gateway(
+    role_detector: HTTPRoleDetector,
+    permission_guard: APIPermissionGuard,
+    message_router: MessageRouter,
+    version_coordinator: APIVersionCoordinator
+) -> MainGatewayRouter:
+    """Factory that returns the controller instance for better control.
+
+    Callers can include `controller.router` into FastAPI and keep the
+    controller reference (e.g., in `app.state.gateway_controller`) to
+    perform lifecycle actions like swapping the message router.
+    """
+    return MainGatewayRouter(
+        role_detector,
+        permission_guard,
+        message_router,
+        version_coordinator
+    )
+
+
 def create_main_gateway_router(
     role_detector: HTTPRoleDetector,
     permission_guard: APIPermissionGuard,
     message_router: MessageRouter,
     version_coordinator: APIVersionCoordinator
 ) -> APIRouter:
-    """Factory function to create main gateway router"""
-    gateway = MainGatewayRouter(
+    """Backward-compatible factory that returns an APIRouter.
+
+    Internally creates the controller and attaches an `update_message_router`
+    attribute on the router for legacy code paths.
+    """
+    controller = create_main_gateway(
         role_detector,
         permission_guard,
         message_router,
         version_coordinator
     )
-    return gateway.router
+    # Attach delegating method for backward compatibility
+    try:
+        setattr(controller.router, "update_message_router", controller.update_message_router)
+    except Exception:
+        pass
+    return controller.router

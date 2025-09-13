@@ -23,6 +23,7 @@ from .feature_gating import FeatureGate, FeatureGateConfig, FeatureAccessResult
 from .quota_manager import QuotaManager, QuotaConfig, QuotaEnforcement
 from .rate_limiter import ServiceRateLimiter, RateLimitConfig, RateLimitResult
 from .subscription_guard import SubscriptionGuard, SubscriptionValidation, AccessDecision
+from .unified_rbac import UnifiedRBAC
 
 __all__ = [
     # Access Middleware
@@ -49,6 +50,9 @@ __all__ = [
     "SubscriptionGuard",
     "SubscriptionValidation",
     "AccessDecision",
+    
+    # Unified RBAC
+    "UnifiedRBAC",
 ]
 
 __version__ = "1.0.0"

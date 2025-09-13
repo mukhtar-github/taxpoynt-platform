@@ -26,6 +26,7 @@ from .feature_flag_manager import FeatureFlagManager
 from .tenant_configurator import TenantConfigurator
 from .environment_manager import EnvironmentManager
 from .secrets_coordinator import SecretsCoordinator
+from .dynamic_config_manager import DynamicConfigManager
 
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     'TenantConfigurator',
     'EnvironmentManager',
     'SecretsCoordinator',
+    'DynamicConfigManager',
     'ConfigurationManagementService'
 ]
 

@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional, Set, Union, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
 import fnmatch
+import inspect
 
 from .event_bus import Event, EventBus, EventScope, EventPriority, get_event_bus
 
@@ -351,6 +352,18 @@ class MessageRouter:
     ) -> Dict[str, Any]:
         """Route a message to target service role with specified operation"""
         try:
+            # Ensure router has default rules and event hooks initialized
+            if not self.is_initialized:
+                await self.initialize()
+            # Soft validation: log when operation is not advertised by any registered endpoint
+            try:
+                known_ops = self._collect_known_operations()
+                if known_ops and operation not in known_ops:
+                    self.logger.warning(
+                        f"Route op not registered in metadata: '{operation}' (role={service_role.value})"
+                    )
+            except Exception:
+                pass
             # Translate operation to message type
             message_type = self._determine_message_type(operation)
             
@@ -430,6 +443,16 @@ class MessageRouter:
             self.logger.error(f"Error routing {operation} to {service_role.value}: {str(e)}")
             self.routing_stats["routing_failures"] += 1
             raise
+
+    def _collect_known_operations(self) -> set:
+        """Aggregate operations from registered service metadata (best-effort)."""
+        ops = set()
+        for endpoint in self.service_endpoints.values():
+            md = endpoint.metadata or {}
+            for op in (md.get("operations") or []):
+                if isinstance(op, str):
+                    ops.add(op)
+        return ops
     
     async def route_to_role(
         self,
@@ -693,25 +716,41 @@ class MessageRouter:
         endpoints: List[ServiceEndpoint], 
         payload: Dict[str, Any]
     ):
-        """Broadcast message to all endpoints"""
+        """Broadcast message to all endpoints and return aggregated responses if any"""
         delivery_tasks = []
-        
         for endpoint in endpoints:
-            task = asyncio.create_task(
-                self._deliver_message(message, endpoint, payload)
-            )
+            task = asyncio.create_task(self._deliver_message(message, endpoint, payload))
             delivery_tasks.append(task)
-        
-        # Wait for all deliveries
-        if delivery_tasks:
-            results = await asyncio.gather(*delivery_tasks, return_exceptions=True)
-            
-            # Update statistics
-            successful = sum(1 for r in results if r is True)
-            failed = len(results) - successful
-            
-            self.routing_stats["successful_deliveries"] += successful
-            self.routing_stats["failed_deliveries"] += failed
+
+        if not delivery_tasks:
+            return None
+
+        results = await asyncio.gather(*delivery_tasks, return_exceptions=True)
+
+        # Update statistics and collect dict responses
+        successful = 0
+        failed = 0
+        dict_responses: List[Dict[str, Any]] = []
+        for r in results:
+            if isinstance(r, BaseException):
+                failed += 1
+                continue
+            if r:
+                successful += 1
+                if isinstance(r, dict):
+                    dict_responses.append(r)
+            else:
+                failed += 1
+
+        self.routing_stats["successful_deliveries"] += successful
+        self.routing_stats["failed_deliveries"] += failed
+
+        # Return a merged response if any dict responses are present
+        if dict_responses:
+            if len(dict_responses) == 1:
+                return dict_responses[0]
+            return self._merge_responses(dict_responses)
+        return None
     
     async def _round_robin_message(
         self, 
@@ -720,9 +759,9 @@ class MessageRouter:
         payload: Dict[str, Any],
         rule_id: str
     ):
-        """Route message using round-robin strategy"""
+        """Route message using round-robin strategy and return result if any"""
         if not endpoints:
-            return
+            return None
         
         # Get current round-robin index
         current_index = self.round_robin_state.get(rule_id, 0)
@@ -738,8 +777,10 @@ class MessageRouter:
         
         if success:
             self.routing_stats["successful_deliveries"] += 1
+            return success if isinstance(success, dict) else None
         else:
             self.routing_stats["failed_deliveries"] += 1
+            return None
     
     async def _priority_message(
         self, 
@@ -747,9 +788,9 @@ class MessageRouter:
         endpoints: List[ServiceEndpoint], 
         payload: Dict[str, Any]
     ):
-        """Route message to highest priority endpoint"""
+        """Route message to highest priority endpoint and return first successful result"""
         if not endpoints:
-            return
+            return None
         
         # Sort by priority (highest first)
         sorted_endpoints = sorted(endpoints, key=lambda e: e.priority, reverse=True)
@@ -757,12 +798,12 @@ class MessageRouter:
         # Try highest priority endpoints until success
         for endpoint in sorted_endpoints:
             success = await self._deliver_message(message, endpoint, payload)
-            
             if success:
                 self.routing_stats["successful_deliveries"] += 1
-                break
+                return success if isinstance(success, dict) else None
         else:
             self.routing_stats["failed_deliveries"] += 1
+            return None
     
     async def _load_balanced_message(
         self, 
@@ -770,9 +811,9 @@ class MessageRouter:
         endpoints: List[ServiceEndpoint], 
         payload: Dict[str, Any]
     ):
-        """Route message using load balancing"""
+        """Route message using load balancing and return selected result"""
         if not endpoints:
-            return
+            return None
         
         # Calculate load scores for each endpoint
         endpoint_scores = []
@@ -800,8 +841,10 @@ class MessageRouter:
         
         if success:
             self.routing_stats["successful_deliveries"] += 1
+            return success if isinstance(success, dict) else None
         else:
             self.routing_stats["failed_deliveries"] += 1
+            return None
     
     async def _failover_message(
         self, 
@@ -809,9 +852,9 @@ class MessageRouter:
         endpoints: List[ServiceEndpoint], 
         payload: Dict[str, Any]
     ):
-        """Route message with failover strategy"""
+        """Route message with failover strategy and return first successful result"""
         if not endpoints:
-            return
+            return None
         
         # Sort by priority and health status
         sorted_endpoints = sorted(
@@ -823,13 +866,13 @@ class MessageRouter:
         # Try endpoints in order until success
         for endpoint in sorted_endpoints:
             success = await self._deliver_message(message, endpoint, payload)
-            
             if success:
                 self.routing_stats["successful_deliveries"] += 1
-                return
+                return success if isinstance(success, dict) else None
         
         # All endpoints failed
         self.routing_stats["failed_deliveries"] += 1
+        return None
     
     async def _deliver_message(
         self, 
@@ -857,10 +900,40 @@ class MessageRouter:
             
             # Deliver via callback if available
             if endpoint.callback:
-                if asyncio.iscoroutinefunction(endpoint.callback):
-                    result = await endpoint.callback(delivery_payload)
+                cb = endpoint.callback
+                # Provide backward-compatible calling conventions:
+                #  - (delivery_payload)
+                #  - (operation, payload)
+                #  - (operation, payload, delivery_context)
+                op_name = None
+                try:
+                    if message.routing_context and message.routing_context.routing_metadata:
+                        op_name = message.routing_context.routing_metadata.get("operation")
+                except Exception:
+                    op_name = None
+
+                try:
+                    sig = inspect.signature(cb)
+                    params = [
+                        p for p in sig.parameters.values()
+                        if p.kind in (
+                            inspect.Parameter.POSITIONAL_ONLY,
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        )
+                    ]
+                    if len(params) >= 3:
+                        args = (op_name, message.payload, delivery_payload)
+                    elif len(params) == 2:
+                        args = (op_name, message.payload)
+                    else:
+                        args = (delivery_payload,)
+                except Exception:
+                    args = (delivery_payload,)
+
+                if asyncio.iscoroutinefunction(cb):
+                    result = await cb(*args)
                 else:
-                    result = endpoint.callback(delivery_payload)
+                    result = cb(*args)
                 
                 # Update endpoint activity
                 endpoint.last_activity = datetime.now(timezone.utc)

@@ -87,6 +87,8 @@ from .incident_tracker import (
     create_incident_tracker
 )
 
+from .unified_error_handler import UnifiedErrorHandler
+
 __all__ = [
     # Error Coordinator
     "ErrorCoordinator",
@@ -154,7 +156,10 @@ __all__ = [
     "Incident",
     "IncidentResolution",
     "IncidentTemplate",
-    "create_incident_tracker"
+    "create_incident_tracker",
+    
+    # Unified Error Handler
+    "UnifiedErrorHandler"
 ]
 
 # Package version

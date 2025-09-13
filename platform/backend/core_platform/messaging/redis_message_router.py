@@ -143,6 +143,41 @@ class RedisMessageRouter(MessageRouter):
             mapping=instance_data
         )
         await self.redis.expire(f"{self.instances_key}:{self.instance_id}", 300)  # 5 min TTL
+
+    def _json_safe(self, obj: Any):
+        """Best-effort conversion of objects to JSON-serializable primitives.
+
+        - Datetimes -> ISO strings
+        - Enums -> value
+        - Callables/functions -> None (not persisted)
+        - Dataclasses -> asdict(...) then recurse
+        - Dict/list/tuple -> recurse
+        - Fallback -> str(obj)
+        """
+        from datetime import datetime
+        from enum import Enum
+        from dataclasses import is_dataclass, asdict as dc_asdict
+
+        if obj is None:
+            return None
+        if isinstance(obj, (str, int, float, bool)):
+            return obj
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, Enum):
+            return obj.value
+        if callable(obj):
+            return None
+        if is_dataclass(obj):
+            try:
+                return self._json_safe(dc_asdict(obj))
+            except Exception:
+                return str(obj)
+        if isinstance(obj, dict):
+            return {str(k): self._json_safe(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple, set)):
+            return [self._json_safe(v) for v in obj]
+        return str(obj)
     
     async def _load_state_from_redis(self):
         """Load routing state from Redis"""
@@ -350,14 +385,19 @@ class RedisMessageRouter(MessageRouter):
     async def _persist_service_endpoint(self, service_id: str, endpoint: ServiceEndpoint):
         """Persist service endpoint to Redis"""
         endpoint_dict = asdict(endpoint)
-        # Convert enum to string for JSON serialization
+
+        # Remove non-serializable callback explicitly
+        endpoint_dict.pop("callback", None)
+
+        # Convert enum and datetime fields
         endpoint_dict["service_role"] = endpoint.service_role.value
         endpoint_dict["last_activity"] = endpoint.last_activity.isoformat() if endpoint.last_activity else None
-        
+
+        sanitized = self._json_safe(endpoint_dict)
         await self.redis.hset(
             self.service_endpoints_key,
             service_id,
-            json.dumps(endpoint_dict)
+            json.dumps(sanitized)
         )
     
     async def _persist_role_mappings(self):
@@ -447,12 +487,12 @@ class RedisMessageRouter(MessageRouter):
         route_data = {
             "message_id": message.message_id,
             "message_type": message.message_type.value,
-            "routing_context": asdict(message.routing_context),
+            "routing_context": self._json_safe(message.routing_context),
             "timestamp": message.timestamp.isoformat(),
             "expiry": message.expiry.isoformat() if message.expiry else None,
-            "route_history": message.route_history
+            "route_history": self._json_safe(message.route_history),
         }
-        
+
         await self.redis.hset(
             self.active_routes_key,
             message.message_id,

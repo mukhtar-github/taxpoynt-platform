@@ -66,6 +66,19 @@ class FIRSIntegrationEndpointsV1:
         self._setup_routes()
         logger.info("FIRS Integration Endpoints V1 initialized")
     
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        """Local guard to enforce Access Point Provider role and permissions."""
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
+    
     def _setup_routes(self):
         """Setup FIRS integration routes"""
         
@@ -152,6 +165,39 @@ class FIRSIntegrationEndpointsV1:
             description="Get processing status of invoice submission in FIRS",
             response_model=V1ResponseModel
         )
+
+        # Transmit (mirror FIRS) - POST transmit
+        self.router.add_api_route(
+            "/invoices/transmit/{irn}",
+            self.transmit_firs_invoice,
+            methods=["POST"],
+            summary="Transmit invoice by IRN",
+            description="Transmit an already signed invoice to FIRS by IRN (mirrors FIRS POST /invoice/transmit/{IRN})",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
+        )
+
+        # Confirm receipt (mirror FIRS) - PATCH transmit
+        self.router.add_api_route(
+            "/invoices/transmit/{irn}",
+            self.confirm_firs_receipt,
+            methods=["PATCH"],
+            summary="Confirm receipt for transmitted invoice",
+            description="Confirm receipt for transmitted invoice (mirrors FIRS PATCH /invoice/transmit/{IRN})",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
+        )
+
+        # FIRS Transmit Route (mirror FIRS MBS Transmit)
+        self.router.add_api_route(
+            "/invoices/transmit/{irn}",
+            self.transmit_firs_invoice,
+            methods=["POST"],
+            summary="Transmit invoice by IRN",
+            description="Transmit an already signed invoice to FIRS by IRN (mirrors FIRS POST /invoice/transmit/{IRN})",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         self.router.add_api_route(
             "/invoices/submissions",
@@ -169,7 +215,8 @@ class FIRSIntegrationEndpointsV1:
             methods=["POST"],
             summary="Validate invoice for FIRS",
             description="Validate invoice against FIRS compliance rules",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
         )
         
         self.router.add_api_route(
@@ -178,7 +225,8 @@ class FIRSIntegrationEndpointsV1:
             methods=["POST"],
             summary="Validate invoice batch for FIRS",
             description="Validate multiple invoices against FIRS compliance rules",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
         )
         
         self.router.add_api_route(
@@ -187,7 +235,8 @@ class FIRSIntegrationEndpointsV1:
             methods=["GET"],
             summary="Get FIRS validation rules",
             description="Get current FIRS validation rules and compliance requirements",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
         )
         
         # Certificate Management Routes
@@ -267,7 +316,7 @@ class FIRSIntegrationEndpointsV1:
         )
     
     # FIRS System Information Endpoints
-    async def get_firs_system_info(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_system_info(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS system information"""
         try:
             result = await self.message_router.route_message(
@@ -287,7 +336,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error getting FIRS system info in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS system info")
     
-    async def check_firs_system_health(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def check_firs_system_health(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Check FIRS system health"""
         try:
             result = await self.message_router.route_message(
@@ -305,7 +354,7 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to check FIRS system health")
     
     # FIRS Authentication Endpoints
-    async def authenticate_with_firs(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def authenticate_with_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Authenticate with FIRS"""
         try:
             body = await request.json()
@@ -325,7 +374,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error authenticating with FIRS in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to authenticate with FIRS")
     
-    async def refresh_firs_token(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def refresh_firs_token(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Refresh FIRS authentication token"""
         try:
             result = await self.message_router.route_message(
@@ -342,7 +391,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error refreshing FIRS token in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to refresh FIRS token")
     
-    async def test_firs_connection(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def test_firs_connection(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Test FIRS connection with provided credentials"""
         try:
             body = await request.json()
@@ -373,7 +422,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error testing FIRS connection in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to test FIRS connection")
     
-    async def get_firs_auth_status(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_auth_status(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS authentication status"""
         try:
             result = await self.message_router.route_message(
@@ -391,7 +440,7 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get FIRS auth status")
     
     # Invoice Submission Endpoints
-    async def submit_invoice_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_invoice_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice to FIRS"""
         try:
             body = await request.json()
@@ -422,7 +471,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error submitting invoice to FIRS in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to submit invoice to FIRS")
     
-    async def submit_invoice_batch_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_invoice_batch_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice batch to FIRS"""
         try:
             body = await request.json()
@@ -442,7 +491,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error submitting invoice batch to FIRS in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to submit invoice batch to FIRS")
     
-    async def get_firs_submission_status(self, submission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_submission_status(self, submission_id: str, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS submission status"""
         try:
             result = await self.message_router.route_message(
@@ -459,13 +508,64 @@ class FIRSIntegrationEndpointsV1:
         except Exception as e:
             logger.error(f"Error getting FIRS submission status {submission_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS submission status")
+
+    async def transmit_firs_invoice(self, irn: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+        """Transmit invoice by IRN (mirrors FIRS MBS transmit endpoint)."""
+        try:
+            # Optional payload passthrough for future flags
+            body = {}
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="transmit_firs_invoice",
+                payload={
+                    "irn": irn,
+                    "options": body or {},
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+
+            return self._create_v1_response(result, "firs_invoice_transmitted")
+        except Exception as e:
+            logger.error(f"Error transmitting FIRS invoice {irn} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to transmit FIRS invoice")
+
+    async def confirm_firs_receipt(self, irn: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+        """Confirm receipt for transmitted invoice (mirror PATCH transmit)."""
+        try:
+            body = {}
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="confirm_firs_receipt",
+                payload={
+                    "irn": irn,
+                    "options": body or {},
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+
+            return self._create_v1_response(result, "firs_receipt_confirmed")
+        except Exception as e:
+            logger.error(f"Error confirming receipt for FIRS invoice {irn} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to confirm FIRS invoice receipt")
     
     async def list_firs_submissions(self, 
                                   request: Request,
                                   status: Optional[str] = Query(None, description="Filter by submission status"),
                                   start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                   end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+                                  context: HTTPRoutingContext = Depends(_require_app_role)):
         """List FIRS submissions"""
         try:
             result = await self.message_router.route_message(
@@ -488,7 +588,7 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to list FIRS submissions")
     
     # Invoice Validation Endpoints
-    async def validate_invoice_for_firs(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_invoice_for_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Validate invoice for FIRS"""
         try:
             body = await request.json()
@@ -508,7 +608,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error validating invoice for FIRS in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to validate invoice for FIRS")
     
-    async def validate_invoice_batch_for_firs(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_invoice_batch_for_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Validate invoice batch for FIRS"""
         try:
             body = await request.json()
@@ -528,7 +628,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error validating invoice batch for FIRS in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to validate invoice batch for FIRS")
     
-    async def get_firs_validation_rules(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_validation_rules(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS validation rules"""
         try:
             result = await self.message_router.route_message(
@@ -546,7 +646,7 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get FIRS validation rules")
     
     # Certificate Management Endpoints
-    async def list_firs_certificates(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def list_firs_certificates(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """List FIRS certificates"""
         try:
             result = await self.message_router.route_message(
@@ -563,7 +663,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error listing FIRS certificates in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list FIRS certificates")
     
-    async def get_firs_certificate(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_certificate(self, certificate_id: str, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS certificate"""
         try:
             result = await self.message_router.route_message(
@@ -581,7 +681,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error getting FIRS certificate {certificate_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS certificate")
     
-    async def renew_firs_certificate(self, certificate_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def renew_firs_certificate(self, certificate_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Renew FIRS certificate"""
         try:
             result = await self.message_router.route_message(
@@ -605,7 +705,7 @@ class FIRSIntegrationEndpointsV1:
                             error_type: Optional[str] = Query(None, description="Filter by error type"),
                             start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                             end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                            context: HTTPRoutingContext = Depends(lambda: None)):
+                            context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS integration errors"""
         try:
             result = await self.message_router.route_message(
@@ -632,7 +732,7 @@ class FIRSIntegrationEndpointsV1:
                                       log_level: Optional[str] = Query(None, description="Filter by log level"),
                                       start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                       end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+                                      context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS integration logs"""
         try:
             result = await self.message_router.route_message(
@@ -655,7 +755,7 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get FIRS integration logs")
     
     # FIRS Reporting Endpoints (Required for FIRS Certification)
-    async def generate_firs_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_firs_report(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Generate FIRS reports"""
         try:
             body = await request.json()
@@ -686,7 +786,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error generating FIRS report in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to generate FIRS report")
     
-    async def get_firs_reporting_dashboard(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_reporting_dashboard(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS reporting dashboard"""
         try:
             result = await self.message_router.route_message(
@@ -714,7 +814,7 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get FIRS reporting dashboard")
     
     # FIRS Invoice Update Endpoints (Required for FIRS Certification)
-    async def update_firs_invoice(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def update_firs_invoice(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Update FIRS invoice"""
         try:
             body = await request.json()

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Fixed imports - use relative imports instead of platform.backend
 from core_platform.data_management.connection_pool import get_db_session
 from api_gateway.role_routing.models import HTTPRoutingContext
+from core_platform.authentication.role_manager import PlatformRole
 from .version_models import V1ResponseModel
 from si_services.firs_integration.comprehensive_invoice_generator import (
     ComprehensiveFIRSInvoiceGenerator,
@@ -140,7 +141,7 @@ def create_firs_invoice_router() -> APIRouter:
         """Get all connected data sources for the organization."""
         try:
             # Verify SI role
-            if current_user.role != 'system_integrator':
+            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied. SI role required."
@@ -251,7 +252,7 @@ def create_firs_invoice_router() -> APIRouter:
         """Search business transactions across all connected systems."""
         try:
             # Verify SI role
-            if current_user.role != 'system_integrator':
+            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied. SI role required."
@@ -345,7 +346,7 @@ def create_firs_invoice_router() -> APIRouter:
         """Generate FIRS-compliant invoices from business transaction data."""
         try:
             # Verify SI role
-            if current_user.role != 'system_integrator':
+            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied. SI role required."
@@ -442,7 +443,7 @@ def create_firs_invoice_router() -> APIRouter:
         """Get sample invoice data for testing FIRS generation."""
         try:
             # Verify SI role
-            if current_user.role != 'system_integrator':
+            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied. SI role required."

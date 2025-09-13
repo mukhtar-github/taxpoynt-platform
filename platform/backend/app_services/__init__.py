@@ -103,25 +103,39 @@ class APPServiceRegistry:
             # Initialize FIRS services with real implementations
             firs_api_client = await self._create_firs_api_client()
             auth_handler = FIRSAuthenticationHandler(
-                client_id=os.getenv("FIRS_CLIENT_ID", "your_firs_client_id"),
-                client_secret=os.getenv("FIRS_CLIENT_SECRET", "your_firs_client_secret"),
-                api_key=os.getenv("FIRS_SANDBOX_API_KEY", "36dc0109-5fab-4433-80c3-84d9cef792a2"),
                 environment=os.getenv("FIRS_ENVIRONMENT", "sandbox")
             )
-            
+            # Thin HTTP client + resource cache for current FIRS header-based flows
+            try:
+                from .firs_communication.firs_http_client import FIRSHttpClient
+                from .firs_communication.resource_cache import FIRSResourceCache
+                firs_http_client = FIRSHttpClient()
+                resource_cache = FIRSResourceCache(firs_http_client)
+            except Exception:
+                firs_http_client = None
+                resource_cache = None
+
             firs_service = {
                 "api_client": firs_api_client,
                 "auth_handler": auth_handler,
+                "http_client": firs_http_client,
+                "resource_cache": resource_cache,
                 "operations": [
                     "process_firs_webhook",
                     "update_firs_submission_status",
                     "submit_to_firs",
                     "validate_firs_response",
-                    "authenticate_firs",
-                    "get_submission_status",
-                    "receive_invoices_from_si",
-                    "receive_invoice_batch_from_si"
-                ]
+                    "validate_invoice_for_firs",
+                    "validate_invoice_batch_for_firs",
+                    "get_firs_validation_rules",
+                    "update_firs_invoice",
+                        "transmit_firs_invoice",
+                        "confirm_firs_receipt",
+                        "authenticate_firs",
+                        "get_submission_status",
+                        "receive_invoices_from_si",
+                        "receive_invoice_batch_from_si"
+                    ]
             }
             
             self.services["firs_communication"] = firs_service
@@ -140,7 +154,12 @@ class APPServiceRegistry:
                         "update_firs_submission_status",
                         "submit_to_firs",
                         "validate_firs_response",
+                        "validate_invoice_for_firs",
+                        "validate_invoice_batch_for_firs",
+                        "get_firs_validation_rules",
                         "get_submission_status",
+                        "update_firs_invoice",
+                        "transmit_firs_invoice",
                         "receive_invoices_from_si",
                         "receive_invoice_batch_from_si"
                     ]
@@ -159,7 +178,7 @@ class APPServiceRegistry:
             # Initialize webhook services with real implementations
             webhook_receiver = WebhookReceiver(
                 webhook_secret=os.getenv("FIRS_WEBHOOK_SECRET", "yRLXTUtWIU2OlMyKOBAWEVmjIop1xJe5ULPJLYoJpyA"),
-                max_concurrent_processing=10
+                max_payload_size=1024 * 1024  # 1MB
             )
             event_processor = EventProcessor()
             signature_validator = SignatureValidator()
@@ -573,14 +592,25 @@ class APPServiceRegistry:
     async def _create_firs_api_client(self):
         """Create FIRS API client with proper configuration"""
         try:
-            from .firs_communication.firs_api_client import create_firs_api_client
-            
-            # Create FIRS API client using factory function
-            client = await create_firs_api_client(
-                client_id="your_firs_client_id",
-                client_secret="your_firs_client_secret", 
-                api_key="36dc0109-5fab-4433-80c3-84d9cef792a2",
-                environment="sandbox"
+            from .firs_communication.firs_api_client import (
+                create_firs_api_client,
+                FIRSEnvironment,
+            )
+
+            # Resolve environment and credentials from env (fallbacks for dev)
+            env_str = os.getenv("FIRS_ENVIRONMENT", "sandbox").lower()
+            environment = FIRSEnvironment.SANDBOX if env_str != "production" else FIRSEnvironment.PRODUCTION
+
+            client_id = os.getenv("FIRS_CLIENT_ID", "your_firs_client_id")
+            client_secret = os.getenv("FIRS_CLIENT_SECRET", "your_firs_client_secret")
+            api_key = os.getenv("FIRS_API_KEY", "test_api_key")
+
+            # Create FIRS API client using factory function (synchronous factory)
+            client = create_firs_api_client(
+                environment=environment,
+                client_id=client_id,
+                client_secret=client_secret,
+                api_key=api_key,
             )
             
             return client
@@ -736,6 +766,10 @@ class APPServiceRegistry:
         """Create callback for FIRS communication operations"""
         async def firs_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                # Utilities
+                http_client = firs_service.get("http_client")
+                resource_cache = firs_service.get("resource_cache")
+
                 if operation == "receive_invoices_from_si":
                     # Handle receiving invoices from SI for FIRS submission
                     invoice_ids = payload.get("invoice_ids", [])
@@ -780,31 +814,105 @@ class APPServiceRegistry:
                             "batch_status": "submitted_to_firs"
                         }
                     }
-                    
+
                 elif operation == "submit_to_firs":
-                    # Use FIRS API client for submission
+                    # Submit flow using header-based endpoints: sign -> transmit
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
                     invoice_data = payload.get("invoice_data", {})
-                    result = firs_service["api_client"].submit_invoice(invoice_data)
-                    return {"operation": operation, "success": True, "data": {"result": result}}
-                    
+                    irn = invoice_data.get("irn") or payload.get("irn")
+                    sign_resp = await http_client.sign_invoice(invoice_data)
+                    if not sign_resp.get("success"):
+                        return {"operation": operation, "success": False, "data": {"sign": sign_resp}}
+                    if not irn and isinstance(sign_resp.get("data"), dict):
+                        irn = sign_resp["data"].get("irn") or irn
+                    if not irn:
+                        return {"operation": operation, "success": False, "error": "missing_irn_for_transmit"}
+                    tx_resp = await http_client.transmit(irn)
+                    success = sign_resp.get("success", False) and tx_resp.get("success", False)
+                    return {"operation": operation, "success": success, "data": {"sign": sign_resp, "transmit": tx_resp}}
+
+                elif operation == "validate_invoice_for_firs":
+                    # Validate invoice via thin HTTP client
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    data = payload.get("validation_data") or payload.get("submission_data") or {}
+                    resp = await http_client.validate_invoice(data)
+                    return {"operation": operation, "success": resp.get("success", False), "data": resp}
+
+                elif operation == "validate_invoice_batch_for_firs":
+                    # Validate invoices in a batch (map each item)
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    batch = payload.get("validation_data") or payload.get("batch_data") or []
+                    results = []
+                    overall = True
+                    if isinstance(batch, dict) and "invoices" in batch:
+                        batch = batch["invoices"]
+                    for item in (batch or []):
+                        resp = await http_client.validate_invoice(item)
+                        overall = overall and resp.get("success", False)
+                        results.append(resp)
+                    return {"operation": operation, "success": overall, "data": {"results": results}}
+
+                elif operation == "get_firs_validation_rules":
+                    # Use resource cache to return consolidated rules metadata
+                    if not resource_cache:
+                        return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
+                    resources = await resource_cache.get_resources()
+                    return {"operation": operation, "success": True, "data": {"resources": resources}}
+
                 elif operation == "process_firs_webhook":
                     # Process FIRS webhook events
                     result = await self._handle_firs_webhook(payload)
                     return {"operation": operation, "success": True, "data": {"result": result}}
                     
                 elif operation == "get_submission_status":
-                    # Get submission status from FIRS
-                    submission_id = payload.get("submission_id")
-                    status = firs_service["api_client"].get_submission_status(submission_id)
-                    return {"operation": operation, "success": True, "data": {"status": status}}
+                    # Interpret submission_id as IRN and lookup transmit status
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    irn = payload.get("submission_id") or payload.get("irn")
+                    if not irn:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+                    resp = await http_client.lookup_transmit_by_irn(irn)
+                    return {"operation": operation, "success": resp.get("success", False), "data": resp}
+
+                elif operation == "update_firs_invoice":
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    upd = payload.get("invoice_update", {})
+                    irn = upd.get("invoice_id") or upd.get("irn")
+                    update_data = upd.get("update_data", {})
+                    if not irn:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+                    resp = await http_client.update_invoice(irn, update_data)
+                    return {"operation": operation, "success": resp.get("success", False), "data": resp}
+
+                elif operation == "transmit_firs_invoice":
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    irn = payload.get("irn")
+                    if not irn:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+                    resp = await http_client.transmit(irn, payload.get("options"))
+                    return {"operation": operation, "success": resp.get("success", False), "data": resp}
+
+                elif operation == "confirm_firs_receipt":
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    irn = payload.get("irn")
+                    if not irn:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+                    resp = await http_client.confirm_receipt(irn, payload.get("options"))
+                    return {"operation": operation, "success": resp.get("success", False), "data": resp}
                     
                 else:
                     return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
-                    
+
             except Exception as e:
                 logger.error(f"Error in FIRS operation {operation}: {str(e)}")
                 return {"operation": operation, "success": False, "error": str(e)}
-                
+
         return firs_callback
     
     async def _process_si_invoices_for_firs(self, invoice_ids, si_user_id, submission_options):

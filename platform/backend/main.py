@@ -104,7 +104,7 @@ try:
     from api_gateway.role_routing.role_detector import HTTPRoleDetector
     from api_gateway.role_routing.permission_guard import APIPermissionGuard
     from api_gateway.role_routing.auth_router import create_auth_router
-    from api_gateway.main_gateway_router import create_main_gateway_router
+    from api_gateway.main_gateway_router import create_main_gateway, create_main_gateway_router
     from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
     
     # Core platform components (production ready)
@@ -258,8 +258,8 @@ def create_taxpoynt_app() -> FastAPI:
     # Create permission guard with app
     permission_guard = APIPermissionGuard(app)
     
-    # Create main gateway router
-    main_router = create_main_gateway_router(
+    # Create main gateway controller (preferred) and include its router
+    gateway_controller = create_main_gateway(
         role_detector=HTTPRoleDetector(),
         permission_guard=permission_guard,
         message_router=temp_message_router,
@@ -267,10 +267,12 @@ def create_taxpoynt_app() -> FastAPI:
     )
     
     # Include main router
-    app.include_router(main_router)
+    app.include_router(gateway_controller.router)
     
-    # Store gateway reference for later message router updates
-    app._taxpoynt_gateway = main_router
+    # Store gateway controller for later message router updates (future-proof)
+    app.state.gateway_controller = gateway_controller
+    # Backward-compat: expose under previous private attribute as well
+    app._taxpoynt_gateway = gateway_controller
     
     # CRITICAL: Add CORS middleware FIRST to handle preflight requests properly
     # This ensures CORS headers are added before any other middleware can interfere
@@ -566,10 +568,9 @@ async def initialize_services():
             # CRITICAL: Update API gateway to use the real Redis message router
             logger.info("🔄 Updating API Gateway to use production Redis Message Router...")
             try:
-                # The gateway reference should be available in the app state if we store it
-                # Let's update the app.state to store the gateway reference during creation
-                if hasattr(app, '_taxpoynt_gateway'):
-                    app._taxpoynt_gateway.update_message_router(app.state.redis_message_router)
+                # Preferred: use stored controller
+                if hasattr(app.state, 'gateway_controller') and app.state.gateway_controller:
+                    app.state.gateway_controller.update_message_router(app.state.redis_message_router)
                 else:
                     # Fallback: Update through route endpoints
                     logger.info("🔍 Fallback: Updating message router through route endpoints...")
@@ -603,7 +604,7 @@ async def initialize_services():
                             "request_id": None,
                             "retry_attempts": 2,
                             "degradation_mode": "continue_without_si_services"
-                        }, "service_registration", "medium"
+                        }, "integration", "medium"
                     )
                 else:
                     logger.error(f"❌ Failed to register SI services: {e}")
@@ -625,7 +626,7 @@ async def initialize_services():
                             "request_id": None,
                             "retry_attempts": 2,
                             "degradation_mode": "continue_without_app_services"
-                        }, "service_registration", "medium"
+                        }, "integration", "medium"
                     )
                 else:
                     logger.error(f"❌ Failed to register APP services: {e}")
@@ -647,7 +648,7 @@ async def initialize_services():
                             "request_id": None,
                             "retry_attempts": 2,
                             "degradation_mode": "continue_without_hybrid_services"
-                        }, "service_registration", "medium"
+                        }, "integration", "medium"
                     )
                 else:
                     logger.error(f"❌ Failed to register Hybrid services: {e}")

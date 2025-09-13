@@ -75,6 +75,11 @@ from .regulatory_tracker import (
     create_regulatory_tracker
 )
 
+from .compliance_monitor import (
+    CrossRoleComplianceMonitor,
+    ComplianceResult
+)
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -143,7 +148,11 @@ __all__ = [
     "RegulatoryNotification",
     "ComplianceGap",
     "ComplianceStatus",
-    "create_regulatory_tracker"
+    "create_regulatory_tracker",
+    
+    # Compliance Monitor
+    "CrossRoleComplianceMonitor",
+    "ComplianceResult"
 ]
 
 

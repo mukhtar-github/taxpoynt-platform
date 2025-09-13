@@ -40,7 +40,11 @@ class PaymentProcessorEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/payments", tags=["Payment Processors V1"])
+        self.router = APIRouter(
+            prefix="/payments",
+            tags=["Payment Processors V1"],
+            dependencies=[Depends(self._require_si_role)]
+        )
         
         # Define available payment processors based on actual implementation
         self.payment_processors = {
@@ -63,6 +67,19 @@ class PaymentProcessorEndpointsV1:
         
         self._setup_routes()
         logger.info("Payment Processor Endpoints V1 initialized")
+    
+    async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
+        """Ensure System Integrator role access for v1 SI endpoints."""
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System Integrator role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/si{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "si"
+        return context
     
     def _setup_routes(self):
         """Setup payment processor integration routes"""

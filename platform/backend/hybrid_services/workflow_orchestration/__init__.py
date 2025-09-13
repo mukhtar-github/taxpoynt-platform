@@ -69,6 +69,8 @@ from .workflow_monitor import (
     create_workflow_monitor
 )
 
+from .business_process_engine import BusinessProcessEngine
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -131,7 +133,10 @@ __all__ = [
     "SystemMetrics",
     "WorkflowAlert",
     "MonitoringRule",
-    "create_workflow_monitor"
+    "create_workflow_monitor",
+    
+    # Business Process Engine
+    "BusinessProcessEngine"
 ]
 
 

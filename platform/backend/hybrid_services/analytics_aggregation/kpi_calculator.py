@@ -15,9 +15,9 @@ import math
 
 from core_platform.data_management.database_init import get_db_session
 from core_platform.models.kpi import KPIDefinition, KPICalculation, KPITarget, KPIHistory
-from core_platform.cache import CacheService
+from core_platform.data_management.cache_manager import CacheManager, CacheConfig
 from core_platform.events import EventBus
-from core_platform.monitoring import MetricsCollector
+from si_services.integration_management.metrics_collector import MetricsCollector
 from core_platform.notifications import NotificationService
 
 from .unified_metrics import UnifiedMetrics, MetricScope, MetricType, AggregatedMetric
@@ -181,7 +181,7 @@ class KPICalculator:
     def __init__(self, unified_metrics: UnifiedMetrics = None):
         """Initialize KPI calculator service"""
         self.unified_metrics = unified_metrics or UnifiedMetrics()
-        self.cache = CacheService()
+        self.cache = CacheManager(CacheConfig())
         self.event_bus = EventBus()
         self.metrics_collector = MetricsCollector()
         self.notification_service = NotificationService()
