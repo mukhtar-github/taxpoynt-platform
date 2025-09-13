@@ -55,7 +55,8 @@ def _normalize_to_async_url(url: str) -> str:
     if lower.startswith("postgresql://"):
         return "postgresql+asyncpg://" + url.split("://", 1)[1]
     if lower.startswith("sqlite:///"):
-        return "sqlite+aiosqlite://" + url.split(":///", 1)[1]
+        # Preserve triple slash when converting to async driver
+        return "sqlite+aiosqlite:///" + url.split(":///", 1)[1]
     return url
 
 
@@ -109,4 +110,3 @@ __all__ = [
     "init_async_engine",
     "get_async_session",
 ]
-
