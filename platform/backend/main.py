@@ -652,6 +652,16 @@ async def initialize_services():
                     )
                 else:
                     logger.error(f"❌ Failed to register Hybrid services: {e}")
+
+            # Validate route→operation mapping after all services are registered
+            try:
+                validate = str(os.getenv("ROUTER_VALIDATE_ON_STARTUP", "false")).lower() in ("1", "true", "yes", "on")
+                if validate and hasattr(app.state, 'gateway_controller') and app.state.gateway_controller:
+                    fail_fast = str(os.getenv("ROUTER_FAIL_FAST_ON_STARTUP", "false")).lower() in ("1", "true", "yes", "on")
+                    app.state.gateway_controller.validate_route_operation_mapping(fail_fast=fail_fast)
+                    logger.info("✅ Route→operation mapping validation completed")
+            except Exception as e:
+                logger.error(f"❌ Route→operation mapping validation failed: {e}")
         
         logger.info("🎯 All Phase 4 Production Services initialized successfully")
         logger.info("🛡️  Phase 6 Enterprise Fault Tolerance: ACTIVE")

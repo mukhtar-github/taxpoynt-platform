@@ -87,6 +87,13 @@ Messaging & Services
 - Callbacks must return a consistent dict: `{ "operation": str, "success": bool, "data"|"error": ... }`.
 - Fault Tolerance: Circuit breakers, retry manager, and dead letter handling are available. Prefer using them for external calls and critical operations.
 
+Router Operation Validation
+- Strict runtime check: set `ROUTER_STRICT_OPS=true` to make the MessageRouter raise on any `route_message` call whose `operation` is not advertised by a registered service. Default is warn-only.
+- Startup validation: set `ROUTER_VALIDATE_ON_STARTUP=true` to scan mounted API handlers and check that every static `operation="..."` used in handlers is advertised by at least one service. Set `ROUTER_FAIL_FAST_ON_STARTUP=true` to raise during startup when mismatches are found (recommended for CI).
+- Notes:
+  - Validation is best-effort (regex over handler source). Dynamic operation names are ignored.
+  - Keep service metadata (`metadata={"operations": [...]}` in `register_service`) in sync with any new/renamed handler ops to avoid warnings/errors.
+
 
 Database
 - SQLAlchemy models in `core_platform/data_management/models/*` (e.g., `user.py`, `organization.py`).
@@ -157,4 +164,4 @@ Quality Checklist Before Finishing
 - Logging is informative; errors route through existing error management where relevant.
 - Any new service is registered with the MessageRouter and returns the standard callback shape.
 - Local instructions to run/validate are included in your final message to the user if useful.
-
+- If you added or changed route operations, ensure service metadata includes them; enable `ROUTER_VALIDATE_ON_STARTUP=true` locally to sanity-check mappings.

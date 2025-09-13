@@ -62,6 +62,17 @@ platform/
    uvicorn app.main:app --reload
    ```
 
+   Optional strictness for router validation (recommended during development):
+   ```bash
+   # Fail on unmapped operations at runtime
+   export ROUTER_STRICT_OPS=true
+
+   # Validate route→operation mapping at startup (best-effort)
+   export ROUTER_VALIDATE_ON_STARTUP=true
+   # Raise on mismatches during startup (useful in CI)
+   export ROUTER_FAIL_FAST_ON_STARTUP=true
+   ```
+
 3. **Frontend Setup**
    ```bash
    cd platform/frontend

@@ -5,7 +5,10 @@ Central router that integrates version management with role-based routing.
 Coordinates between API versions, role detection, and endpoint routing.
 """
 import logging
-from typing import Dict, Any, List, Optional
+import os
+import re
+import inspect
+from typing import Dict, Any, List, Optional, Set
 from fastapi import APIRouter, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
 
@@ -83,6 +86,15 @@ class MainGatewayRouter:
             self.router.include_router(version_router)
             
             logger.info(f"Configured routing for API {version} ({version_info.status.value})")
+
+        # Optional: validate route→operation mapping at startup
+        try:
+            validate = str(os.getenv("ROUTER_VALIDATE_ON_STARTUP", "false")).lower() in ("1", "true", "yes", "on")
+            if validate:
+                fail_fast = str(os.getenv("ROUTER_FAIL_FAST_ON_STARTUP", "false")).lower() in ("1", "true", "yes", "on")
+                self.validate_route_operation_mapping(fail_fast=fail_fast)
+        except Exception as e:
+            logger.warning(f"Route operation validation skipped due to error: {e}")
     
     def _add_role_routers(self, version_router: APIRouter, version: str):
         """Add role-specific routers for a version"""
@@ -156,6 +168,70 @@ class MainGatewayRouter:
             description="Check health of API Gateway and all versions",
             tags=["Gateway Management"]
         )
+
+    def _extract_ops_from_handler(self, handler) -> Set[str]:
+        """Best-effort extraction of operation names from a route handler.
+
+        Scans the handler source for message_router.route_message(... operation="<op>") patterns.
+        Returns a set of discovered operation names. If the source is unavailable or
+        no static operation strings are found, returns an empty set.
+        """
+        ops: Set[str] = set()
+        try:
+            src = inspect.getsource(handler)
+            for m in re.finditer(r"operation\s*=\s*['\"]([A-Za-z0-9_\-:\.]+)['\"]", src):
+                ops.add(m.group(1))
+        except Exception:
+            # Some handlers (wrappers) may not have retrievable source
+            pass
+        return ops
+
+    def validate_route_operation_mapping(self, fail_fast: bool = False) -> Dict[str, Any]:
+        """Validate that every route handler that calls route_message uses an operation
+        advertised by at least one registered service.
+
+        - When fail_fast is True, raises RuntimeError on first mismatch.
+        - Otherwise, logs warnings and returns a report dict.
+        """
+        # Collect advertised ops from the message router
+        try:
+            known_ops = set()
+            if hasattr(self.message_router, "_collect_known_operations"):
+                known_ops = set(self.message_router._collect_known_operations())  # type: ignore[attr-defined]
+        except Exception:
+            known_ops = set()
+
+        used_ops: Set[str] = set()
+        route_map: Dict[str, List[str]] = {}
+
+        # Traverse registered routes in this gateway
+        for route in getattr(self.router, "routes", []):
+            handler = getattr(route, "endpoint", None)
+            if not handler:
+                continue
+            ops = self._extract_ops_from_handler(handler)
+            if not ops:
+                continue
+            route_path = getattr(route, "path", getattr(route, "path_format", "unknown"))
+            used_ops.update(ops)
+            route_map[route_path] = sorted(list(ops))
+
+        missing = sorted(list(used_ops - known_ops)) if known_ops else []
+
+        if missing:
+            msg = f"Unmapped route operations detected: {missing}"
+            if fail_fast:
+                logger.error(msg)
+                raise RuntimeError(msg)
+            else:
+                logger.warning(msg)
+
+        return {
+            "known_ops": sorted(list(known_ops)),
+            "used_ops": sorted(list(used_ops)),
+            "missing_ops": missing,
+            "route_map": route_map,
+        }
 
     def update_message_router(self, new_message_router: MessageRouter) -> None:
         """Update the message router used by version/role routers.
