@@ -177,6 +177,11 @@ Async DB + Tenant Context (Scaffold)
   - Start with non-critical endpoints; avoid mixing sync/async DB usage in the same handler.
   - Do not introduce implicit commits in dependencies; manage transactions explicitly as needed.
 
+When to use `db_async.py` vs `database_abstraction.py`
+- Use `db_async.py` (AsyncSession DI) for new or migrated async FastAPI handlers and repositories. It provides minimal, lightweight async engine/session helpers.
+- Use `database_abstraction.py` (sync DAL) in legacy sync code paths or scripts that already depend on the sync session model. Do not try to intermix sync and async sessions within the same handler.
+- Long term, prefer migrating read-heavy endpoints to async for better concurrency, while leaving complex write paths on sync DAL until fully planned migration.
+
 Shared Tenant Dependency
 - To reuse tenant scoping across APP routers, use `api_gateway/dependencies/tenant.py`:
   - `make_tenant_scope_dependency(self._require_app_role)` returns a dependency that sets the tenant from `HTTPRoutingContext`.

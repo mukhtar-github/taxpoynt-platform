@@ -27,6 +27,15 @@ from core_platform.authentication.tenant_context import (
     set_current_tenant,
     clear_current_tenant,
 )
+import uuid
+
+try:
+    # Optional: align with platform MultiTenantManager when initialized
+    from core_platform.data_management.multi_tenant_manager import (
+        get_tenant_manager,
+    )
+except Exception:
+    get_tenant_manager = None  # type: ignore
 
 
 def make_tenant_scope_dependency(
@@ -45,6 +54,31 @@ def make_tenant_scope_dependency(
     ) -> AsyncGenerator[None, None]:
         tenant = context.organization_id or context.tenant_id
         set_current_tenant(str(tenant) if tenant else None)
+
+        # Best-effort: also update MultiTenantManager if present
+        try:
+            if get_tenant_manager:
+                mgr = get_tenant_manager()
+                if mgr and tenant and context.organization_id:
+                    # Convert to UUID when possible
+                    try:
+                        tid = uuid.UUID(str(context.tenant_id or context.organization_id))
+                    except Exception:
+                        tid = None
+                    try:
+                        oid = uuid.UUID(str(context.organization_id))
+                    except Exception:
+                        oid = None
+                    if tid and oid:
+                        # user_id is optional; pass if looks like UUID
+                        try:
+                            uid = uuid.UUID(str(context.user_id)) if context.user_id else None
+                        except Exception:
+                            uid = None
+                        mgr.set_tenant_context(tid, oid, uid)
+        except Exception:
+            # Ignore manager alignment failures
+            pass
         try:
             yield
         finally:
@@ -54,4 +88,3 @@ def make_tenant_scope_dependency(
 
 
 __all__ = ["make_tenant_scope_dependency"]
-
