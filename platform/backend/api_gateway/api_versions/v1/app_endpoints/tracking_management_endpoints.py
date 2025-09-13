@@ -613,17 +613,10 @@ class TrackingManagementEndpointsV1:
             logger.error(f"Error getting batch status summary in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get batch status summary")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
-        """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": datetime.now().isoformat(),
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
+        """Create standardized v1 response format using V1ResponseModel"""
+        from api_gateway.utils.v1_response import build_v1_response
+        return build_v1_response(data, action)
 
 
 def create_tracking_management_router(role_detector: HTTPRoleDetector,

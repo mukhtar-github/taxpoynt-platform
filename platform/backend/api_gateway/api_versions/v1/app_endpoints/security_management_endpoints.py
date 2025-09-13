@@ -467,17 +467,10 @@ class SecurityManagementEndpointsV1:
             logger.error(f"Error generating security report in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to generate security report")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
-        """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": datetime.now().isoformat(),
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
+        """Create standardized v1 response format using V1ResponseModel"""
+        from api_gateway.utils.v1_response import build_v1_response
+        return build_v1_response(data, action)
 
 
 def create_security_management_router(role_detector: HTTPRoleDetector,
@@ -486,4 +479,3 @@ def create_security_management_router(role_detector: HTTPRoleDetector,
     """Factory function to create Security Management Router"""
     security_endpoints = SecurityManagementEndpointsV1(role_detector, permission_guard, message_router)
     return security_endpoints.router
-

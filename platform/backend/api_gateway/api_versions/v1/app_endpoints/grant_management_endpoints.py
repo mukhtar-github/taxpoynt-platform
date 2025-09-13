@@ -15,6 +15,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -472,17 +473,9 @@ class GrantManagementEndpointsV1:
         """Get grant requirements - placeholder"""
         return self._create_v1_response({"requirements": []}, "grant_requirements_retrieved")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
-        """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
+        """Create standardized v1 response format using V1ResponseModel"""
+        return build_v1_response(data, action)
 
 
 def create_grant_management_router(role_detector: HTTPRoleDetector,

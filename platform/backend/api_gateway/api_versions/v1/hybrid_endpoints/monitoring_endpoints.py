@@ -257,17 +257,10 @@ class MonitoringEndpointsV1:
         else:
             return ServiceRole.SYSTEM_INTEGRATOR  # Default
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
-        """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200):
+        """Create standardized v1 response format using V1ResponseModel"""
+        from api_gateway.utils.v1_response import build_v1_response
+        return build_v1_response(data, action)
 
 
 def create_monitoring_router(role_detector: HTTPRoleDetector,
