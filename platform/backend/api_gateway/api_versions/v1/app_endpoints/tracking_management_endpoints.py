@@ -16,6 +16,11 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.data_management.db_async import get_async_session
+from api_gateway.dependencies.tenant import make_tenant_scope_dependency
+from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions
+from core_platform.data_management.models.firs_submission import FIRSSubmission
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +76,25 @@ class TrackingManagementEndpointsV1:
             }
         }
         
+        # Shared tenant scope dependency (uses APP role guard)
+        self.tenant_scope = make_tenant_scope_dependency(self._require_app_role)
+
         self._setup_routes()
         logger.info("Tracking Management Endpoints V1 initialized")
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        """Enforce APP role and permissions for v1 APP tracking routes."""
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
+
     
     def _setup_routes(self):
         """Setup tracking management routes"""
@@ -85,6 +107,17 @@ class TrackingManagementEndpointsV1:
             summary="Get tracking metrics",
             description="Get comprehensive tracking metrics and statistics",
             response_model=V1ResponseModel
+        )
+
+        # Recent submissions (async + tenant scoped)
+        self.router.add_api_route(
+            "/submissions/recent",
+            self.get_recent_submissions,
+            methods=["GET"],
+            summary="Get recent FIRS submissions",
+            description="List recent FIRS submissions for the current tenant (APP)",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -199,6 +232,34 @@ class TrackingManagementEndpointsV1:
             description="Acknowledge and resolve alert",
             response_model=V1ResponseModel
         )
+
+    def _to_submission_dict(self, s: FIRSSubmission) -> Dict[str, Any]:
+        return {
+            "id": str(getattr(s, "id", None)),
+            "organization_id": str(getattr(s, "organization_id", "")) if getattr(s, "organization_id", None) else None,
+            "invoice_number": getattr(s, "invoice_number", None),
+            "irn": getattr(s, "irn", None),
+            "status": getattr(s, "status", None).value if getattr(s, "status", None) else None,
+            "validation_status": getattr(s, "validation_status", None).value if getattr(s, "validation_status", None) else None,
+            "total_amount": float(getattr(s, "total_amount", 0) or 0),
+            "currency": getattr(s, "currency", None),
+            "created_at": getattr(s, "created_at", None).isoformat() if getattr(s, "created_at", None) else None,
+            "submitted_at": getattr(s, "submitted_at", None).isoformat() if getattr(s, "submitted_at", None) else None,
+        }
+
+    async def get_recent_submissions(self,
+                                    limit: int = Query(10, ge=1, le=100),
+                                    db: AsyncSession = Depends(get_async_session)):
+        try:
+            rows = await list_recent_submissions(db, limit=limit)
+            payload = {
+                "items": [self._to_submission_dict(r) for r in rows],
+                "count": len(rows)
+            }
+            return self._create_v1_response(payload, "recent_submissions_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting recent submissions: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get recent submissions")
         
         # Search and Filtering
         self.router.add_api_route(
@@ -594,4 +655,3 @@ def create_tracking_management_router(role_detector: HTTPRoleDetector,
     """Factory function to create Tracking Management Router"""
     tracking_endpoints = TrackingManagementEndpointsV1(role_detector, permission_guard, message_router)
     return tracking_endpoints.router
-

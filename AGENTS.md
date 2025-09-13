@@ -176,3 +176,8 @@ Async DB + Tenant Context (Scaffold)
 - Migration guidance:
   - Start with non-critical endpoints; avoid mixing sync/async DB usage in the same handler.
   - Do not introduce implicit commits in dependencies; manage transactions explicitly as needed.
+
+Shared Tenant Dependency
+- To reuse tenant scoping across APP routers, use `api_gateway/dependencies/tenant.py`:
+  - `make_tenant_scope_dependency(self._require_app_role)` returns a dependency that sets the tenant from `HTTPRoutingContext`.
+  - Attach to routes: `dependencies=[Depends(self.tenant_scope)]`.

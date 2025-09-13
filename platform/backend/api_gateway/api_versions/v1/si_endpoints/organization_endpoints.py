@@ -14,6 +14,10 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from .version_models import V1ResponseModel, V1ErrorModel, V1PaginationModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions
+from core_platform.authentication.tenant_context import set_current_tenant, clear_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +187,16 @@ class OrganizationEndpointsV1:
             description="Get aggregated transaction statistics for an organization",
             response_model=V1ResponseModel
         )
+
+        # Recent submissions for an organization (async + tenant scoped)
+        self.router.add_api_route(
+            "/{org_id}/submissions/recent",
+            self.get_org_recent_submissions,
+            methods=["GET"],
+            summary="Get organization's recent FIRS submissions",
+            description="List recent FIRS submissions for a specific organization",
+            response_model=V1ResponseModel
+        )
     
     async def list_organizations(self, 
                                 request: Request,
@@ -213,6 +227,38 @@ class OrganizationEndpointsV1:
         except Exception as e:
             logger.error(f"Error listing organizations in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list organizations")
+
+    async def get_org_recent_submissions(self,
+                                         org_id: str,
+                                         limit: int = Query(10, ge=1, le=100),
+                                         db: AsyncSession = Depends(get_async_session)):
+        """Get recent FIRS submissions for the specified organization (SI view)."""
+        try:
+            # Temporarily scope tenant to the specified organization for repository logic
+            set_current_tenant(org_id)
+            try:
+                rows = await list_recent_submissions(db, limit=limit)
+            finally:
+                clear_current_tenant()
+
+            payload = {
+                "organization_id": org_id,
+                "items": [
+                    {
+                        "id": str(getattr(r, "id", None)),
+                        "invoice_number": getattr(r, "invoice_number", None),
+                        "irn": getattr(r, "irn", None),
+                        "status": getattr(r, "status", None).value if getattr(r, "status", None) else None,
+                        "created_at": getattr(r, "created_at", None).isoformat() if getattr(r, "created_at", None) else None,
+                    }
+                    for r in rows
+                ],
+                "count": len(rows)
+            }
+            return self._create_v1_response(payload, "organization_recent_submissions_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting recent submissions for org {org_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get organization's recent submissions")
     
     async def create_organization(self, 
                                  request: Request,
