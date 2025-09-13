@@ -20,7 +20,8 @@ from core_platform.data_management.db_async import init_async_engine
 from core_platform.data_management.models.base import Base
 from core_platform.data_management.models.organization import Organization
 from core_platform.data_management.models.business_systems import (
-    ERPConnection, ERPProvider, SyncStatus
+    ERPConnection, ERPProvider, SyncStatus,
+    BankingConnection, BankingProvider, ConnectionStatus,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
@@ -63,13 +64,30 @@ async def test_si_business_systems_erp_pagination_and_isolation(monkeypatch):
                 system_name=f"Odoo-{i}",
                 status=SyncStatus.COMPLETED,
             ))
-        # ERP connection for org2 (should not appear)
+        # ERP connection for org2 (should not appear in org1 list)
         db.add(ERPConnection(
             organization_id=org2.id,
             si_id=uuid.uuid4(),
             provider=ERPProvider.SAP,
             system_name="SAP-01",
             status=SyncStatus.PENDING,
+        ))
+        # Banking connections
+        db.add(BankingConnection(
+            organization_id=org1.id,
+            si_id=uuid.uuid4(),
+            provider=BankingProvider.MONO,
+            provider_connection_id="mono_conn_1",
+            status=ConnectionStatus.CONNECTED,
+            bank_name="GTBank",
+        ))
+        db.add(BankingConnection(
+            organization_id=org2.id,
+            si_id=uuid.uuid4(),
+            provider=BankingProvider.MONO,
+            provider_connection_id="mono_conn_2",
+            status=ConnectionStatus.DISCONNECTED,
+            bank_name="Access Bank",
         ))
         await db.commit()
         break
@@ -110,3 +128,17 @@ async def test_si_business_systems_erp_pagination_and_isolation(monkeypatch):
     body3 = r3.json()
     assert body3["data"]["count"] == 1
     assert body3["data"]["items"][0]["system_name"] == "SAP-01"
+
+    # Banking list for org1
+    r4 = client.get(f"/api/v1/si/organizations/{org1.id}/business-systems/banking")
+    assert r4.status_code == 200
+    body4 = r4.json()
+    assert body4["data"]["count"] == 1
+    assert body4["data"]["items"][0]["provider"] == "mono"
+    assert body4["data"]["items"][0]["bank_name"] == "GTBank"
+
+    # Provider filter (mono) for banking on org1 
+    r5 = client.get(f"/api/v1/si/organizations/{org1.id}/business-systems/banking?provider=mono")
+    assert r5.status_code == 200
+    body5 = r5.json()
+    assert body5["data"]["count"] == 1

@@ -16,8 +16,9 @@ from sqlalchemy import select
 
 from core_platform.authentication.tenant_context import get_current_tenant
 from core_platform.data_management.models.business_systems import (
-    ERPConnection, CRMConnection, POSConnection,
-    ERPProvider, CRMProvider, POSProvider, SyncStatus,
+    ERPConnection, CRMConnection, POSConnection, BankingConnection,
+    ERPProvider, CRMProvider, POSProvider, BankingProvider,
+    SyncStatus, ConnectionStatus,
 )
 
 
@@ -53,6 +54,7 @@ async def list_business_systems(
         prov_enum = ERPProvider
         prov_attr = ERPConnection.provider
         status_attr = ERPConnection.status
+        status_enum = SyncStatus
         name_field = "system_name"
         last_field = "last_sync_at"
     elif sys_type == "crm":
@@ -60,6 +62,7 @@ async def list_business_systems(
         prov_enum = CRMProvider
         prov_attr = CRMConnection.provider
         status_attr = CRMConnection.status
+        status_enum = SyncStatus
         name_field = "system_name"
         last_field = "last_sync_at"
     elif sys_type == "pos":
@@ -67,8 +70,17 @@ async def list_business_systems(
         prov_enum = POSProvider
         prov_attr = POSConnection.provider
         status_attr = POSConnection.status
+        status_enum = SyncStatus
         name_field = "device_name"
         last_field = "last_transaction_sync"
+    elif sys_type == "banking":
+        model = BankingConnection
+        prov_enum = BankingProvider
+        prov_attr = BankingConnection.provider
+        status_attr = BankingConnection.status
+        status_enum = ConnectionStatus
+        name_field = "bank_name"
+        last_field = "last_sync_at"
     else:
         return {"items": [], "count": 0}
 
@@ -85,7 +97,7 @@ async def list_business_systems(
     # Status filter
     if status:
         try:
-            st = SyncStatus[status.upper()]
+            st = status_enum[status.upper()]
             base = base.where(status_attr == st)
         except KeyError:
             return {"items": [], "count": 0}
