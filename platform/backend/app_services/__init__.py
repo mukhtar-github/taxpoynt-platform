@@ -115,7 +115,7 @@ class APPServiceRegistry:
                 firs_http_client = None
                 resource_cache = None
 
-            firs_service = {
+                firs_service = {
                 "api_client": firs_api_client,
                 "auth_handler": auth_handler,
                 "http_client": firs_http_client,
@@ -124,6 +124,10 @@ class APPServiceRegistry:
                     "process_firs_webhook",
                     "update_firs_submission_status",
                     "submit_to_firs",
+                        "submit_invoice_to_firs",  # alias used by v1 app endpoints
+                        "submit_invoice",          # legacy alias used by invoice_submission_endpoints
+                        "submit_invoice_batch_to_firs",
+                        "submit_invoice_batch",
                     "validate_firs_response",
                     "validate_invoice_for_firs",
                     "validate_invoice_batch_for_firs",
@@ -131,6 +135,7 @@ class APPServiceRegistry:
                     "update_firs_invoice",
                         "transmit_firs_invoice",
                         "confirm_firs_receipt",
+                        "get_firs_submission_status",  # alias naming in endpoints
                         "authenticate_firs",
                         "get_submission_status",
                         "receive_invoices_from_si",
@@ -153,11 +158,16 @@ class APPServiceRegistry:
                         "process_firs_webhook",
                         "update_firs_submission_status",
                         "submit_to_firs",
+                        "submit_invoice_to_firs",
+                        "submit_invoice",
+                        "submit_invoice_batch_to_firs",
+                        "submit_invoice_batch",
                         "validate_firs_response",
                         "validate_invoice_for_firs",
                         "validate_invoice_batch_for_firs",
                         "get_firs_validation_rules",
                         "get_submission_status",
+                        "get_firs_submission_status",
                         "update_firs_invoice",
                         "transmit_firs_invoice",
                         "receive_invoices_from_si",
@@ -815,7 +825,7 @@ class APPServiceRegistry:
                         }
                     }
 
-                elif operation == "submit_to_firs":
+                elif operation in ("submit_to_firs", "submit_invoice_to_firs", "submit_invoice"):
                     # Submit flow using header-based endpoints: sign -> transmit
                     if not http_client:
                         return {"operation": operation, "success": False, "error": "http_client_unavailable"}
@@ -867,7 +877,7 @@ class APPServiceRegistry:
                     result = await self._handle_firs_webhook(payload)
                     return {"operation": operation, "success": True, "data": {"result": result}}
                     
-                elif operation == "get_submission_status":
+                elif operation in ("get_submission_status", "get_firs_submission_status"):
                     # Interpret submission_id as IRN and lookup transmit status
                     if not http_client:
                         return {"operation": operation, "success": False, "error": "http_client_unavailable"}
@@ -887,6 +897,38 @@ class APPServiceRegistry:
                         return {"operation": operation, "success": False, "error": "missing_irn"}
                     resp = await http_client.update_invoice(irn, update_data)
                     return {"operation": operation, "success": resp.get("success", False), "data": resp}
+
+                elif operation in ("submit_invoice_batch_to_firs", "submit_invoice_batch"):
+                    # Batch submit: sign -> transmit for each invoice
+                    if not http_client:
+                        return {"operation": operation, "success": False, "error": "http_client_unavailable"}
+                    batch = payload.get("batch_data") or payload.get("invoices") or []
+                    if isinstance(batch, dict) and "invoices" in batch:
+                        batch = batch["invoices"]
+                    results = []
+                    overall = True
+                    for item in (batch or []):
+                        try:
+                            sign_resp = await http_client.sign_invoice(item)
+                            if not sign_resp.get("success"):
+                                results.append({"sign": sign_resp, "transmit": None, "success": False})
+                                overall = False
+                                continue
+                            irn = item.get("irn")
+                            if not irn and isinstance(sign_resp.get("data"), dict):
+                                irn = sign_resp["data"].get("irn")
+                            if not irn:
+                                results.append({"sign": sign_resp, "transmit": {"success": False, "error": "missing_irn"}, "success": False})
+                                overall = False
+                                continue
+                            tx_resp = await http_client.transmit(irn)
+                            success = sign_resp.get("success", False) and tx_resp.get("success", False)
+                            results.append({"sign": sign_resp, "transmit": tx_resp, "success": success})
+                            overall = overall and success
+                        except Exception as ex:
+                            results.append({"error": str(ex), "success": False})
+                            overall = False
+                    return {"operation": operation, "success": overall, "data": {"results": results, "count": len(batch or [])}}
 
                 elif operation == "transmit_firs_invoice":
                     if not http_client:
