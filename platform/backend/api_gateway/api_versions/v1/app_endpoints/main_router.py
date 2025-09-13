@@ -15,6 +15,13 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel, V1ErrorModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.data_management.db_async import get_async_session
+from api_gateway.dependencies.tenant import make_tenant_scope_dependency
+from core_platform.data_management.repositories.firs_submission_repo_async import (
+    get_submission_metrics,
+    list_recent_submissions,
+)
 
 # Import APP system routers
 from .firs_integration_endpoints import create_firs_integration_router
@@ -219,6 +226,9 @@ class APPRouterV1:
             response_model=V1ResponseModel
         )
         
+        # Shared tenant scope for APP routes
+        self.tenant_scope = make_tenant_scope_dependency(self._require_app_role)
+
         # APP Dashboard Routes
         self.router.add_api_route(
             "/dashboard",
@@ -227,7 +237,7 @@ class APPRouterV1:
             summary="Get APP dashboard data",
             description="Get dashboard data for APP operations overview",
             response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_app_role)]
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -414,18 +424,22 @@ class APPRouterV1:
             raise HTTPException(status_code=500, detail="Failed to get APP capabilities")
     
     # APP Dashboard Handlers
-    async def get_app_dashboard(self, context: HTTPRoutingContext = Depends(_require_app_role)):
-        """Get APP dashboard data"""
+    async def get_app_dashboard(self, db: AsyncSession = Depends(get_async_session)):
+        """Get APP dashboard data (async, tenant-scoped)."""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_app_dashboard",
-                payload={
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            
+            metrics = await get_submission_metrics(db)
+            recent = await list_recent_submissions(db, limit=5)
+            result = {
+                "metrics": metrics,
+                "recent_submissions": [
+                    {
+                        "invoice_number": getattr(s, "invoice_number", None),
+                        "status": getattr(s, "status", None).value if getattr(s, "status", None) else None,
+                        "created_at": getattr(s, "created_at", None).isoformat() if getattr(s, "created_at", None) else None,
+                    }
+                    for s in recent
+                ],
+            }
             return self._create_v1_response(result, "app_dashboard_retrieved")
         except Exception as e:
             logger.error(f"Error getting APP dashboard in v1: {e}")
