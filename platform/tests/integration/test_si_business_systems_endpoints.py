@@ -80,6 +80,9 @@ async def test_si_business_systems_erp_pagination_and_isolation(monkeypatch):
             provider_connection_id="mono_conn_1",
             status=ConnectionStatus.CONNECTED,
             bank_name="GTBank",
+            account_number="1234567890",
+            account_name="Acme Ltd",
+            bank_code="058",
         ))
         db.add(BankingConnection(
             organization_id=org2.id,
@@ -134,8 +137,14 @@ async def test_si_business_systems_erp_pagination_and_isolation(monkeypatch):
     assert r4.status_code == 200
     body4 = r4.json()
     assert body4["data"]["count"] == 1
-    assert body4["data"]["items"][0]["provider"] == "mono"
-    assert body4["data"]["items"][0]["bank_name"] == "GTBank"
+    item_b = body4["data"]["items"][0]
+    assert item_b["provider"] == "mono"
+    assert item_b["bank_name"] == "GTBank"
+    # Masked account number present and ends with last 4
+    assert item_b.get("masked_account_number").endswith("7890")
+    assert item_b.get("masked_account_number") != "1234567890"
+    assert item_b.get("account_name") == "Acme Ltd"
+    assert item_b.get("bank_code") == "058"
 
     # Provider filter (mono) for banking on org1 
     r5 = client.get(f"/api/v1/si/organizations/{org1.id}/business-systems/banking?provider=mono")

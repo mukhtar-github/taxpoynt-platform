@@ -107,16 +107,34 @@ async def list_business_systems(
     stmt = base.order_by(getattr(model, "created_at").desc()).offset(max(0, int(offset))).limit(max(1, int(limit)))
     rows = (await db.execute(stmt)).scalars().all()
 
+    def _mask_account_number(acc: Optional[str]) -> Optional[str]:
+        if not acc or not isinstance(acc, str):
+            return None
+        tail = acc[-4:]
+        return f"****{tail}"
+
     def to_dict(row) -> Dict[str, Any]:
-        return {
+        base = {
             "id": str(getattr(row, "id", None)),
             "provider": getattr(row, "provider", None).value if getattr(row, "provider", None) else None,
             name_field: getattr(row, name_field, None),
             "status": getattr(row, "status", None).value if getattr(row, "status", None) else None,
-            "is_active": bool(getattr(row, "is_active", False)),
+            "is_active": bool(getattr(row, "is_active", False)) if hasattr(row, "is_active") else None,
             last_field: getattr(row, last_field, None).isoformat() if getattr(row, last_field, None) else None,
-            "version": getattr(row, "version", None) if hasattr(row, "version") else None,
         }
+        # ERP may have version
+        if hasattr(row, "version"):
+            base["version"] = getattr(row, "version", None)
+        # Banking extras with masking
+        if sys_type == "banking":
+            base.update({
+                "bank_name": getattr(row, "bank_name", None),
+                "bank_code": getattr(row, "bank_code", None),
+                "account_name": getattr(row, "account_name", None),
+                "masked_account_number": _mask_account_number(getattr(row, "account_number", None)),
+                "provider_account_id": getattr(row, "provider_account_id", None),
+            })
+        return base
 
     return {
         "items": [to_dict(r) for r in rows],
