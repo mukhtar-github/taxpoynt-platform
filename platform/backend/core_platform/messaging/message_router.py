@@ -12,6 +12,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import fnmatch
 import inspect
+import os
 
 from .event_bus import Event, EventBus, EventScope, EventPriority, get_event_bus
 
@@ -190,6 +191,9 @@ class MessageRouter:
         
         self.logger = logging.getLogger(__name__)
         self.is_initialized = False
+        # Strict operation mapping validation (env-controlled)
+        # Set ROUTER_STRICT_OPS=true|1|yes|on to raise on unmapped operations
+        self.strict_op_validation = str(os.getenv("ROUTER_STRICT_OPS", "false")).lower() in ("1", "true", "yes", "on")
     
     async def initialize(self):
         """Initialize the message router"""
@@ -359,9 +363,12 @@ class MessageRouter:
             try:
                 known_ops = self._collect_known_operations()
                 if known_ops and operation not in known_ops:
-                    self.logger.warning(
-                        f"Route op not registered in metadata: '{operation}' (role={service_role.value})"
-                    )
+                    msg = f"Route op not registered in metadata: '{operation}' (role={service_role.value})"
+                    if self.strict_op_validation:
+                        self.logger.error(msg)
+                        raise RuntimeError(msg)
+                    else:
+                        self.logger.warning(msg)
             except Exception:
                 pass
             # Translate operation to message type
