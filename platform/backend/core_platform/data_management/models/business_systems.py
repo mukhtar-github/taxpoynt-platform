@@ -101,28 +101,6 @@ class SyncStatus(str, PyEnum):
     CANCELLED = "cancelled"
 
 
-class BankingProvider(str, PyEnum):
-    """Banking integration providers"""
-    MONO = "mono"
-    STITCH = "stitch"
-    UNIFIED_BANKING = "unified_banking"
-
-
-class ConnectionStatus(str, PyEnum):
-    """External connection status for banking providers"""
-    CONNECTED = "connected"
-    DISCONNECTED = "disconnected"
-    PENDING = "pending"
-    ERROR = "error"
-    REAUTHORIZATION_REQUIRED = "reauthorization_required"
-
-
-class AccountType(str, PyEnum):
-    """Bank account types"""
-    SAVINGS = "savings"
-    CURRENT = "current"
-    DOMICILIARY = "domiciliary"
-    FIXED_DEPOSIT = "fixed_deposit"
 
 
 class CertificateType(str, PyEnum):
@@ -368,35 +346,7 @@ class POSTransactionLog(BaseModel):
 
 
 # ==============================================================================
-# BANKING INTEGRATION MODELS
-# ==============================================================================
-
-class BankingConnection(BaseModel):
-    """Banking integration connections (e.g., Mono)."""
-    __tablename__ = "banking_connections"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    si_id = Column(UUID(as_uuid=True), nullable=False)
-    organization_id = Column(UUID(as_uuid=True), nullable=True)
-
-    provider = Column(Enum(BankingProvider), nullable=False)
-    provider_connection_id = Column(String(255), nullable=False)
-    provider_account_id = Column(String(255), nullable=True)
-
-    status = Column(Enum(ConnectionStatus), nullable=True)
-    bank_name = Column(String(255), nullable=True)
-    bank_code = Column(String(20), nullable=True)
-    account_number = Column(String(50), nullable=True)
-    account_name = Column(String(255), nullable=True)
-    account_type = Column(Enum(AccountType), nullable=True)
-
-    access_token = Column(Text, nullable=True)
-    refresh_token = Column(Text, nullable=True)
-    token_expires_at = Column(DateTime(timezone=True), nullable=True)
-    connection_metadata = Column(get_json_type(), default={})
-
-    last_sync_at = Column(DateTime(timezone=True), nullable=True)
-    sync_frequency_hours = Column(Integer, nullable=True)
+## Banking integration models are defined in models/banking.py to avoid duplication.
 
 
 # ==============================================================================

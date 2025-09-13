@@ -16,9 +16,11 @@ from sqlalchemy import select
 
 from core_platform.authentication.tenant_context import get_current_tenant
 from core_platform.data_management.models.business_systems import (
-    ERPConnection, CRMConnection, POSConnection, BankingConnection,
-    ERPProvider, CRMProvider, POSProvider, BankingProvider,
-    SyncStatus, ConnectionStatus,
+    ERPConnection, CRMConnection, POSConnection,
+    ERPProvider, CRMProvider, POSProvider, SyncStatus,
+)
+from core_platform.data_management.models.banking import (
+    BankingConnection, BankingProvider, ConnectionStatus,
 )
 
 

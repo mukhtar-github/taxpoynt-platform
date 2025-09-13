@@ -21,6 +21,8 @@ from core_platform.data_management.models.base import Base
 from core_platform.data_management.models.organization import Organization
 from core_platform.data_management.models.business_systems import (
     ERPConnection, ERPProvider, SyncStatus,
+)
+from core_platform.data_management.models.banking import (
     BankingConnection, BankingProvider, ConnectionStatus,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
