@@ -22,6 +22,7 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
     get_submission_metrics,
     list_recent_submissions,
 )
+from api_gateway.utils.pagination import normalize_pagination
 
 # Import APP system routers
 from .firs_integration_endpoints import create_firs_integration_router
@@ -424,11 +425,14 @@ class APPRouterV1:
             raise HTTPException(status_code=500, detail="Failed to get APP capabilities")
     
     # APP Dashboard Handlers
-    async def get_app_dashboard(self, db: AsyncSession = Depends(get_async_session)):
+    async def get_app_dashboard(self,
+                               recent_limit: int = Query(5, ge=1, le=100),
+                               recent_offset: int = Query(0, ge=0),
+                               db: AsyncSession = Depends(get_async_session)):
         """Get APP dashboard data (async, tenant-scoped)."""
         try:
             metrics = await get_submission_metrics(db)
-            recent = await list_recent_submissions(db, limit=5)
+            recent = await list_recent_submissions(db, limit=recent_limit, offset=recent_offset)
             result = {
                 "metrics": metrics,
                 "recent_submissions": [
@@ -439,6 +443,9 @@ class APPRouterV1:
                     }
                     for s in recent
                 ],
+                "recent_pagination": normalize_pagination(
+                    limit=recent_limit, offset=recent_offset, total=len(recent)
+                ),
             }
             return self._create_v1_response(result, "app_dashboard_retrieved")
         except Exception as e:

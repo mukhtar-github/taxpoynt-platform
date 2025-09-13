@@ -15,6 +15,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from api_gateway.utils.pagination import normalize_pagination
 
 logger = logging.getLogger(__name__)
 
@@ -565,6 +566,8 @@ class FIRSIntegrationEndpointsV1:
                                   status: Optional[str] = Query(None, description="Filter by submission status"),
                                   start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                   end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+                                  limit: int = Query(50, ge=1, le=1000),
+                                  offset: int = Query(0, ge=0),
                                   context: HTTPRoutingContext = Depends(_require_app_role)):
         """List FIRS submissions"""
         try:
@@ -578,10 +581,17 @@ class FIRSIntegrationEndpointsV1:
                         "start_date": start_date,
                         "end_date": end_date
                     },
+                    "pagination": {"limit": limit, "offset": offset},
                     "api_version": "v1"
                 }
             )
-            
+            # Attach pagination meta
+            try:
+                items = result.get("items") or result.get("data") or []
+                total = result.get("total") or result.get("count") or (len(items) if isinstance(items, list) else 0)
+                result["pagination"] = normalize_pagination(limit=limit, offset=offset, total=total)
+            except Exception:
+                pass
             return self._create_v1_response(result, "firs_submissions_listed")
         except Exception as e:
             logger.error(f"Error listing FIRS submissions in v1: {e}")
