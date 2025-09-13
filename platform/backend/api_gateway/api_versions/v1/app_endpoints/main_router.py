@@ -6,7 +6,7 @@ Consolidates all APP-specific functionality for FIRS e-invoicing compliance.
 """
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Request, HTTPException, Depends, status
+from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
 
 from core_platform.authentication.role_manager import PlatformRole, RoleScope
