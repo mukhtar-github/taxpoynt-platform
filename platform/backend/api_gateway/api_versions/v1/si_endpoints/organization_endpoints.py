@@ -373,12 +373,14 @@ class OrganizationEndpointsV1:
                                                org_id: str,
                                                limit: int = Query(50, ge=1, le=1000),
                                                offset: int = Query(0, ge=0),
+                                               provider: Optional[str] = Query(None, description="Filter by provider (e.g., odoo, sap)"),
+                                               status: Optional[str] = Query(None, description="Filter by status (pending, completed, etc.)"),
                                                db: AsyncSession = Depends(get_async_session)):
         """Get organization's business systems (async, ERP only for now)."""
         try:
             set_current_tenant(org_id)
             try:
-                data = await list_business_systems(db, limit=limit, offset=offset)
+                data = await list_business_systems(db, limit=limit, offset=offset, provider=provider, status=status)
             finally:
                 clear_current_tenant()
 
@@ -400,6 +402,8 @@ class OrganizationEndpointsV1:
                                                       system_type: str,
                                                       limit: int = Query(50, ge=1, le=1000),
                                                       offset: int = Query(0, ge=0),
+                                                      provider: Optional[str] = Query(None, description="Filter by provider (e.g., salesforce, clover)"),
+                                                      status: Optional[str] = Query(None, description="Filter by status (pending, completed, etc.)"),
                                                       db: AsyncSession = Depends(get_async_session)):
         """Get organization's business systems by type"""
         try:
@@ -414,7 +418,7 @@ class OrganizationEndpointsV1:
             set_current_tenant(org_id)
             try:
                 result = await list_business_systems(
-                    db, system_type=system_type, limit=limit, offset=offset
+                    db, system_type=system_type, limit=limit, offset=offset, provider=provider, status=status
                 )
             finally:
                 clear_current_tenant()

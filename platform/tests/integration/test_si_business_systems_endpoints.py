@@ -94,10 +94,16 @@ async def test_si_business_systems_erp_pagination_and_isolation(monkeypatch):
     assert body2["success"] is True
     assert len(body2["data"]["items"]) == 2
 
+    # Provider filter (odoo) should still return records
+    r2b = client.get(f"/api/v1/si/organizations/{org1.id}/business-systems?provider=odoo")
+    assert r2b.status_code == 200
+    body2b = r2b.json()
+    assert body2b["data"]["count"] == 3
+    assert all(item.get("provider") == "odoo" for item in body2b["data"]["items"])
+
     # Ensure isolation: listing org2 yields only its own
     r3 = client.get(f"/api/v1/si/organizations/{org2.id}/business-systems")
     assert r3.status_code == 200
     body3 = r3.json()
     assert body3["data"]["count"] == 1
     assert body3["data"]["items"][0]["system_name"] == "SAP-01"
-
