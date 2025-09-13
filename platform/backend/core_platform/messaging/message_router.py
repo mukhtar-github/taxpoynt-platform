@@ -359,18 +359,20 @@ class MessageRouter:
             # Ensure router has default rules and event hooks initialized
             if not self.is_initialized:
                 await self.initialize()
-            # Soft validation: log when operation is not advertised by any registered endpoint
+            # Soft/strict validation: check operation is advertised by some registered endpoint
+            known_ops = set()
             try:
                 known_ops = self._collect_known_operations()
-                if known_ops and operation not in known_ops:
-                    msg = f"Route op not registered in metadata: '{operation}' (role={service_role.value})"
-                    if self.strict_op_validation:
-                        self.logger.error(msg)
-                        raise RuntimeError(msg)
-                    else:
-                        self.logger.warning(msg)
             except Exception:
-                pass
+                # Best-effort; proceed without known ops
+                known_ops = set()
+            if known_ops and operation not in known_ops:
+                msg = f"Route op not registered in metadata: '{operation}' (role={service_role.value})"
+                if self.strict_op_validation:
+                    self.logger.error(msg)
+                    raise RuntimeError(msg)
+                else:
+                    self.logger.warning(msg)
             # Translate operation to message type
             message_type = self._determine_message_type(operation)
             
