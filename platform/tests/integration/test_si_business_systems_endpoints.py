@@ -93,6 +93,9 @@ async def test_si_business_systems_erp_pagination_and_isolation(monkeypatch):
     body2 = r2.json()
     assert body2["success"] is True
     assert len(body2["data"]["items"]) == 2
+    # Pagination meta present
+    assert "pagination" in body2["data"]
+    assert body2["data"]["pagination"]["limit"] == 2
 
     # Provider filter (odoo) should still return records
     r2b = client.get(f"/api/v1/si/organizations/{org1.id}/business-systems?provider=odoo")

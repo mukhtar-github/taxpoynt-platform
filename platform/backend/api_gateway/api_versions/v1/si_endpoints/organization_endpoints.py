@@ -22,6 +22,7 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
     list_submissions_filtered,
 )
 from core_platform.data_management.repositories.business_systems_repo_async import list_business_systems
+from api_gateway.utils.pagination import normalize_pagination
 from core_platform.authentication.tenant_context import set_current_tenant, clear_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -392,6 +393,9 @@ class OrganizationEndpointsV1:
                 "accounting": ["quickbooks", "xero", "wave", "freshbooks", "sage"],
                 "inventory": ["cin7", "fishbowl", "tradegecko", "unleashed"]
             }
+            # Normalize pagination metadata
+            meta = normalize_pagination(limit=limit, offset=offset, total=data.get("count", 0))
+            data["pagination"] = meta
             return self._create_v1_response(data, "organization_business_systems_retrieved")
         except Exception as e:
             logger.error(f"Error getting organization business systems {org_id} in v1: {e}")
@@ -422,6 +426,8 @@ class OrganizationEndpointsV1:
                 )
             finally:
                 clear_current_tenant()
+            meta = normalize_pagination(limit=limit, offset=offset, total=result.get("count", 0))
+            result["pagination"] = meta
             return self._create_v1_response(result, f"organization_{system_type}_systems_retrieved")
         except HTTPException:
             raise
@@ -557,6 +563,9 @@ class OrganizationEndpointsV1:
                     for r in rows
                 ],
             }
+            # Add normalized pagination metadata
+            meta = normalize_pagination(limit=limit, offset=int(qp.get("offset", 0) or 0), total=len(rows))
+            payload["pagination"] = meta
             return self._create_v1_response(payload, "organization_transactions_retrieved")
         except Exception as e:
             logger.error(f"Error getting transactions for organization {org_id} in v1: {e}")
