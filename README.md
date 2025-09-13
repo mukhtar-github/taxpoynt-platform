@@ -62,6 +62,18 @@ platform/
    uvicorn app.main:app --reload
    ```
 
+   Optional: use async DB sessions in new endpoints (scaffold)
+   ```python
+   # Example FastAPI handler
+   from fastapi import Depends
+   from sqlalchemy.ext.asyncio import AsyncSession
+   from core_platform.data_management.db_async import get_async_session
+
+   async def handler(db: AsyncSession = Depends(get_async_session)):
+       result = await db.execute("SELECT 1")
+       return {"ok": True}
+   ```
+
    Optional strictness for router validation (recommended during development):
    ```bash
    # Fail on unmapped operations at runtime

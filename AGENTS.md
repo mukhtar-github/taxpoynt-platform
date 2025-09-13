@@ -165,3 +165,14 @@ Quality Checklist Before Finishing
 - Any new service is registered with the MessageRouter and returns the standard callback shape.
 - Local instructions to run/validate are included in your final message to the user if useful.
 - If you added or changed route operations, ensure service metadata includes them; enable `ROUTER_VALIDATE_ON_STARTUP=true` locally to sanity-check mappings.
+
+Async DB + Tenant Context (Scaffold)
+- Async DB sessions: use `core_platform.data_management.db_async.get_async_session` as a FastAPI dependency to obtain an `AsyncSession`.
+  - Initializes an async engine lazily with `DATABASE_URL` (auto-converted to async drivers: `postgresql+asyncpg`, `sqlite+aiosqlite`).
+  - Keep legacy sync code paths unchanged; migrate endpoints/services incrementally.
+- Tenant context: use `core_platform.authentication.tenant_context` helpers to propagate a per-request `tenant_id`.
+  - `set_current_tenant`, `get_current_tenant`, `tenant_context(...)`, `apply_tenant_from_obj(...)`.
+  - Set from routing context at request entry; repositories may read it to apply row-level filtering.
+- Migration guidance:
+  - Start with non-critical endpoints; avoid mixing sync/async DB usage in the same handler.
+  - Do not introduce implicit commits in dependencies; manage transactions explicitly as needed.
