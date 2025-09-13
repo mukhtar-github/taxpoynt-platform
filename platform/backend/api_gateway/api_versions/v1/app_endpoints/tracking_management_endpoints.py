@@ -19,7 +19,7 @@ from ..version_models import V1ResponseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
 from api_gateway.dependencies.tenant import make_tenant_scope_dependency
-from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions
+from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions, get_submission_metrics
 from core_platform.data_management.models.firs_submission import FIRSSubmission
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get tracking metrics",
             description="Get comprehensive tracking metrics and statistics",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
 
         # Recent submissions (async + tenant scoped)
@@ -282,39 +283,12 @@ class TrackingManagementEndpointsV1:
         )
     
     # Tracking Metrics Endpoints
-    async def get_tracking_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get comprehensive tracking metrics"""
+    async def get_tracking_metrics(self, db: AsyncSession = Depends(get_async_session)):
+        """Get comprehensive tracking metrics (async, tenant-scoped)."""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_tracking_metrics",
-                payload={
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            
-            # Add demo data if service not available
-            if not result:
-                result = {
-                    "totalTransmissions": 456,
-                    "processing": 23,
-                    "completed": 430,
-                    "failed": 3,
-                    "averageProcessingTime": "2.5 minutes",
-                    "successRate": 94.3,
-                    "todayTransmissions": 45,
-                    "realTimeStatus": {
-                        "activeTransmissions": 12,
-                        "queuedTransmissions": 8,
-                        "firsResponsePending": 5
-                    }
-                }
-            
-            # Add capabilities information
-            result["capabilities"] = self.tracking_capabilities
-            
-            return self._create_v1_response(result, "tracking_metrics_retrieved")
+            metrics = await get_submission_metrics(db)
+            metrics["capabilities"] = self.tracking_capabilities
+            return self._create_v1_response(metrics, "tracking_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting tracking metrics in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get tracking metrics")
