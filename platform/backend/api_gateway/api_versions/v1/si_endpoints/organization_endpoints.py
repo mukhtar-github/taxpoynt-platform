@@ -21,6 +21,7 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
     get_submission_metrics,
     list_submissions_filtered,
 )
+from core_platform.data_management.repositories.business_systems_repo_async import list_business_systems
 from core_platform.authentication.tenant_context import set_current_tenant, clear_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -370,21 +371,18 @@ class OrganizationEndpointsV1:
     
     async def get_organization_business_systems(self, 
                                                org_id: str,
-                                               context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get organization's business systems"""
+                                               limit: int = Query(50, ge=1, le=1000),
+                                               offset: int = Query(0, ge=0),
+                                               db: AsyncSession = Depends(get_async_session)):
+        """Get organization's business systems (async, ERP only for now)."""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="get_organization_business_systems",
-                payload={
-                    "org_id": org_id,
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            
-            # Add available system types for v1
-            result["available_system_types"] = {
+            set_current_tenant(org_id)
+            try:
+                data = await list_business_systems(db, limit=limit, offset=offset)
+            finally:
+                clear_current_tenant()
+
+            data["available_system_types"] = {
                 "erp": ["sap", "oracle", "dynamics", "netsuite", "odoo"],
                 "crm": ["salesforce", "hubspot", "dynamics_crm", "pipedrive", "zoho"],
                 "pos": ["square", "clover", "lightspeed", "toast", "shopify_pos", "moniepoint", "opay", "palmpay"],
@@ -392,8 +390,7 @@ class OrganizationEndpointsV1:
                 "accounting": ["quickbooks", "xero", "wave", "freshbooks", "sage"],
                 "inventory": ["cin7", "fishbowl", "tradegecko", "unleashed"]
             }
-            
-            return self._create_v1_response(result, "organization_business_systems_retrieved")
+            return self._create_v1_response(data, "organization_business_systems_retrieved")
         except Exception as e:
             logger.error(f"Error getting organization business systems {org_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get organization business systems")
@@ -401,7 +398,9 @@ class OrganizationEndpointsV1:
     async def get_organization_business_system_by_type(self, 
                                                       org_id: str,
                                                       system_type: str,
-                                                      context: HTTPRoutingContext = Depends(lambda: None)):
+                                                      limit: int = Query(50, ge=1, le=1000),
+                                                      offset: int = Query(0, ge=0),
+                                                      db: AsyncSession = Depends(get_async_session)):
         """Get organization's business systems by type"""
         try:
             # Validate system type
@@ -412,17 +411,13 @@ class OrganizationEndpointsV1:
                     detail=f"Invalid system type. Must be one of: {', '.join(valid_types)}"
                 )
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="get_organization_business_systems_by_type",
-                payload={
-                    "org_id": org_id,
-                    "system_type": system_type,
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            
+            set_current_tenant(org_id)
+            try:
+                result = await list_business_systems(
+                    db, system_type=system_type, limit=limit, offset=offset
+                )
+            finally:
+                clear_current_tenant()
             return self._create_v1_response(result, f"organization_{system_type}_systems_retrieved")
         except HTTPException:
             raise
