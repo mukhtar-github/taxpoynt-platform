@@ -17,6 +17,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -579,17 +580,9 @@ class TransmissionManagementEndpointsV1:
             logger.error(f"Error getting transmission statistics in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get transmission statistics")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
-        """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": datetime.now().isoformat(),
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
+        """Create standardized v1 response format using V1ResponseModel"""
+        return build_v1_response(data, action)
 
 
 def create_transmission_management_router(role_detector: HTTPRoleDetector,
@@ -598,4 +591,3 @@ def create_transmission_management_router(role_detector: HTTPRoleDetector,
     """Factory function to create Transmission Management Router"""
     transmission_endpoints = TransmissionManagementEndpointsV1(role_detector, permission_guard, message_router)
     return transmission_endpoints.router
-
