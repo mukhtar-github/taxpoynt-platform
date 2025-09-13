@@ -132,6 +132,8 @@ class APPServiceRegistry:
                     "validate_invoice_for_firs",
                     "validate_invoice_batch_for_firs",
                     "get_firs_validation_rules",
+                    "refresh_firs_resources",
+                    "refresh_firs_resource",
                     "update_firs_invoice",
                         "transmit_firs_invoice",
                         "confirm_firs_receipt",
@@ -166,6 +168,8 @@ class APPServiceRegistry:
                         "validate_invoice_for_firs",
                         "validate_invoice_batch_for_firs",
                         "get_firs_validation_rules",
+                        "refresh_firs_resources",
+                        "refresh_firs_resource",
                         "get_submission_status",
                         "get_firs_submission_status",
                         "update_firs_invoice",
@@ -871,6 +875,21 @@ class APPServiceRegistry:
                         return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
                     resources = await resource_cache.get_resources()
                     return {"operation": operation, "success": True, "data": {"resources": resources}}
+
+                elif operation == "refresh_firs_resources":
+                    if not resource_cache:
+                        return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
+                    resources = await resource_cache.refresh_all()
+                    return {"operation": operation, "success": True, "data": {"resources": resources}}
+
+                elif operation == "refresh_firs_resource":
+                    if not resource_cache:
+                        return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
+                    res_key = payload.get("resource")
+                    if res_key not in ("currencies", "invoice-types", "services-codes", "vat-exemptions"):
+                        return {"operation": operation, "success": False, "error": "invalid_resource"}
+                    out = await resource_cache.refresh_resource(res_key)
+                    return {"operation": operation, "success": True, "data": out}
 
                 elif operation == "process_firs_webhook":
                     # Process FIRS webhook events

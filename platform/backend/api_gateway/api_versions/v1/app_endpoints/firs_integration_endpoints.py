@@ -240,6 +240,28 @@ class FIRSIntegrationEndpointsV1:
             response_model=V1ResponseModel,
             dependencies=[Depends(self._require_app_role)]
         )
+
+        # Resource Cache Refresh (all)
+        self.router.add_api_route(
+            "/validation/refresh",
+            self.refresh_firs_resources,
+            methods=["POST"],
+            summary="Refresh FIRS resources cache",
+            description="Refresh cached FIRS resources (currencies, invoice-types, services-codes, vat-exemptions)",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
+        )
+
+        # Resource Cache Refresh (single)
+        self.router.add_api_route(
+            "/validation/refresh/{resource}",
+            self.refresh_firs_resource,
+            methods=["POST"],
+            summary="Refresh a specific FIRS resource",
+            description="Refresh a single cached FIRS resource by key",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Certificate Management Routes
         self.router.add_api_route(
@@ -655,6 +677,43 @@ class FIRSIntegrationEndpointsV1:
         except Exception as e:
             logger.error(f"Error getting FIRS validation rules in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS validation rules")
+
+    async def refresh_firs_resources(self, context: HTTPRoutingContext = Depends(_require_app_role)):
+        """Refresh all cached FIRS resources (currencies/types/codes/exemptions)."""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="refresh_firs_resources",
+                payload={
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "firs_resources_refreshed")
+        except Exception as e:
+            logger.error(f"Error refreshing FIRS resources in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to refresh FIRS resources")
+
+    async def refresh_firs_resource(self, resource: str, context: HTTPRoutingContext = Depends(_require_app_role)):
+        """Refresh a specific cached FIRS resource by key."""
+        try:
+            if resource not in ("currencies", "invoice-types", "services-codes", "vat-exemptions"):
+                raise HTTPException(status_code=400, detail="invalid_resource")
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="refresh_firs_resource",
+                payload={
+                    "resource": resource,
+                    "app_id": context.user_id,
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "firs_resource_refreshed")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error refreshing FIRS resource {resource} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to refresh FIRS resource")
     
     # Certificate Management Endpoints
     async def list_firs_certificates(self, context: HTTPRoutingContext = Depends(_require_app_role)):
