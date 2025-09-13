@@ -16,7 +16,7 @@ from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from .version_models import V1ResponseModel, V1ErrorModel, V1PaginationModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
-from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions
+from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions, get_submission_metrics
 from core_platform.authentication.tenant_context import set_current_tenant, clear_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -538,20 +538,28 @@ class OrganizationEndpointsV1:
     
     async def get_organization_transaction_summary(self, 
                                                    org_id: str,
-                                                   context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get organization transaction summary"""
+                                                   db: AsyncSession = Depends(get_async_session)):
+        """Get organization transaction summary (async, submission-based)."""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="get_organization_transaction_summary",
-                payload={
-                    "org_id": org_id,
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            
-            return self._create_v1_response(result, "organization_transaction_summary_retrieved")
+            set_current_tenant(org_id)
+            try:
+                metrics = await get_submission_metrics(db)
+            finally:
+                clear_current_tenant()
+            payload = {
+                "organization_id": org_id,
+                "summary": {
+                    "total_transmissions": metrics.get("totalTransmissions", 0),
+                    "completed": metrics.get("completed", 0),
+                    "failed": metrics.get("failed", 0),
+                    "processing": metrics.get("processing", 0),
+                    "submitted": metrics.get("submitted", 0),
+                    "success_rate": metrics.get("successRate", 0.0),
+                    "avg_processing_time": metrics.get("averageProcessingTime"),
+                    "today": metrics.get("todayTransmissions", 0),
+                },
+            }
+            return self._create_v1_response(payload, "organization_transaction_summary_retrieved")
         except Exception as e:
             logger.error(f"Error getting transaction summary for organization {org_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get organization transaction summary")
