@@ -142,9 +142,9 @@ We welcome contributions! Please see our contributing guidelines and code of con
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## License
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).  
+See the [LICENSE](./LICENSE) file for details.
 
 ## 🆘 Support
 
