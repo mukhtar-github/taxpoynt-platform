@@ -18,6 +18,10 @@ jobs:
     env:
       ENVIRONMENT: development
       PYTHONPATH: platform/backend
+      # Router validation modes for CI
+      ROUTER_STRICT_OPS: "true"
+      ROUTER_VALIDATE_ON_STARTUP: "true"
+      ROUTER_FAIL_FAST_ON_STARTUP: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,4 +42,3 @@ jobs:
       - name: Run unit tests
         run: |
           pytest -q platform/tests/unit
-
