@@ -16,7 +16,11 @@ from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from .version_models import V1ResponseModel, V1ErrorModel, V1PaginationModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
-from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions, get_submission_metrics
+from core_platform.data_management.repositories.firs_submission_repo_async import (
+    list_recent_submissions,
+    get_submission_metrics,
+    list_submissions_filtered,
+)
 from core_platform.authentication.tenant_context import set_current_tenant, clear_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -517,21 +521,44 @@ class OrganizationEndpointsV1:
     async def get_organization_transactions(self, 
                                            org_id: str,
                                            request: Request,
-                                           context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get organization transactions"""
+                                           db: AsyncSession = Depends(get_async_session)):
+        """Get organization transactions (submission-based list with filters)."""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="get_organization_transactions",
-                payload={
-                    "org_id": org_id,
-                    "filters": dict(request.query_params),
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            
-            return self._create_v1_response(result, "organization_transactions_retrieved")
+            # Basic filters: status, start_date, end_date, limit
+            qp = dict(request.query_params)
+            status = qp.get("status")
+            start_date = qp.get("start_date")
+            end_date = qp.get("end_date")
+            limit = int(qp.get("limit", 50))
+
+            set_current_tenant(org_id)
+            try:
+                rows = await list_submissions_filtered(
+                    db,
+                    status=status,
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=limit,
+                )
+            finally:
+                clear_current_tenant()
+
+            payload = {
+                "organization_id": org_id,
+                "count": len(rows),
+                "items": [
+                    {
+                        "invoice_number": getattr(r, "invoice_number", None),
+                        "status": getattr(r, "status", None).value if getattr(r, "status", None) else None,
+                        "created_at": getattr(r, "created_at", None).isoformat() if getattr(r, "created_at", None) else None,
+                        "irn": getattr(r, "irn", None),
+                        "total_amount": float(getattr(r, "total_amount", 0) or 0),
+                        "currency": getattr(r, "currency", None),
+                    }
+                    for r in rows
+                ],
+            }
+            return self._create_v1_response(payload, "organization_transactions_retrieved")
         except Exception as e:
             logger.error(f"Error getting transactions for organization {org_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get organization transactions")

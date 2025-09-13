@@ -53,11 +53,12 @@ async def test_si_org_recent_and_summary_integration(monkeypatch):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Prepare sample data
+    # Prepare sample data (two orgs for isolation)
     org = Organization(id=uuid.uuid4(), name="Org SI")
+    org2 = Organization(id=uuid.uuid4(), name="Other Org")
     async for db in get_async_session():
         db: AsyncSession
-        db.add(org)
+        db.add_all([org, org2])
         await db.flush()
         s1 = FIRSSubmission(
             id=uuid.uuid4(),
@@ -71,6 +72,19 @@ async def test_si_org_recent_and_summary_integration(monkeypatch):
             currency="NGN",
         )
         db.add(s1)
+        # Submission for other org (should not appear)
+        s_other = FIRSSubmission(
+            id=uuid.uuid4(),
+            organization_id=org2.id,
+            invoice_number="X-1",
+            invoice_type=InvoiceType.STANDARD_INVOICE,
+            status=SubmissionStatus.SUBMITTED,
+            validation_status=ValidationStatus.VALID,
+            invoice_data={"s": 9},
+            total_amount=999,
+            currency="NGN",
+        )
+        db.add(s_other)
         await db.commit()
         break
 
@@ -88,6 +102,8 @@ async def test_si_org_recent_and_summary_integration(monkeypatch):
     body1 = r1.json()
     assert body1["success"] is True
     assert body1["data"]["count"] == 1
+    # Ensure only org's invoices returned
+    assert all(item["invoice_number"].startswith("S-") for item in body1["data"]["items"])
 
     # Summary
     r2 = client.get(f"/api/v1/si/organizations/{org.id}/transaction-summary")
@@ -95,4 +111,3 @@ async def test_si_org_recent_and_summary_integration(monkeypatch):
     body2 = r2.json()
     assert body2["success"] is True
     assert body2["data"]["summary"]["total_transmissions"] >= 1
-

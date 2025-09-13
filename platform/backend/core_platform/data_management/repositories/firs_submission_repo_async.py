@@ -160,3 +160,58 @@ async def get_submission_metrics(
         "successRate": success_rate,
         "todayTransmissions": int(today_count),
     }
+
+
+async def list_submissions_filtered(
+    db: AsyncSession,
+    *,
+    organization_id: Optional[Union[UUIDType, str]] = None,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+) -> List[FIRSSubmission]:
+    """List submissions for a tenant with basic filters.
+
+    - status: one of SubmissionStatus names (case-insensitive)
+    - start_date, end_date: ISO8601 date (YYYY-MM-DD)
+    - limit: max rows
+    """
+    org_id: Optional[Union[UUIDType, str]] = organization_id or get_current_tenant()
+    if not org_id:
+        return []
+    if isinstance(org_id, str):
+        try:
+            org_id = uuid.UUID(org_id)
+        except Exception:
+            return []
+
+    from sqlalchemy import select, func
+    from datetime import datetime
+    from core_platform.data_management.models.firs_submission import SubmissionStatus
+
+    stmt = select(FIRSSubmission).where(FIRSSubmission.organization_id == org_id)
+
+    if status:
+        try:
+            st = SubmissionStatus[status.upper()]
+            stmt = stmt.where(FIRSSubmission.status == st)
+        except KeyError:
+            # Unknown status -> return empty
+            return []
+
+    # Date filtering on created_at (by date)
+    if start_date:
+        try:
+            stmt = stmt.where(func.date(FIRSSubmission.created_at) >= start_date)
+        except Exception:
+            pass
+    if end_date:
+        try:
+            stmt = stmt.where(func.date(FIRSSubmission.created_at) <= end_date)
+        except Exception:
+            pass
+
+    stmt = stmt.order_by(FIRSSubmission.created_at.desc()).limit(max(1, int(limit)))
+    res = await db.execute(stmt)
+    return res.scalars().all()
