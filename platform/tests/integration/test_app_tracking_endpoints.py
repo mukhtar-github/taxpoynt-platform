@@ -103,6 +103,15 @@ async def test_app_tracking_recent_and_metrics_integration(monkeypatch):
     body1 = r1.json()
     assert body1["success"] is True
     assert body1["data"]["count"] == 2
+    assert "pagination" in body1["data"]
+
+    # Offset pagination
+    r1b = client.get("/api/v1/app/tracking/submissions/recent?limit=1&offset=1")
+    assert r1b.status_code == 200
+    body1b = r1b.json()
+    assert body1b["success"] is True
+    assert body1b["data"]["count"] == 1
+    assert body1b["data"]["pagination"]["limit"] == 1
 
     # Metrics
     r2 = client.get("/api/v1/app/tracking/metrics")
@@ -111,4 +120,3 @@ async def test_app_tracking_recent_and_metrics_integration(monkeypatch):
     assert body2["success"] is True
     assert body2["data"]["totalTransmissions"] == 2
     assert body2["data"]["completed"] == 1
-

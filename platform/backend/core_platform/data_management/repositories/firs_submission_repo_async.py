@@ -23,6 +23,7 @@ async def list_recent_submissions(
     db: AsyncSession,
     *,
     limit: int = 10,
+    offset: int = 0,
     organization_id: Optional[Union[UUIDType, str]] = None,
 ) -> List[FIRSSubmission]:
     """Return recent FIRS submissions for the current tenant (organization).
@@ -46,6 +47,7 @@ async def list_recent_submissions(
         select(FIRSSubmission)
         .where(FIRSSubmission.organization_id == org_id)
         .order_by(desc(FIRSSubmission.created_at))
+        .offset(max(0, int(offset)))
         .limit(max(1, int(limit)))
     )
     result = await db.execute(stmt)

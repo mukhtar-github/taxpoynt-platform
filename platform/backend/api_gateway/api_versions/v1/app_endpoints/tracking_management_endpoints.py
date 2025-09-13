@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
 from api_gateway.dependencies.tenant import make_tenant_scope_dependency
 from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions, get_submission_metrics
+from api_gateway.utils.pagination import normalize_pagination
 from core_platform.data_management.models.firs_submission import FIRSSubmission
 
 logger = logging.getLogger(__name__)
@@ -250,12 +251,14 @@ class TrackingManagementEndpointsV1:
 
     async def get_recent_submissions(self,
                                     limit: int = Query(10, ge=1, le=100),
+                                    offset: int = Query(0, ge=0),
                                     db: AsyncSession = Depends(get_async_session)):
         try:
-            rows = await list_recent_submissions(db, limit=limit)
+            rows = await list_recent_submissions(db, limit=limit, offset=offset)
             payload = {
                 "items": [self._to_submission_dict(r) for r in rows],
-                "count": len(rows)
+                "count": len(rows),
+                "pagination": normalize_pagination(limit=limit, offset=offset, total=len(rows))
             }
             return self._create_v1_response(payload, "recent_submissions_retrieved")
         except Exception as e:
