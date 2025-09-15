@@ -70,6 +70,8 @@ class APPRouterV1:
         self.permission_guard = permission_guard
         self.message_router = message_router
         self.router = APIRouter(prefix="/app", tags=["Access Point Provider V1"])
+        # Shared tenant scope for APP routes (must be set before including sub-routers)
+        self.tenant_scope = make_tenant_scope_dependency(self._require_app_role)
         
         # Include all APP sub-routers
         self._include_sub_routers()
@@ -228,9 +230,6 @@ class APPRouterV1:
             response_model=V1ResponseModel
         )
         
-        # Shared tenant scope for APP routes
-        self.tenant_scope = make_tenant_scope_dependency(self._require_app_role)
-
         # APP Dashboard Routes
         self.router.add_api_route(
             "/dashboard",
