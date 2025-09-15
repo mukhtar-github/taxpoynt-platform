@@ -644,7 +644,7 @@ class RequestValidator(BaseHTTPMiddleware):
     def _compile_path_traversal_patterns(self) -> List[Pattern]:
         """Compile path traversal detection patterns."""
         patterns = [
-            r'\.\./|\.\.\',
+            r'\.\./',
             r'%2e%2e%2f',
             r'%252e%252e%252f',
             r'\.\.\\|\.\.%5c',

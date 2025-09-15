@@ -68,7 +68,7 @@ class RoleAuthenticator(BaseHTTPMiddleware):
         self.role_manager = role_manager
         self.role_detector = role_detector
         
-        # JWT configuration
+        # JWT configuration (centralized via jwt_manager; legacy args kept for compat)
         self.jwt_secret_key = jwt_secret_key
         self.jwt_algorithm = jwt_algorithm
         self.token_expiry_hours = token_expiry_hours
@@ -209,25 +209,18 @@ class RoleAuthenticator(BaseHTTPMiddleware):
         token = auth_header[7:]  # Remove "Bearer " prefix
         
         try:
-            # Decode and validate JWT
-            payload = jwt.decode(
-                token, 
-                self.jwt_secret_key, 
-                algorithms=[self.jwt_algorithm]
-            )
-            
-            # Validate required claims
-            if "user_id" not in payload:
-                raise AuthenticationError("Missing user_id in token")
-            
-            # Check expiration
-            if "exp" in payload:
-                exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-                if datetime.now(timezone.utc) > exp_time:
-                    raise AuthenticationError("Token expired")
-            
-            return payload["user_id"], payload
-            
+            # Use centralized JWT manager for verification
+            from core_platform.security import get_jwt_manager
+            jwt_manager = get_jwt_manager()
+            payload = jwt_manager.verify_token(token)
+
+            # Support both legacy and unified claim names
+            user_id = payload.get("user_id") or payload.get("sub")
+            if not user_id:
+                raise AuthenticationError("Missing user identifier in token")
+
+            return str(user_id), payload
+
         except jwt.ExpiredSignatureError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -370,8 +363,12 @@ class RoleAuthenticator(BaseHTTPMiddleware):
             api_key=auth_data.get("api_key"),
             client_ip=self._get_client_ip(request),
             user_agent=request.headers.get("user-agent"),
-            correlation_id=request.headers.get("x-correlation-id")
+            correlation_id=request.headers.get("x-correlation-id"),
+            is_authenticated=True
         )
+
+        # Ensure explicit authentication flag is set for downstream handlers
+        routing_context.is_authenticated = True
         
         # Add authentication metadata
         routing_context.metadata.update({

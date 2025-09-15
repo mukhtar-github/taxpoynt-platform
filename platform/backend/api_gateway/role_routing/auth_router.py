@@ -14,8 +14,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
-from jose import JWTError, jwt
-import os
+import jwt
 
 # Fix import paths
 import sys
@@ -42,9 +41,7 @@ logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "taxpoynt-platform-secret-key-change-in-production")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours
+# JWT settings are managed centrally by core_platform.security.jwt_manager
 
 # Pydantic models for requests/responses
 class UserRegisterRequest(BaseModel):
@@ -124,23 +121,36 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
-    
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
+    """Create JWT access token using centralized manager."""
+    from core_platform.security import get_jwt_manager
+    jwt_manager = get_jwt_manager()
+    user_data = {
+        "user_id": data.get("user_id") or data.get("sub"),
+        "email": data.get("email") or data.get("sub"),
+        "role": data.get("role"),
+        "organization_id": data.get("organization_id"),
+        "permissions": data.get("permissions", [])
+    }
+    return jwt_manager.create_access_token(user_data)
 
 def verify_access_token(token: str) -> Dict[str, Any]:
-    """Verify and decode JWT access token"""
+    """Verify and decode JWT access token via centralized manager.
+
+    Normalizes claims to include `user_id` for legacy callers by
+    mapping the standard `sub` claim to `user_id` when missing.
+    """
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        from core_platform.security import get_jwt_manager
+        jwt_manager = get_jwt_manager()
+        payload = jwt_manager.verify_token(token)
+
+        # Back-compat: many callers expect `user_id` in payload.
+        # Our unified JWT uses `sub` as the canonical subject.
+        if payload.get("user_id") is None and payload.get("sub") is not None:
+            payload["user_id"] = payload.get("sub")
+
         return payload
-    except JWTError as e:
+    except jwt.InvalidTokenError as e:
         logger.warning(f"Token verification failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -273,9 +283,8 @@ def create_auth_router(
                 "service_package": user_data.service_package
             }
             
-            # Set token expiration based on remember_me (default to 24 hours)
-            expires_delta = timedelta(minutes=JWT_EXPIRATION_MINUTES)
-            access_token = create_access_token(data=token_data, expires_delta=expires_delta)
+            # Create access token via centralized manager
+            access_token = create_access_token(data=token_data)
             
             # Prepare response
             organization_response = OrganizationResponse(
@@ -302,9 +311,11 @@ def create_auth_router(
             
             logger.info(f"User registered successfully: {user['email']} ({user_role})")
             
+            from core_platform.security import get_jwt_manager
+            jwt_manager = get_jwt_manager()
             return TokenResponse(
                 access_token=access_token,
-                expires_in=JWT_EXPIRATION_MINUTES * 60,
+                expires_in=int(jwt_manager.access_token_expire_minutes) * 60,
                 user=user_response
             )
             
@@ -362,13 +373,8 @@ def create_auth_router(
                 "service_package": user["service_package"]
             }
             
-            # Set token expiration based on remember_me
-            if credentials.remember_me:
-                expires_delta = timedelta(days=30)  # 30 days for remember me
-            else:
-                expires_delta = timedelta(minutes=JWT_EXPIRATION_MINUTES)  # 24 hours default
-            
-            access_token = create_access_token(data=token_data, expires_delta=expires_delta)
+            # Create token via centralized manager (manager controls expiration)
+            access_token = create_access_token(data=token_data)
             
             # Update last login info
             user["last_login"] = datetime.utcnow().isoformat()
@@ -404,9 +410,11 @@ def create_auth_router(
             
             logger.info(f"User login successful: {user['email']}")
             
+            from core_platform.security import get_jwt_manager
+            jwt_manager = get_jwt_manager()
             return TokenResponse(
                 access_token=access_token,
-                expires_in=int(expires_delta.total_seconds()),
+                expires_in=int(jwt_manager.access_token_expire_minutes) * 60,
                 user=user_response
             )
             
@@ -480,7 +488,7 @@ def create_auth_router(
             
         except HTTPException:
             raise
-        except JWTError as e:
+        except jwt.InvalidTokenError as e:
             logger.warning(f"JWT token validation failed: {e}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -704,7 +712,7 @@ def create_auth_router(
         try:
             # Extract and verify token
             token = credentials.credentials
-            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            payload = verify_access_token(token)
             
             user_id = payload.get("user_id")
             role = payload.get("role", "system_integrator")
@@ -716,7 +724,7 @@ def create_auth_router(
                 "timestamp": datetime.utcnow().isoformat()
             })
             
-        except JWTError:
+        except jwt.InvalidTokenError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication token"
@@ -734,7 +742,7 @@ def create_auth_router(
         try:
             # Extract and verify token
             token = credentials.credentials
-            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            payload = verify_access_token(token)
             
             user_id = payload.get("user_id")
             role = payload.get("role", "system_integrator")
@@ -758,7 +766,7 @@ def create_auth_router(
                 "timestamp": datetime.utcnow().isoformat()
             })
             
-        except JWTError:
+        except jwt.InvalidTokenError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication token"

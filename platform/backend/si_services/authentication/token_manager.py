@@ -519,6 +519,16 @@ class TokenManager:
     async def _validate_jwt_token(self, token_value: str) -> bool:
         """Validate JWT token signature and claims"""
         try:
+            # Prefer centralized platform JWT validation when applicable
+            try:
+                from core_platform.security import get_jwt_manager
+                jwt_manager = get_jwt_manager()
+                jwt_manager.verify_token(token_value)
+                return True
+            except Exception:
+                # Fall back to local validation for non-platform tokens
+                pass
+
             if self.config.jwt_algorithm.value.startswith("HS"):
                 # HMAC verification
                 if not self.jwt_secret_key:

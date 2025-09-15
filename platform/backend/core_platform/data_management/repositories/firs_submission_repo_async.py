@@ -19,6 +19,44 @@ from core_platform.authentication.tenant_context import get_current_tenant
 from core_platform.data_management.models.firs_submission import FIRSSubmission
 
 
+async def get_submission_by_id(
+    db: AsyncSession,
+    *,
+    submission_id: Union[UUIDType, str],
+    organization_id: Optional[Union[UUIDType, str]] = None,
+) -> Optional[FIRSSubmission]:
+    """Fetch a single FIRS submission by ID, tenant-scoped.
+
+    If `organization_id` is not provided, uses current tenant from context.
+    Returns None on invalid IDs or when not found.
+    """
+    # Normalize IDs
+    sub_id: Optional[UUIDType]
+    if isinstance(submission_id, uuid.UUID):
+        sub_id = submission_id
+    else:
+        try:
+            sub_id = uuid.UUID(str(submission_id))
+        except Exception:
+            return None
+
+    org_id: Optional[Union[UUIDType, str]] = organization_id or get_current_tenant()
+    if not org_id:
+        return None
+    if isinstance(org_id, str):
+        try:
+            org_id = uuid.UUID(org_id)
+        except Exception:
+            return None
+
+    stmt = (
+        select(FIRSSubmission)
+        .where(FIRSSubmission.id == sub_id, FIRSSubmission.organization_id == org_id)
+        .limit(1)
+    )
+    res = await db.execute(stmt)
+    return res.scalars().first()
+
 async def list_recent_submissions(
     db: AsyncSession,
     *,

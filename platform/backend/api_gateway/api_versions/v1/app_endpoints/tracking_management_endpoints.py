@@ -19,7 +19,12 @@ from ..version_models import V1ResponseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
 from api_gateway.dependencies.tenant import make_tenant_scope_dependency
-from core_platform.data_management.repositories.firs_submission_repo_async import list_recent_submissions, get_submission_metrics
+from core_platform.data_management.repositories.firs_submission_repo_async import (
+    list_recent_submissions,
+    get_submission_metrics,
+    list_submissions_filtered,
+    get_submission_by_id,
+)
 from api_gateway.utils.pagination import normalize_pagination
 from core_platform.data_management.models.firs_submission import FIRSSubmission
 
@@ -118,6 +123,28 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get recent FIRS submissions",
             description="List recent FIRS submissions for the current tenant (APP)",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
+        )
+
+        # Filtered submissions (async + tenant scoped)
+        self.router.add_api_route(
+            "/submissions",
+            self.get_submissions,
+            methods=["GET"],
+            summary="List submissions with filters",
+            description="List FIRS submissions for the current tenant with filters and pagination",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
+        )
+
+        # Submission detail (async + tenant scoped)
+        self.router.add_api_route(
+            "/submissions/{submission_id}",
+            self.get_submission,
+            methods=["GET"],
+            summary="Get submission by ID",
+            description="Get a single submission for the current tenant by ID",
             response_model=V1ResponseModel,
             dependencies=[Depends(self.tenant_scope)]
         )
@@ -264,6 +291,53 @@ class TrackingManagementEndpointsV1:
         except Exception as e:
             logger.error(f"Error getting recent submissions: {e}")
             raise HTTPException(status_code=500, detail="Failed to get recent submissions")
+
+    async def get_submissions(
+        self,
+        status: Optional[str] = Query(None, description="Filter by submission status"),
+        start_date: Optional[str] = Query(None, description="Start date (ISO)")
+        ,
+        end_date: Optional[str] = Query(None, description="End date (ISO)"),
+        limit: int = Query(50, ge=1, le=1000),
+        offset: int = Query(0, ge=0),
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """List submissions with filters (async, tenant scoped via dependency)."""
+        try:
+            rows = await list_submissions_filtered(
+                db,
+                status=status,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit,
+                offset=offset,
+            )
+            payload = {
+                "items": [self._to_submission_dict(r) for r in rows],
+                "count": len(rows),
+                "pagination": normalize_pagination(limit=limit, offset=offset, total=len(rows)),
+            }
+            return self._create_v1_response(payload, "submissions_listed")
+        except Exception as e:
+            logger.error(f"Error listing submissions: {e}")
+            raise HTTPException(status_code=500, detail="Failed to list submissions")
+
+    async def get_submission(
+        self,
+        submission_id: str,
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """Get a single submission (async, tenant scoped via dependency)."""
+        try:
+            row = await get_submission_by_id(db, submission_id=submission_id)
+            if not row:
+                raise HTTPException(status_code=404, detail="Submission not found")
+            return self._create_v1_response(self._to_submission_dict(row), "submission_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting submission {submission_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get submission")
         
         # Search and Filtering
         self.router.add_api_route(

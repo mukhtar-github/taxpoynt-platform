@@ -358,7 +358,16 @@ class AuthDatabaseManager:
         """Get user by ID using existing User model."""
         session = self.get_session()
         try:
-            query = session.query(User).filter(User.id == user_id)
+            # Ensure UUID type for comparison
+            import uuid as _uuid
+            _user_id = user_id
+            if isinstance(user_id, str):
+                try:
+                    _user_id = _uuid.UUID(user_id)
+                except ValueError:
+                    _user_id = user_id
+
+            query = session.query(User).filter(User.id == _user_id)
             
             # By default, exclude soft-deleted users
             if not include_deleted:
@@ -395,7 +404,16 @@ class AuthDatabaseManager:
         """Get organization by ID using existing Organization model."""
         session = self.get_session()
         try:
-            org = session.query(Organization).filter(Organization.id == org_id).first()
+            # Ensure UUID type for comparison
+            import uuid as _uuid
+            _org_id = org_id
+            if isinstance(org_id, str):
+                try:
+                    _org_id = _uuid.UUID(org_id)
+                except ValueError:
+                    _org_id = org_id
+
+            org = session.query(Organization).filter(Organization.id == _org_id).first()
             if not org:
                 return None
                 
@@ -420,7 +438,16 @@ class AuthDatabaseManager:
         """Update user login timestamp and count."""
         session = self.get_session()
         try:
-            user = session.query(User).filter(User.id == user_id).first()
+            # Ensure UUID type for comparison
+            import uuid as _uuid
+            _user_id = user_id
+            if isinstance(user_id, str):
+                try:
+                    _user_id = _uuid.UUID(user_id)
+                except ValueError:
+                    _user_id = user_id
+
+            user = session.query(User).filter(User.id == _user_id).first()
             if user:
                 user.last_login = datetime.now(timezone.utc)
                 user.login_count = (user.login_count or 0) + 1
@@ -436,7 +463,16 @@ class AuthDatabaseManager:
         """Update organization owner."""
         session = self.get_session()
         try:
-            org = session.query(Organization).filter(Organization.id == org_id).first()
+            # Ensure UUID type for comparison
+            import uuid as _uuid
+            _org_id = org_id
+            if isinstance(org_id, str):
+                try:
+                    _org_id = _uuid.UUID(org_id)
+                except ValueError:
+                    _org_id = org_id
+
+            org = session.query(Organization).filter(Organization.id == _org_id).first()
             if org:
                 # Note: Organization model might need owner_id field added
                 # For now, just update the updated_at timestamp

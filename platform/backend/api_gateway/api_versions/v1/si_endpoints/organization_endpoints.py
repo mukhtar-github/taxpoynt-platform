@@ -20,6 +20,12 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
     list_recent_submissions,
     get_submission_metrics,
     list_submissions_filtered,
+    get_submission_by_id,
+)
+from core_platform.data_management.repositories.organization_repo_async import (
+    list_organizations as list_orgs_async,
+    list_organizations_by_system as list_orgs_by_system_async,
+    get_organization_by_id as get_org_by_id_async,
 )
 from core_platform.data_management.repositories.business_systems_repo_async import list_business_systems
 from api_gateway.utils.pagination import normalize_pagination
@@ -97,6 +103,16 @@ class OrganizationEndpointsV1:
             methods=["GET"],
             summary="Get organization details",
             description="Retrieve detailed information about a specific organization",
+            response_model=V1ResponseModel
+        )
+
+        # Basic organization details (async minimal fallback)
+        self.router.add_api_route(
+            "/{org_id}/basic",
+            self.get_organization_basic,
+            methods=["GET"],
+            summary="Get basic organization details",
+            description="Retrieve minimal organization details via async repository",
             response_model=V1ResponseModel
         )
         
@@ -203,36 +219,66 @@ class OrganizationEndpointsV1:
             description="List recent FIRS submissions for a specific organization",
             response_model=V1ResponseModel
         )
+
+        # Submission detail for an organization (async + tenant scoped)
+        self.router.add_api_route(
+            "/{org_id}/submissions/{submission_id}",
+            self.get_org_submission,
+            methods=["GET"],
+            summary="Get organization's submission by ID",
+            description="Get a single FIRS submission for a specific organization",
+            response_model=V1ResponseModel
+        )
     
-    async def list_organizations(self, 
-                                request: Request,
-                                page: int = Query(1, ge=1, description="Page number"),
-                                limit: int = Query(50, ge=1, le=1000, description="Items per page"),
-                                search: Optional[str] = Query(None, description="Search organizations"),
-                                status: Optional[str] = Query(None, description="Filter by status"),
-                                business_system: Optional[str] = Query(None, description="Filter by business system type"),
-                                context: HTTPRoutingContext = Depends(lambda: None)):
-        """List organizations managed by this SI"""
+    async def list_organizations(
+        self,
+        request: Request,
+        page: int = Query(1, ge=1, description="Page number"),
+        limit: int = Query(50, ge=1, le=1000, description="Items per page"),
+        search: Optional[str] = Query(None, description="Search organizations"),
+        status: Optional[str] = Query(None, description="Filter by status"),
+        business_system: Optional[str] = Query(None, description="Filter by business system type"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """List organizations (async) with simple filters and pagination.
+
+        Note: `business_system` filter is ignored in this minimal async migration
+        to avoid broad joins; can be added later.
+        """
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="list_organizations",
-                payload={
-                    "si_id": context.user_id,
-                    "pagination": {"page": page, "limit": limit},
-                    "filters": {
-                        "search": search,
-                        "status": status,
-                        "business_system": business_system
-                    },
-                    "api_version": "v1"
-                }
-            )
-            
-            return self._create_v1_response(result, "organizations_listed")
+            if business_system:
+                data = await list_orgs_by_system_async(
+                    db,
+                    system_type=business_system,
+                    page=page,
+                    limit=limit,
+                    search=search,
+                    status=status,
+                )
+            else:
+                data = await list_orgs_async(db, page=page, limit=limit, search=search, status=status)
+            data["pagination"] = normalize_pagination(limit=limit, offset=data.get("offset", 0), total=data.get("count", 0))
+            return self._create_v1_response(data, "organizations_listed")
         except Exception as e:
             logger.error(f"Error listing organizations in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list organizations")
+
+    # Basic organization detail (async minimal)
+    async def get_organization_basic(
+        self,
+        org_id: str,
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        try:
+            data = await get_org_by_id_async(db, organization_id=org_id)
+            if not data:
+                raise HTTPException(status_code=404, detail="Organization not found")
+            return self._create_v1_response(data, "organization_basic_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting organization basic {org_id} in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get organization")
 
     async def get_org_recent_submissions(self,
                                          org_id: str,
@@ -265,6 +311,38 @@ class OrganizationEndpointsV1:
         except Exception as e:
             logger.error(f"Error getting recent submissions for org {org_id}: {e}")
             raise HTTPException(status_code=500, detail="Failed to get organization's recent submissions")
+
+    async def get_org_submission(
+        self,
+        org_id: str,
+        submission_id: str,
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """Get a single submission for the specified organization (async)."""
+        try:
+            set_current_tenant(org_id)
+            try:
+                row = await get_submission_by_id(db, submission_id=submission_id, organization_id=org_id)
+            finally:
+                clear_current_tenant()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Submission not found")
+
+            payload = {
+                "id": str(getattr(row, "id", None)),
+                "invoice_number": getattr(row, "invoice_number", None),
+                "irn": getattr(row, "irn", None),
+                "status": getattr(row, "status", None).value if getattr(row, "status", None) else None,
+                "created_at": getattr(row, "created_at", None).isoformat() if getattr(row, "created_at", None) else None,
+                "organization_id": org_id,
+            }
+            return self._create_v1_response(payload, "organization_submission_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting submission {submission_id} for org {org_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get organization submission")
     
     async def create_organization(self, 
                                  request: Request,
@@ -301,25 +379,33 @@ class OrganizationEndpointsV1:
     
     async def get_organization(self, 
                               org_id: str,
-                              context: HTTPRoutingContext = Depends(lambda: None)):
+                              context: HTTPRoutingContext = Depends(lambda: None),
+                              db: AsyncSession = Depends(get_async_session)):
         """Get organization details"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="get_organization",
-                payload={
-                    "org_id": org_id,
-                    "si_id": context.user_id,
-                    "include_business_systems": True,
-                    "include_compliance_status": True,
-                    "api_version": "v1"
-                }
-            )
-            
-            if not result:
+            try:
+                result = await self.message_router.route_message(
+                    service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                    operation="get_organization",
+                    payload={
+                        "org_id": org_id,
+                        "si_id": context.user_id,
+                        "include_business_systems": True,
+                        "include_compliance_status": True,
+                        "api_version": "v1"
+                    }
+                )
+            except Exception:
+                result = None
+
+            if result:
+                return self._create_v1_response(result, "organization_retrieved")
+
+            # Fallback to async minimal repo
+            basic = await get_org_by_id_async(db, organization_id=org_id)
+            if not basic:
                 raise HTTPException(status_code=404, detail="Organization not found")
-            
-            return self._create_v1_response(result, "organization_retrieved")
+            return self._create_v1_response({"organization": basic}, "organization_retrieved")
         except HTTPException:
             raise
         except Exception as e:

@@ -588,26 +588,58 @@ class HTTPRoleDetector:
     async def _extract_authentication_info(self, request: Request) -> Dict[str, Any]:
         """Extract authentication information from request."""
         auth_info = {}
-        
-        # Extract from headers
-        auth_info["api_key"] = request.headers.get("x-api-key")
-        auth_info["session_id"] = request.headers.get("x-session-id")
-        auth_info["organization_id"] = request.headers.get("x-organization-id")
-        auth_info["tenant_id"] = request.headers.get("x-tenant-id")
-        auth_info["user_id"] = request.headers.get("x-user-id")
-        
+
+        # Prefer Authorization: Bearer <token> using centralized JWT manager
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            try:
+                from core_platform.security import get_jwt_manager
+                jwt_manager = get_jwt_manager()
+                claims = jwt_manager.verify_token(token)
+                # Populate auth_info from claims
+                auth_info["user_id"] = claims.get("user_id") or claims.get("sub")
+                if claims.get("organization_id") is not None:
+                    auth_info["organization_id"] = claims.get("organization_id")
+                if claims.get("tenant_id") is not None:
+                    auth_info["tenant_id"] = claims.get("tenant_id")
+            except Exception:
+                # Leave auth_info empty; will fall back to headers
+                pass
+
+        # Fallback to headers if not provided by JWT
+        auth_info.setdefault("api_key", request.headers.get("x-api-key"))
+        auth_info.setdefault("session_id", request.headers.get("x-session-id"))
+        if "organization_id" not in auth_info:
+            org_id = request.headers.get("x-organization-id")
+            if org_id is not None:
+                auth_info["organization_id"] = org_id
+        if "tenant_id" not in auth_info:
+            tenant_id = request.headers.get("x-tenant-id")
+            if tenant_id is not None:
+                auth_info["tenant_id"] = tenant_id
+        if "user_id" not in auth_info:
+            user_id = request.headers.get("x-user-id")
+            if user_id is not None:
+                auth_info["user_id"] = user_id
+
         return {k: v for k, v in auth_info.items() if v is not None}
 
     def _check_authentication_status(self, request: Request, auth_info: Dict[str, Any], analysis: RequestAnalysis) -> bool:
         """Check if the request is authenticated based on available authentication information."""
         
-        # Check for JWT token in Authorization header
+        # Check for JWT token in Authorization header and verify
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer ") and len(auth_header) > 7:
             token = auth_header[7:]
-            # Basic token validation (non-empty and reasonable length)
-            if len(token) > 20:  # JWT tokens are typically much longer
+            try:
+                from core_platform.security import get_jwt_manager
+                jwt_manager = get_jwt_manager()
+                jwt_manager.verify_token(token)
                 return True
+            except Exception:
+                # Invalid token should not count as authenticated
+                return False
         
         # Check for API key authentication
         if auth_info.get("api_key"):

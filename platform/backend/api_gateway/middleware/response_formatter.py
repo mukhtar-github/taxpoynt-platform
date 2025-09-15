@@ -16,7 +16,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import asyncio
 
 from core_platform.authentication.role_manager import PlatformRole
-from core_platform.authentication.models import UserRole
 
 
 logger = logging.getLogger(__name__)
