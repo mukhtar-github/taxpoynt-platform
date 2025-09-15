@@ -94,6 +94,14 @@ def _is_uuid(value: str) -> bool:
 def _map_user_role_to_role_id(user_role: Optional[UserRole]) -> str:
     if not user_role:
         return "user"
-    # Minimal mapping: use the enum value directly; can be adjusted to RoleManager role IDs later
-    return user_role.value
-
+    # Map platform enum to RoleManager role IDs
+    if user_role == UserRole.PLATFORM_ADMIN:
+        return "platform_admin"
+    if user_role == UserRole.SI_USER:
+        return "si_admin"
+    if user_role == UserRole.APP_USER:
+        return "app_admin"
+    if user_role == UserRole.HYBRID_USER:
+        return "hybrid_admin"
+    # Business roles collapse to basic user
+    return "user"

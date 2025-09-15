@@ -108,7 +108,7 @@ try:
     from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
     
     # Core platform components (production ready)
-    from core_platform.authentication.role_manager import RoleManager
+from core_platform.authentication.role_manager import RoleManager
     from core_platform.messaging.redis_message_router import get_redis_message_router, RedisMessageRouter
     from core_platform.messaging.message_router import ServiceRole
     
@@ -142,7 +142,28 @@ def create_role_manager():
         'environment': ENVIRONMENT,
         'log_level': 'INFO' if not DEBUG else 'DEBUG'
     }
-    return RoleManager(config)
+    # Optionally wire a persistence-backed repository
+    repository = None
+    try:
+        use_repo = str(os.getenv("ROLE_MANAGER_USE_REPOSITORY", "false")).lower() in ("1", "true", "yes", "on")
+        if use_repo:
+            from core_platform.authentication.role_repository_sqlalchemy import SQLAlchemyRoleRepository
+            from core_platform.data_management.db_async import init_async_engine
+            from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+            engine = init_async_engine()  # reuse global async engine
+            session_maker = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+
+            async def session_factory():
+                # Return an async context manager created by sessionmaker
+                return session_maker()
+
+            repository = SQLAlchemyRoleRepository(session_factory)  # type: ignore[arg-type]
+            logger.info("RoleManager will use SQLAlchemyRoleRepository for persistence")
+    except Exception as e:
+        logger.warning(f"Failed to initialize RoleManager repository: {e}")
+
+    return RoleManager(config, repository=repository)
 
 def get_service_degradation_mode(service_name: str, error: Exception) -> str:
     """Phase 6.3: Determine appropriate degradation mode for failed services"""
