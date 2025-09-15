@@ -313,6 +313,13 @@ def create_taxpoynt_app() -> FastAPI:
         collect_traces=True,
         track_business_operations=True
     )
+
+    # Optional tenant scoping middleware for APP routes
+    try:
+        from api_gateway.middleware.tenant_scope import AppTenantScopeMiddleware
+        app.add_middleware(AppTenantScopeMiddleware)
+    except Exception as _e:
+        logger.warning(f"Tenant scope middleware not applied: {_e}")
     
     # Add OWASP security headers middleware (critical security)
     app.middleware("http")(security_headers_middleware)

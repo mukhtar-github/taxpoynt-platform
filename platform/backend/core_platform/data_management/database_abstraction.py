@@ -69,6 +69,8 @@ class DatabaseAbstractionLayer:
         self._slow_query_threshold = 1.0  # seconds
         
         self._initialize_engine()
+        # Deprecation flag for sync session usage warnings
+        self._sync_session_warning_emitted = False
         
     def _detect_engine_type(self, database_url: str) -> DatabaseEngine:
         """Detect database engine from URL."""
@@ -191,6 +193,13 @@ class DatabaseAbstractionLayer:
         Yields:
             Session: SQLAlchemy session
         """
+        # Deprecation notice for sync session usage
+        if not self._sync_session_warning_emitted:
+            logger.warning(
+                "DEPRECATION: Using sync DB sessions (get_session) is deprecated. "
+                "Prefer core_platform.data_management.db_async.get_async_session for new/migrated endpoints."
+            )
+            self._sync_session_warning_emitted = True
         session = self.session_factory()
         try:
             yield session
@@ -209,6 +218,12 @@ class DatabaseAbstractionLayer:
         Returns:
             Session: SQLAlchemy session
         """
+        if not self._sync_session_warning_emitted:
+            logger.warning(
+                "DEPRECATION: Using sync DB sessions (get_session_direct) is deprecated. "
+                "Prefer core_platform.data_management.db_async.get_async_session for new/migrated endpoints."
+            )
+            self._sync_session_warning_emitted = True
         return self.session_factory()
     
     def execute_raw_query(self, query: str, params: Optional[Dict] = None) -> List[Dict]:

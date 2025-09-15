@@ -100,6 +100,31 @@ def test_firs_webhook_bad_signature_unauthorized(monkeypatch):
     assert r.status_code == 401
 
 
+def test_firs_webhook_invalid_json_returns_400(monkeypatch):
+    monkeypatch.setenv("FIRS_WEBHOOK_SECRET", "test_firs_secret")
+    from api_gateway.api_versions.v1.webhook_endpoints.firs_webhook import create_firs_webhook_router
+
+    app = FastAPI()
+    app.include_router(create_firs_webhook_router(StubMessageRouter()))
+    client = TestClient(app)
+
+    # Invalid JSON body but correct signature over the raw body string
+    body = "{ invalid json"
+    ts = str(int(datetime.utcnow().timestamp()))
+    sig = _hmac_sha256("test_firs_secret", f"{ts}.{body}")
+
+    r = client.post(
+        "/webhooks/firs/callback",
+        data=body,
+        headers={
+            "x-firs-signature": sig,
+            "x-firs-timestamp": ts,
+            "content-type": "application/json",
+        },
+    )
+    assert r.status_code == 400
+
+
 def test_mono_webhook_valid_signature_routes():
     from api_gateway.api_versions.v1.webhook_endpoints.mono_webhook import create_mono_webhook_router
 
@@ -158,3 +183,26 @@ def test_mono_webhook_bad_signature_unauthorized():
     )
     assert r.status_code == 401
 
+
+def test_mono_webhook_invalid_json_returns_400():
+    from api_gateway.api_versions.v1.webhook_endpoints.mono_webhook import create_mono_webhook_router
+
+    app = FastAPI()
+    app.include_router(create_mono_webhook_router(StubMessageRouter()))
+    client = TestClient(app)
+
+    body = "{ invalid json"
+    ts = str(int(datetime.utcnow().timestamp()))
+    # Signature computed over raw body
+    sig = _hmac_sha256("sec_O62WW0RY6TP8ZGOPNILU", f"{ts}.{body}")
+
+    r = client.post(
+        "/integrations/mono/webhook",
+        data=body,
+        headers={
+            "x-mono-signature": sig,
+            "x-mono-timestamp": ts,
+            "content-type": "application/json",
+        },
+    )
+    assert r.status_code == 400
