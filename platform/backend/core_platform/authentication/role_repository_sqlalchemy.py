@@ -75,6 +75,10 @@ class SQLAlchemyRoleRepository:
                         )
                     )
 
+            # TODO: When permission/role hierarchy models are available, load and
+            # augment RoleAssignment metadata with effective permissions and any
+            # derived role relationships here.
+
         # Filter by scope and status when requested
         if scope:
             assignments = [a for a in assignments if a.scope == scope]
