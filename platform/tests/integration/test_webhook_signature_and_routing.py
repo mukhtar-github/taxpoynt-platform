@@ -82,7 +82,6 @@ def test_firs_webhook_valid_signature_routes(monkeypatch):
     webhook_calls = [c for c in stub_router.calls if c["operation"] == "process_firs_webhook"]
     assert webhook_calls, "process_firs_webhook call not recorded"
     assert webhook_calls[-1]["payload"]["event_type"] == "invoice.accepted"
-    assert call["payload"]["event_type"] == "invoice.accepted"
 
 
 def test_firs_webhook_bad_signature_unauthorized(monkeypatch):
