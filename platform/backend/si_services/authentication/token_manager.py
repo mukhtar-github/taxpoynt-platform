@@ -517,56 +517,14 @@ class TokenManager:
             return False, None
     
     async def _validate_jwt_token(self, token_value: str) -> bool:
-        """Validate JWT token signature and claims"""
+        """Validate JWT token using centralized platform JWT manager"""
         try:
-            # Prefer centralized platform JWT validation when applicable
-            try:
-                from core_platform.security import get_jwt_manager
-                jwt_manager = get_jwt_manager()
-                jwt_manager.verify_token(token_value)
-                return True
-            except Exception:
-                # Fall back to local validation for non-platform tokens
-                pass
-
-            if self.config.jwt_algorithm.value.startswith("HS"):
-                # HMAC verification
-                if not self.jwt_secret_key:
-                    return False
-                
-                payload = jwt.decode(
-                    token_value,
-                    self.jwt_secret_key,
-                    algorithms=[self.config.jwt_algorithm.value]
-                )
-            else:
-                # RSA/EC verification
-                if not self.jwt_public_key:
-                    return False
-                
-                payload = jwt.decode(
-                    token_value,
-                    self.jwt_public_key,
-                    algorithms=[self.config.jwt_algorithm.value]
-                )
-            
-            # Validate issuer and audience
-            if payload.get("iss") != self.config.jwt_issuer:
-                return False
-            
-            if payload.get("aud") != self.config.jwt_audience:
-                return False
-            
+            from core_platform.security import get_jwt_manager
+            jwt_manager = get_jwt_manager()
+            jwt_manager.verify_token(token_value)
             return True
-            
-        except jwt.ExpiredSignatureError:
-            logger.debug("JWT token expired")
-            return False
-        except jwt.InvalidTokenError as e:
-            logger.debug(f"JWT token invalid: {e}")
-            return False
         except Exception as e:
-            logger.error(f"JWT validation error: {e}")
+            logger.debug(f"JWT validation failed via centralized manager: {e}")
             return False
     
     async def refresh_token(self, refresh_token_value: str) -> TokenResponse:

@@ -6,6 +6,7 @@ providing hierarchical role management with support for multiple roles per user.
 """
 
 import asyncio
+import os
 import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Set, Union
@@ -137,7 +138,7 @@ class RoleManager(BaseService):
     providing hierarchical role management with support for multiple roles per user.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, repository: Optional[Any] = None):
         super().__init__(config)
         self.logger = logging.getLogger(__name__)
         
@@ -175,6 +176,16 @@ class RoleManager(BaseService):
             'hierarchy_evaluations': 0
         }
         
+        # Optional repository (persistence)
+        self.repository = repository
+        if self.repository is None and str(os.getenv("ROLE_MANAGER_USE_REPOSITORY", "false")).lower() in ("1", "true", "yes", "on"):
+            try:
+                from .role_repository import StubRoleRepository
+                self.repository = StubRoleRepository()
+                self.logger.info("RoleManager persistence enabled (stub repository)")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize role repository: {e}")
+
         # Background tasks
         self.background_tasks: Dict[str, asyncio.Task] = {}
     
@@ -395,11 +406,10 @@ class RoleManager(BaseService):
     ) -> List[RoleAssignment]:
         """Get user's role assignments"""
         try:
-            if user_id not in self.user_assignments:
-                return []
-            
-            user_roles = []
-            assignment_ids = self.user_assignments[user_id]
+            user_roles: List[RoleAssignment] = []
+
+            # Load in-memory assignments if present
+            assignment_ids = self.user_assignments.get(user_id, [])
             
             for assignment_id in assignment_ids:
                 if assignment_id not in self.assignments:
@@ -434,6 +444,33 @@ class RoleManager(BaseService):
                 
                 user_roles.append(assignment)
             
+            # Optionally augment from repository
+            if self.repository is not None:
+                try:
+                    persisted = await self.repository.load_user_assignments(
+                        user_id, include_inactive=include_inactive, scope=scope
+                    )
+                    # Merge persisted with in-memory, deduplicate by assignment_id
+                    seen = {a.assignment_id for a in user_roles}
+                    for a in persisted:
+                        if a.assignment_id not in seen:
+                            # Apply additional filters consistent with in-memory checks
+                            if not include_inactive and a.status != RoleStatus.ACTIVE:
+                                continue
+                            if scope and a.scope != scope:
+                                continue
+                            if tenant_id and a.tenant_id != tenant_id:
+                                continue
+                            if service_id and a.service_id != service_id:
+                                continue
+                            if environment and a.environment != environment:
+                                continue
+                            if a.expires_at and datetime.utcnow() > a.expires_at:
+                                continue
+                            user_roles.append(a)
+                except Exception as e:
+                    self.logger.warning(f"Role repository load failed for {user_id}: {e}")
+
             return user_roles
             
         except Exception as e:
