@@ -88,7 +88,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(firs_router)
+        self.router.include_router(firs_router, dependencies=[Depends(self.tenant_scope)])
         
         # Taxpayer Management Routes
         taxpayer_router = create_taxpayer_management_router(
@@ -96,7 +96,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(taxpayer_router)
+        self.router.include_router(taxpayer_router, dependencies=[Depends(self.tenant_scope)])
         
         # Invoice Submission Routes
         invoice_router = create_invoice_submission_router(
@@ -104,7 +104,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(invoice_router)
+        self.router.include_router(invoice_router, dependencies=[Depends(self.tenant_scope)])
         
         # Compliance Validation Routes
         compliance_router = create_compliance_validation_router(
@@ -112,7 +112,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(compliance_router)
+        self.router.include_router(compliance_router, dependencies=[Depends(self.tenant_scope)])
         
         # Certificate Management Routes
         certificate_router = create_certificate_management_router(
@@ -120,7 +120,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(certificate_router)
+        self.router.include_router(certificate_router, dependencies=[Depends(self.tenant_scope)])
         
         # Grant Management Routes
         grant_router = create_grant_management_router(
@@ -128,7 +128,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(grant_router)
+        self.router.include_router(grant_router, dependencies=[Depends(self.tenant_scope)])
         
         # Security Management Routes
         security_router = create_security_management_router(
@@ -136,7 +136,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(security_router)
+        self.router.include_router(security_router, dependencies=[Depends(self.tenant_scope)])
         
         # Validation Management Routes
         validation_router = create_validation_management_router(
@@ -144,7 +144,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(validation_router)
+        self.router.include_router(validation_router, dependencies=[Depends(self.tenant_scope)])
         
         # Transmission Management Routes
         transmission_router = create_transmission_management_router(
@@ -152,7 +152,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(transmission_router)
+        self.router.include_router(transmission_router, dependencies=[Depends(self.tenant_scope)])
         
         # Tracking Management Routes
         tracking_router = create_tracking_management_router(
@@ -160,7 +160,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(tracking_router)
+        self.router.include_router(tracking_router, dependencies=[Depends(self.tenant_scope)])
         
         # Report Generation Routes
         report_router = create_report_generation_router(
@@ -168,7 +168,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(report_router)
+        self.router.include_router(report_router, dependencies=[Depends(self.tenant_scope)])
         
         # Dashboard Data Routes (root level endpoints)
         dashboard_router = create_dashboard_data_router(
@@ -184,7 +184,7 @@ class APPRouterV1:
             self.permission_guard, 
             self.message_router
         )
-        self.router.include_router(onboarding_router)
+        self.router.include_router(onboarding_router, dependencies=[Depends(self.tenant_scope)])
     
     def _setup_routes(self):
         """Configure general APP v1 routes"""
