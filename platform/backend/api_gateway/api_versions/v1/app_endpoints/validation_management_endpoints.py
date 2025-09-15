@@ -73,6 +73,8 @@ class ValidationManagementEndpointsV1:
         
         self._setup_routes()
         logger.info("Validation Management Endpoints V1 initialized")
+        # Minimal idempotency store (in-memory per process)
+        self._idempotency_store = {}
     
     def _setup_routes(self):
         """Setup validation management routes"""
@@ -348,6 +350,11 @@ class ValidationManagementEndpointsV1:
         """Validate single invoice"""
         try:
             body = await request.json()
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                if idem_key in self._idempotency_store:
+                    return self._create_v1_response({"status": "duplicate", "idempotency_key": idem_key}, "idempotent_replay")
+                self._idempotency_store[idem_key] = True
             
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,

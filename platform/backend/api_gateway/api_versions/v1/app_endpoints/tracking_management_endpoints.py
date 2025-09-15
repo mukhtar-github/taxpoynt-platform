@@ -27,6 +27,7 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
 )
 from api_gateway.utils.pagination import normalize_pagination
 from core_platform.data_management.models.firs_submission import FIRSSubmission
+from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,11 @@ class TrackingManagementEndpointsV1:
 
         self._setup_routes()
         logger.info("Tracking Management Endpoints V1 initialized")
+        # Metrics: count recent submissions requests
+        self.metric_recent_submissions_total = Counter(
+            "app_recent_submissions_requests_total",
+            "Total recent submissions requests",
+        )
 
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
         """Enforce APP role and permissions for v1 APP tracking routes."""
@@ -281,6 +287,7 @@ class TrackingManagementEndpointsV1:
                                     offset: int = Query(0, ge=0),
                                     db: AsyncSession = Depends(get_async_session)):
         try:
+            self.metric_recent_submissions_total.inc()
             rows = await list_recent_submissions(db, limit=limit, offset=offset)
             payload = {
                 "items": [self._to_submission_dict(r) for r in rows],

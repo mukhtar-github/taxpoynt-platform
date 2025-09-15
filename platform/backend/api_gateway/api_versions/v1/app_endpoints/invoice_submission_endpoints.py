@@ -47,6 +47,8 @@ class InvoiceSubmissionEndpointsV1:
 
         self._setup_routes()
         logger.info("Invoice Submission Endpoints V1 initialized")
+        # Minimal idempotency store (in-memory per process)
+        self._idempotency_store = {}
 
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
         """Local guard to enforce APP role and permissions for v1 routes."""
@@ -208,6 +210,12 @@ class InvoiceSubmissionEndpointsV1:
         """Submit invoice to FIRS"""
         try:
             body = await request.json()
+            # Idempotency key handling
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                if idem_key in self._idempotency_store:
+                    return self._create_v1_response({"status": "duplicate", "idempotency_key": idem_key}, "idempotent_replay")
+                self._idempotency_store[idem_key] = True
             
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,

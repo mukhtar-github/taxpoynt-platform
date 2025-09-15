@@ -35,6 +35,7 @@ from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from app_services.webhook_services.webhook_receiver import WebhookReceiver
 from app_services.status_management.callback_manager import CallbackManager
 from api_gateway.api_versions.models import V1ResponseModel
+from prometheus_client import Counter, Histogram
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,17 @@ class FIRSWebhookEndpoints:
         
         self._setup_routes()
         logger.info("FIRS webhook endpoints initialized")
+
+        # Metrics
+        self.metric_events_total = Counter(
+            "firs_webhook_events_total",
+            "Total FIRS webhook events processed",
+            ["event_type", "outcome"],
+        )
+        self.metric_process_seconds = Histogram(
+            "firs_webhook_process_seconds",
+            "Time spent processing FIRS webhook events",
+        )
     
     def _setup_routes(self):
         """Setup FIRS webhook routes"""
@@ -136,6 +148,7 @@ class FIRSWebhookEndpoints:
             JSONResponse confirming webhook processing
         """
         try:
+            start_time = datetime.utcnow().timestamp()
             # Get raw payload
             payload = await request.body()
             payload_str = payload.decode('utf-8')
@@ -172,13 +185,19 @@ class FIRSWebhookEndpoints:
             result = await self._process_firs_webhook_event(
                 event_type, webhook_data, submission_id, irn, status_data
             )
+            self.metric_events_total.labels(event_type or "unknown", "success").inc()
+            self.metric_process_seconds.observe(datetime.utcnow().timestamp() - start_time)
             
             return self._create_webhook_response(result, "firs_webhook_processed")
             
         except HTTPException:
+            if 'event_type' in locals():
+                self.metric_events_total.labels(event_type or "unknown", "error").inc()
             raise
         except Exception as e:
             logger.error(f"Error processing FIRS webhook: {str(e)}", exc_info=True)
+            if 'event_type' in locals():
+                self.metric_events_total.labels(event_type or "unknown", "error").inc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal webhook processing error"
