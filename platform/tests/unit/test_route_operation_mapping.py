@@ -72,3 +72,45 @@ def test_route_operation_mapping_subset_no_missing(monkeypatch):
     missing_subset = target_ops - known_ops
     assert not missing_subset, f"Missing mapped operations for target modules: {sorted(list(missing_subset))}"
 
+
+def test_route_operation_mapping_all_no_missing(monkeypatch):
+    from api_gateway.main_gateway_router import MainGatewayRouter
+    from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
+    from api_gateway.role_routing.role_detector import HTTPRoleDetector
+    from api_gateway.role_routing.permission_guard import APIPermissionGuard
+    from core_platform.messaging.message_router import MessageRouter, ServiceRole
+
+    msg_router = MessageRouter()
+    version_coord = APIVersionCoordinator(msg_router)
+    gateway = MainGatewayRouter(
+        role_detector=HTTPRoleDetector(),
+        permission_guard=APIPermissionGuard(app=None),
+        message_router=msg_router,
+        version_coordinator=version_coord,
+    )
+
+    # Discover all used ops in the gateway
+    report = gateway.validate_route_operation_mapping(fail_fast=False)
+    all_used_ops = set(report.get("used_ops", []))
+    assert all_used_ops, "No operations discovered from gateway handlers"
+
+    # Register a mock service per role advertising all used ops
+    async def _register_all():
+        await msg_router.register_service(
+            service_name="mock_app_service",
+            service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+            metadata={"operations": sorted(list(all_used_ops))},
+        )
+        await msg_router.register_service(
+            service_name="mock_si_service",
+            service_role=ServiceRole.SYSTEM_INTEGRATOR,
+            metadata={"operations": sorted(list(all_used_ops))},
+        )
+
+    import asyncio
+    asyncio.run(_register_all())
+
+    # Validate that now no used ops are missing
+    report2 = gateway.validate_route_operation_mapping(fail_fast=False)
+    missing = report2.get("missing_ops", [])
+    assert not missing, f"Missing mapped operations in full gateway scan: {missing}"

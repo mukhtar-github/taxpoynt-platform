@@ -35,6 +35,10 @@ def _hmac_sha256(secret: str, signed_payload: str) -> str:
     return hmac.new(secret.encode("utf-8"), signed_payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def _hmac_sha512(secret: str, payload: str) -> str:
+    return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha512).hexdigest()
+
+
 def test_firs_webhook_valid_signature_routes(monkeypatch):
     # Ensure secret is set for FIRS webhook router
     monkeypatch.setenv("FIRS_WEBHOOK_SECRET", "test_firs_secret")
@@ -206,3 +210,41 @@ def test_mono_webhook_invalid_json_returns_400():
         },
     )
     assert r.status_code == 400
+
+
+def test_payment_webhook_valid_signature_routes(monkeypatch):
+    # Use default test secret in router
+    from api_gateway.api_versions.v1.webhook_endpoints.payment_webhook import create_payment_webhook_router
+
+    app = FastAPI()
+    stub_router = StubMessageRouter()
+    app.include_router(create_payment_webhook_router(stub_router))
+    client = TestClient(app)
+
+    payload = {"event": "charge.success", "data": {"id": "pay_123", "amount": 5000}}
+    body = json.dumps(payload)
+    sig = _hmac_sha512("test_paystack_secret", body)
+
+    r = client.post(
+        "/payments/callback",
+        data=body,
+        headers={"x-paystack-signature": sig, "content-type": "application/json"},
+    )
+    assert r.status_code == 200
+    assert stub_router.calls and stub_router.calls[-1]["operation"] == "process_payment_webhook"
+
+
+def test_payment_webhook_bad_signature_unauthorized():
+    from api_gateway.api_versions.v1.webhook_endpoints.payment_webhook import create_payment_webhook_router
+
+    app = FastAPI()
+    app.include_router(create_payment_webhook_router(StubMessageRouter()))
+    client = TestClient(app)
+
+    body = json.dumps({"event": "charge.failed", "data": {"id": "pay_999"}})
+    r = client.post(
+        "/payments/callback",
+        data=body,
+        headers={"x-paystack-signature": "bad", "content-type": "application/json"},
+    )
+    assert r.status_code == 401

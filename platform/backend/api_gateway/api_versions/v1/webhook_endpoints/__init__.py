@@ -12,8 +12,10 @@ Available Webhooks:
 
 from .mono_webhook import create_mono_webhook_router
 from .firs_webhook import create_firs_webhook_router
+from .payment_webhook import create_payment_webhook_router
 
 __all__ = [
     "create_mono_webhook_router",
-    "create_firs_webhook_router"
+    "create_firs_webhook_router",
+    "create_payment_webhook_router"
 ]

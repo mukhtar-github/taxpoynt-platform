@@ -323,7 +323,14 @@ def create_taxpoynt_app() -> FastAPI:
     
     # Add OWASP security headers middleware (critical security)
     app.middleware("http")(security_headers_middleware)
-    
+
+    # Ensure every request has a request ID and propagate
+    try:
+        from api_gateway.middleware.request_id import RequestIDMiddleware
+        app.add_middleware(RequestIDMiddleware)
+    except Exception as _e:
+        logger.warning(f"Request ID middleware not applied: {_e}")
+
     # Add rate limiting middleware (critical security)
     app.middleware("http")(rate_limit_middleware)
     

@@ -205,7 +205,8 @@ class TaxPoyntAPIGateway:
         """
         from ..api_versions.v1.webhook_endpoints import (
             create_mono_webhook_router,
-            create_firs_webhook_router
+            create_firs_webhook_router,
+            create_payment_webhook_router,
         )
         
         # Create main webhook router (no authentication required)
@@ -225,6 +226,14 @@ class TaxPoyntAPIGateway:
             firs_webhook_router,
             prefix="/firs",
             tags=["FIRS Compliance Webhooks"]
+        )
+
+        # Include Payment processor webhooks
+        payment_router = create_payment_webhook_router(self.message_router)
+        webhook_router.include_router(
+            payment_router,
+            prefix="/payments",
+            tags=["Payment Processor Webhooks"],
         )
         
         logger.info("✅ Webhook router created with Mono and FIRS endpoints")

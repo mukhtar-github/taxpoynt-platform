@@ -59,13 +59,16 @@ class OWASPSecurityHeaders:
         """Build comprehensive OWASP security headers"""
         
         # Build Content Security Policy
+        extra_connect = os.getenv("CSP_EXTRA_CONNECT_SRC", "").strip()
+        extra_connect_list = [s for s in (x.strip() for x in extra_connect.split(",")) if s]
         csp_directives = [
             "default-src 'self'",
             f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.{self.domain}",
             f"style-src 'self' 'unsafe-inline' https://*.{self.domain} https://fonts.googleapis.com",
             f"img-src 'self' data: https://*.{self.domain} https://mono.co https://stitch.money",
             f"font-src 'self' https://fonts.gstatic.com https://*.{self.domain}",
-            f"connect-src 'self' https://*.{self.domain} https://api.firs.gov.ng https://api.mono.co https://api.stitch.money",
+            f"connect-src 'self' https://*.{self.domain} https://api.firs.gov.ng https://api.mono.co https://api.stitch.money"
+            + (" " + " ".join(extra_connect_list) if extra_connect_list else ""),
             f"frame-src 'self' https://*.{self.domain} https://connect.mono.co https://js.stitch.money",
             "frame-ancestors 'self'",
             "object-src 'none'",
