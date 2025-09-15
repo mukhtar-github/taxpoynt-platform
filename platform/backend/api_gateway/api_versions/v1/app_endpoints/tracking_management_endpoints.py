@@ -92,6 +92,7 @@ class TrackingManagementEndpointsV1:
         self.metric_recent_submissions_total = Counter(
             "app_recent_submissions_requests_total",
             "Total recent submissions requests",
+            registry=None,
         )
 
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:

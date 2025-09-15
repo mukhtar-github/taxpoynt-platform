@@ -70,10 +70,12 @@ class FIRSWebhookEndpoints:
             "firs_webhook_events_total",
             "Total FIRS webhook events processed",
             ["event_type", "outcome"],
+            registry=None,
         )
         self.metric_process_seconds = Histogram(
             "firs_webhook_process_seconds",
             "Time spent processing FIRS webhook events",
+            registry=None,
         )
     
     def _setup_routes(self):
