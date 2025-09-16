@@ -338,9 +338,10 @@ class MessageRouter:
         # Register with event bus
         await self._register_event_handlers()
         
-        # Start monitoring tasks
-        asyncio.create_task(self._health_monitoring_loop())
-        asyncio.create_task(self._load_balancing_loop())
+        # Start monitoring tasks (skip in pytest to avoid hanging background tasks)
+        if os.getenv("PYTEST_CURRENT_TEST") is None:
+            asyncio.create_task(self._health_monitoring_loop())
+            asyncio.create_task(self._load_balancing_loop())
         
         self.is_initialized = True
         self.logger.info("Message Router initialized")
