@@ -109,11 +109,16 @@ class ProductionJWTManager:
                 return encryption_key.encode()
             except Exception:
                 logger.error("Invalid ENCRYPTION_KEY format in environment")
-        
-        # Generate from master password
+        # In production, fail hard if no explicit encryption key is provided
+        if os.getenv("ENVIRONMENT", "production").lower() == "production":
+            raise ValueError(
+                "CRITICAL SECURITY ERROR: ENCRYPTION_KEY is required in production. "
+                "Set a base64-encoded Fernet key via ENCRYPTION_KEY."
+            )
+
+        # Development fallback: derive from master password (dev only)
         master_password = os.getenv("MASTER_PASSWORD", "taxpoynt-development-key").encode()
         salt = os.getenv("ENCRYPTION_SALT", "taxpoynt-salt").encode()
-        
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -121,6 +126,7 @@ class ProductionJWTManager:
             iterations=100000,
         )
         key = base64.urlsafe_b64encode(kdf.derive(master_password))
+        logger.warning("Derived development encryption key. Set ENCRYPTION_KEY in production.")
         return key
     
     def _generate_secure_secret(self) -> str:

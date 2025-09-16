@@ -67,7 +67,7 @@ class OWASPSecurityHeaders:
             f"style-src 'self' 'unsafe-inline' https://*.{self.domain} https://fonts.googleapis.com",
             f"img-src 'self' data: https://*.{self.domain} https://mono.co https://stitch.money",
             f"font-src 'self' https://fonts.gstatic.com https://*.{self.domain}",
-            f"connect-src 'self' https://*.{self.domain} https://api.firs.gov.ng https://api.mono.co https://api.stitch.money"
+            f"connect-src 'self' https://*.{self.domain} https://api.firs.gov.ng https://api.mono.co https://api.stitch.money https://*.ondigitalocean.app"
             + (" " + " ".join(extra_connect_list) if extra_connect_list else ""),
             f"frame-src 'self' https://*.{self.domain} https://connect.mono.co https://js.stitch.money",
             "frame-ancestors 'self'",

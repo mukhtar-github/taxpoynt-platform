@@ -516,7 +516,52 @@ def initialize_rate_limiter(redis_client: Optional[redis.Redis] = None) -> Produ
 async def rate_limit_middleware(request: Request, call_next):
     """FastAPI middleware for rate limiting"""
     rate_limiter = get_rate_limiter()
-    
+    # Align dynamic limits with APIVersionCoordinator per-role config when available
+    try:
+        app = request.app
+        gateway = getattr(app.state, 'gateway_controller', None)
+        if gateway and hasattr(gateway, 'version_coordinator'):
+            vc = gateway.version_coordinator
+            # Detect API version from request path/headers
+            version = vc.detect_version_from_request(request)
+            routing = vc.get_routing_config(version)
+            # Derive role from routing_context if available
+            role_key = None
+            ctx = getattr(request.state, 'routing_context', None)
+            if ctx and getattr(ctx, 'primary_role', None):
+                role_val = str(getattr(ctx, 'primary_role')).lower()
+                if 'system_integrator' in role_val or 'si' in role_val:
+                    role_key = 'system_integrator'
+                elif 'access_point_provider' in role_val or 'app' in role_val:
+                    role_key = 'access_point_provider'
+                elif 'admin' in role_val:
+                    role_key = 'administrator'
+            # Fallback: infer from path prefix
+            if role_key is None:
+                path = str(request.url.path)
+                if '/si/' in path:
+                    role_key = 'system_integrator'
+                elif '/app/' in path:
+                    role_key = 'access_point_provider'
+            # Apply dynamic rule if mapping present
+            if role_key and role_key in routing.rate_limits:
+                per_hour = routing.rate_limits[role_key]
+                per_minute = max(1, int(per_hour / 60))
+                rule_name = f"dynamic_{version}_{role_key}_per_user"
+                # Create/update a high-priority rule for this version+role scope
+                rate_limiter.add_rule(RateLimitRule(
+                    name=rule_name,
+                    limit_type=RateLimitType.PER_USER,
+                    max_requests=per_minute,
+                    window=RateLimitWindow.MINUTE,
+                    window_seconds=60,
+                    endpoint_pattern=f"/api/{version}/*",
+                    priority=120,  # higher than defaults
+                ))
+    except Exception as _e:
+        # Fail open on adapter issues
+        pass
+
     try:
         # Check rate limit
         is_allowed, rate_info = await rate_limiter.check_rate_limit(request)
