@@ -488,6 +488,46 @@ async def initialize_services():
             app.state.scaling_coordinator = messaging_infrastructure["scaling_coordinator"]
             app.state.circuit_breaker_manager = messaging_infrastructure["circuit_breaker_manager"]
             app.state.health_check_manager = messaging_infrastructure["health_check_manager"]
+            # Register basic operation schemas for core operations
+            try:
+                from core_platform.messaging.message_router import MessageRouter
+                mr: MessageRouter = app.state.redis_message_router
+                # Pydantic model for submit_invoice
+                try:
+                    from pydantic import BaseModel
+
+                    class _SubmitInvoiceSchema(BaseModel):
+                        schema_version: str
+                        invoice_number: str
+                        amount: float
+
+                    mr.register_operation_schema(
+                        "submit_invoice",
+                        pydantic_model=_SubmitInvoiceSchema,
+                        expected_version="1.0",
+                    )
+                except Exception as _e:
+                    logger.warning(f"Schema registry (pydantic) not available: {_e}")
+
+                # JSON Schema for update_firs_submission_status (or status notifications)
+                status_schema = {
+                    "type": "object",
+                    "required": ["schema_version", "submission_id", "status"],
+                    "properties": {
+                        "schema_version": {"type": "string"},
+                        "submission_id": {"type": "string"},
+                        "status": {"type": "string"},
+                        "metadata": {"type": "object"},
+                    },
+                    "additionalProperties": True,
+                }
+                mr.register_operation_schema(
+                    "update_firs_submission_status",
+                    json_schema=status_schema,
+                    expected_version="1.0",
+                )
+            except Exception as se:
+                logger.warning(f"Operation schema registration skipped: {se}")
             
             # Set health manager in middleware
             for middleware in app.user_middleware:

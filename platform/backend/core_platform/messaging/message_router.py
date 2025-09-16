@@ -297,6 +297,33 @@ class MessageRouter:
         else:
             # Default warn
             self.logger.warning(msg)
+
+        # Optional: forward invalid payload metadata to a DLQ via QueueManager
+        try:
+            if str(os.getenv("ROUTER_SCHEMA_DLQ", "false")).lower() in ("1", "true", "yes", "on"):
+                async def _enqueue_dead_letter():
+                    try:
+                        from .queue_manager import get_queue_manager
+                        qm = get_queue_manager()
+                        # Ensure queue manager is initialized lazily
+                        if not getattr(qm, 'is_initialized', False):
+                            await qm.initialize()
+                        meta = {
+                            "type": "schema_validation_failed",
+                            "operation": operation,
+                            "error": error_message,
+                        }
+                        await qm.enqueue_to_queue(
+                            queue_name="dead_letter",
+                            payload={"meta": meta, "payload": payload},
+                            priority=0,
+                        )
+                    except Exception:
+                        # Avoid raising inside error handler
+                        pass
+                asyncio.create_task(_enqueue_dead_letter())
+        except Exception:
+            pass
     
     async def initialize(self):
         """Initialize the message router"""
