@@ -108,7 +108,7 @@ try:
     from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
     
     # Core platform components (production ready)
-from core_platform.authentication.role_manager import RoleManager
+    from core_platform.authentication.role_manager import RoleManager
     from core_platform.messaging.redis_message_router import get_redis_message_router, RedisMessageRouter
     from core_platform.messaging.message_router import ServiceRole
     
