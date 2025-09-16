@@ -11,6 +11,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any, Union
 from uuid import UUID
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 # Import granular components
 from .certificate_generator import CertificateGenerator
@@ -140,7 +142,6 @@ class CertificateService:
             if self.db:
                 try:
                     cert_metadata = self.extract_certificate_metadata(certificate_data)
-                    
                     legacy_cert = Certificate(
                         certificate_id=certificate_id,
                         certificate_data=certificate_data,
@@ -150,10 +151,13 @@ class CertificateService:
                         metadata=cert_metadata,
                         created_at=datetime.now()
                     )
-                    
-                    self.db.add(legacy_cert)
-                    self.db.commit()
-                    
+                    if isinstance(self.db, AsyncSession):
+                        self.db.add(legacy_cert)
+                        await self.db.commit()
+                    else:
+                        self.db.add(legacy_cert)
+                        self.db.commit()
+                
                 except Exception as e:
                     logger.warning(f"Could not store in legacy database: {str(e)}")
             
@@ -308,7 +312,7 @@ class CertificateService:
             logger.error(f"Error renewing certificate {certificate_id}: {str(e)}")
             return "", False
     
-    def revoke_certificate(self, certificate_id: str, reason: str) -> bool:
+    async def revoke_certificate(self, certificate_id: str, reason: str) -> bool:
         """
         Revoke certificate using lifecycle manager
         
@@ -328,14 +332,23 @@ class CertificateService:
             # Also update legacy database
             if self.db and success:
                 try:
-                    cert = self.db.query(Certificate).filter(
-                        Certificate.certificate_id == certificate_id
-                    ).first()
+                    if isinstance(self.db, AsyncSession):
+                        res = await self.db.execute(
+                            select(Certificate).where(Certificate.certificate_id == certificate_id)
+                        )
+                        cert = res.scalars().first()
+                    else:
+                        cert = self.db.query(Certificate).filter(
+                            Certificate.certificate_id == certificate_id
+                        ).first()
                     
                     if cert:
                         cert.status = LegacyCertificateStatus.REVOKED
                         cert.updated_at = datetime.now()
-                        self.db.commit()
+                        if isinstance(self.db, AsyncSession):
+                            await self.db.commit()
+                        else:
+                            self.db.commit()
                         
                 except Exception as e:
                     logger.warning(f"Could not update legacy database: {str(e)}")

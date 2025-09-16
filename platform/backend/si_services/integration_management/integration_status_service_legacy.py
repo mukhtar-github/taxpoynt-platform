@@ -14,8 +14,8 @@ SI Role Responsibilities:
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
-from sqlalchemy import func, desc, and_, text
-from sqlalchemy.orm import Session
+from sqlalchemy import func, desc, and_, text, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.submission import SubmissionRecord, SubmissionStatus
 from app.models.integration import Integration, IntegrationType
@@ -36,7 +36,7 @@ class IntegrationStatusService:
     """
     
     @staticmethod
-    def get_odoo_status(db: Session, integration_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_odoo_status(db: AsyncSession, integration_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Check the status of Odoo integration - SI Role Function.
         
@@ -51,15 +51,14 @@ class IntegrationStatusService:
             Dictionary with Odoo connection status and health metrics
         """
         # Query active Odoo integrations
-        query = db.query(Integration).filter(
+        stmt = select(Integration).where(
             Integration.integration_type == IntegrationType.ODOO,
-            Integration.is_active == True
+            Integration.is_active.is_(True)
         )
-        
         if integration_id:
-            query = query.filter(Integration.id == integration_id)
-            
-        integrations = query.all()
+            stmt = stmt.where(Integration.id == integration_id)
+        res = await db.execute(stmt)
+        integrations = res.scalars().all()
         
         if not integrations:
             return {
@@ -109,10 +108,12 @@ class IntegrationStatusService:
                 now = datetime.utcnow()
                 one_day_ago = now - timedelta(days=1)
                 
-                submissions = db.query(SubmissionRecord).filter(
+                sub_stmt = select(SubmissionRecord).where(
                     SubmissionRecord.integration_id == str(integration.id),
                     SubmissionRecord.created_at >= one_day_ago
-                ).all()
+                )
+                sub_res = await db.execute(sub_stmt)
+                submissions = sub_res.scalars().all()
                 
                 total_submissions = len(submissions)
                 successful = sum(1 for s in submissions if s.status in ['accepted', 'signed'])
@@ -152,7 +153,7 @@ class IntegrationStatusService:
         }
     
     @staticmethod
-    async def get_firs_api_status(db: Session) -> Dict[str, Any]:
+    async def get_firs_api_status(db: AsyncSession) -> Dict[str, Any]:
         """
         Check the status of FIRS API - SI Role Function.
         
@@ -174,9 +175,11 @@ class IntegrationStatusService:
             now = datetime.utcnow()
             one_day_ago = now - timedelta(days=1)
             
-            submissions = db.query(SubmissionRecord).filter(
+            sub_stmt = select(SubmissionRecord).where(
                 SubmissionRecord.created_at >= one_day_ago
-            ).all()
+            )
+            sub_res = await db.execute(sub_stmt)
+            submissions = sub_res.scalars().all()
             
             total_submissions = len(submissions)
             successful = sum(1 for s in submissions if s.status in ['accepted', 'signed'])
@@ -185,10 +188,17 @@ class IntegrationStatusService:
             success_rate = (successful / total_submissions * 100) if total_submissions > 0 else 0
             
             # Check if there are recent submissions with errors
-            recent_errors = db.query(SubmissionRecord).filter(
-                SubmissionRecord.status.in_(['failed', 'rejected', 'error']),
-                SubmissionRecord.created_at >= one_day_ago
-            ).order_by(desc(SubmissionRecord.created_at)).limit(5).all()
+            recent_stmt = (
+                select(SubmissionRecord)
+                .where(
+                    SubmissionRecord.status.in_(['failed', 'rejected', 'error']),
+                    SubmissionRecord.created_at >= one_day_ago
+                )
+                .order_by(desc(SubmissionRecord.created_at))
+                .limit(5)
+            )
+            rec_res = await db.execute(recent_stmt)
+            recent_errors = rec_res.scalars().all()
             
             recent_error_details = []
             for error in recent_errors:
@@ -221,7 +231,7 @@ class IntegrationStatusService:
             }
     
     @staticmethod
-    async def get_all_integration_status(db: Session) -> Dict[str, Any]:
+    async def get_all_integration_status(db: AsyncSession) -> Dict[str, Any]:
         """
         Get comprehensive status of all integrations - SI Role Function.
         
@@ -234,7 +244,7 @@ class IntegrationStatusService:
         Returns:
             Dictionary with status of all integrations and overall system health
         """
-        odoo_status = IntegrationStatusService.get_odoo_status(db)
+        odoo_status = await IntegrationStatusService.get_odoo_status(db)
         firs_status = await IntegrationStatusService.get_firs_api_status(db)
         
         # Calculate overall system status
@@ -252,7 +262,7 @@ class IntegrationStatusService:
         }
     
     @staticmethod
-    def get_integration_performance_metrics(db: Session, integration_id: str, days: int = 7) -> Dict[str, Any]:
+    async def get_integration_performance_metrics(db: AsyncSession, integration_id: str, days: int = 7) -> Dict[str, Any]:
         """
         Get detailed performance metrics for a specific integration - SI Role Function.
         
@@ -272,10 +282,12 @@ class IntegrationStatusService:
         start_date = now - timedelta(days=days)
         
         # Query submissions for the integration
-        submissions = db.query(SubmissionRecord).filter(
+        stmt = select(SubmissionRecord).where(
             SubmissionRecord.integration_id == integration_id,
             SubmissionRecord.created_at >= start_date
-        ).all()
+        )
+        res = await db.execute(stmt)
+        submissions = res.scalars().all()
         
         if not submissions:
             return {
