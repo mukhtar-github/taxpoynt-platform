@@ -18,6 +18,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +260,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "available_batches_retrieved")
         except Exception as e:
             logger.error(f"Error getting available batches in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get available batches")
+            return v1_error_response(e, action="get_available_batches")
     
     async def list_transmission_batches(self, 
                                       status: Optional[str] = Query(None, description="Filter by status"),
@@ -281,7 +282,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_batches_listed")
         except Exception as e:
             logger.error(f"Error listing transmission batches in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list transmission batches")
+            return v1_error_response(e, action="list_transmission_batches")
     
     async def get_batch_details(self, batch_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get detailed batch information"""
@@ -299,7 +300,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "batch_details_retrieved")
         except Exception as e:
             logger.error(f"Error getting batch details {batch_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get batch details")
+            return v1_error_response(e, action="get_batch_details")
     
     # Transmission Submission Endpoints
     async def submit_invoice_batches(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -332,7 +333,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "invoice_batches_submitted")
         except Exception as e:
             logger.error(f"Error submitting invoice batches in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit invoice batches")
+            return v1_error_response(e, action="submit_invoice_batches")
     
     async def submit_invoice_file(self, 
                                 file: UploadFile = File(...),
@@ -370,7 +371,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "invoice_file_submitted")
         except Exception as e:
             logger.error(f"Error submitting invoice file in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit invoice file")
+            return v1_error_response(e, action="submit_invoice_file")
     
     async def submit_single_batch(self, batch_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Submit single batch to FIRS"""
@@ -391,7 +392,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "single_batch_submitted")
         except Exception as e:
             logger.error(f"Error submitting single batch {batch_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit single batch")
+            return v1_error_response(e, action="submit_single_batch")
     
     # Transmission History Endpoints
     async def get_transmission_history(self, 
@@ -448,7 +449,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_history_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission history in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission history")
+            return v1_error_response(e, action="get_transmission_history")
     
     async def get_transmission_details(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get detailed transmission information"""
@@ -466,7 +467,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_details_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission details {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission details")
+            return v1_error_response(e, action="get_transmission_details")
     
     # Reports and Downloads
     async def download_transmission_report(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -496,7 +497,7 @@ class TransmissionManagementEndpointsV1:
             )
         except Exception as e:
             logger.error(f"Error downloading transmission report {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to download transmission report")
+            return v1_error_response(e, action="download_transmission_report")
     
     async def get_transmission_status(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get current transmission status"""
@@ -514,7 +515,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission status {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission status")
+            return v1_error_response(e, action="get_transmission_status")
     
     # Retry and Recovery Endpoints
     async def retry_transmission(self, transmission_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -536,7 +537,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_retry_initiated")
         except Exception as e:
             logger.error(f"Error retrying transmission {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retry transmission")
+            return v1_error_response(e, action="retry_transmission")
     
     async def cancel_transmission(self, transmission_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Cancel pending transmission"""
@@ -557,7 +558,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_cancelled")
         except Exception as e:
             logger.error(f"Error cancelling transmission {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to cancel transmission")
+            return v1_error_response(e, action="cancel_transmission")
     
     # Statistics Endpoints
     async def get_transmission_statistics(self, 
@@ -578,7 +579,7 @@ class TransmissionManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_statistics_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission statistics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission statistics")
+            return v1_error_response(e, action="get_transmission_statistics")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

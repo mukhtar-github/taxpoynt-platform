@@ -16,6 +16,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "compliance_standards_retrieved")
         except Exception as e:
             logger.error(f"Error getting compliance standards in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get compliance standards")
+            return v1_error_response(e, action="get_compliance_standards")
     
     # UBL Validation Endpoints
     async def validate_ubl_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -261,7 +262,7 @@ class ComplianceValidationEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error validating UBL compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate UBL compliance")
+            return v1_error_response(e, action="validate_ubl_compliance")
     
     async def validate_ubl_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Validate UBL batch compliance"""
@@ -281,7 +282,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "ubl_batch_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating UBL batch compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate UBL batch compliance")
+            return v1_error_response(e, action="validate_ubl_batch_compliance")
     
     # PEPPOL Validation Endpoints
     async def validate_peppol_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -302,7 +303,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "peppol_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating PEPPOL compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate PEPPOL compliance")
+            return v1_error_response(e, action="validate_peppol_compliance")
     
     # ISO Standards Validation Endpoints
     async def validate_iso20022_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -323,7 +324,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "iso20022_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating ISO 20022 compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate ISO 20022 compliance")
+            return v1_error_response(e, action="validate_iso20022_compliance")
     
     async def validate_iso27001_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Validate ISO 27001 compliance"""
@@ -343,7 +344,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "iso27001_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating ISO 27001 compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate ISO 27001 compliance")
+            return v1_error_response(e, action="validate_iso27001_compliance")
     
     # Data Protection Validation Endpoints
     async def validate_data_protection_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -364,7 +365,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "data_protection_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating data protection compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate data protection compliance")
+            return v1_error_response(e, action="validate_data_protection_compliance")
     
     # Product Classification Validation Endpoints
     async def validate_product_classification(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -385,7 +386,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "product_classification_validated")
         except Exception as e:
             logger.error(f"Error validating product classification in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate product classification")
+            return v1_error_response(e, action="validate_product_classification")
     
     # Entity Validation Endpoints
     async def validate_lei_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -406,7 +407,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "lei_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating LEI compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate LEI compliance")
+            return v1_error_response(e, action="validate_lei_compliance")
     
     # Comprehensive Compliance Validation
     async def validate_comprehensive_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -427,7 +428,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "comprehensive_compliance_validated")
         except Exception as e:
             logger.error(f"Error validating comprehensive compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate comprehensive compliance")
+            return v1_error_response(e, action="validate_comprehensive_compliance")
     
     # Compliance Report Endpoints
     async def generate_compliance_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -448,7 +449,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "compliance_report_generated")
         except Exception as e:
             logger.error(f"Error generating compliance report in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate compliance report")
+            return v1_error_response(e, action="generate_compliance_report")
     
     async def list_compliance_reports(self, 
                                     request: Request,
@@ -473,7 +474,7 @@ class ComplianceValidationEndpointsV1:
             return self._create_v1_response(result, "compliance_reports_listed")
         except Exception as e:
             logger.error(f"Error listing compliance reports in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list compliance reports")
+            return v1_error_response(e, action="list_compliance_reports")
     
     async def get_compliance_report(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get compliance report"""
@@ -496,7 +497,7 @@ class ComplianceValidationEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting compliance report {report_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get compliance report")
+            return v1_error_response(e, action="get_compliance_report")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

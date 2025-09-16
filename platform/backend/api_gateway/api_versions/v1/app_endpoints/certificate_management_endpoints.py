@@ -16,6 +16,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +214,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "certificates_listed")
         except Exception as e:
             logger.error(f"Error listing certificates in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list certificates")
+            return v1_error_response(e, action="list_certificates")
     
     async def create_certificate(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Create certificate"""
@@ -233,7 +234,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "certificate_created", status_code=201)
         except Exception as e:
             logger.error(f"Error creating certificate in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create certificate")
+            return v1_error_response(e, action="create_certificate")
     
     async def get_certificate(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get certificate details"""
@@ -251,7 +252,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "certificate_retrieved")
         except Exception as e:
             logger.error(f"Error getting certificate {certificate_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get certificate")
+            return v1_error_response(e, action="get_certificate")
     
     async def update_certificate(self, certificate_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Update certificate"""
@@ -272,7 +273,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "certificate_updated")
         except Exception as e:
             logger.error(f"Error updating certificate {certificate_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update certificate")
+            return v1_error_response(e, action="update_certificate")
     
     async def delete_certificate(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Delete certificate (revoke)"""
@@ -290,7 +291,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "certificate_deleted")
         except Exception as e:
             logger.error(f"Error deleting certificate {certificate_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to delete certificate")
+            return v1_error_response(e, action="delete_certificate")
     
     # Certificate Renewal Endpoints
     async def renew_certificate(self, certificate_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -309,7 +310,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "certificate_renewed")
         except Exception as e:
             logger.error(f"Error renewing certificate {certificate_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to renew certificate")
+            return v1_error_response(e, action="renew_certificate")
     
     async def get_renewal_status(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get renewal status"""
@@ -327,7 +328,7 @@ class CertificateManagementEndpointsV1:
             return self._create_v1_response(result, "renewal_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting renewal status {certificate_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get renewal status")
+            return v1_error_response(e, action="get_renewal_status")
     
     async def list_expiring_certificates(self, 
                                        days_ahead: Optional[int] = Query(30, description="Days ahead to check for expiration"),

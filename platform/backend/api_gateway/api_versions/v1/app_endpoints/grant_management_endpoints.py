@@ -16,6 +16,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +231,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "grant_overview_retrieved")
         except Exception as e:
             logger.error(f"Error getting grant overview in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get grant overview")
+            return v1_error_response(e, action="get_grant_overview")
     
     async def get_current_grant_status(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get current grant status"""
@@ -247,7 +248,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "current_grant_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting current grant status in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get current grant status")
+            return v1_error_response(e, action="get_current_grant_status")
     
     # Milestone Management Endpoints
     async def list_grant_milestones(self, 
@@ -271,7 +272,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "grant_milestones_listed")
         except Exception as e:
             logger.error(f"Error listing grant milestones in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list grant milestones")
+            return v1_error_response(e, action="list_grant_milestones")
     
     async def get_milestone_details(self, milestone_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get milestone details"""
@@ -289,7 +290,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "milestone_details_retrieved")
         except Exception as e:
             logger.error(f"Error getting milestone details {milestone_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get milestone details")
+            return v1_error_response(e, action="get_milestone_details")
     
     async def get_milestone_progress(self, milestone_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get milestone progress"""
@@ -307,7 +308,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "milestone_progress_retrieved")
         except Exception as e:
             logger.error(f"Error getting milestone progress {milestone_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get milestone progress")
+            return v1_error_response(e, action="get_milestone_progress")
     
     async def get_upcoming_milestones(self, 
                                     days_ahead: Optional[int] = Query(30, description="Days ahead to check for milestones"),
@@ -327,7 +328,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "upcoming_milestones_retrieved")
         except Exception as e:
             logger.error(f"Error getting upcoming milestones in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get upcoming milestones")
+            return v1_error_response(e, action="get_upcoming_milestones")
     
     # Performance Metrics Endpoints
     async def get_performance_metrics(self, 
@@ -348,7 +349,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "performance_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting performance metrics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get performance metrics")
+            return v1_error_response(e, action="get_performance_metrics")
     
     async def get_onboarding_performance(self, 
                                        period: Optional[str] = Query("30d", description="Performance period"),
@@ -368,7 +369,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "onboarding_performance_retrieved")
         except Exception as e:
             logger.error(f"Error getting onboarding performance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get onboarding performance")
+            return v1_error_response(e, action="get_onboarding_performance")
     
     async def get_performance_trends(self, 
                                    period: Optional[str] = Query("90d", description="Trends period"),
@@ -388,7 +389,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "performance_trends_retrieved")
         except Exception as e:
             logger.error(f"Error getting performance trends in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get performance trends")
+            return v1_error_response(e, action="get_performance_trends")
     
     # Grant Reporting Endpoints
     async def generate_grant_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -409,7 +410,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "grant_report_generated")
         except Exception as e:
             logger.error(f"Error generating grant report in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate grant report")
+            return v1_error_response(e, action="generate_grant_report")
     
     async def list_grant_reports(self, 
                                request: Request,
@@ -432,7 +433,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "grant_reports_listed")
         except Exception as e:
             logger.error(f"Error listing grant reports in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list grant reports")
+            return v1_error_response(e, action="list_grant_reports")
     
     async def get_grant_report(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get grant report"""
@@ -450,7 +451,7 @@ class GrantManagementEndpointsV1:
             return self._create_v1_response(result, "grant_report_retrieved")
         except Exception as e:
             logger.error(f"Error getting grant report {report_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get grant report")
+            return v1_error_response(e, action="get_grant_report")
     
     # Placeholder implementations for remaining endpoints
     async def list_grant_payments(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):

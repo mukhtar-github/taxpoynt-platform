@@ -17,6 +17,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +256,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "validation_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation metrics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get validation metrics")
+            return v1_error_response(e, action="get_validation_metrics")
     
     async def get_validation_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get validation overview"""
@@ -272,7 +273,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "validation_overview_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation overview in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get validation overview")
+            return v1_error_response(e, action="get_validation_overview")
     
     # Validation Results Endpoints
     async def get_recent_validation_results(self, 
@@ -325,7 +326,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "recent_validation_results_retrieved")
         except Exception as e:
             logger.error(f"Error getting recent validation results in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get recent validation results")
+            return v1_error_response(e, action="get_recent_validation_results")
     
     async def get_validation_result(self, validation_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get detailed validation result"""
@@ -343,7 +344,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "validation_result_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation result {validation_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get validation result")
+            return v1_error_response(e, action="get_validation_result")
     
     # Invoice Validation Endpoints
     async def validate_single_invoice(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -369,7 +370,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "single_invoice_validated")
         except Exception as e:
             logger.error(f"Error validating single invoice in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate single invoice")
+            return v1_error_response(e, action="validate_single_invoice")
     
     async def validate_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Validate invoice batch"""
@@ -413,7 +414,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "invoice_batch_validated")
         except Exception as e:
             logger.error(f"Error validating invoice batch in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate invoice batch")
+            return v1_error_response(e, action="validate_invoice_batch")
     
     async def get_batch_validation_status(self, batch_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get batch validation status"""
@@ -431,7 +432,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "batch_validation_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting batch validation status {batch_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get batch validation status")
+            return v1_error_response(e, action="get_batch_validation_status")
     
     async def validate_uploaded_file(self, 
                                    file: UploadFile = File(...),
@@ -469,7 +470,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "uploaded_file_validation_initiated")
         except Exception as e:
             logger.error(f"Error validating uploaded file in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate uploaded file")
+            return v1_error_response(e, action="validate_uploaded_file")
     
     # Validation Rules and Standards Endpoints
     async def get_validation_rules(self, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -487,7 +488,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "validation_rules_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation rules in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get validation rules")
+            return v1_error_response(e, action="get_validation_rules")
     
     async def get_ubl_validation_standards(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get UBL validation standards"""
@@ -504,7 +505,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "ubl_validation_standards_retrieved")
         except Exception as e:
             logger.error(f"Error getting UBL validation standards in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get UBL validation standards")
+            return v1_error_response(e, action="get_ubl_validation_standards")
     
     async def get_firs_validation_standards(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get FIRS validation standards"""
@@ -521,7 +522,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "firs_validation_standards_retrieved")
         except Exception as e:
             logger.error(f"Error getting FIRS validation standards in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get FIRS validation standards")
+            return v1_error_response(e, action="get_firs_validation_standards")
     
     # Error Analysis Endpoints
     async def get_validation_error_analysis(self, 
@@ -542,7 +543,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "validation_error_analysis_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation error analysis in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get validation error analysis")
+            return v1_error_response(e, action="get_validation_error_analysis")
     
     async def get_validation_error_help(self, error_code: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get validation error help"""
@@ -560,7 +561,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "validation_error_help_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation error help for {error_code} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get validation error help")
+            return v1_error_response(e, action="get_validation_error_help")
     
     # Quality Metrics Endpoints
     async def get_data_quality_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -578,7 +579,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "data_quality_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting data quality metrics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get data quality metrics")
+            return v1_error_response(e, action="get_data_quality_metrics")
     
     async def generate_quality_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Generate quality report"""
@@ -598,7 +599,7 @@ class ValidationManagementEndpointsV1:
             return self._create_v1_response(result, "quality_report_generated")
         except Exception as e:
             logger.error(f"Error generating quality report in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate quality report")
+            return v1_error_response(e, action="generate_quality_report")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

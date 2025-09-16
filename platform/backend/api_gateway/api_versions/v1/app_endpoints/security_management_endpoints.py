@@ -240,7 +240,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "security_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting security metrics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get security metrics")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="get_security_metrics")
     
     async def get_security_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get security overview"""
@@ -257,7 +258,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "security_overview_retrieved")
         except Exception as e:
             logger.error(f"Error getting security overview in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get security overview")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="get_security_overview")
     
     # Security Scanning Endpoints
     async def run_security_scan(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -287,7 +289,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "security_scan_initiated")
         except Exception as e:
             logger.error(f"Error running security scan in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to run security scan")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="run_security_scan")
     
     async def get_scan_status(self, scan_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get security scan status"""
@@ -305,7 +308,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "scan_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting scan status {scan_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get scan status")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="get_scan_status")
     
     async def get_scan_results(self, scan_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get security scan results"""
@@ -323,7 +327,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "scan_results_retrieved")
         except Exception as e:
             logger.error(f"Error getting scan results {scan_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get scan results")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="get_scan_results")
     
     # Vulnerability Management Endpoints
     async def list_vulnerabilities(self, 
@@ -392,7 +397,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "access_logs_retrieved")
         except Exception as e:
             logger.error(f"Error getting access logs in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get access logs")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="get_access_logs")
     
     async def get_suspicious_activity(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get suspicious activity"""
@@ -409,7 +415,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "suspicious_activity_retrieved")
         except Exception as e:
             logger.error(f"Error getting suspicious activity in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get suspicious activity")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="get_suspicious_activity")
     
     # Compliance Monitoring Endpoints
     async def check_iso27001_compliance(self, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -427,7 +434,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "iso27001_compliance_checked")
         except Exception as e:
             logger.error(f"Error checking ISO 27001 compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to check ISO 27001 compliance")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="check_iso27001_compliance")
     
     async def check_gdpr_compliance(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Check GDPR compliance"""
@@ -444,7 +452,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "gdpr_compliance_checked")
         except Exception as e:
             logger.error(f"Error checking GDPR compliance in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to check GDPR compliance")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="check_gdpr_compliance")
     
     # Security Reporting Endpoints
     async def generate_security_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -465,7 +474,8 @@ class SecurityManagementEndpointsV1:
             return self._create_v1_response(result, "security_report_generated")
         except Exception as e:
             logger.error(f"Error generating security report in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate security report")
+            from api_gateway.utils.error_mapping import v1_error_response
+            return v1_error_response(e, action="generate_security_report")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

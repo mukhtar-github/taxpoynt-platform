@@ -16,6 +16,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
 from api_gateway.utils.pagination import normalize_pagination
 
 logger = logging.getLogger(__name__)
@@ -183,7 +184,7 @@ class InvoiceSubmissionEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error generating FIRS-compliant invoice in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate FIRS-compliant invoice")
+            return v1_error_response(e, action="generate_firs_compliant_invoice")
     
     async def generate_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Generate invoice batch"""
@@ -203,7 +204,7 @@ class InvoiceSubmissionEndpointsV1:
             return self._create_v1_response(result, "invoice_batch_generation_initiated")
         except Exception as e:
             logger.error(f"Error generating invoice batch in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate invoice batch")
+            return v1_error_response(e, action="generate_invoice_batch")
     
     # Invoice Submission Endpoints
     async def submit_invoice(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
@@ -230,7 +231,7 @@ class InvoiceSubmissionEndpointsV1:
             return self._create_v1_response(result, "invoice_submitted")
         except Exception as e:
             logger.error(f"Error submitting invoice in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit invoice")
+            return v1_error_response(e, action="submit_invoice")
     
     async def submit_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice batch to FIRS"""
@@ -250,7 +251,7 @@ class InvoiceSubmissionEndpointsV1:
             return self._create_v1_response(result, "invoice_batch_submitted")
         except Exception as e:
             logger.error(f"Error submitting invoice batch in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit invoice batch")
+            return v1_error_response(e, action="submit_invoice_batch")
     
     # Submission Status Endpoints
     async def get_submission_status(self, submission_id: str, context: HTTPRoutingContext = Depends(_require_app_role)):
@@ -269,7 +270,7 @@ class InvoiceSubmissionEndpointsV1:
             return self._create_v1_response(result, "submission_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting submission status {submission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get submission status")
+            return v1_error_response(e, action="get_submission_status")
     
     async def list_submissions(self, 
                              request: Request,
@@ -331,7 +332,7 @@ class InvoiceSubmissionEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting invoice {invoice_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get invoice")
+            return v1_error_response(e, action="get_invoice")
     
     async def cancel_invoice_submission(self, invoice_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Cancel invoice submission"""
@@ -349,7 +350,7 @@ class InvoiceSubmissionEndpointsV1:
             return self._create_v1_response(result, "invoice_submission_cancelled")
         except Exception as e:
             logger.error(f"Error cancelling invoice submission {invoice_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to cancel invoice submission")
+            return v1_error_response(e, action="cancel_invoice_submission")
     
     async def resubmit_invoice(self, invoice_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Resubmit invoice"""
@@ -370,7 +371,7 @@ class InvoiceSubmissionEndpointsV1:
             return self._create_v1_response(result, "invoice_resubmitted")
         except Exception as e:
             logger.error(f"Error resubmitting invoice {invoice_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to resubmit invoice")
+            return v1_error_response(e, action="resubmit_invoice")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""
