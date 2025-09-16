@@ -166,20 +166,35 @@ class DatabaseInitializer:
         try:
             # Resolve script_location
             script_path_env = os.getenv("ALEMBIC_MIGRATIONS_PATH")
-            base_dir = Path(__file__).resolve().parents[4]  # points to platform/backend
+            current_path = Path(__file__).resolve()
+            # Expected structure: platform/backend/core_platform/data_management/database_init.py
+            backend_dir = current_path.parents[2]   # platform/backend
+            platform_dir = current_path.parents[3]  # platform
+            repo_root = platform_dir.parent         # repo root
+
             candidates = [
                 Path(script_path_env) if script_path_env else None,
-                base_dir / "alembic",
-                base_dir.parent / "archive" / "legacy" / "backend" / "alembic",
+                backend_dir / "migrations",                               # preferred modern location
+                backend_dir / "alembic",                                  # alternative under backend
+                platform_dir / "alembic",                                 # legacy under platform
+                repo_root / "archive" / "legacy" / "backend" / "alembic", # archived legacy
             ]
+
             script_location = None
+            scanned: list[str] = []
             for cand in candidates:
-                if cand and cand.exists() and (cand / "env.py").exists():
+                if not cand:
+                    continue
+                scanned.append(str(cand))
+                if cand.exists() and (cand / "env.py").exists():
                     script_location = str(cand)
                     break
 
             if not script_location:
-                raise RuntimeError("Could not locate Alembic migrations directory. Set ALEMBIC_MIGRATIONS_PATH.")
+                logger.error("Could not locate Alembic migrations directory. Scanned: %s", ", ".join(scanned))
+                raise RuntimeError(
+                    "Could not locate Alembic migrations directory. Set ALEMBIC_MIGRATIONS_PATH to the folder containing env.py (e.g., platform/backend/migrations)."
+                )
 
             cfg = Config()
             cfg.set_main_option("script_location", script_location)

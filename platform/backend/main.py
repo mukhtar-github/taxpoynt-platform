@@ -570,11 +570,12 @@ async def initialize_services():
         logger.info("📊 Initializing Phase 4 Production Observability...")
         try:
             from core_platform.monitoring import setup_production_observability
-            
+            # OpenTelemetry is optional; gate on OTEL_ENABLED
+            otel_enabled = str(os.getenv("OTEL_ENABLED", "false")).lower() in ("1", "true", "yes", "on")
             await setup_production_observability(
                 enable_prometheus=True,
                 prometheus_port=9090,
-                enable_opentelemetry=True,
+                enable_opentelemetry=otel_enabled,
                 service_name="taxpoynt-platform"
             )
             
@@ -689,27 +690,31 @@ async def initialize_services():
             except Exception as e:
                 logger.error(f"❌ Failed to update API Gateway message router: {e}")
             
-            # Register SI services
-            try:
-                from si_services import initialize_si_services
-                si_registry = await initialize_si_services(app.state.redis_message_router)
-                logger.info(f"✅ SI Services registered: {len(si_registry.service_endpoints)} services")
-            except Exception as e:
-                # Phase 6: Service registration error handling
-                if app.state.error_management:
-                    await handle_platform_error(
-                        app.state.error_management, e, {
-                            "service_name": "si_services",
-                            "operation_name": "service_registration",
-                            "severity": "medium",
-                            "user_id": None,
-                            "request_id": None,
-                            "retry_attempts": 2,
-                            "degradation_mode": "continue_without_si_services"
-                        }, "integration", "medium"
-                    )
-                else:
-                    logger.error(f"❌ Failed to register SI services: {e}")
+            # Register SI services (optional in staging via ENABLE_SI_SERVICES)
+            enable_si = str(os.getenv("ENABLE_SI_SERVICES", "true" if ENVIRONMENT != "staging" else "false")).lower() in ("1", "true", "yes", "on")
+            if enable_si:
+                try:
+                    from si_services import initialize_si_services
+                    si_registry = await initialize_si_services(app.state.redis_message_router)
+                    logger.info(f"✅ SI Services registered: {len(si_registry.service_endpoints)} services")
+                except Exception as e:
+                    # Phase 6: Service registration error handling
+                    if app.state.error_management:
+                        await handle_platform_error(
+                            app.state.error_management, e, {
+                                "service_name": "si_services",
+                                "operation_name": "service_registration",
+                                "severity": "medium",
+                                "user_id": None,
+                                "request_id": None,
+                                "retry_attempts": 2,
+                                "degradation_mode": "continue_without_si_services"
+                            }, "integration", "medium"
+                        )
+                    else:
+                        logger.error(f"❌ Failed to register SI services: {e}")
+            else:
+                logger.info("⏭️ Skipping SI service registration (ENABLE_SI_SERVICES disabled)")
             
             # Register APP services  
             try:
@@ -733,27 +738,31 @@ async def initialize_services():
                 else:
                     logger.error(f"❌ Failed to register APP services: {e}")
             
-            # Register Hybrid services
-            try:
-                from hybrid_services import initialize_hybrid_services
-                hybrid_registry = await initialize_hybrid_services(app.state.redis_message_router)
-                logger.info(f"✅ Hybrid Services registered: {len(hybrid_registry.service_endpoints)} services")
-            except Exception as e:
-                # Phase 6: Service registration error handling
-                if app.state.error_management:
-                    await handle_platform_error(
-                        app.state.error_management, e, {
-                            "service_name": "hybrid_services",
-                            "operation_name": "service_registration",
-                            "severity": "medium",
-                            "user_id": None,
-                            "request_id": None,
-                            "retry_attempts": 2,
-                            "degradation_mode": "continue_without_hybrid_services"
-                        }, "integration", "medium"
-                    )
-                else:
-                    logger.error(f"❌ Failed to register Hybrid services: {e}")
+            # Register Hybrid services (optional in staging via ENABLE_HYBRID_SERVICES)
+            enable_hybrid = str(os.getenv("ENABLE_HYBRID_SERVICES", "true" if ENVIRONMENT != "staging" else "false")).lower() in ("1", "true", "yes", "on")
+            if enable_hybrid:
+                try:
+                    from hybrid_services import initialize_hybrid_services
+                    hybrid_registry = await initialize_hybrid_services(app.state.redis_message_router)
+                    logger.info(f"✅ Hybrid Services registered: {len(hybrid_registry.service_endpoints)} services")
+                except Exception as e:
+                    # Phase 6: Service registration error handling
+                    if app.state.error_management:
+                        await handle_platform_error(
+                            app.state.error_management, e, {
+                                "service_name": "hybrid_services",
+                                "operation_name": "service_registration",
+                                "severity": "medium",
+                                "user_id": None,
+                                "request_id": None,
+                                "retry_attempts": 2,
+                                "degradation_mode": "continue_without_hybrid_services"
+                            }, "integration", "medium"
+                        )
+                    else:
+                        logger.error(f"❌ Failed to register Hybrid services: {e}")
+            else:
+                logger.info("⏭️ Skipping Hybrid service registration (ENABLE_HYBRID_SERVICES disabled)")
 
             # Validate route→operation mapping after all services are registered
             try:

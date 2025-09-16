@@ -168,7 +168,8 @@ class MetricsAggregator:
             if collector:
                 self.collectors[source_name] = collector
             
-            logger.info(f"Registered metric source: {source_name} ({service_role.value})")
+            role_label = service_role.value if hasattr(service_role, 'value') else str(service_role)
+            logger.info(f"Registered metric source: {source_name} ({role_label})")
             return True
             
         except Exception as e:
@@ -214,13 +215,32 @@ class MetricsAggregator:
     ) -> bool:
         """Collect a single metric point"""
         try:
+            # Normalize inputs that might come in as strings instead of Enums
+            try:
+                norm_role = service_role
+                if isinstance(service_role, str):
+                    try:
+                        norm_role = ServiceRole(service_role)
+                    except Exception:
+                        norm_role = service_role  # keep as string; downstream guards handle it
+
+                norm_type = metric_type
+                if isinstance(metric_type, str):
+                    try:
+                        norm_type = MetricType(metric_type)
+                    except Exception:
+                        norm_type = metric_type
+            except Exception:
+                norm_role = service_role
+                norm_type = metric_type
+
             metric_point = MetricPoint(
                 name=name,
                 value=value,
                 timestamp=datetime.utcnow(),
-                service_role=service_role,
+                service_role=norm_role,
                 service_name=service_name,
-                metric_type=metric_type,
+                metric_type=norm_type,
                 tags=tags or {},
                 metadata=metadata or {}
             )
@@ -280,6 +300,24 @@ class MetricsAggregator:
                 
                 # Add metrics to storage
                 for metric in metrics:
+                    # Normalize external collector outputs defensively
+                    try:
+                        if hasattr(metric, 'service_role'):
+                            sr = getattr(metric, 'service_role')
+                            if isinstance(sr, str):
+                                try:
+                                    setattr(metric, 'service_role', ServiceRole(sr))
+                                except Exception:
+                                    pass
+                        if hasattr(metric, 'metric_type'):
+                            mt = getattr(metric, 'metric_type')
+                            if isinstance(mt, str):
+                                try:
+                                    setattr(metric, 'metric_type', MetricType(mt))
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
                     self.raw_metrics.append(metric)
                     self.collection_stats["total_metrics_collected"] += 1
                 
@@ -449,7 +487,8 @@ class MetricsAggregator:
         }
         
         for role, services in by_role.items():
-            real_time_data["by_role"][role.value] = {
+            role_key = role.value if hasattr(role, 'value') else str(role)
+            real_time_data["by_role"][role_key] = {
                 "service_count": len(services),
                 "total_metrics": sum(len(metrics) for metrics in services.values()),
                 "services": {
@@ -481,9 +520,9 @@ class MetricsAggregator:
                     "name": metric.name,
                     "value": metric.value,
                     "timestamp": metric.timestamp,
-                    "service_role": metric.service_role.value,
+                    "service_role": metric.service_role.value if hasattr(metric.service_role, 'value') else str(metric.service_role),
                     "service_name": metric.service_name,
-                    "metric_type": metric.metric_type.value,
+                    "metric_type": metric.metric_type.value if hasattr(metric.metric_type, 'value') else str(metric.metric_type),
                     "tags": metric.tags or {}
                 }
                 current_metrics.append(metric_dict)
