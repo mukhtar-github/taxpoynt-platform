@@ -49,17 +49,65 @@ class ProductionJWTManager:
         logger.info("Production JWT Manager initialized with secure key management")
     
     def _get_redis_client(self) -> redis.Redis:
-        """Get Redis client for token blacklist management"""
+        """Get Redis client for token blacklist management.
+
+        In CI/development, Redis is optional. If `JWT_REDIS_DISABLED` is true-y,
+        use a lightweight in-memory stub to avoid connection attempts that can
+        hang tests/CI when no Redis is available.
+        """
+        # Allow explicit disable (default on for common dev/test envs)
+        env = os.getenv("ENVIRONMENT", "production").lower()
+        default_disable = env in ("development", "dev", "testing", "test", "ci")
+        disable_redis = str(os.getenv("JWT_REDIS_DISABLED", str(default_disable))).lower() in ("1", "true", "yes", "on")
+
+        if disable_redis:
+            class _DummyRedis:
+                def __init__(self):
+                    self._kv = {}
+                    self._hash = {}
+                # Simple KV
+                def setex(self, key, ttl, value):
+                    self._kv[key] = value
+                    return True
+                def get(self, key):
+                    return self._kv.get(key)
+                def exists(self, key):
+                    return 1 if key in self._kv else 0
+                def expire(self, key, ttl):
+                    return True
+                # Hash helpers
+                def hmset(self, key, mapping):
+                    self._hash[key] = dict(mapping)
+                    return True
+                def hgetall(self, key):
+                    return dict(self._hash.get(key, {}))
+                def scan_iter(self, match=None):
+                    # Iterate over stored keys respecting a simple prefix match
+                    keys = list(self._kv.keys()) + list(self._hash.keys())
+                    if match is None:
+                        for k in keys:
+                            yield k
+                    else:
+                        import fnmatch as _fnm
+                        for k in keys:
+                            if _fnm.fnmatch(k, match):
+                                yield k
+            logger.info("JWT_REDIS_DISABLED=true; using in-memory Redis stub for JWT management")
+            return _DummyRedis()
+
         redis_url = os.getenv("REDIS_URL")
         if redis_url:
-            return redis.from_url(redis_url, decode_responses=True)
-        
-        # Fallback to local Redis
+            # Use conservative timeouts to avoid long hangs in CI
+            return redis.from_url(redis_url, decode_responses=True, socket_timeout=2.0, socket_connect_timeout=1.0)
+
+        # Fallback to local Redis with timeouts
         return redis.Redis(
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", "6379")),
             db=int(os.getenv("REDIS_DB", "0")),
-            decode_responses=True
+            decode_responses=True,
+            socket_timeout=2.0,
+            socket_connect_timeout=1.0,
         )
     
     def _get_or_generate_jwt_secret(self) -> str:
