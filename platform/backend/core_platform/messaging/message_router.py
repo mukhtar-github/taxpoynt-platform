@@ -7,7 +7,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Set, Union, Callable
+from typing import Dict, Any, List, Optional, Set, Union, Callable, Type
 from dataclasses import dataclass, asdict
 from enum import Enum
 import fnmatch
@@ -15,6 +15,11 @@ import inspect
 import os
 
 from .event_bus import Event, EventBus, EventScope, EventPriority, get_event_bus
+try:
+    # Optional: Pydantic v1 BaseModel for schema validation
+    from pydantic import BaseModel
+except Exception:  # pragma: no cover
+    BaseModel = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +199,104 @@ class MessageRouter:
         # Strict operation mapping validation (env-controlled)
         # Set ROUTER_STRICT_OPS=true|1|yes|on to raise on unmapped operations
         self.strict_op_validation = str(os.getenv("ROUTER_STRICT_OPS", "false")).lower() in ("1", "true", "yes", "on")
+        # Schema validation (env-controlled)
+        # ROUTER_VALIDATE_SCHEMA=true|1|yes|on enables validation against registered schemas
+        self.validate_schema = str(os.getenv("ROUTER_VALIDATE_SCHEMA", "false")).lower() in ("1", "true", "yes", "on")
+        # Behavior on validation error: 'raise' | 'warn' | 'event'
+        self.schema_fail_mode = os.getenv("ROUTER_SCHEMA_FAIL_MODE", "warn").lower()
+        # Operation schema registry: op -> { 'pydantic_model': Type[BaseModel] | None, 'json_schema': Dict | None, 'expected_version': str | None }
+        self._operation_schemas: Dict[str, Dict[str, Any]] = {}
+
+    def register_operation_schema(
+        self,
+        operation: str,
+        *,
+        pydantic_model: Optional[Type[BaseModel]] = None,
+        json_schema: Optional[Dict[str, Any]] = None,
+        expected_version: Optional[str] = None,
+    ) -> None:
+        """Register a schema for a message operation.
+
+        Accepts either a Pydantic BaseModel (v1) or a JSON Schema dict.
+        Optionally specify an expected schema_version to check in payloads.
+        """
+        if not pydantic_model and not json_schema:
+            raise ValueError("Must provide either pydantic_model or json_schema for operation schema registration")
+        self._operation_schemas[operation] = {
+            "pydantic_model": pydantic_model,
+            "json_schema": json_schema,
+            "expected_version": expected_version,
+        }
+
+    def _validate_payload_schema(self, operation: str, payload: Dict[str, Any]) -> None:
+        """Validate payload against a registered schema if enabled.
+
+        - Checks schema_version when provided in registration
+        - Validates via Pydantic model or JSON Schema
+        - On failure, either raises, logs a warning, or emits an event based on mode
+        """
+        if not self.validate_schema:
+            return
+        spec = self._operation_schemas.get(operation)
+        if not spec:
+            return
+
+        # Version check
+        expected_version: Optional[str] = spec.get("expected_version")
+        if expected_version is not None:
+            got_version = None
+            try:
+                got_version = payload.get("schema_version")
+            except Exception:
+                got_version = None
+            if str(got_version) != str(expected_version):
+                self._handle_schema_error(operation, payload, f"schema_version mismatch: expected={expected_version}, got={got_version}")
+                return
+
+        # Pydantic validation
+        model = spec.get("pydantic_model")
+        if model is not None and BaseModel is not None:
+            try:
+                model.parse_obj(payload)
+            except Exception as e:
+                self._handle_schema_error(operation, payload, f"pydantic validation failed: {e}")
+                return
+
+        # JSON Schema validation
+        schema = spec.get("json_schema")
+        if schema is not None:
+            try:
+                import jsonschema  # local import to avoid hard dependency at import time
+                jsonschema.validate(instance=payload, schema=schema)
+            except Exception as e:
+                self._handle_schema_error(operation, payload, f"jsonschema validation failed: {e}")
+                return
+
+    def _handle_schema_error(self, operation: str, payload: Dict[str, Any], error_message: str) -> None:
+        """Handle schema validation failure according to configured mode."""
+        msg = f"Schema validation error for op '{operation}': {error_message}"
+        mode = self.schema_fail_mode
+        if mode == "raise":
+            raise RuntimeError(msg)
+        elif mode == "event":
+            # Emit a structured event and log warning
+            try:
+                asyncio.create_task(self.event_bus.emit(
+                    event_type="message.validation_failed",
+                    payload={
+                        "operation": operation,
+                        "error": error_message,
+                    },
+                    source="message_router",
+                    scope=EventScope.GLOBAL,
+                    priority=EventPriority.HIGH,
+                ))
+            except Exception:
+                pass
+            self.logger.warning(msg)
+        else:
+            # Default warn
+            self.logger.warning(msg)
     
     async def initialize(self):
         """Initialize the message router"""
@@ -359,6 +462,12 @@ class MessageRouter:
             # Ensure router has default rules and event hooks initialized
             if not self.is_initialized:
                 await self.initialize()
+            # Schema validation for payload
+            try:
+                self._validate_payload_schema(operation, payload)
+            except RuntimeError:
+                # Re-raise fatal validation errors
+                raise
             # Soft/strict validation: check operation is advertised by some registered endpoint
             known_ops = set()
             try:
