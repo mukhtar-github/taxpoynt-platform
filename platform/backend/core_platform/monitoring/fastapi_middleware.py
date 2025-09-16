@@ -189,8 +189,13 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                                           span, start_time: float) -> Response:
         """Process request with active tracing span"""
         try:
-            # Add request attributes to span
-            span.set_attribute("http.request.size", len(await request.body()) if hasattr(request, 'body') else 0)
+            # Add request attributes to span without consuming body
+            try:
+                content_length = request.headers.get("content-length")
+                req_size = int(content_length) if content_length and content_length.isdigit() else 0
+            except Exception:
+                req_size = 0
+            span.set_attribute("http.request.size", req_size)
             
             # Process the request
             response = await call_next(request)

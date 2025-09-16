@@ -198,6 +198,19 @@ class PrometheusIntegration:
             description="Active database connections",
             labels=["pool_name", "database"]
         ))
+        # Additional DB pool stats
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_database_pool_stats",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="DB pool stats by metric",
+            labels=["metric"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_database_query_stats",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="DB query statistics (counts and averages)",
+            labels=["metric"]
+        ))
         
         self.register_metric(PrometheusMetric(
             name="taxpoynt_database_queries_total",
@@ -244,6 +257,13 @@ class PrometheusIntegration:
             metric_type=PrometheusMetricsType.GAUGE,
             description="Number of active service instances",
             labels=["service_type", "coordinator_id"]
+        ))
+        # Tenant cache metrics
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_tenant_cache_stats",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="Tenant cache hit/miss stats",
+            labels=["metric"]
         ))
     
     def register_metric(self, metric_definition: PrometheusMetric):
@@ -361,12 +381,48 @@ class PrometheusIntegration:
         while self._running:
             try:
                 await self._sync_aggregator_metrics()
+                await self._sync_platform_runtime_metrics()
                 await asyncio.sleep(10)  # Sync every 10 seconds
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Error in metrics sync loop: {e}")
                 await asyncio.sleep(10)
+
+    async def _sync_platform_runtime_metrics(self):
+        """Collect DB pool and tenant cache metrics into Prometheus gauges."""
+        try:
+            # DB pool metrics
+            try:
+                from core_platform.data_management.connection_pool import get_database_metrics
+                dbm = get_database_metrics()
+                pool_stats = dbm.get("pool_statistics", {})
+                perf = dbm.get("performance_metrics", {})
+                # Pool stats
+                for key in ("pool_size", "checked_in", "checked_out", "overflow", "invalid"):
+                    val = float(pool_stats.get(key, 0) or 0)
+                    self.record_metric("taxpoynt_database_pool_stats", val, {"metric": key})
+                # Performance metrics (counts/averages)
+                for mkey in ("query_count", "read_queries", "write_queries", "slow_queries", "average_query_time"):
+                    val = float(perf.get(mkey, 0) or 0)
+                    self.record_metric("taxpoynt_database_query_stats", val, {"metric": mkey})
+            except Exception as e:
+                logger.debug(f"DB metrics unavailable: {e}")
+
+            # Tenant cache metrics (best-effort)
+            try:
+                from core_platform.data_management.multi_tenant_manager import get_tenant_manager
+                mgr = get_tenant_manager()
+                if mgr is not None:
+                    # Simulate cache stats via query stats keys
+                    stats = getattr(mgr, "_query_stats", {})
+                    for k in ("cache_hits", "cache_misses", "tenant_filtered_queries", "total_queries"):
+                        val = float(stats.get(k, 0) or 0)
+                        self.record_metric("taxpoynt_tenant_cache_stats", val, {"metric": k})
+            except Exception as e:
+                logger.debug(f"Tenant manager metrics unavailable: {e}")
+        except Exception as e:
+            logger.error(f"Error syncing platform runtime metrics: {e}")
     
     async def _sync_aggregator_metrics(self):
         """Sync metrics from existing aggregator to Prometheus"""
