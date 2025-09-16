@@ -235,58 +235,64 @@ class TokenManager:
         """Generate JWT token"""
         try:
             now = datetime.now()
-            expires_in = request.expires_in or self.config.default_access_token_ttl
-            expires_at = now + timedelta(seconds=expires_in)
-            
-            # Prepare JWT payload
-            payload = {
-                "iss": self.config.jwt_issuer,
-                "aud": request.audience or self.config.jwt_audience,
-                "sub": request.subject or request.user_id,
-                "iat": int(now.timestamp()),
-                "exp": int(expires_at.timestamp()),
-                "client_id": request.client_id,
-                "scope": " ".join(request.scope),
-                "jti": secrets.token_hex(16),  # JWT ID
-                **request.claims
-            }
-            
-            if request.session_id:
-                payload["session_id"] = request.session_id
-            
-            # Sign JWT
-            if self.config.jwt_algorithm.value.startswith("HS"):
-                # HMAC signing
-                if not self.jwt_secret_key:
-                    raise ValueError("JWT secret key not configured")
-                
-                token_value = jwt.encode(
-                    payload,
-                    self.jwt_secret_key,
-                    algorithm=self.config.jwt_algorithm.value
-                )
-            else:
-                # RSA/EC signing
-                if not self.jwt_private_key:
-                    raise ValueError("JWT private key not configured")
-                
-                token_value = jwt.encode(
-                    payload,
-                    self.jwt_private_key,
-                    algorithm=self.config.jwt_algorithm.value
-                )
-            
+            # Prefer centralized ProductionJWTManager for consistency across platform
+            try:
+                from core_platform.security import get_jwt_manager
+                jwt_manager = get_jwt_manager()
+                # Map to unified user_data; include common fields
+                user_data = {
+                    "user_id": request.user_id or request.subject or request.client_id,
+                    "email": request.claims.get("email") if request.claims else None,
+                    "role": request.claims.get("role") if request.claims else None,
+                    "organization_id": request.claims.get("organization_id") if request.claims else None,
+                    "permissions": request.claims.get("permissions", []) if request.claims else [],
+                }
+                token_value = jwt_manager.create_access_token(user_data)
+                # Approximate expiry using manager config
+                expires_at = now + timedelta(minutes=int(jwt_manager.access_token_expire_minutes))
+                issuer = "taxpoynt-platform"
+                audience = "taxpoynt-api"
+                subject = str(user_data.get("user_id")) if user_data.get("user_id") else None
+            except Exception:
+                # Fallback to local signing if manager unavailable
+                expires_in = request.expires_in or self.config.default_access_token_ttl
+                expires_at = now + timedelta(seconds=expires_in)
+                payload = {
+                    "iss": self.config.jwt_issuer,
+                    "aud": request.audience or self.config.jwt_audience,
+                    "sub": request.subject or request.user_id,
+                    "iat": int(now.timestamp()),
+                    "exp": int(expires_at.timestamp()),
+                    "client_id": request.client_id,
+                    "scope": " ".join(request.scope),
+                    "jti": secrets.token_hex(16),
+                    **(request.claims or {}),
+                }
+                if request.session_id:
+                    payload["session_id"] = request.session_id
+                if self.config.jwt_algorithm.value.startswith("HS"):
+                    if not self.jwt_secret_key:
+                        raise ValueError("JWT secret key not configured")
+                    token_value = jwt.encode(payload, self.jwt_secret_key, algorithm=self.config.jwt_algorithm.value)
+                else:
+                    if not self.jwt_private_key:
+                        raise ValueError("JWT private key not configured")
+                    token_value = jwt.encode(payload, self.jwt_private_key, algorithm=self.config.jwt_algorithm.value)
+                issuer = payload["iss"]
+                audience = payload["aud"]
+                subject = payload["sub"]
+
             # Create token info
             token_info = TokenInfo(
-                token_id=payload["jti"],
+                token_id=secrets.token_hex(16),
                 token_type=TokenType.JWT,
                 token_value=token_value,
                 token_hash=hashlib.sha256(token_value.encode()).hexdigest(),
                 issued_at=now,
                 expires_at=expires_at,
-                issuer=payload["iss"],
-                audience=payload["aud"],
-                subject=payload["sub"],
+                issuer=issuer,
+                audience=audience,
+                subject=subject,
                 scope=request.scope,
                 claims=request.claims,
                 client_id=request.client_id,
@@ -301,7 +307,7 @@ class TokenManager:
             return TokenResponse(
                 access_token=token_value,
                 token_type="Bearer",
-                expires_in=expires_in,
+                expires_in=int((token_info.expires_at - now).total_seconds()) if token_info.expires_at else None,
                 scope=" ".join(request.scope),
                 token_info=token_info
             )
