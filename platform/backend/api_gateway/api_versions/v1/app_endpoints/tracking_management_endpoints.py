@@ -376,7 +376,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(metrics, "tracking_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting tracking metrics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get tracking metrics")
+            return v1_error_response(e, action="get_tracking_metrics")
     
     async def get_tracking_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get tracking overview"""
@@ -393,7 +393,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(result, "tracking_overview_retrieved")
         except Exception as e:
             logger.error(f"Error getting tracking overview in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get tracking overview")
+            return v1_error_response(e, action="get_tracking_overview")
     
     # Transmission Status Tracking
     async def get_transmission_statuses(self, 
@@ -446,7 +446,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_statuses_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission statuses in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission statuses")
+            return v1_error_response(e, action="get_transmission_statuses")
     
     async def get_transmission_tracking(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get detailed tracking information for specific transmission"""
@@ -464,7 +464,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_tracking_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission tracking {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission tracking")
+            return v1_error_response(e, action="get_transmission_tracking")
     
     async def get_transmission_progress(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get real-time progress of transmission"""
@@ -482,7 +482,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(result, "transmission_progress_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission progress {transmission_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get transmission progress")
+            return v1_error_response(e, action="get_transmission_progress")
     
     # Real-time Updates
     async def get_live_updates(self, 
@@ -503,7 +503,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(result, "live_updates_retrieved")
         except Exception as e:
             logger.error(f"Error getting live updates in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get live updates")
+            return v1_error_response(e, action="get_live_updates")
     
     async def get_recent_status_changes(self, 
                                       hours: Optional[int] = Query(24, description="Hours of status changes to retrieve"),
@@ -523,7 +523,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(result, "recent_status_changes_retrieved")
         except Exception as e:
             logger.error(f"Error getting recent status changes in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get recent status changes")
+            return v1_error_response(e, action="get_recent_status_changes")
     
     # FIRS Response Tracking
     async def get_firs_responses(self, 

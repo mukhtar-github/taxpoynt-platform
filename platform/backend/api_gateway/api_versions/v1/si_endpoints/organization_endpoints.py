@@ -373,7 +373,7 @@ class OrganizationEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error creating organization in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create organization")
+            return v1_error_response(e, action="create_organization")
     
     async def get_organization(self, 
                               org_id: str,
@@ -408,7 +408,7 @@ class OrganizationEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization")
+            return v1_error_response(e, action="get_organization")
     
     async def update_organization(self, 
                                  org_id: str,
@@ -432,7 +432,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(result, "organization_updated")
         except Exception as e:
             logger.error(f"Error updating organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update organization")
+            return v1_error_response(e, action="update_organization")
     
     async def delete_organization(self, 
                                  org_id: str,
@@ -452,7 +452,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(result, "organization_deleted")
         except Exception as e:
             logger.error(f"Error deleting organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to delete organization")
+            return v1_error_response(e, action="delete_organization")
     
     async def get_organization_business_systems(self, 
                                                org_id: str,
