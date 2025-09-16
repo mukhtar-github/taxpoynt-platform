@@ -258,6 +258,20 @@ class PrometheusIntegration:
             description="Number of active service instances",
             labels=["service_type", "coordinator_id"]
         ))
+        # Repository query KPIs
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_repository_queries_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Total repository queries by method/table/outcome",
+            labels=["repository", "method", "table", "outcome"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_repository_query_duration_seconds",
+            metric_type=PrometheusMetricsType.HISTOGRAM,
+            description="Repository query duration",
+            labels=["repository", "method", "table"],
+            buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+        ))
         # Tenant cache metrics
         self.register_metric(PrometheusMetric(
             name="taxpoynt_tenant_cache_stats",

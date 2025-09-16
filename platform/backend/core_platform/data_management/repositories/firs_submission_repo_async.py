@@ -9,6 +9,7 @@ from tenant context by default.
 from __future__ import annotations
 
 from typing import List, Optional, Union, Dict, Any
+import time
 from uuid import UUID as UUIDType
 import uuid
 
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_platform.authentication.tenant_context import get_current_tenant
 from core_platform.data_management.models.firs_submission import FIRSSubmission
+from core_platform.monitoring.prometheus_integration import get_prometheus_integration
 
 
 async def get_submission_by_id(
@@ -54,8 +56,27 @@ async def get_submission_by_id(
         .where(FIRSSubmission.id == sub_id, FIRSSubmission.organization_id == org_id)
         .limit(1)
     )
-    res = await db.execute(stmt)
-    return res.scalars().first()
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        res = await db.execute(stmt)
+        row = res.scalars().first()
+        return row
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "firs_submission", "method": "get_submission_by_id", "table": "firs_submissions", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "firs_submission", "method": "get_submission_by_id", "table": "firs_submissions"}
+            )
 
 async def list_recent_submissions(
     db: AsyncSession,
@@ -88,9 +109,27 @@ async def list_recent_submissions(
         .offset(max(0, int(offset)))
         .limit(max(1, int(limit)))
     )
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
-    return rows
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
+        return rows
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "firs_submission", "method": "list_recent_submissions", "table": "firs_submissions", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "firs_submission", "method": "list_recent_submissions", "table": "firs_submissions"}
+            )
 
 
 async def get_submission_metrics(
@@ -142,14 +181,17 @@ async def get_submission_metrics(
     from datetime import datetime, timezone
     from core_platform.data_management.models.firs_submission import SubmissionStatus, FIRSSubmission
 
-    # Totals by status
-    status_stmt = (
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        # Totals by status
+        status_stmt = (
         select(FIRSSubmission.status, func.count(FIRSSubmission.id))
         .where(FIRSSubmission.organization_id == org_id)
         .group_by(FIRSSubmission.status)
-    )
-    res = await db.execute(status_stmt)
-    by_status = {row[0]: row[1] for row in res.all()}
+        )
+        res = await db.execute(status_stmt)
+        by_status = {row[0]: row[1] for row in res.all()}
 
     total = sum(by_status.values())
     processing = sum(by_status.get(s, 0) for s in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING))
@@ -190,7 +232,7 @@ async def get_submission_metrics(
 
     success_rate = round((completed / total) * 100.0, 2) if total else 0.0
 
-    return {
+        return {
         "totalTransmissions": int(total),
         "processing": int(processing),
         "completed": int(completed),
@@ -199,7 +241,22 @@ async def get_submission_metrics(
         "averageProcessingTime": f"{avg_minutes} minutes" if avg_minutes is not None else None,
         "successRate": success_rate,
         "todayTransmissions": int(today_count),
-    }
+        }
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "firs_submission", "method": "get_submission_metrics", "table": "firs_submissions", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "firs_submission", "method": "get_submission_metrics", "table": "firs_submissions"}
+            )
 
 
 async def list_submissions_filtered(

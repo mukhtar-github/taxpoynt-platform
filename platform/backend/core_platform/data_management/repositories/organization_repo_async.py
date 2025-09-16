@@ -8,6 +8,7 @@ queries efficient and simple for pagination.
 from __future__ import annotations
 
 from typing import Optional, Dict, Any, Union, List
+import time
 import uuid
 from uuid import UUID as UUIDType
 
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from core_platform.data_management.models.organization import Organization, OrganizationStatus
+from core_platform.monitoring.prometheus_integration import get_prometheus_integration
 
 
 async def list_organizations(
@@ -56,11 +58,14 @@ async def list_organizations(
 
     # Total count
     count_stmt = stmt.with_only_columns(func.count(Organization.id))
-    total = (await db.execute(count_stmt)).scalar_one_or_none() or 0
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        total = (await db.execute(count_stmt)).scalar_one_or_none() or 0
 
-    # Page
-    page_stmt = stmt.order_by(Organization.created_at.desc()).offset(offset).limit(limit)
-    rows = (await db.execute(page_stmt)).scalars().all()
+        # Page
+        page_stmt = stmt.order_by(Organization.created_at.desc()).offset(offset).limit(limit)
+        rows = (await db.execute(page_stmt)).scalars().all()
 
     def to_dict(org: Organization) -> Dict[str, Any]:
         return {
@@ -73,13 +78,28 @@ async def list_organizations(
             "created_at": getattr(org, "created_at", None).isoformat() if getattr(org, "created_at", None) else None,
         }
 
-    return {
-        "items": [to_dict(r) for r in rows],
-        "count": int(total),
-        "page": page,
-        "limit": limit,
-        "offset": offset,
-    }
+        return {
+            "items": [to_dict(r) for r in rows],
+            "count": int(total),
+            "page": page,
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "organization", "method": "list_organizations", "table": "organizations", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "organization", "method": "list_organizations", "table": "organizations"}
+            )
 
 
 async def get_organization_by_id(
@@ -94,19 +114,37 @@ async def get_organization_by_id(
         except Exception:
             return None
 
-    row = (await db.execute(select(Organization).where(Organization.id == org_id))).scalars().first()
-    if not row:
-        return None
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        row = (await db.execute(select(Organization).where(Organization.id == org_id))).scalars().first()
+        if not row:
+            return None
 
-    return {
-        "id": str(getattr(row, "id", None)),
-        "name": getattr(row, "name", None),
-        "business_type": getattr(row, "business_type", None).value if getattr(row, "business_type", None) else None,
-        "tin": getattr(row, "tin", None),
-        "rc_number": getattr(row, "rc_number", None),
-        "status": getattr(row, "status", None).value if getattr(row, "status", None) else None,
-        "created_at": getattr(row, "created_at", None).isoformat() if getattr(row, "created_at", None) else None,
-    }
+        return {
+            "id": str(getattr(row, "id", None)),
+            "name": getattr(row, "name", None),
+            "business_type": getattr(row, "business_type", None).value if getattr(row, "business_type", None) else None,
+            "tin": getattr(row, "tin", None),
+            "rc_number": getattr(row, "rc_number", None),
+            "status": getattr(row, "status", None).value if getattr(row, "status", None) else None,
+            "created_at": getattr(row, "created_at", None).isoformat() if getattr(row, "created_at", None) else None,
+        }
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "organization", "method": "get_organization_by_id", "table": "organizations", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "organization", "method": "get_organization_by_id", "table": "organizations"}
+            )
 
 
 async def list_organizations_by_system(
@@ -159,15 +197,18 @@ async def list_organizations_by_system(
             | (Organization.rc_number.like(pattern))
         )
 
-    count_stmt = select(func.count(func.distinct(Organization.id))).select_from(base.subquery())
-    total = (await db.execute(count_stmt)).scalar_one_or_none() or 0
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        count_stmt = select(func.count(func.distinct(Organization.id))).select_from(base.subquery())
+        total = (await db.execute(count_stmt)).scalar_one_or_none() or 0
 
-    page_stmt = (
-        base.order_by(Organization.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    rows = (await db.execute(page_stmt)).scalars().all()
+        page_stmt = (
+            base.order_by(Organization.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        rows = (await db.execute(page_stmt)).scalars().all()
 
     def to_dict(org: Organization) -> Dict[str, Any]:
         return {
@@ -180,11 +221,26 @@ async def list_organizations_by_system(
             "created_at": getattr(org, "created_at", None).isoformat() if getattr(org, "created_at", None) else None,
         }
 
-    return {
-        "items": [to_dict(r) for r in rows],
-        "count": int(total),
-        "page": page,
-        "limit": limit,
-        "offset": offset,
-        "system_type": sys_key,
-    }
+        return {
+            "items": [to_dict(r) for r in rows],
+            "count": int(total),
+            "page": page,
+            "limit": limit,
+            "offset": offset,
+            "system_type": sys_key,
+        }
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "organization", "method": "list_organizations_by_system", "table": "organizations", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "organization", "method": "list_organizations_by_system", "table": "organizations"}
+            )

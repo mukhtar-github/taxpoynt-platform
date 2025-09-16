@@ -8,6 +8,7 @@ schema dependencies in this targeted migration.
 from __future__ import annotations
 
 from typing import List, Optional, Union, Dict, Any
+import time
 import uuid
 from uuid import UUID as UUIDType
 
@@ -22,6 +23,7 @@ from core_platform.data_management.models.business_systems import (
 from core_platform.data_management.models.banking import (
     BankingConnection, BankingProvider, ConnectionStatus,
 )
+from core_platform.monitoring.prometheus_integration import get_prometheus_integration
 
 
 async def list_business_systems(
@@ -104,10 +106,13 @@ async def list_business_systems(
         except KeyError:
             return {"items": [], "count": 0}
 
-    # Count (naive)
-    total_rows = (await db.execute(base)).scalars().all()
-    stmt = base.order_by(getattr(model, "created_at").desc()).offset(max(0, int(offset))).limit(max(1, int(limit)))
-    rows = (await db.execute(stmt)).scalars().all()
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        # Count (naive)
+        total_rows = (await db.execute(base)).scalars().all()
+        stmt = base.order_by(getattr(model, "created_at").desc()).offset(max(0, int(offset))).limit(max(1, int(limit)))
+        rows = (await db.execute(stmt)).scalars().all()
 
     def _mask_account_number(acc: Optional[str]) -> Optional[str]:
         if not acc or not isinstance(acc, str):
@@ -138,10 +143,25 @@ async def list_business_systems(
             })
         return base
 
-    return {
-        "items": [to_dict(r) for r in rows],
-        "count": len(total_rows),
-        "limit": int(limit),
-        "offset": int(offset),
-        "system_type": sys_type,
-    }
+        return {
+            "items": [to_dict(r) for r in rows],
+            "count": len(total_rows),
+            "limit": int(limit),
+            "offset": int(offset),
+            "system_type": sys_type,
+        }
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        dt = time.monotonic() - start
+        integ = get_prometheus_integration()
+        if integ:
+            integ.record_metric(
+                "taxpoynt_repository_queries_total", 1,
+                {"repository": "business_systems", "method": "list_business_systems", "table": "business_systems", "outcome": outcome}
+            )
+            integ.record_metric(
+                "taxpoynt_repository_query_duration_seconds", dt,
+                {"repository": "business_systems", "method": "list_business_systems", "table": "business_systems"}
+            )
