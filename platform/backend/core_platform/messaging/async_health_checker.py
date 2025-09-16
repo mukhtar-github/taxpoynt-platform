@@ -541,24 +541,37 @@ async def setup_default_health_checks(manager: AsyncHealthCheckManager):
     
     # Database health check
     async def check_database():
+        """Prefer database_init health; fallback to connection_pool ping.
+
+        This aligns health status with the actual DB init path used by the app
+        and avoids initializing a separate connection layer.
+        """
         try:
-            # Use synchronous context manager inside async function (short/cheap call)
-            from core_platform.data_management.connection_pool import get_db_session, get_connection_pool, initialize_connection_pool
-            from sqlalchemy import text
-            # Ensure pool is initialized
-            pool = get_connection_pool()
-            if getattr(pool, 'session_factory', None) is None:
+            # Try database_init health first (unified path used by main)
+            try:
+                from core_platform.data_management.database_init import get_database
+                dbi = get_database()
+            except Exception:
+                dbi = None
+            if dbi is not None:
                 try:
-                    initialize_connection_pool()
+                    health = await dbi.health_check()
+                    if health.get("status") == "healthy":
+                        return "Database connection healthy"
+                    # Treat non-healthy as degraded without failing the check
+                    return "Database not initialized (degraded)"
                 except Exception:
-                    # fall through and try anyway
+                    # Fall through to simple ping
                     pass
-            # Try a lightweight ping
+
+            # Fallback: lightweight ping via connection_pool (if available)
+            from core_platform.data_management.connection_pool import get_db_session
+            from sqlalchemy import text
             with get_db_session() as session:
                 session.execute(text("SELECT 1"))
             return "Database connection healthy"
-        except TypeError as e:
-            # Handle 'NoneType' object is not callable (uninitialized pool)
+        except TypeError:
+            # Handle uninitialized pool/session factory
             return "Database not initialized (degraded)"
         except Exception as e:
             raise Exception(f"Database check failed: {e}")
