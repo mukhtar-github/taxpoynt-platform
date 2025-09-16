@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import StaticPool
 from alembic import command
 from alembic.config import Config
+import warnings
 from pathlib import Path
 
 from .models import (
@@ -385,7 +386,19 @@ async def cleanup_database():
 
 # Dependency for FastAPI
 def get_db_session():
-    """FastAPI dependency for database sessions"""
+    """FastAPI dependency for database sessions (deprecated for handlers).
+
+    Deprecated: Do not use this as a FastAPI dependency in HTTP handlers.
+    Prefer `core_platform.data_management.db_async.get_async_session` for
+    request-time database access. This sync session helper remains available
+    for non-HTTP service code paths and background jobs.
+    """
+    warnings.warn(
+        "database_init.get_db_session is deprecated for FastAPI handlers; "
+        "use core_platform.data_management.db_async.get_async_session instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not _database_initializer:
         raise RuntimeError("Database not initialized")
     

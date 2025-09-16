@@ -6,6 +6,7 @@ Implements connection pooling, read replicas, and performance monitoring.
 """
 
 import os
+import warnings
 import logging
 from typing import Dict, Any, Optional, List
 from sqlalchemy import create_engine, event, pool
@@ -482,7 +483,18 @@ def get_db_session(read_only: bool = False):
     
     Args:
         read_only: If True, use read replica (if available)
+    
+    Note: Deprecated for FastAPI HTTP handler DI. Use
+    `core_platform.data_management.db_async.get_async_session` in
+    request handlers. This helper remains appropriate for internal
+    services and non-HTTP code paths that prefer sync sessions.
     """
+    warnings.warn(
+        "connection_pool.get_db_session is deprecated for FastAPI handlers; "
+        "use core_platform.data_management.db_async.get_async_session for DI.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     pool = get_connection_pool()
     
     if read_only and pool.read_session_factory:
