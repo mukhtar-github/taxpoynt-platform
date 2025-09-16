@@ -106,14 +106,6 @@ async def list_business_systems(
         except KeyError:
             return {"items": [], "count": 0}
 
-    start = time.monotonic()
-    outcome = "success"
-    try:
-        # Count (naive)
-        total_rows = (await db.execute(base)).scalars().all()
-        stmt = base.order_by(getattr(model, "created_at").desc()).offset(max(0, int(offset))).limit(max(1, int(limit)))
-        rows = (await db.execute(stmt)).scalars().all()
-
     def _mask_account_number(acc: Optional[str]) -> Optional[str]:
         if not acc or not isinstance(acc, str):
             return None
@@ -143,13 +135,21 @@ async def list_business_systems(
             })
         return base
 
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        # Count (naive)
+        total_rows = (await db.execute(base)).scalars().all()
+        stmt = base.order_by(getattr(model, "created_at").desc()).offset(max(0, int(offset))).limit(max(1, int(limit)))
+        rows = (await db.execute(stmt)).scalars().all()
+
         return {
-            "items": [to_dict(r) for r in rows],
-            "count": len(total_rows),
-            "limit": int(limit),
-            "offset": int(offset),
-            "system_type": sys_type,
-        }
+                "items": [to_dict(r) for r in rows],
+                "count": len(total_rows),
+                "limit": int(limit),
+                "offset": int(offset),
+                "system_type": sys_type,
+            }
     except Exception:
         outcome = "error"
         raise
