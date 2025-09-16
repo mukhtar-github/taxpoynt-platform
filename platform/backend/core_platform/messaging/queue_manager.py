@@ -123,6 +123,7 @@ class QueueConfiguration:
     auto_ack: bool = True
     dead_letter_queue: Optional[str] = None
     retry_delays: List[float] = None
+    max_retries: int = 3
     metrics_enabled: bool = True
     
     def __post_init__(self):
@@ -285,6 +286,8 @@ class MessageQueue:
                 tags=tags or [],
                 metadata=metadata or {}
             )
+            # Apply queue-level retry policy
+            message.max_retries = max(0, int(self.config.max_retries))
             
             # Add to queue based on type
             if self.config.queue_type == QueueType.PRIORITY:
@@ -853,6 +856,29 @@ class QueueManager:
         
         self.logger = logging.getLogger(__name__)
         self.is_initialized = False
+        # Retry policy registry (overrides per queue)
+        self.retry_policies: Dict[str, Dict[str, Any]] = {}
+
+    def register_retry_policy(self, queue_name: str, *, max_retries: Optional[int] = None, retry_delays: Optional[List[float]] = None) -> None:
+        """Register or update a per-queue retry policy.
+
+        The policy updates the underlying QueueConfiguration for the queue if it exists,
+        and is also stored for application when a queue is created later.
+        """
+        policy: Dict[str, Any] = {}
+        if max_retries is not None:
+            policy["max_retries"] = int(max_retries)
+        if retry_delays is not None:
+            policy["retry_delays"] = list(retry_delays)
+        self.retry_policies[queue_name] = {**self.retry_policies.get(queue_name, {}), **policy}
+
+        # If queue already exists, apply immediately
+        q = self.queues.get(queue_name)
+        if q:
+            if "max_retries" in policy:
+                q.config.max_retries = policy["max_retries"]
+            if "retry_delays" in policy:
+                q.config.retry_delays = policy["retry_delays"]
     
     async def initialize(self):
         """Initialize the queue manager"""
@@ -883,6 +909,14 @@ class QueueManager:
                 config.persistence_path = self.persistence_root
             
             # Create queue
+            # Apply pre-registered retry policy overrides
+            rp = self.retry_policies.get(config.queue_name)
+            if rp:
+                if "max_retries" in rp:
+                    config.max_retries = rp["max_retries"]
+                if "retry_delays" in rp:
+                    config.retry_delays = rp["retry_delays"]
+
             queue = MessageQueue(config)
             await queue.start()
             
@@ -1013,9 +1047,30 @@ class QueueManager:
                 queue_type=QueueType.FIFO,
                 max_workers=1,
                 enable_persistence=True
-            )
+            ),
+            # Dedicated queues for FIRS submissions (high throughput + retry)
+            QueueConfiguration(
+                queue_name="firs_submissions_high",
+                queue_type=QueueType.PRIORITY,
+                max_workers=12,
+                strategy=QueueStrategy.MULTIPLE_CONSUMER,
+                message_ttl=timedelta(hours=6),
+                retry_delays=[2.0, 10.0, 30.0, 120.0, 300.0],
+                max_retries=5,
+                dead_letter_queue="dead_letter",
+            ),
+            QueueConfiguration(
+                queue_name="firs_submissions_retry",
+                queue_type=QueueType.DELAYED,
+                max_workers=4,
+                strategy=QueueStrategy.SINGLE_CONSUMER,
+                message_ttl=timedelta(hours=24),
+                retry_delays=[60.0, 300.0, 900.0, 1800.0, 3600.0],
+                max_retries=8,
+                dead_letter_queue="dead_letter",
+            ),
         ]
-        
+
         for config in default_queues:
             await self.create_queue(config)
     
