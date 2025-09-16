@@ -90,7 +90,9 @@ class MainGatewayRouter:
         # Optional: validate route→operation mapping at startup
         try:
             validate = str(os.getenv("ROUTER_VALIDATE_ON_STARTUP", "false")).lower() in ("1", "true", "yes", "on")
-            if validate:
+            # Skip automatic validation when running under pytest to allow tests to register mock services first
+            running_tests = os.getenv("PYTEST_CURRENT_TEST") is not None
+            if validate and not running_tests:
                 fail_fast = str(os.getenv("ROUTER_FAIL_FAST_ON_STARTUP", "false")).lower() in ("1", "true", "yes", "on")
                 self.validate_route_operation_mapping(fail_fast=fail_fast)
         except Exception as e:

@@ -193,55 +193,55 @@ async def get_submission_metrics(
         res = await db.execute(status_stmt)
         by_status = {row[0]: row[1] for row in res.all()}
 
-    total = sum(by_status.values())
-    processing = sum(by_status.get(s, 0) for s in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING))
-    completed = by_status.get(SubmissionStatus.ACCEPTED, 0)
-    failed = sum(by_status.get(s, 0) for s in (SubmissionStatus.REJECTED, SubmissionStatus.FAILED))
-    submitted = by_status.get(SubmissionStatus.SUBMITTED, 0)
+        total = sum(by_status.values())
+        processing = sum(by_status.get(s, 0) for s in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING))
+        completed = by_status.get(SubmissionStatus.ACCEPTED, 0)
+        failed = sum(by_status.get(s, 0) for s in (SubmissionStatus.REJECTED, SubmissionStatus.FAILED))
+        submitted = by_status.get(SubmissionStatus.SUBMITTED, 0)
 
-    # Today transmissions (UTC, created_at date)
-    today = datetime.now(timezone.utc).date()
-    today_stmt = (
-        select(func.count(FIRSSubmission.id))
-        .where(
-            FIRSSubmission.organization_id == org_id,
-            func.date(FIRSSubmission.created_at) == today.isoformat(),
+        # Today transmissions (UTC, created_at date)
+        today = datetime.now(timezone.utc).date()
+        today_stmt = (
+            select(func.count(FIRSSubmission.id))
+            .where(
+                FIRSSubmission.organization_id == org_id,
+                func.date(FIRSSubmission.created_at) == today.isoformat(),
+            )
         )
-    )
-    today_count = (await db.execute(today_stmt)).scalar_one_or_none() or 0
+        today_count = (await db.execute(today_stmt)).scalar_one_or_none() or 0
 
-    # Average processing time over accepted submissions (in minutes)
-    time_stmt = (
-        select(FIRSSubmission.submitted_at, FIRSSubmission.accepted_at)
-        .where(
-            FIRSSubmission.organization_id == org_id,
-            FIRSSubmission.accepted_at.isnot(None),
-            FIRSSubmission.submitted_at.isnot(None),
+        # Average processing time over accepted submissions (in minutes)
+        time_stmt = (
+            select(FIRSSubmission.submitted_at, FIRSSubmission.accepted_at)
+            .where(
+                FIRSSubmission.organization_id == org_id,
+                FIRSSubmission.accepted_at.isnot(None),
+                FIRSSubmission.submitted_at.isnot(None),
+            )
         )
-    )
-    times = (await db.execute(time_stmt)).all()
-    avg_minutes = None
-    if times:
-        deltas = [
-            (acc - sub).total_seconds() / 60.0
-            for (sub, acc) in times
-            if acc and sub and acc > sub
-        ]
-        if deltas:
-            avg_minutes = round(sum(deltas) / len(deltas), 2)
+        times = (await db.execute(time_stmt)).all()
+        avg_minutes = None
+        if times:
+            deltas = [
+                (acc - sub).total_seconds() / 60.0
+                for (sub, acc) in times
+                if acc and sub and acc > sub
+            ]
+            if deltas:
+                avg_minutes = round(sum(deltas) / len(deltas), 2)
 
-    success_rate = round((completed / total) * 100.0, 2) if total else 0.0
+        success_rate = round((completed / total) * 100.0, 2) if total else 0.0
 
         return {
-        "totalTransmissions": int(total),
-        "processing": int(processing),
-        "completed": int(completed),
-        "failed": int(failed),
-        "submitted": int(submitted),
-        "averageProcessingTime": f"{avg_minutes} minutes" if avg_minutes is not None else None,
-        "successRate": success_rate,
-        "todayTransmissions": int(today_count),
-        }
+                "totalTransmissions": int(total),
+                "processing": int(processing),
+                "completed": int(completed),
+                "failed": int(failed),
+                "submitted": int(submitted),
+                "averageProcessingTime": f"{avg_minutes} minutes" if avg_minutes is not None else None,
+                "successRate": success_rate,
+                "todayTransmissions": int(today_count),
+            }
     except Exception:
         outcome = "error"
         raise
