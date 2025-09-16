@@ -14,8 +14,8 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request
 from pydantic import BaseModel, validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Fixed imports - use relative imports instead of platform.backend
-from core_platform.data_management.connection_pool import get_db_session
+# Use async DB session dependency for SI endpoints
+from core_platform.data_management.db_async import get_async_session
 from api_gateway.role_routing.models import HTTPRoutingContext
 from core_platform.authentication.role_manager import PlatformRole
 from .version_models import V1ResponseModel
@@ -136,7 +136,7 @@ def create_firs_invoice_router() -> APIRouter:
     )
     async def get_connected_sources(
         current_user = Depends(get_current_user_context),
-        db: AsyncSession = Depends(get_db_session)
+        db: AsyncSession = Depends(get_async_session)
     ):
         """Get all connected data sources for the organization."""
         try:
@@ -247,7 +247,7 @@ def create_firs_invoice_router() -> APIRouter:
     async def search_business_transactions(
         filters: TransactionFilterRequest,
         current_user = Depends(get_current_user_context),
-        db: AsyncSession = Depends(get_db_session)
+        db: AsyncSession = Depends(get_async_session)
     ):
         """Search business transactions across all connected systems."""
         try:
@@ -341,7 +341,7 @@ def create_firs_invoice_router() -> APIRouter:
     async def generate_firs_invoices(
         request: FIRSInvoiceGenerationRequestAPI,
         current_user = Depends(get_current_user_context),
-        db: AsyncSession = Depends(get_db_session)
+        db: AsyncSession = Depends(get_async_session)
     ):
         """Generate FIRS-compliant invoices from business transaction data."""
         try:
@@ -438,7 +438,7 @@ def create_firs_invoice_router() -> APIRouter:
     )
     async def get_sample_invoice_data(
         current_user = Depends(get_current_user_context),
-        db: AsyncSession = Depends(get_db_session)
+        db: AsyncSession = Depends(get_async_session)
     ):
         """Get sample invoice data for testing FIRS generation."""
         try:

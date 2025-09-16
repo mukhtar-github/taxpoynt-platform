@@ -126,25 +126,75 @@ class DatabaseInitializer:
             raise
     
     async def _create_tables(self):
-        """Create all database tables"""
+        """Initialize database schema (migrations or dev create_all)."""
         try:
-            # Create all tables from models
-            Base.metadata.create_all(bind=self.engine)
-            
-            table_count = len(Base.metadata.tables)
-            logger.info(f"✅ Created {table_count} database tables")
-            
-            # Log table names for verification
-            table_names = list(Base.metadata.tables.keys())
-            logger.info(f"📊 Tables: {', '.join(table_names)}")
-            
+            is_postgres = "postgresql" in (self.database_url or "").lower() or "postgres://" in (self.database_url or "").lower()
+            enable_alembic = os.getenv("ALEMBIC_RUN_ON_STARTUP", "true").lower() == "true"
+            allow_create_all = os.getenv("ALLOW_CREATE_ALL", "false").lower() == "true"
+
+            if is_postgres and enable_alembic:
+                logger.info("📜 Applying Alembic migrations (PostgreSQL detected)...")
+                await self._run_alembic_migrations()
+                logger.info("✅ Alembic migrations applied")
+            else:
+                # Dev-only fallback: create_all for lightweight local setups
+                if self.environment in ("development", "dev", "testing", "test") or allow_create_all:
+                    logger.info("🛠️ Dev/test environment detected – creating tables via Base.metadata.create_all")
+                    Base.metadata.create_all(bind=self.engine)
+                    table_count = len(Base.metadata.tables)
+                    logger.info(f"✅ Created {table_count} database tables (dev/test)")
+                    table_names = list(Base.metadata.tables.keys())
+                    logger.info(f"📊 Tables: {', '.join(table_names)}")
+                else:
+                    logger.info("ℹ️ Skipping create_all in non-dev environment (set ALEMBIC_RUN_ON_STARTUP=true to apply migrations)")
+
             # Create production indexes for performance (PostgreSQL only)
-            if "postgresql" in self.database_url:
+            if is_postgres:
                 await self._create_production_indexes()
-            
+
         except Exception as e:
-            logger.error(f"❌ Failed to create tables: {e}")
+            logger.error(f"❌ Failed to initialize schema: {e}")
             raise
+
+    async def _run_alembic_migrations(self) -> None:
+        """Run Alembic migrations to head using programmatic API.
+
+        Resolves migration script location from environment or known paths.
+        Honors ALEMBIC_FAIL_ON_STARTUP_ERROR (default true) to control failure mode.
+        """
+        try:
+            # Resolve script_location
+            script_path_env = os.getenv("ALEMBIC_MIGRATIONS_PATH")
+            base_dir = Path(__file__).resolve().parents[4]  # points to platform/backend
+            candidates = [
+                Path(script_path_env) if script_path_env else None,
+                base_dir / "alembic",
+                base_dir.parent / "archive" / "legacy" / "backend" / "alembic",
+            ]
+            script_location = None
+            for cand in candidates:
+                if cand and cand.exists() and (cand / "env.py").exists():
+                    script_location = str(cand)
+                    break
+
+            if not script_location:
+                raise RuntimeError("Could not locate Alembic migrations directory. Set ALEMBIC_MIGRATIONS_PATH.")
+
+            cfg = Config()
+            cfg.set_main_option("script_location", script_location)
+            cfg.set_main_option("sqlalchemy.url", self.database_url)
+            # Optional: quiet logging unless explicitly enabled
+            if os.getenv("ALEMBIC_LOG_LEVEL"):
+                cfg.set_main_option("log_level", os.getenv("ALEMBIC_LOG_LEVEL", "INFO"))
+
+            # Run upgrade to head
+            command.upgrade(cfg, "head")
+        except Exception as e:
+            fail = os.getenv("ALEMBIC_FAIL_ON_STARTUP_ERROR", "true").lower() == "true"
+            logger.error(f"Alembic migration error: {e}")
+            if fail:
+                raise
+            logger.warning("Continuing startup without applying migrations due to configuration")
     
     async def _create_production_indexes(self):
         """Create production database indexes for performance"""

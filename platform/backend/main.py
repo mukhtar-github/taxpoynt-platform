@@ -337,8 +337,8 @@ def create_taxpoynt_app() -> FastAPI:
 
     # Optional tenant scoping middleware for APP routes
     try:
-        from api_gateway.middleware.tenant_scope import AppTenantScopeMiddleware
-        app.add_middleware(AppTenantScopeMiddleware)
+        from api_gateway.middleware.tenant_scope import TenantScopeMiddleware
+        app.add_middleware(TenantScopeMiddleware)
     except Exception as _e:
         logger.warning(f"Tenant scope middleware not applied: {_e}")
     
@@ -422,6 +422,33 @@ async def initialize_services():
             database = await initialize_database_with_retry()
             app.state.database = database
             logger.info("✅ Production database initialized with optimizations")
+
+            # Initialize MultiTenantManager (aligns with tenant dependency)
+            try:
+                from core_platform.data_management.multi_tenant_manager import initialize_tenant_manager
+                from contextlib import contextmanager
+
+                class _DBLayerAdapter:
+                    """Minimal adapter exposing get_session() for MultiTenantManager."""
+                    def __init__(self, SessionLocal):
+                        self._SessionLocal = SessionLocal
+
+                    @contextmanager
+                    def get_session(self):
+                        session = self._SessionLocal()
+                        try:
+                            yield session
+                        finally:
+                            session.close()
+
+                if hasattr(database, 'SessionLocal') and database.SessionLocal is not None:
+                    tenant_mgr = initialize_tenant_manager(_DBLayerAdapter(database.SessionLocal))
+                    app.state.tenant_manager = tenant_mgr
+                    logger.info("✅ MultiTenantManager initialized and wired to request lifecycle")
+                else:
+                    logger.warning("⚠️ Could not initialize MultiTenantManager: SessionLocal not available")
+            except Exception as te:
+                logger.warning(f"⚠️ Tenant manager initialization skipped: {te}")
         except Exception as e:
             # Phase 6: Structured error handling with context preservation
             if app.state.error_management:

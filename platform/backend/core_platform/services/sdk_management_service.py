@@ -13,8 +13,8 @@ import hashlib
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, desc, select
 
 from ..data_management.models import (
     SDK, SDKVersion, SDKDownload, SDKUsageLog, SandboxScenario, 
@@ -33,7 +33,7 @@ class SDKManagementService:
     and demo data fallbacks.
     """
     
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: AsyncSession):
         self.db = db_session
         self.use_demo_data = os.getenv("USE_DEMO_DATA", "false").lower() == "true"
         self.demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
@@ -70,13 +70,12 @@ class SDKManagementService:
         }
     
     async def _get_database_sdk_catalog(self, language: Optional[str] = None) -> Dict[str, Any]:
-        """Get SDK catalog from database."""
-        query = self.db.query(SDK).filter(SDK.is_active == True)
-        
+        """Get SDK catalog from database (async)."""
+        stmt = select(SDK).where(SDK.is_active == True)
         if language:
-            query = query.filter(SDK.language == language)
-        
-        sdks = query.all()
+            stmt = stmt.where(SDK.language == language)
+        res = await self.db.execute(stmt)
+        sdks = res.scalars().all()
         
         catalog = {}
         for sdk in sdks:
@@ -109,9 +108,10 @@ class SDKManagementService:
             if self.use_demo_data or self.demo_mode:
                 return DEMO_SDK_DATA.get(language)
             
-            sdk = self.db.query(SDK).filter(
-                and_(SDK.language == language, SDK.is_active == True)
-            ).first()
+            res = await self.db.execute(
+                select(SDK).where(and_(SDK.language == language, SDK.is_active == True)).limit(1)
+            )
+            sdk = res.scalars().first()
             
             if not sdk:
                 return None
@@ -145,9 +145,8 @@ class SDKManagementService:
             if self.use_demo_data or self.demo_mode:
                 return {"scenarios": DEMO_SCENARIOS, "source": "demo_data"}
             
-            scenarios = self.db.query(SandboxScenario).filter(
-                SandboxScenario.is_active == True
-            ).all()
+            res = await self.db.execute(select(SandboxScenario).where(SandboxScenario.is_active == True))
+            scenarios = res.scalars().all()
             
             scenario_dict = {}
             for scenario in scenarios:
@@ -214,9 +213,8 @@ class SDKManagementService:
         """Record test result in database."""
         try:
             # Find scenario in database
-            scenario = self.db.query(SandboxScenario).filter(
-                SandboxScenario.name == scenario_name
-            ).first()
+            res = await self.db.execute(select(SandboxScenario).where(SandboxScenario.name == scenario_name).limit(1))
+            scenario = res.scalars().first()
             
             if not scenario:
                 return
@@ -236,11 +234,11 @@ class SDKManagementService:
             )
             
             self.db.add(result)
-            self.db.commit()
+            await self.db.commit()
             
         except Exception as e:
             logger.error(f"Failed to record test result: {e}")
-            self.db.rollback()
+            await self.db.rollback()
     
     # ==================== Helper Methods ====================
     
@@ -616,15 +614,14 @@ if __name__ == '__main__':
             start_date = datetime.utcnow() - timedelta(days=30)
         
         # Query analytics from database
-        query = self.db.query(SDKAnalytics).filter(SDKAnalytics.date >= start_date)
-        
+        stmt = select(SDKAnalytics).where(SDKAnalytics.date >= start_date)
         if language:
-            # Filter by specific language
-            sdk_query = self.db.query(SDK).filter(SDK.language == language).first()
-            if sdk_query:
-                query = query.filter(SDKAnalytics.sdk_id == sdk_query.id)
-        
-        analytics_data = query.all()
+            res_sdk = await self.db.execute(select(SDK).where(SDK.language == language).limit(1))
+            sdk_row = res_sdk.scalars().first()
+            if sdk_row:
+                stmt = stmt.where(SDKAnalytics.sdk_id == sdk_row.id)
+        res = await self.db.execute(stmt)
+        analytics_data = res.scalars().all()
         
         # Aggregate results
         total_downloads = sum(a.downloads for a in analytics_data if a.downloads)
@@ -660,9 +657,10 @@ if __name__ == '__main__':
                 }
             
             # Get SDK
-            sdk = self.db.query(SDK).filter(
-                and_(SDK.language == language, SDK.is_active == True)
-            ).first()
+            res = await self.db.execute(
+                select(SDK).where(and_(SDK.language == language, SDK.is_active == True)).limit(1)
+            )
+            sdk = res.scalars().first()
             
             if not sdk:
                 raise ValueError(f"SDK for language '{language}' not found")
@@ -679,7 +677,7 @@ if __name__ == '__main__':
             )
             
             self.db.add(feedback)
-            self.db.commit()
+            await self.db.commit()
             
             return {
                 "feedback_id": str(feedback.id),
@@ -690,5 +688,5 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Failed to submit feedback: {e}")
             if not self.use_demo_data:
-                self.db.rollback()
+                await self.db.rollback()
             raise

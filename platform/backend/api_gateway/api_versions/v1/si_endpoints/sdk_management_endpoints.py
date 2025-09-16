@@ -29,7 +29,7 @@ from core_platform.data_management.models import (
     DEMO_SDK_DATA, DEMO_SCENARIOS
 )
 from core_platform.services.sdk_management_service import SDKManagementService
-from core_platform.data_management.database_init import get_db_session
+from core_platform.data_management.db_async import get_async_session
 from ..version_models import V1ResponseModel, V1ErrorModel  # pyright: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
@@ -46,20 +46,16 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     
     router = APIRouter(prefix="/sdk", tags=["SDK Management"])
     
-    def get_sdk_service() -> SDKManagementService:
-        """Get SDK management service with database session."""
-        db_session = get_db_session()
-        return SDKManagementService(db_session)
-    
     @router.get("/catalog", response_model=V1ResponseModel)
     async def get_sdk_catalog(
         request: Request,
         language: Optional[str] = None,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Get available SDKs catalog with optional language filtering"""
         try:
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             catalog_data = await sdk_service.get_sdk_catalog(language)
             
             return V1ResponseModel(
@@ -76,11 +72,12 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     async def get_sdk_by_language(
         language: str,
         request: Request,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Get specific SDK by programming language"""
         try:
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             sdk_info = await sdk_service.get_sdk_by_language(language)
             
             if not sdk_info:
@@ -103,11 +100,12 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
         request: Request,
         language: str,
         custom_config: Optional[Dict[str, Any]] = None,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Generate a new SDK based on configuration"""
         try:
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             sdk_data = await sdk_service.generate_sdk_package(language, custom_config)
             
             return V1ResponseModel(
@@ -124,7 +122,8 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
     async def download_sdk(
         sdk_name: str,
         request: Request,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Download generated SDK as ZIP file"""
         try:
@@ -287,11 +286,12 @@ python-dotenv>=0.19.0
     @router.get("/sandbox/scenarios", response_model=V1ResponseModel)
     async def get_sandbox_scenarios(
         request: Request,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Get available API testing scenarios for sandbox"""
         try:
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             scenarios_data = await sdk_service.get_sandbox_scenarios()
             
             return V1ResponseModel(
@@ -311,11 +311,12 @@ python-dotenv>=0.19.0
         api_key: str,
         custom_headers: Optional[Dict[str, str]] = None,
         custom_body: Optional[Dict[str, Any]] = None,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Test an API scenario in the sandbox environment"""
         try:
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             
             test_data = {
                 "api_key": api_key,
@@ -347,11 +348,12 @@ python-dotenv>=0.19.0
         request: Request,
         period: str = "30d",
         language: Optional[str] = None,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Get SDK usage analytics and metrics"""
         try:
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             analytics_data = await sdk_service.get_sdk_analytics(period, language)
             
             return V1ResponseModel(
@@ -371,14 +373,15 @@ python-dotenv>=0.19.0
         feedback_type: str,
         rating: int,
         comments: Optional[str] = None,
-        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE))
+        context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
+        db = Depends(get_async_session),
     ):
         """Submit feedback for SDK experience"""
         try:
             if not 1 <= rating <= 5:
                 raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
             
-            sdk_service = get_sdk_service()
+            sdk_service = SDKManagementService(db)
             
             user_id = getattr(context, 'user_id', 'anonymous')
             organization_id = getattr(context, 'organization_id', 'default')

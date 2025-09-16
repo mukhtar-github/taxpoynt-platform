@@ -20,21 +20,24 @@ from core_platform.authentication.tenant_context import (
 )
 
 
-class AppTenantScopeMiddleware(BaseHTTPMiddleware):
+class TenantScopeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path: str = str(request.url.path)
         applied = False
         try:
-            if path.startswith("/api/v1/app"):
+            if path.startswith("/api/v1/app") or path.startswith("/api/v1/si"):
                 ctx = getattr(request.state, "routing_context", None)
+                tenant = None
                 if ctx:
                     tenant = getattr(ctx, "organization_id", None) or getattr(ctx, "tenant_id", None)
-                    if tenant:
-                        set_current_tenant(str(tenant))
-                        applied = True
+                # For SI routes, allow query param fallback (org_id)
+                if not tenant and path.startswith("/api/v1/si"):
+                    tenant = request.query_params.get("org_id")
+                if tenant:
+                    set_current_tenant(str(tenant))
+                    applied = True
             response = await call_next(request)
             return response
         finally:
             if applied:
                 clear_current_tenant()
-
