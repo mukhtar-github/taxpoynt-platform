@@ -58,14 +58,6 @@ async def list_organizations(
 
     # Total count
     count_stmt = stmt.with_only_columns(func.count(Organization.id))
-    start = time.monotonic()
-    outcome = "success"
-    try:
-        total = (await db.execute(count_stmt)).scalar_one_or_none() or 0
-
-        # Page
-        page_stmt = stmt.order_by(Organization.created_at.desc()).offset(offset).limit(limit)
-        rows = (await db.execute(page_stmt)).scalars().all()
 
     def to_dict(org: Organization) -> Dict[str, Any]:
         return {
@@ -78,13 +70,22 @@ async def list_organizations(
             "created_at": getattr(org, "created_at", None).isoformat() if getattr(org, "created_at", None) else None,
         }
 
+    start = time.monotonic()
+    outcome = "success"
+    try:
+        total = (await db.execute(count_stmt)).scalar_one_or_none() or 0
+
+        # Page
+        page_stmt = stmt.order_by(Organization.created_at.desc()).offset(offset).limit(limit)
+        rows = (await db.execute(page_stmt)).scalars().all()
+
         return {
-            "items": [to_dict(r) for r in rows],
-            "count": int(total),
-            "page": page,
-            "limit": limit,
-            "offset": offset,
-        }
+                "items": [to_dict(r) for r in rows],
+                "count": int(total),
+                "page": page,
+                "limit": limit,
+                "offset": offset,
+            }
     except Exception:
         outcome = "error"
         raise
@@ -197,6 +198,17 @@ async def list_organizations_by_system(
             | (Organization.rc_number.like(pattern))
         )
 
+    def to_dict(org: Organization) -> Dict[str, Any]:
+        return {
+            "id": str(getattr(org, "id", None)),
+            "name": getattr(org, "name", None),
+            "business_type": getattr(org, "business_type", None).value if getattr(org, "business_type", None) else None,
+            "tin": getattr(org, "tin", None),
+            "rc_number": getattr(org, "rc_number", None),
+            "status": getattr(org, "status", None).value if getattr(org, "status", None) else None,
+            "created_at": getattr(org, "created_at", None).isoformat() if getattr(org, "created_at", None) else None,
+        }
+
     start = time.monotonic()
     outcome = "success"
     try:
@@ -210,25 +222,14 @@ async def list_organizations_by_system(
         )
         rows = (await db.execute(page_stmt)).scalars().all()
 
-    def to_dict(org: Organization) -> Dict[str, Any]:
         return {
-            "id": str(getattr(org, "id", None)),
-            "name": getattr(org, "name", None),
-            "business_type": getattr(org, "business_type", None).value if getattr(org, "business_type", None) else None,
-            "tin": getattr(org, "tin", None),
-            "rc_number": getattr(org, "rc_number", None),
-            "status": getattr(org, "status", None).value if getattr(org, "status", None) else None,
-            "created_at": getattr(org, "created_at", None).isoformat() if getattr(org, "created_at", None) else None,
-        }
-
-        return {
-            "items": [to_dict(r) for r in rows],
-            "count": int(total),
-            "page": page,
-            "limit": limit,
-            "offset": offset,
-            "system_type": sys_key,
-        }
+                "items": [to_dict(r) for r in rows],
+                "count": int(total),
+                "page": page,
+                "limit": limit,
+                "offset": offset,
+                "system_type": sys_key,
+            }
     except Exception:
         outcome = "error"
         raise
