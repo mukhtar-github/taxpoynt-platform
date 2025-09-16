@@ -61,10 +61,19 @@ class OWASPSecurityHeaders:
         # Build Content Security Policy
         extra_connect = os.getenv("CSP_EXTRA_CONNECT_SRC", "").strip()
         extra_connect_list = [s for s in (x.strip() for x in extra_connect.split(",")) if s]
+        # Base directives common to all envs
         csp_directives = [
             "default-src 'self'",
-            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.{self.domain}",
-            f"style-src 'self' 'unsafe-inline' https://*.{self.domain} https://fonts.googleapis.com",
+        ]
+        # Scripts/styles: allow unsafe-inline only outside production
+        if self.environment == "production":
+            csp_directives.append(f"script-src 'self' https://*.{self.domain}")
+            csp_directives.append(f"style-src 'self' https://*.{self.domain} https://fonts.googleapis.com")
+        else:
+            csp_directives.append(f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.{self.domain}")
+            csp_directives.append(f"style-src 'self' 'unsafe-inline' https://*.{self.domain} https://fonts.googleapis.com")
+
+        csp_directives.extend([
             f"img-src 'self' data: https://*.{self.domain} https://mono.co https://stitch.money",
             f"font-src 'self' https://fonts.gstatic.com https://*.{self.domain}",
             f"connect-src 'self' https://*.{self.domain} https://api.firs.gov.ng https://api.mono.co https://api.stitch.money https://*.ondigitalocean.app"
@@ -75,7 +84,7 @@ class OWASPSecurityHeaders:
             "base-uri 'self'",
             "form-action 'self'",
             "upgrade-insecure-requests"
-        ]
+        ])
         
         # Add report-uri for CSP violations in production
         if self.environment == "production":

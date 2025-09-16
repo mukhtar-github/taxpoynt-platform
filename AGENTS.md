@@ -198,4 +198,23 @@ Database DI Policy (FastAPI Handlers)
 - Migrations: For PostgreSQL, Alembic runs at startup; `create_all` is gated to dev/test. Control with:
   - `ALEMBIC_RUN_ON_STARTUP=true|false` (default true)
   - `ALEMBIC_MIGRATIONS_PATH` (override scripts path)
+
+
+Boot & Health Flow (DB + Observability)
+- Single DB init path
+  - The app initializes DB via `database_init.initialize_database()` inside `main.initialize_services`. Do not add separate `connection_pool.initialize_connection_pool()` calls during startup.
+  - For FastAPI handlers, keep using async DI (`db_async.get_async_session`). Sync `get_db_session` helpers remain for non‑HTTP/background jobs only.
+
+- Health checks (unified)
+  - The async health checker prefers the `database_init` path for DB health via `get_database().health_check()`. It only falls back to a lightweight `SELECT 1` using `connection_pool.get_db_session()` if `database_init` is not available. This keeps health status aligned with the actual session provider.
+
+- Observability
+  - Observability is initialized once via `core_platform.monitoring.setup_production_observability(...)` from `main.initialize_services`.
+  - `ObservabilityMiddleware` provides request‑level metrics/tracing and does not duplicate the Phase 4 initialization.
+
+- Quick references
+  - Startup: `platform/backend/main.py`
+  - DB init: `platform/backend/core_platform/data_management/database_init.py`
+  - Async DI: `platform/backend/core_platform/data_management/db_async.py`
+  - Health checker: `platform/backend/core_platform/messaging/async_health_checker.py`
   - `ALLOW_CREATE_ALL=true|false` (dev-only fallback in non-dev envs)

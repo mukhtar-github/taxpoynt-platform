@@ -76,9 +76,15 @@ class ProductionJWTManager:
                 def expire(self, key, ttl):
                     return True
                 # Hash helpers
-                def hmset(self, key, mapping):
-                    self._hash[key] = dict(mapping)
+                def hset(self, key, mapping=None, **kwargs):
+                    data = mapping or kwargs
+                    if not isinstance(data, dict):
+                        return False
+                    self._hash[key] = dict(data)
                     return True
+                # Back-compat alias
+                def hmset(self, key, mapping):
+                    return self.hset(key, mapping=mapping)
                 def hgetall(self, key):
                     return dict(self._hash.get(key, {}))
                 def scan_iter(self, match=None):
@@ -369,7 +375,8 @@ class ProductionJWTManager:
     def _cache_token_metadata(self, jti: str, metadata: Dict[str, Any]) -> None:
         """Cache token metadata for management"""
         try:
-            self.redis_client.hmset(f"taxpoynt:token_meta:{jti}", metadata)
+            # redis-py hmset is deprecated; use hset with mapping
+            self.redis_client.hset(f"taxpoynt:token_meta:{jti}", mapping=metadata)
             # Set expiration based on token expiration
             expire_str = metadata.get("expires_at")
             if expire_str:
