@@ -19,6 +19,8 @@ from ..version_models import V1ResponseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
 from api_gateway.dependencies.tenant import make_tenant_scope_dependency
+from api_gateway.utils.error_mapping import v1_error_response
+from core_platform.data_management.repository_base import EntityNotFoundError
 from core_platform.data_management.repositories.firs_submission_repo_async import (
     list_recent_submissions,
     get_submission_metrics,
@@ -298,7 +300,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(payload, "recent_submissions_retrieved")
         except Exception as e:
             logger.error(f"Error getting recent submissions: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get recent submissions")
+            return v1_error_response(e, action="get_recent_submissions")
 
     async def get_submissions(
         self,
@@ -328,7 +330,7 @@ class TrackingManagementEndpointsV1:
             return self._create_v1_response(payload, "submissions_listed")
         except Exception as e:
             logger.error(f"Error listing submissions: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list submissions")
+            return v1_error_response(e, action="get_submissions")
 
     async def get_submission(
         self,
@@ -339,13 +341,11 @@ class TrackingManagementEndpointsV1:
         try:
             row = await get_submission_by_id(db, submission_id=submission_id)
             if not row:
-                raise HTTPException(status_code=404, detail="Submission not found")
+                return v1_error_response(EntityNotFoundError("Submission not found"), action="get_submission")
             return self._create_v1_response(self._to_submission_dict(row), "submission_retrieved")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error getting submission {submission_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get submission")
+            return v1_error_response(e, action="get_submission")
         
         # Search and Filtering
         self.router.add_api_route(
