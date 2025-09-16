@@ -186,3 +186,16 @@ Shared Tenant Dependency
 - To reuse tenant scoping across APP routers, use `api_gateway/dependencies/tenant.py`:
   - `make_tenant_scope_dependency(self._require_app_role)` returns a dependency that sets the tenant from `HTTPRoutingContext`.
   - Attach to routes: `dependencies=[Depends(self.tenant_scope)]`.
+
+
+Database DI Policy (FastAPI Handlers)
+- Use `core_platform.data_management.db_async.get_async_session` for all FastAPI handlers. This yields an `AsyncSession` and initializes an async engine lazily from `DATABASE_URL`.
+- Do NOT import or depend on these in handlers (deprecated for request-time DI):
+  - `core_platform.data_management.connection_pool.get_db_session`
+  - `core_platform.data_management.database_init.get_db_session`
+- Sync sessions remain supported for non-HTTP/internal services and background tasks that already use the sync DAL.
+- Tests enforce this policy: `platform/tests/unit/test_di_standardization.py` scans handler modules for deprecated DI imports.
+- Migrations: For PostgreSQL, Alembic runs at startup; `create_all` is gated to dev/test. Control with:
+  - `ALEMBIC_RUN_ON_STARTUP=true|false` (default true)
+  - `ALEMBIC_MIGRATIONS_PATH` (override scripts path)
+  - `ALLOW_CREATE_ALL=true|false` (dev-only fallback in non-dev envs)
