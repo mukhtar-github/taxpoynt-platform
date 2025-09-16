@@ -30,6 +30,8 @@ from core_platform.data_management.repositories.organization_repo_async import (
 from core_platform.data_management.repositories.business_systems_repo_async import list_business_systems
 from api_gateway.utils.pagination import normalize_pagination
 from core_platform.authentication.tenant_context import set_current_tenant, clear_current_tenant
+from api_gateway.utils.error_mapping import v1_error_response
+from core_platform.data_management.repository_base import EntityNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +263,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(data, "organizations_listed")
         except Exception as e:
             logger.error(f"Error listing organizations in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list organizations")
+            return v1_error_response(e, action="list_organizations")
 
     # Basic organization detail (async minimal)
     async def get_organization_basic(
@@ -272,13 +274,11 @@ class OrganizationEndpointsV1:
         try:
             data = await get_org_by_id_async(db, organization_id=org_id)
             if not data:
-                raise HTTPException(status_code=404, detail="Organization not found")
+                return v1_error_response(EntityNotFoundError("Organization not found"), action="get_organization_basic")
             return self._create_v1_response(data, "organization_basic_retrieved")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error getting organization basic {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization")
+            return v1_error_response(e, action="get_organization_basic")
 
     async def get_org_recent_submissions(self,
                                          org_id: str,
@@ -310,7 +310,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(payload, "organization_recent_submissions_retrieved")
         except Exception as e:
             logger.error(f"Error getting recent submissions for org {org_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization's recent submissions")
+            return v1_error_response(e, action="get_org_recent_submissions")
 
     async def get_org_submission(
         self,
@@ -327,7 +327,7 @@ class OrganizationEndpointsV1:
                 clear_current_tenant()
 
             if not row:
-                raise HTTPException(status_code=404, detail="Submission not found")
+                return v1_error_response(EntityNotFoundError("Submission not found"), action="get_org_submission")
 
             payload = {
                 "id": str(getattr(row, "id", None)),
@@ -338,11 +338,9 @@ class OrganizationEndpointsV1:
                 "organization_id": org_id,
             }
             return self._create_v1_response(payload, "organization_submission_retrieved")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error getting submission {submission_id} for org {org_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization submission")
+            return v1_error_response(e, action="get_org_submission")
     
     async def create_organization(self, 
                                  request: Request,
@@ -485,7 +483,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(data, "organization_business_systems_retrieved")
         except Exception as e:
             logger.error(f"Error getting organization business systems {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization business systems")
+            return v1_error_response(e, action="get_organization_business_systems")
     
     async def get_organization_business_system_by_type(self, 
                                                       org_id: str,
@@ -519,7 +517,7 @@ class OrganizationEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting organization {system_type} systems {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to get organization {system_type} systems")
+            return v1_error_response(e, action=f"get_organization_{system_type}_systems")
     
     async def initiate_organization_onboarding(self, 
                                               org_id: str,
@@ -655,7 +653,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(payload, "organization_transactions_retrieved")
         except Exception as e:
             logger.error(f"Error getting transactions for organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization transactions")
+            return v1_error_response(e, action="get_organization_transactions")
     
     async def get_organization_transaction_summary(self, 
                                                    org_id: str,
@@ -683,7 +681,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(payload, "organization_transaction_summary_retrieved")
         except Exception as e:
             logger.error(f"Error getting transaction summary for organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization transaction summary")
+            return v1_error_response(e, action="get_organization_transaction_summary")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
         """Create standardized v1 response format"""
