@@ -145,7 +145,12 @@ def create_role_manager():
     # Optionally wire a persistence-backed repository
     repository = None
     try:
-        use_repo = str(os.getenv("ROLE_MANAGER_USE_REPOSITORY", "false")).lower() in ("1", "true", "yes", "on")
+        # Default to using repository in development unless explicitly disabled
+        repo_env = str(os.getenv("ROLE_MANAGER_USE_REPOSITORY", "")).strip().lower()
+        if repo_env:
+            use_repo = repo_env in ("1", "true", "yes", "on")
+        else:
+            use_repo = (ENVIRONMENT == "development")
         if use_repo:
             from core_platform.authentication.role_repository_sqlalchemy import SQLAlchemyRoleRepository
             from core_platform.data_management.db_async import init_async_engine
