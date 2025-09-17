@@ -15,6 +15,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -313,7 +314,7 @@ class ValidationEndpointsV1:
         )
     
     # Validation Services Overview Endpoints
-    async def get_available_validation_services(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_available_validation_services(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get all available validation services"""
         try:            
             result = {
@@ -335,7 +336,7 @@ class ValidationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get available validation services")
     
     # BVN Validation Endpoints
-    async def validate_bvn(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Validate BVN"""
         try:
             body = await request.json()
@@ -366,7 +367,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error validating BVN in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to validate BVN")
     
-    async def lookup_bvn(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def lookup_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Lookup BVN details"""
         try:
             body = await request.json()
@@ -386,7 +387,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error looking up BVN in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to lookup BVN")
     
-    async def bulk_validate_bvn(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def bulk_validate_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk validate BVNs"""
         try:
             body = await request.json()
@@ -406,7 +407,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error bulk validating BVNs in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to bulk validate BVNs")
     
-    async def bulk_lookup_bvn(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def bulk_lookup_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk lookup BVNs"""
         try:
             body = await request.json()
@@ -430,7 +431,7 @@ class ValidationEndpointsV1:
                                        request: Request,
                                        start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                        end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                                       context: HTTPRoutingContext = Depends(lambda: None)):
+                                       context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get BVN validation history"""
         try:
             result = await self.message_router.route_message(
@@ -451,7 +452,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error getting BVN validation history in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get BVN validation history")
     
-    async def get_bvn_validation_status(self, validation_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_bvn_validation_status(self, validation_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get BVN validation status"""
         try:
             result = await self.message_router.route_message(
@@ -470,7 +471,7 @@ class ValidationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get BVN validation status")
     
     # KYC Processing Endpoints
-    async def process_kyc(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def process_kyc(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Process KYC"""
         try:
             body = await request.json()
@@ -490,7 +491,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error processing KYC in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to process KYC")
     
-    async def process_bulk_kyc(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def process_bulk_kyc(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Process bulk KYC"""
         try:
             body = await request.json()
@@ -510,7 +511,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error processing bulk KYC in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to process bulk KYC")
     
-    async def verify_kyc_document(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def verify_kyc_document(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Verify KYC document"""
         try:
             body = await request.json()
@@ -530,7 +531,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error verifying KYC document in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to verify KYC document")
     
-    async def get_kyc_status(self, kyc_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_kyc_status(self, kyc_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get KYC status"""
         try:
             result = await self.message_router.route_message(
@@ -548,7 +549,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error getting KYC status {kyc_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get KYC status")
     
-    async def get_kyc_details(self, kyc_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_kyc_details(self, kyc_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get KYC details"""
         try:
             result = await self.message_router.route_message(
@@ -569,7 +570,7 @@ class ValidationEndpointsV1:
     async def list_kyc_processes(self, 
                                request: Request,
                                status: Optional[str] = Query(None, description="Filter by status"),
-                               context: HTTPRoutingContext = Depends(lambda: None)):
+                               context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List KYC processes"""
         try:
             result = await self.message_router.route_message(
@@ -589,7 +590,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error listing KYC processes in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list KYC processes")
     
-    async def check_kyc_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def check_kyc_compliance(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Check KYC compliance"""
         try:
             body = await request.json()
@@ -610,7 +611,7 @@ class ValidationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to check KYC compliance")
     
     # Identity Verification Endpoints
-    async def verify_identity(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def verify_identity(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Verify identity"""
         try:
             body = await request.json()
@@ -630,7 +631,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error verifying identity in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to verify identity")
     
-    async def verify_bulk_identity(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def verify_bulk_identity(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Verify bulk identities"""
         try:
             body = await request.json()
@@ -650,7 +651,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error verifying bulk identities in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to verify bulk identities")
     
-    async def validate_identity_document(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_identity_document(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Validate identity document"""
         try:
             body = await request.json()
@@ -670,7 +671,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error validating identity document in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to validate identity document")
     
-    async def verify_biometric(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def verify_biometric(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Verify biometric"""
         try:
             body = await request.json()
@@ -690,7 +691,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error verifying biometric in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to verify biometric")
     
-    async def get_identity_verification_status(self, verification_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_identity_verification_status(self, verification_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get identity verification status"""
         try:
             result = await self.message_router.route_message(
@@ -712,7 +713,7 @@ class ValidationEndpointsV1:
                                               request: Request,
                                               start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                               end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                                              context: HTTPRoutingContext = Depends(lambda: None)):
+                                              context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get identity verification history"""
         try:
             result = await self.message_router.route_message(
@@ -734,7 +735,7 @@ class ValidationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get identity verification history")
     
     # Service Health Endpoints
-    async def test_validation_service(self, service_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def test_validation_service(self, service_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Test validation service"""
         try:
             result = await self.message_router.route_message(
@@ -752,7 +753,7 @@ class ValidationEndpointsV1:
             logger.error(f"Error testing validation service {service_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to test validation service")
     
-    async def get_validation_service_health(self, service_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_validation_service_health(self, service_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get validation service health"""
         try:
             result = await self.message_router.route_message(
@@ -770,17 +771,9 @@ class ValidationEndpointsV1:
             logger.error(f"Error getting validation service health {service_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get validation service health")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_validation_router(role_detector: HTTPRoleDetector,

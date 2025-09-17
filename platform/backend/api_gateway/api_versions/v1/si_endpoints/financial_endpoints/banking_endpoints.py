@@ -229,7 +229,7 @@ class BankingEndpointsV1:
         )
     
     # Banking System Overview Endpoints
-    async def get_available_banking_systems(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_available_banking_systems(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get all available banking systems"""
         try:            
             result = {
@@ -249,7 +249,7 @@ class BankingEndpointsV1:
     # Open Banking Endpoints
     async def list_open_banking_connections(self, 
                                           request: Request,
-                                          context: HTTPRoutingContext = Depends(lambda: None)):
+                                          context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List Open Banking connections"""
         try:
             result = await self.message_router.route_message(
@@ -269,7 +269,7 @@ class BankingEndpointsV1:
     
     async def create_mono_widget_link(self,
                                      request: Request,
-                                     context: HTTPRoutingContext = Depends(lambda: None)):
+                                     context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Generate Mono widget link for bank account linking"""
         try:
             body = await request.json()
@@ -314,7 +314,7 @@ class BankingEndpointsV1:
 
     async def handle_mono_callback(self,
                                    request: Request,
-                                   context: HTTPRoutingContext = Depends(lambda: None)):
+                                   context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Handle Mono banking callback after account linking completion"""
         try:
             body = await request.json()
@@ -351,7 +351,7 @@ class BankingEndpointsV1:
 
     async def handle_banking_callback(self,
                                       request: Request,
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+                                      context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Handle generic banking callback from any provider"""
         try:
             body = await request.json()
@@ -384,7 +384,7 @@ class BankingEndpointsV1:
 
     async def create_open_banking_connection(self, 
                                            request: Request,
-                                           context: HTTPRoutingContext = Depends(lambda: None)):
+                                           context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Create Open Banking connection"""
         try:
             body = await request.json()
@@ -422,7 +422,7 @@ class BankingEndpointsV1:
             logger.error(f"Error creating open banking connection in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to create open banking connection")
     
-    async def get_open_banking_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_open_banking_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get Open Banking connection"""
         try:
             result = await self.message_router.route_message(
@@ -445,7 +445,7 @@ class BankingEndpointsV1:
             logger.error(f"Error getting open banking connection {connection_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get open banking connection")
     
-    async def update_open_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def update_open_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Update Open Banking connection"""
         try:
             body = await request.json()
@@ -466,7 +466,7 @@ class BankingEndpointsV1:
             logger.error(f"Error updating open banking connection {connection_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to update open banking connection")
     
-    async def delete_open_banking_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def delete_open_banking_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Delete Open Banking connection"""
         try:
             result = await self.message_router.route_message(
@@ -490,7 +490,7 @@ class BankingEndpointsV1:
                                      connection_id: Optional[str] = Query(None, description="Filter by connection"),
                                      start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                      end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-                                     context: HTTPRoutingContext = Depends(lambda: None)):
+                                     context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get banking transactions"""
         try:
             result = await self.message_router.route_message(
@@ -512,7 +512,7 @@ class BankingEndpointsV1:
             logger.error(f"Error getting banking transactions in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get banking transactions")
     
-    async def sync_banking_transactions(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def sync_banking_transactions(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Sync banking transactions"""
         try:
             body = await request.json()
@@ -536,7 +536,7 @@ class BankingEndpointsV1:
     async def get_banking_accounts(self, 
                                  request: Request,
                                  connection_id: Optional[str] = Query(None, description="Filter by connection"),
-                                 context: HTTPRoutingContext = Depends(lambda: None)):
+                                 context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get banking accounts"""
         try:
             result = await self.message_router.route_message(
@@ -556,7 +556,7 @@ class BankingEndpointsV1:
             logger.error(f"Error getting banking accounts in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get banking accounts")
     
-    async def get_account_balance(self, account_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_account_balance(self, account_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get account balance"""
         try:
             result = await self.message_router.route_message(
@@ -575,7 +575,7 @@ class BankingEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get account balance")
     
     # Connection Health Endpoints
-    async def test_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def test_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Test banking connection"""
         try:
             result = await self.message_router.route_message(
@@ -593,7 +593,7 @@ class BankingEndpointsV1:
             logger.error(f"Error testing banking connection {connection_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to test banking connection")
     
-    async def get_banking_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_banking_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get banking connection health"""
         try:
             result = await self.message_router.route_message(
@@ -612,7 +612,7 @@ class BankingEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get banking connection health")
     
     # Banking Statistics Endpoint (Missing Implementation)
-    async def get_banking_stats(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_banking_stats(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get comprehensive banking integration statistics"""
         try:
             result = await self.message_router.route_message(

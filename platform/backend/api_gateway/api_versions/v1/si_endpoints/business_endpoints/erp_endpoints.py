@@ -15,6 +15,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,7 @@ class ERPEndpointsV1:
                                   organization_id: Optional[str] = Query(None, description="Filter by organization"),
                                   erp_system: Optional[str] = Query(None, description="Filter by ERP system"),
                                   status: Optional[str] = Query(None, description="Filter by connection status"),
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+                                  context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List ERP connections"""
         try:
             # Validate ERP system if provided
@@ -340,7 +341,7 @@ class ERPEndpointsV1:
     
     async def create_erp_connection(self, 
                                    request: Request,
-                                   context: HTTPRoutingContext = Depends(lambda: None)):
+                                   context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Create ERP connection"""
         try:
             body = await request.json()
@@ -381,7 +382,7 @@ class ERPEndpointsV1:
     
     async def get_erp_connection(self, 
                                 connection_id: str,
-                                context: HTTPRoutingContext = Depends(lambda: None)):
+                                context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP connection"""
         try:
             result = await self.message_router.route_message(
@@ -407,79 +408,71 @@ class ERPEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get ERP connection")
     
     # Placeholder implementations for remaining endpoints
-    async def update_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def update_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Update ERP connection - placeholder"""
         return self._create_v1_response({"connection_id": connection_id}, "erp_connection_updated")
     
-    async def delete_erp_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def delete_erp_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Delete ERP connection - placeholder"""
         return self._create_v1_response({"connection_id": connection_id}, "erp_connection_deleted")
     
-    async def test_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def test_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Test ERP connection - placeholder"""
         return self._create_v1_response({"connection_id": connection_id, "test_result": "success"}, "erp_connection_tested")
     
-    async def get_erp_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP connection health - placeholder"""
         return self._create_v1_response({"connection_id": connection_id, "health": "healthy"}, "erp_connection_health_retrieved")
     
-    async def sync_erp_data(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def sync_erp_data(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Sync ERP data - placeholder"""
         return self._create_v1_response({"sync_id": "sync_123"}, "erp_data_sync_initiated")
     
-    async def get_erp_sync_status(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_sync_status(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP sync status - placeholder"""
         return self._create_v1_response({"connection_id": connection_id, "sync_status": "completed"}, "erp_sync_status_retrieved")
     
-    async def get_erp_invoices(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_invoices(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP invoices - placeholder"""
         return self._create_v1_response({"invoices": []}, "erp_invoices_retrieved")
     
-    async def get_erp_customers(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_customers(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP customers - placeholder"""
         return self._create_v1_response({"customers": []}, "erp_customers_retrieved")
     
-    async def get_erp_products(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_products(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP products - placeholder"""
         return self._create_v1_response({"products": []}, "erp_products_retrieved")
     
-    async def get_erp_financial_data(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_financial_data(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP financial data - placeholder"""
         return self._create_v1_response({"financial_data": []}, "erp_financial_data_retrieved")
     
-    async def get_erp_schema(self, erp_system: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_schema(self, erp_system: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP schema - placeholder"""
         if erp_system not in self.erp_systems:
             raise HTTPException(status_code=404, detail="ERP system not found")
         return self._create_v1_response({"schema": {}}, "erp_schema_retrieved")
     
-    async def get_erp_field_mapping(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_erp_field_mapping(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get ERP field mapping - placeholder"""
         return self._create_v1_response({"field_mapping": {}}, "erp_field_mapping_retrieved")
     
-    async def update_erp_field_mapping(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def update_erp_field_mapping(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Update ERP field mapping - placeholder"""
         return self._create_v1_response({"connection_id": connection_id}, "erp_field_mapping_updated")
     
-    async def bulk_test_erp_connections(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def bulk_test_erp_connections(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk test ERP connections - placeholder"""
         return self._create_v1_response({"test_id": "bulk_test_123"}, "bulk_erp_connection_tests_initiated")
     
-    async def bulk_sync_erp_data(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def bulk_sync_erp_data(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk sync ERP data - placeholder"""
         return self._create_v1_response({"sync_id": "bulk_sync_123"}, "bulk_erp_data_sync_initiated")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_erp_router(role_detector: HTTPRoleDetector,

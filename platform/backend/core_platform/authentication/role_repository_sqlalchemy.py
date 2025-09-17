@@ -120,30 +120,90 @@ def _map_user_role_to_role_id(user_role: Optional[UserRole]) -> str:
 
 
 async def _try_load_permissions(db: AsyncSession, role_id: str) -> Set[str]:
-    """Attempt to load permissions from DB models when available.
+    """Load effective permissions for a role_id using RBAC tables, including inheritance.
 
-    This is a stub until dedicated RBAC tables are introduced. It tries to import
-    hypothetical models and assemble permissions; otherwise returns an empty set.
+    - Direct permissions via rbac_role_permissions
+    - Inherited permissions by traversing rbac_permission_hierarchy upward
     """
     try:
-        # Hypothetical models: Role, Permission, RolePermission, PermissionHierarchy
-        from core_platform.data_management.models.rbac import Role as DBRole, Permission as DBPerm, RolePermission, PermissionHierarchy  # type: ignore
+        from core_platform.data_management.models.rbac import (
+            Role as DBRole,
+            Permission as DBPerm,
+            RolePermission as DBRolePerm,
+            PermissionHierarchy as DBPermHier,
+        )
+
         role = (await db.execute(select(DBRole).where(DBRole.role_id == role_id))).scalars().first()
         if not role:
             return set()
-        perm_rows = (await db.execute(
-            select(DBPerm.name).join(RolePermission, RolePermission.permission_id == DBPerm.id).where(RolePermission.role_id == role.id)
-        )).scalars().all()
-        perms = set(perm_rows)
-        # Apply simple inheritance (one hop)
-        inherited = (await db.execute(
-            select(DBPerm.name)
-            .join(RolePermission, RolePermission.permission_id == DBPerm.id)
-            .join(PermissionHierarchy, PermissionHierarchy.child_permission_id == DBPerm.id)
-            .where(PermissionHierarchy.parent_permission_id.isnot(None))
-        )).scalars().all()
-        perms.update(inherited)
-        return set(perms)
+
+        # Collect role inheritance closure (child -> parents)
+        from core_platform.data_management.models.rbac import RoleInheritance as DBRoleInh
+        edges = (
+            await db.execute(
+                select(DBRoleInh.parent_role_id, DBRoleInh.child_role_id)
+            )
+        ).all()
+        parents_by_child = {}
+        for parent_id, child_id in edges:
+            parents_by_child.setdefault(child_id, set()).add(parent_id)
+
+        collected_roles = {role.id}
+        frontier = [role.id]
+        while frontier:
+            current = frontier.pop()
+            new_parents = parents_by_child.get(current, set()) - collected_roles
+            if new_parents:
+                collected_roles.update(new_parents)
+                frontier.extend(new_parents)
+
+        # Direct permissions for role set
+        direct_perm_rows = (
+            await db.execute(
+                select(DBPerm.id, DBPerm.name)
+                .join(DBRolePerm, DBRolePerm.permission_id == DBPerm.id)
+                .where(DBRolePerm.role_id.in_(list(collected_roles)))
+            )
+        ).all()
+        if not direct_perm_rows:
+            return set()
+
+        id_to_name = {pid: name for (pid, name) in direct_perm_rows}
+        collected_ids: Set[str] = set(id_to_name.keys())
+
+        # Load hierarchy edges and walk ancestors (child -> parent)
+        edges = (
+            await db.execute(
+                select(DBPermHier.parent_permission_id, DBPermHier.child_permission_id)
+            )
+        ).all()
+        parent_by_child = {}
+        for parent_id, child_id in edges:
+            parent_by_child.setdefault(child_id, set()).add(parent_id)
+
+        # Also map names for any parents we may discover
+        async def ensure_name_map(perm_ids: Set[str]):
+            missing = [pid for pid in perm_ids if pid not in id_to_name]
+            if not missing:
+                return
+            rows = (
+                await db.execute(select(DBPerm.id, DBPerm.name).where(DBPerm.id.in_(missing)))
+            ).all()
+            for pid, name in rows:
+                id_to_name[pid] = name
+
+        # BFS up the hierarchy to include implied parent permissions
+        frontier = list(collected_ids)
+        while frontier:
+            current = frontier.pop()
+            parents = parent_by_child.get(current, set())
+            new_parents = parents - collected_ids
+            if new_parents:
+                collected_ids.update(new_parents)
+                await ensure_name_map(new_parents)
+                frontier.extend(new_parents)
+
+        return {id_to_name[pid] for pid in collected_ids if pid in id_to_name}
     except Exception:
         return set()
 

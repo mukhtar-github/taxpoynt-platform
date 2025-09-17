@@ -264,7 +264,7 @@ class AuthenticationIntegrationDemo:
                 'country': 'NG'
             }
             
-            cert_id, cert_pem = self.certificate_service.generate_certificate(
+            cert_id, cert_pem = await self.certificate_service.generate_certificate(
                 subject_info=subject_info,
                 organization_id='demo-org-001',
                 validity_days=365,

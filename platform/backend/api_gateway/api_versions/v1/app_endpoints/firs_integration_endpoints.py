@@ -869,13 +869,14 @@ class FIRSIntegrationEndpointsV1:
             )
             
             # Add FIRS-specific dashboard metrics
+            from datetime import datetime
             result["firs_metrics"] = {
                 "total_submissions": result.get("total_submissions", 0),
                 "successful_submissions": result.get("successful_submissions", 0),
                 "failed_submissions": result.get("failed_submissions", 0),
                 "pending_submissions": result.get("pending_submissions", 0),
                 "compliance_rate": result.get("compliance_rate", "100%"),
-                "last_sync": result.get("last_sync", "2024-12-31T00:00:00Z")
+                "last_sync": result.get("last_sync", datetime.utcnow().isoformat())
             }
             
             return self._create_v1_response(result, "firs_reporting_dashboard_retrieved")

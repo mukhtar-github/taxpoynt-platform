@@ -108,7 +108,7 @@ class CertificateService:
             logger.error(f"Error extracting certificate metadata: {str(e)}")
             raise
     
-    def store_certificate(
+    async def store_certificate(
         self,
         certificate_data: str,
         organization_id: str,
@@ -231,7 +231,7 @@ class CertificateService:
                 'validated_at': datetime.now().isoformat()
             }
     
-    def generate_certificate(
+    async def generate_certificate(
         self,
         subject_info: Dict[str, str],
         organization_id: str,
@@ -263,7 +263,7 @@ class CertificateService:
             )
             
             # Store certificate
-            certificate_id = self.store_certificate(
+            certificate_id = await self.store_certificate(
                 certificate_data=cert_pem.decode('utf-8'),
                 organization_id=organization_id,
                 certificate_type=certificate_type,

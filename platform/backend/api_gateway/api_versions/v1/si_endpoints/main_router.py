@@ -9,6 +9,12 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core_platform.data_management.db_async import get_async_session
+from si_services.integration_management.integration_status_service_legacy import (
+    IntegrationStatusService,
+)
 from fastapi.responses import JSONResponse
 
 from core_platform.authentication.role_manager import PlatformRole, RoleScope
@@ -17,6 +23,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel, V1ErrorModel
+from api_gateway.utils.v1_response import build_v1_response
 
 # Import business system routers  
 from .organization_endpoints import create_organization_router
@@ -109,126 +116,9 @@ class SIRouterV1:
         )
         
         # Business System Integration Routes
-        self.router.add_api_route(
-            "/integrations/erp",
-            self.list_erp_connections,
-            methods=["GET"],
-            summary="List ERP system connections",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
+        # ERP/CRM/POS endpoints handled by business system sub-routers
         
-        self.router.add_api_route(
-            "/integrations/erp",
-            self.create_erp_connection,
-            methods=["POST"],
-            summary="Create ERP connection",
-            response_model=V1ResponseModel,
-            status_code=201,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/integrations/erp/{connection_id}",
-            self.update_erp_connection,
-            methods=["PUT"],
-            summary="Update ERP connection",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/integrations/erp/{connection_id}/test",
-            self.test_erp_connection,
-            methods=["POST"],
-            summary="Test ERP connection",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/integrations/crm",
-            self.list_crm_connections,
-            methods=["GET"],
-            summary="List CRM system connections",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/integrations/pos",
-            self.list_pos_connections,
-            methods=["GET"],
-            summary="List POS system connections",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        # Transaction Processing Routes
-        self.router.add_api_route(
-            "/transactions",
-            self.list_transactions,
-            methods=["GET"],
-            summary="List processed transactions",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/transactions/process",
-            self.process_transaction_batch,
-            methods=["POST"],
-            summary="Process transaction batch",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/transactions/{transaction_id}",
-            self.get_transaction,
-            methods=["GET"],
-            summary="Get transaction details",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/transactions/{transaction_id}/status",
-            self.get_transaction_status,
-            methods=["GET"],
-            summary="Get transaction processing status",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/transactions/bulk-import",
-            self.bulk_import_transactions,
-            methods=["POST"],
-            summary="Bulk import transactions from business systems",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        # Invoice Generation Routes
-        self.router.add_api_route(
-            "/invoices/generate",
-            self.generate_invoices,
-            methods=["POST"],
-            summary="Generate FIRS-compliant invoices",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/invoices/{invoice_id}",
-            self.get_invoice,
-            methods=["GET"],
-            summary="Get generated invoice",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
+        # Invoice Forwarding Routes (kept — bridge to APP)
         # SI → APP Invoice Forwarding (CRITICAL BRIDGE)
         self.router.add_api_route(
             "/invoices/forward-to-app",
@@ -250,61 +140,8 @@ class SIRouterV1:
             dependencies=[Depends(self._require_si_role)]
         )
         
-        self.router.add_api_route(
-            "/invoices/batch/{batch_id}",
-            self.get_invoice_batch_status,
-            methods=["GET"],
-            summary="Get invoice batch generation status",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        # Compliance and Validation Routes
-        self.router.add_api_route(
-            "/compliance/validate",
-            self.validate_compliance,
-            methods=["POST"],
-            summary="Validate transaction compliance",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/compliance/reports/onboarding",
-            self.get_onboarding_report,
-            methods=["GET"],
-            summary="Get organization onboarding report",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/compliance/reports/transactions",
-            self.get_transaction_compliance_report,
-            methods=["GET"],
-            summary="Get transaction compliance report",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        # Data Management Routes
-        self.router.add_api_route(
-            "/data/export",
-            self.export_data,
-            methods=["POST"],
-            summary="Export organization and transaction data",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
-        
-        self.router.add_api_route(
-            "/data/sync",
-            self.sync_business_system_data,
-            methods=["POST"],
-            summary="Sync data from connected business systems",
-            response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_si_role)]
-        )
+        # Note: Transaction, Compliance, Invoice generation and Data routes
+        # are provided by their dedicated sub-routers; duplicates removed here.
         
         # Health and Monitoring Routes
         self.router.add_api_route(
@@ -328,7 +165,10 @@ class SIRouterV1:
         """Include all SI sub-routers"""
         
         # FIRS Invoice Generation Routes
-        firs_invoice_router = create_firs_invoice_router()
+        firs_invoice_router = create_firs_invoice_router(
+            self.role_detector,
+            self.permission_guard,
+        )
         self.router.include_router(firs_invoice_router, tags=["FIRS Invoice Generation"])
         
         # SDK Management Routes
@@ -374,6 +214,18 @@ class SIRouterV1:
         except ImportError as e:
             logger.warning(f"⚠️  Could not import reconciliation endpoints: {e}")
         
+        # Compliance and Reporting Routes
+        try:
+            compliance_router = create_compliance_router(
+                self.role_detector,
+                self.permission_guard,
+                self.message_router,
+            )
+            self.router.include_router(compliance_router, tags=["Compliance V1"])
+            logger.info("✅ Compliance endpoints connected to SI router")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not include compliance endpoints: {e}")
+
         # Onboarding Management Routes
         onboarding_router = create_onboarding_router(
             self.role_detector,
@@ -487,78 +339,6 @@ class SIRouterV1:
             raise HTTPException(status_code=500, detail="Failed to update organization")
     
     # Integration Management Handlers (abbreviated for brevity - similar pattern)
-    async def list_erp_connections(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """List ERP system connections"""
-        try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="list_erp_connections",
-                payload={
-                    "si_id": context.user_id,
-                    "filters": dict(request.query_params),
-                    "api_version": "v1"
-                }
-            )
-            return self._create_v1_response(result, "erp_connections_listed")
-        except Exception as e:
-            logger.error(f"Error listing ERP connections in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list ERP connections")
-    
-    async def create_erp_connection(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Create new ERP system connection"""
-        try:
-            body = await request.json()
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="create_erp_connection",
-                payload={
-                    "connection_data": body,
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            return self._create_v1_response(result, "erp_connection_created", status_code=201)
-        except Exception as e:
-            logger.error(f"Error creating ERP connection in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create ERP connection")
-    
-    # Additional handlers following same pattern...
-    async def update_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Update ERP connection"""
-        try:
-            body = await request.json()
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="update_erp_connection",
-                payload={
-                    "connection_id": connection_id,
-                    "updates": body,
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            return self._create_v1_response(result, "erp_connection_updated")
-        except Exception as e:
-            logger.error(f"Error updating ERP connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update ERP connection")
-    
-    async def test_erp_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Test ERP connection"""
-        try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="test_erp_connection",
-                payload={
-                    "connection_id": connection_id,
-                    "si_id": context.user_id,
-                    "api_version": "v1"
-                }
-            )
-            return self._create_v1_response(result, "erp_connection_tested")
-        except Exception as e:
-            logger.error(f"Error testing ERP connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to test ERP connection")
-    
     # Health and utility handlers
     async def health_check(self):
         """SI services health check for v1"""
@@ -595,70 +375,23 @@ class SIRouterV1:
                 status_code=503
             )
     
-    # Additional placeholder handlers (implement as needed)
-    async def list_crm_connections(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """List CRM connections - placeholder"""
-        return self._create_v1_response({"connections": []}, "crm_connections_listed")
+    # Additional handlers removed (now provided by sub-routers)
     
-    async def list_pos_connections(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """List POS connections - placeholder"""
-        return self._create_v1_response({"connections": []}, "pos_connections_listed")
-    
-    async def list_transactions(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """List transactions - placeholder"""
-        return self._create_v1_response({"transactions": []}, "transactions_listed")
-    
-    async def process_transaction_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Process transaction batch - placeholder"""
-        return self._create_v1_response({"batch_id": "batch_123"}, "transaction_batch_processed")
-    
-    async def get_transaction(self, transaction_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get transaction - placeholder"""
-        return self._create_v1_response({"transaction_id": transaction_id}, "transaction_retrieved")
-    
-    async def get_transaction_status(self, transaction_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get transaction status - placeholder"""
-        return self._create_v1_response({"status": "processed"}, "transaction_status_retrieved")
-    
-    async def bulk_import_transactions(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Bulk import transactions - placeholder"""
-        return self._create_v1_response({"import_id": "import_123"}, "bulk_import_started")
-    
-    async def generate_invoices(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Generate invoices - placeholder"""
-        return self._create_v1_response({"generation_id": "gen_123"}, "invoice_generation_started")
-    
-    async def get_invoice(self, invoice_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get invoice - placeholder"""
-        return self._create_v1_response({"invoice_id": invoice_id}, "invoice_retrieved")
-    
-    async def get_invoice_batch_status(self, batch_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get invoice batch status - placeholder"""
-        return self._create_v1_response({"batch_id": batch_id, "status": "completed"}, "invoice_batch_status_retrieved")
-    
-    async def validate_compliance(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Validate compliance - placeholder"""
-        return self._create_v1_response({"validation_result": "passed"}, "compliance_validated")
-    
-    async def get_onboarding_report(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get onboarding report - placeholder"""
-        return self._create_v1_response({"report_id": "report_123"}, "onboarding_report_generated")
-    
-    async def get_transaction_compliance_report(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get transaction compliance report - placeholder"""
-        return self._create_v1_response({"report_id": "compliance_report_123"}, "compliance_report_generated")
-    
-    async def export_data(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Export data - placeholder"""
-        return self._create_v1_response({"export_id": "export_123"}, "data_export_started")
-    
-    async def sync_business_system_data(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Sync business system data - placeholder"""
-        return self._create_v1_response({"sync_id": "sync_123"}, "data_sync_started")
-    
-    async def get_integration_status(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
-        """Get integration status - placeholder"""
-        return self._create_v1_response({"integrations": []}, "integration_status_retrieved")
+    async def get_integration_status(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+        context: HTTPRoutingContext = Depends(_require_si_role),
+    ):
+        """Get comprehensive integration status (SI)"""
+        try:
+            result = await IntegrationStatusService.get_all_integration_status(db)
+            return self._create_v1_response(result, "integration_status_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting integration status in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get integration status")
     
     # CRITICAL BRIDGE: SI → APP Invoice Forwarding
     async def forward_invoices_to_app(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
@@ -751,17 +484,9 @@ class SIRouterV1:
                 detail="Failed to forward invoice batch to APP"
             )
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_si_v1_router(role_detector: HTTPRoleDetector,

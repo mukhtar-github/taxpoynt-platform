@@ -16,6 +16,7 @@ from core_platform.ai import AIService, get_ai_service, AIConfig, AICapability
 from core_platform.authentication.role_manager import PlatformRole, RoleScope
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..si_endpoints.version_models import V1ResponseModel, V1ErrorModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -178,11 +179,7 @@ def create_ai_router(
                 is_initialized=health_data.get("is_initialized", False)
             )
             
-            return V1ResponseModel(
-                success=True,
-                data=response_data,
-                message="AI service health retrieved successfully"
-            )
+            return build_v1_response(response_data, action="ai_health_retrieved")
             
         except Exception as e:
             logger.error(f"AI health check failed: {e}")
@@ -228,11 +225,7 @@ def create_ai_router(
                 request.data
             )
             
-            return V1ResponseModel(
-                success=True,
-                data=response_data,
-                message=f"Generated {len(result.get('insights', []))} insights successfully"
-            )
+            return build_v1_response(response_data, action="insights_generated")
             
         except HTTPException:
             raise
@@ -263,11 +256,7 @@ def create_ai_router(
             
             result = await ai_svc.detect_anomalies(request.data)
             
-            return V1ResponseModel(
-                success=True,
-                data=result,
-                message="Anomaly detection completed successfully"
-            )
+            return build_v1_response(result, action="anomalies_detected")
             
         except HTTPException:
             raise
@@ -298,11 +287,7 @@ def create_ai_router(
             
             result = await ai_svc.analyze_trends(data)
             
-            return V1ResponseModel(
-                success=True,
-                data=result,
-                message="Trend analysis completed successfully"
-            )
+            return build_v1_response(result, action="trend_analysis_completed")
             
         except HTTPException:
             raise
@@ -333,11 +318,7 @@ def create_ai_router(
             
             result = await ai_svc.classify_data(request.data, request.categories)
             
-            return V1ResponseModel(
-                success=True,
-                data=result,
-                message="Data classification completed successfully"
-            )
+            return build_v1_response(result, action="classification_completed")
             
         except HTTPException:
             raise
@@ -368,11 +349,7 @@ def create_ai_router(
             
             result = await ai_svc.summarize_text(request.text, request.max_length)
             
-            return V1ResponseModel(
-                success=True,
-                data=result,
-                message="Text summarization completed successfully"
-            )
+            return build_v1_response(result, action="summarization_completed")
             
         except HTTPException:
             raise

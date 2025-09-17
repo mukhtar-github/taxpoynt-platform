@@ -87,6 +87,7 @@ class APPServiceRegistry:
             await self._register_reporting_services()
             await self._register_taxpayer_services()
             await self._register_onboarding_services()
+            await self._register_certificate_services()
             
             self.is_initialized = True
             logger.info(f"APP services initialized successfully. Registered {len(self.service_endpoints)} services.")
@@ -401,6 +402,101 @@ class APPServiceRegistry:
             
         except Exception as e:
             logger.error(f"Failed to register security services: {str(e)}")
+
+    async def _register_certificate_services(self):
+        """Register APP-side certificate management service"""
+        try:
+            from core_platform.data_management.db_async import get_async_session
+            from si_services.certificate_management.certificate_service import CertificateService
+
+            async def certificate_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+                try:
+                    async for db in get_async_session():
+                        service = CertificateService(db=db)
+
+                        if operation == "create_certificate":
+                            cd = payload.get("certificate_data")
+                            if isinstance(cd, dict) and cd.get("subject_info"):
+                                org_id = cd.get("organization_id") or payload.get("organization_id")
+                                cert_type = cd.get("certificate_type", "signing")
+                                validity_days = int(cd.get("validity_days", 365))
+                                cert_id, cert_pem = await service.generate_certificate(
+                                    subject_info=cd["subject_info"],
+                                    organization_id=org_id,
+                                    validity_days=validity_days,
+                                    certificate_type=cert_type,
+                                )
+                                return {"operation": operation, "success": True, "data": {"certificate_id": cert_id, "certificate_pem": cert_pem}}
+                            else:
+                                org_id = (cd.get("organization_id") if isinstance(cd, dict) else None) or payload.get("organization_id")
+                                cert_type = (cd.get("certificate_type") if isinstance(cd, dict) else None) or payload.get("certificate_type", "signing")
+                                meta = cd.get("metadata") if isinstance(cd, dict) else None
+                                pem = cd if isinstance(cd, str) else cd.get("certificate_pem") or cd.get("pem") or cd.get("data")
+                                cert_id = await service.store_certificate(pem, org_id, cert_type, meta)
+                                return {"operation": operation, "success": True, "data": {"certificate_id": cert_id}}
+
+                        if operation == "get_certificate":
+                            certificate_id = payload.get("certificate_id")
+                            pem = service.retrieve_certificate(certificate_id)
+                            if not pem:
+                                return {"operation": operation, "success": False, "error": "not_found"}
+                            return {"operation": operation, "success": True, "data": {"certificate_id": certificate_id, "certificate_pem": pem}}
+
+                        if operation == "update_certificate":
+                            return {"operation": operation, "success": True, "data": {"status": "no_op"}}
+
+                        if operation == "delete_certificate":
+                            certificate_id = payload.get("certificate_id")
+                            ok = await service.revoke_certificate(certificate_id, reason=payload.get("reason", "revoked_by_app"))
+                            return {"operation": operation, "success": ok, "data": {"certificate_id": certificate_id}}
+
+                        if operation == "renew_certificate":
+                            certificate_id = payload.get("certificate_id")
+                            validity_days = int(payload.get("validity_days", 365))
+                            new_id, ok = service.renew_certificate(certificate_id, validity_days)
+                            return {"operation": operation, "success": ok, "data": {"new_certificate_id": new_id}}
+
+                        if operation == "get_renewal_status":
+                            return {"operation": operation, "success": True, "data": {"status": "unknown"}}
+
+                        if operation == "list_expiring_certificates":
+                            days = int(payload.get("days_ahead", 30))
+                            return {"operation": operation, "success": True, "data": {"expiring_within_days": days, "items": []}}
+
+                        if operation == "validate_certificate":
+                            cd = payload.get("certificate_data")
+                            result = service.validate_certificate(cd)
+                            return {"operation": operation, "success": result.get("is_valid", False), "data": result}
+
+                        return {"operation": operation, "success": False, "error": "unsupported_operation"}
+                except Exception as e:
+                    return {"operation": operation, "success": False, "error": str(e)}
+
+            endpoint_id = await self.message_router.register_service(
+                service_name="certificate_management",
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                callback=certificate_callback,
+                priority=4,
+                tags=["certificate", "pki", "security"],
+                metadata={
+                    "service_type": "certificate_management",
+                    "operations": [
+                        "create_certificate",
+                        "get_certificate",
+                        "update_certificate",
+                        "delete_certificate",
+                        "renew_certificate",
+                        "get_renewal_status",
+                        "list_expiring_certificates",
+                        "validate_certificate",
+                    ],
+                },
+            )
+
+            self.service_endpoints["certificate_management_app"] = endpoint_id
+            logger.info(f"APP certificate management service registered: {endpoint_id}")
+        except Exception as e:
+            logger.error(f"Failed to register APP certificate services: {str(e)}")
     
     async def _register_authentication_services(self):
         """Register authentication and seals services"""

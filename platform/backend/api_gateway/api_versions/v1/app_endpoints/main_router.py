@@ -307,11 +307,9 @@ class APPRouterV1:
                 operation="health_check",
                 payload={"api_version": "v1"}
             )
-            
-            return JSONResponse(content={
+            data = {
                 "status": "healthy",
                 "service": "app_services",
-                "api_version": "v1",
                 "timestamp": result.get("timestamp"),
                 "version_specific": {
                     "supported_features": [
@@ -325,17 +323,12 @@ class APPRouterV1:
                     "v1_compatibility": "full",
                     "firs_connectivity": "connected"
                 }
-            })
+            }
+            return self._create_v1_response(data, "app_health_retrieved")
         except Exception as e:
             logger.error(f"APP v1 health check failed: {e}")
-            return JSONResponse(
-                content={
-                    "status": "unhealthy",
-                    "api_version": "v1",
-                    "error": str(e)
-                },
-                status_code=503
-            )
+            data = {"status": "unhealthy", "error": str(e)}
+            return self._create_v1_response(data, "app_health_unhealthy")
     
     async def get_app_status(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get APP status overview"""

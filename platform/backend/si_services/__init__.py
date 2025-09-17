@@ -28,6 +28,11 @@ from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from .banking_integration.banking_service import SIBankingService
 from .banking_integration.mono_integration_service import MonoIntegrationService
 from .onboarding_management.onboarding_service import SIOnboardingService
+from .organization_management.organization_service import SIOrganizationService
+from .payment_integration.payment_service import SIPaymentService
+from .reconciliation_management.reconciliation_service import SIReconciliationService
+from .validation_services.validation_service import SIValidationService
+from .reporting_services.reporting_service import SIReportingService
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +67,10 @@ class SIServiceRegistry:
             # Initialize all SI services
             await self._register_banking_services()
             await self._register_onboarding_services()
+            await self._register_organization_services()
+            await self._register_payment_services()
+            await self._register_reconciliation_services()
+            await self._register_validation_services()
             await self._register_erp_services()
             await self._register_certificate_services()
             await self._register_document_services()
@@ -70,6 +79,7 @@ class SIServiceRegistry:
             await self._register_integration_management_services()
             await self._register_authentication_services()
             await self._register_subscription_services()
+            await self._register_reporting_services()
             
             self.is_initialized = True
             logger.info(f"SI services initialized successfully. Registered {len(self.service_endpoints)} services.")
@@ -123,6 +133,178 @@ class SIServiceRegistry:
         except Exception as e:
             logger.error(f"Failed to register banking services: {str(e)}")
             raise
+
+    async def _register_organization_services(self):
+        """Register organization management service (scaffold)"""
+        try:
+            org_service = SIOrganizationService()
+            endpoint_id = await self.message_router.register_service(
+                service_name="organization_management",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_org_callback(org_service),
+                priority=4,
+                tags=["organization", "compliance"],
+                metadata={
+                    "service_type": "organization_management",
+                    "operations": [
+                        "create_organization",
+                        "get_organization",
+                        "update_organization",
+                        "delete_organization",
+                        "get_organization_compliance",
+                        "validate_organization_compliance",
+                    ],
+                },
+            )
+            self.service_endpoints["organization_management"] = endpoint_id
+        except Exception as e:
+            logger.error(f"Failed to register organization services: {str(e)}")
+
+    def _create_org_callback(self, org_service: SIOrganizationService):
+        from core_platform.data_management.db_async import get_async_session
+        async def cb(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            async for db in get_async_session():
+                return await org_service.handle_operation(operation, payload, db)
+        return cb
+
+    async def _register_payment_services(self):
+        """Register payment processor integration service (scaffold)"""
+        try:
+            pay_service = SIPaymentService()
+            endpoint_id = await self.message_router.register_service(
+                service_name="payment_integration",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_payment_callback(pay_service),
+                priority=4,
+                tags=["payments", "processors"],
+                metadata={
+                    "service_type": "payment_integration",
+                    "operations": [
+                        "register_payment_webhooks",
+                        "list_payment_webhooks",
+                        "process_payment_transactions",
+                        "bulk_import_payment_transactions",
+                        "get_unified_payment_transactions",
+                        "test_payment_connection",
+                        "get_payment_connection_health",
+                    ],
+                },
+            )
+            self.service_endpoints["payment_integration"] = endpoint_id
+        except Exception as e:
+            logger.error(f"Failed to register payment services: {str(e)}")
+
+    def _create_payment_callback(self, pay_service: SIPaymentService):
+        from core_platform.data_management.db_async import get_async_session
+        async def cb(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            async for db in get_async_session():
+                return await pay_service.handle_operation(operation, payload, db)
+        return cb
+
+    async def _register_reconciliation_services(self):
+        """Register reconciliation configuration service (scaffold)"""
+        try:
+            rec_service = SIReconciliationService()
+            endpoint_id = await self.message_router.register_service(
+                service_name="reconciliation_management",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_reconciliation_callback(rec_service),
+                priority=4,
+                tags=["reconciliation", "rules"],
+                metadata={
+                    "service_type": "reconciliation_management",
+                    "operations": [
+                        "save_reconciliation_configuration",
+                        "get_reconciliation_configuration",
+                        "update_reconciliation_configuration",
+                        "list_transaction_categories",
+                        "test_pattern_matching",
+                        "get_pattern_statistics",
+                        "sync_with_transaction_processor",
+                    ],
+                },
+            )
+            self.service_endpoints["reconciliation_management"] = endpoint_id
+        except Exception as e:
+            logger.error(f"Failed to register reconciliation services: {str(e)}")
+
+    def _create_reconciliation_callback(self, rec_service: SIReconciliationService):
+        from core_platform.data_management.db_async import get_async_session
+        async def cb(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            async for db in get_async_session():
+                return await rec_service.handle_operation(operation, payload, db)
+        return cb
+
+    async def _register_validation_services(self):
+        """Register validation services (scaffold)"""
+        try:
+            val_service = SIValidationService()
+            endpoint_id = await self.message_router.register_service(
+                service_name="validation_services",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_validation_callback(val_service),
+                priority=4,
+                tags=["validation", "bvn", "kyc", "identity"],
+                metadata={
+                    "service_type": "validation_services",
+                    "operations": [
+                        "validate_bvn",
+                        "lookup_bvn",
+                        "bulk_validate_bvn",
+                        "process_kyc",
+                        "process_bulk_kyc",
+                        "verify_kyc_document",
+                        "get_kyc_status",
+                        "get_kyc_details",
+                        "check_kyc_compliance",
+                        "verify_identity",
+                        "verify_bulk_identity",
+                        "validate_identity_document",
+                        "verify_biometric",
+                        "test_validation_service",
+                        "get_validation_service_health",
+                    ],
+                },
+            )
+            self.service_endpoints["validation_services"] = endpoint_id
+        except Exception as e:
+            logger.error(f"Failed to register validation services: {str(e)}")
+
+    def _create_validation_callback(self, val_service: SIValidationService):
+        from core_platform.data_management.db_async import get_async_session
+        async def cb(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            async for db in get_async_session():
+                return await val_service.handle_operation(operation, payload, db)  # type: ignore[arg-type]
+        return cb
+
+    async def _register_reporting_services(self):
+        """Register reporting services (scaffold)"""
+        try:
+            rep_service = SIReportingService()
+            endpoint_id = await self.message_router.register_service(
+                service_name="reporting_services",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_reporting_callback(rep_service),
+                priority=3,
+                tags=["reporting", "compliance", "onboarding"],
+                metadata={
+                    "service_type": "reporting_services",
+                    "operations": [
+                        "generate_onboarding_report",
+                        "generate_transaction_compliance_report",
+                    ],
+                },
+            )
+            self.service_endpoints["reporting_services"] = endpoint_id
+        except Exception as e:
+            logger.error(f"Failed to register reporting services: {str(e)}")
+
+    def _create_reporting_callback(self, rep_service: SIReportingService):
+        from core_platform.data_management.db_async import get_async_session
+        async def cb(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            async for db in get_async_session():
+                return await rep_service.handle_operation(operation, payload, db)
+        return cb
     
     async def _register_onboarding_services(self):
         """Register onboarding management services"""
@@ -566,10 +748,53 @@ class SIServiceRegistry:
         return erp_callback
     
     def _create_certificate_callback(self, cert_service):
-        """Create callback for certificate operations"""
+        """Create callback for certificate operations with AsyncSession DI"""
+        from core_platform.data_management.db_async import get_async_session
+        from si_services.certificate_management.certificate_service import CertificateService
+
         async def cert_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                # Acquire a short-lived async session for operations that need DB
+                async for db in get_async_session():
+                    service = CertificateService(db=db)
+
+                    if operation == "generate_certificate":
+                        subject_info = payload.get("subject_info", {})
+                        organization_id = payload.get("organization_id")
+                        validity_days = int(payload.get("validity_days", 365))
+                        certificate_type = payload.get("certificate_type", "signing")
+                        cert_id, cert_pem = await service.generate_certificate(
+                            subject_info=subject_info,
+                            organization_id=organization_id,
+                            validity_days=validity_days,
+                            certificate_type=certificate_type,
+                        )
+                        return {"operation": operation, "success": True, "data": {"certificate_id": cert_id, "certificate_pem": cert_pem}}
+
+                    if operation == "revoke_certificate":
+                        certificate_id = payload.get("certificate_id")
+                        reason = payload.get("reason", "unspecified")
+                        success = await service.revoke_certificate(certificate_id, reason)
+                        return {"operation": operation, "success": success, "data": {"certificate_id": certificate_id}}
+
+                    if operation == "renew_certificate":
+                        certificate_id = payload.get("certificate_id")
+                        validity_days = int(payload.get("validity_days", 365))
+                        new_id, success = service.renew_certificate(certificate_id, validity_days)
+                        return {"operation": operation, "success": success, "data": {"new_certificate_id": new_id}}
+
+                    if operation == "validate_certificate":
+                        certificate_data = payload.get("certificate_data")
+                        result = service.validate_certificate(certificate_data)
+                        return {"operation": operation, "success": result.get("is_valid", False), "data": result}
+
+                    if operation == "get_certificate_status":
+                        certificate_id = payload.get("certificate_id")
+                        status = service.get_certificate_status(certificate_id)
+                        return {"operation": operation, "success": True, "data": status}
+
+                    # Default placeholder
+                    return {"operation": operation, "success": True, "data": {"status": "unsupported_operation"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return cert_callback

@@ -349,6 +349,12 @@ class HTTPRoleDetector:
                 "risk_score": analysis.risk_score
             })
             
+            # Expose routing context on request for downstream middleware (rate limiter)
+            try:
+                request.state.routing_context = context
+            except Exception:
+                pass
+
             return context
             
         except Exception as e:

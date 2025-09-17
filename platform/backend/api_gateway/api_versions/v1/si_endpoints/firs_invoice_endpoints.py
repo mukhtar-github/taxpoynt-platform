@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Use async DB session dependency for SI endpoints
 from core_platform.data_management.db_async import get_async_session
 from api_gateway.role_routing.models import HTTPRoutingContext
+from api_gateway.role_routing.role_detector import HTTPRoleDetector
+from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from core_platform.authentication.role_manager import PlatformRole
 from .version_models import V1ResponseModel
 from si_services.firs_integration.comprehensive_invoice_generator import (
@@ -28,19 +30,28 @@ from external_integrations.financial_systems.banking.open_banking.invoice_automa
 
 logger = logging.getLogger(__name__)
 
-# Simple authentication dependency
-async def get_current_user_context(request: Request) -> HTTPRoutingContext:
-    """Simple authentication dependency that returns a mock context for now"""
-    # This is a placeholder - in production, this would verify JWT tokens
-    # and return proper user context
-    from api_gateway.role_routing.role_detector import HTTPRoleDetector
-    from api_gateway.role_routing.permission_guard import APIPermissionGuard
-    
-    role_detector = HTTPRoleDetector()
-    permission_guard = APIPermissionGuard()
-    
-    context = await role_detector.detect_role_context(request)
-    return context
+def create_firs_invoice_router(
+    role_detector: HTTPRoleDetector,
+    permission_guard: APIPermissionGuard,
+) -> APIRouter:
+    """Create and configure the FIRS invoice generation router."""
+    router = APIRouter(
+        prefix="/firs/invoices",
+        tags=["FIRS Invoice Generation"],
+        dependencies=[Depends(lambda request: _require_si_role(role_detector, permission_guard, request))]
+    )
+
+    async def _require_si_role(role_detector: HTTPRoleDetector, permission_guard: APIPermissionGuard, request: Request) -> HTTPRoutingContext:
+        context = await role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System Integrator role required for v1 API")
+        if not await permission_guard.check_endpoint_permission(
+            context, f"v1/si{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "si"
+        return context
 
 
 # Request/Response Models
@@ -124,10 +135,6 @@ class ConnectedSourceResponse(BaseModel):
     record_count: int
 
 
-def create_firs_invoice_router() -> APIRouter:
-    """Create and configure the FIRS invoice generation router."""
-    router = APIRouter(prefix="/firs/invoices", tags=["FIRS Invoice Generation"])
-
     @router.get(
         "/sources",
         response_model=V1ResponseModel,
@@ -135,17 +142,13 @@ def create_firs_invoice_router() -> APIRouter:
         description="Retrieve all connected business and financial systems available for invoice generation"
     )
     async def get_connected_sources(
-        current_user = Depends(get_current_user_context),
+        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Get all connected data sources for the organization."""
         try:
             # Verify SI role
-            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied. SI role required."
-                )
+            # Role already enforced by dependency
 
             # Mock connected sources (in real implementation, query from database)
             sources = [
@@ -246,22 +249,16 @@ def create_firs_invoice_router() -> APIRouter:
     )
     async def search_business_transactions(
         filters: TransactionFilterRequest,
-        current_user = Depends(get_current_user_context),
+        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Search business transactions across all connected systems."""
         try:
             # Verify SI role
-            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied. SI role required."
-                )
+            # Role already enforced by dependency
 
             # Initialize FIRS generator
-            firs_formatter = FIRSFormatter(
-                supplier_info={"name": current_user.company_name or "TaxPoynt User"}
-            )
+            firs_formatter = FIRSFormatter(supplier_info={"name": "TaxPoynt User"})
             generator = ComprehensiveFIRSInvoiceGenerator(db, firs_formatter)
 
             # Set date range
@@ -271,7 +268,7 @@ def create_firs_invoice_router() -> APIRouter:
 
             # Get aggregated transaction data
             transactions = await generator.aggregate_business_data(
-                organization_id=current_user.current_organization_id,
+                organization_id=context.organization_id,
                 date_range=date_range
             )
 
@@ -340,17 +337,13 @@ def create_firs_invoice_router() -> APIRouter:
     )
     async def generate_firs_invoices(
         request: FIRSInvoiceGenerationRequestAPI,
-        current_user = Depends(get_current_user_context),
+        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Generate FIRS-compliant invoices from business transaction data."""
         try:
             # Verify SI role
-            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied. SI role required."
-                )
+            # Role already enforced by dependency
 
             if not request.transaction_ids:
                 raise HTTPException(
@@ -437,17 +430,13 @@ def create_firs_invoice_router() -> APIRouter:
         description="Get sample invoice data for testing FIRS generation"
     )
     async def get_sample_invoice_data(
-        current_user = Depends(get_current_user_context),
+        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Get sample invoice data for testing FIRS generation."""
         try:
             # Verify SI role
-            if not hasattr(current_user, 'has_role') or not current_user.has_role(PlatformRole.SYSTEM_INTEGRATOR):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied. SI role required."
-                )
+            # Role already enforced by dependency
 
             # Sample data representing different business systems
             sample_transactions = [

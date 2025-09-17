@@ -27,6 +27,14 @@ Architecture:
 
 import logging
 from typing import Dict, Any, Optional
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.repositories.banking_repo_async import (
+    create_banking_connection,
+    get_banking_connection,
+    list_banking_connections,
+    update_banking_connection,
+    delete_banking_connection,
+)
 
 from .mono_integration_service import MonoIntegrationService
 
@@ -165,51 +173,58 @@ class SIBankingService:
     async def _handle_list_open_banking_connections(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle listing Open Banking connections"""
         filters = payload.get("filters", {})
-        
-        result = await self.mono_service.list_open_banking_connections(si_id, filters)
-        
-        return {
-            "operation": "list_open_banking_connections",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+        async for db in get_async_session():
+            result = await list_banking_connections(
+                db,
+                si_id=si_id,
+                provider=filters.get("provider"),
+                limit=int(filters.get("limit", 50)),
+                offset=int(filters.get("offset", 0)),
+            )
+            return {
+                "operation": "list_open_banking_connections",
+                "success": True,
+                "data": result,
+                "si_id": si_id,
+            }
     
     async def _handle_create_open_banking_connection(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle creating Open Banking connection"""
         connection_data = payload.get("connection_data")
         if not connection_data:
             raise ValueError("Connection data is required")
-            
-        result = await self.mono_service.create_open_banking_connection(si_id, connection_data)
-        
-        return {
-            "operation": "create_open_banking_connection",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+
+        async for db in get_async_session():
+            created = await create_banking_connection(
+                db,
+                si_id=si_id,
+                organization_id=connection_data.get("organization_id"),
+                provider=connection_data["provider"],
+                provider_connection_id=connection_data.get("provider_connection_id", "pending"),
+                status=connection_data.get("status", "pending"),
+                metadata=connection_data.get("connection_config", {}),
+            )
+            await db.commit()
+            return {
+                "operation": "create_open_banking_connection",
+                "success": True,
+                "data": created,
+                "si_id": si_id,
+            }
     
     async def _handle_get_open_banking_connection(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle getting Open Banking connection"""
         connection_id = payload.get("connection_id")
         if not connection_id:
             raise ValueError("Connection ID is required")
-            
-        # For now, return mock data
-        result = {
-            "connection_id": connection_id,
-            "provider": "mono",
-            "status": "active",
-            "si_id": si_id
-        }
-        
-        return {
-            "operation": "get_open_banking_connection",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+        async for db in get_async_session():
+            result = await get_banking_connection(db, connection_id)
+            return {
+                "operation": "get_open_banking_connection",
+                "success": result is not None,
+                "data": result or {"error": "not_found"},
+                "si_id": si_id,
+            }
     
     async def _handle_update_open_banking_connection(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle updating Open Banking connection"""
@@ -218,40 +233,30 @@ class SIBankingService:
         
         if not connection_id:
             raise ValueError("Connection ID is required")
-            
-        # For now, return mock data
-        result = {
-            "connection_id": connection_id,
-            "updates_applied": updates,
-            "si_id": si_id
-        }
-        
-        return {
-            "operation": "update_open_banking_connection",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+        async for db in get_async_session():
+            updated = await update_banking_connection(db, connection_id, updates)
+            await db.commit()
+            return {
+                "operation": "update_open_banking_connection",
+                "success": updated is not None,
+                "data": updated or {"error": "not_found"},
+                "si_id": si_id,
+            }
     
     async def _handle_delete_open_banking_connection(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle deleting Open Banking connection"""
         connection_id = payload.get("connection_id")
         if not connection_id:
             raise ValueError("Connection ID is required")
-            
-        # For now, return mock data
-        result = {
-            "connection_id": connection_id,
-            "deleted": True,
-            "si_id": si_id
-        }
-        
-        return {
-            "operation": "delete_open_banking_connection",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+        async for db in get_async_session():
+            await delete_banking_connection(db, connection_id)
+            await db.commit()
+            return {
+                "operation": "delete_open_banking_connection",
+                "success": True,
+                "data": {"connection_id": connection_id, "deleted": True},
+                "si_id": si_id,
+            }
     
     async def _handle_get_banking_transactions(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle getting banking transactions"""

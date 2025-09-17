@@ -13,6 +13,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from .version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.repositories.firs_submission_repo_async import (
@@ -128,29 +129,21 @@ class TransactionEndpointsV1:
             logger.error(f"Error listing transactions in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list transactions")
     
-    async def process_transaction_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def process_transaction_batch(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Process transaction batch"""
         return self._create_v1_response({"batch_id": "batch_123"}, "transaction_batch_processed")
     
-    async def get_transaction(self, transaction_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_transaction(self, transaction_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get transaction"""
         return self._create_v1_response({"transaction_id": transaction_id}, "transaction_retrieved")
     
-    async def get_transaction_status(self, transaction_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_transaction_status(self, transaction_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get transaction status"""
         return self._create_v1_response({"status": "processed"}, "transaction_status_retrieved")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_transaction_router(role_detector: HTTPRoleDetector,

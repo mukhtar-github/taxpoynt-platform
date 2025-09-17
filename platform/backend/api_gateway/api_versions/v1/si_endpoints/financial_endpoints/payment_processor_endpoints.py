@@ -269,7 +269,7 @@ class PaymentProcessorEndpointsV1:
             request: Request,
             organization_id: Optional[str] = Query(None, description="Filter by organization"),
             status: Optional[str] = Query(None, description="Filter by connection status"),
-            context: HTTPRoutingContext = Depends(lambda: None)
+            context: HTTPRoutingContext = Depends(self._require_si_role)
         ):
             try:
                 result = await self.message_router.route_message(
@@ -287,7 +287,8 @@ class PaymentProcessorEndpointsV1:
                     }
                 )
                 
-                return self._create_v1_response(result, f"{processor}_connections_listed")
+                data = result.get("data", result)
+                return self._create_v1_response(data, f"{processor}_connections_listed")
             except Exception as e:
                 logger.error(f"Error listing {processor} connections in v1: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to list {processor} connections")
@@ -297,7 +298,7 @@ class PaymentProcessorEndpointsV1:
     def _create_payment_create_handler(self, processor: str, region: str):
         async def create_connection(
             request: Request,
-            context: HTTPRoutingContext = Depends(lambda: None)
+            context: HTTPRoutingContext = Depends(self._require_si_role)
         ):
             try:
                 body = await request.json()
@@ -323,7 +324,8 @@ class PaymentProcessorEndpointsV1:
                     }
                 )
                 
-                return self._create_v1_response(result, f"{processor}_connection_created", status_code=201)
+                data = result.get("data", result)
+                return self._create_v1_response(data, f"{processor}_connection_created", status_code=201)
             except HTTPException:
                 raise
             except Exception as e:
@@ -335,7 +337,7 @@ class PaymentProcessorEndpointsV1:
     def _create_payment_get_handler(self, processor: str, region: str):
         async def get_connection(
             connection_id: str,
-            context: HTTPRoutingContext = Depends(lambda: None)
+            context: HTTPRoutingContext = Depends(self._require_si_role)
         ):
             try:
                 result = await self.message_router.route_message(
@@ -353,7 +355,8 @@ class PaymentProcessorEndpointsV1:
                 if not result:
                     raise HTTPException(status_code=404, detail=f"{processor} connection not found")
                 
-                return self._create_v1_response(result, f"{processor}_connection_retrieved")
+                data = result.get("data", result)
+                return self._create_v1_response(data, f"{processor}_connection_retrieved")
             except HTTPException:
                 raise
             except Exception as e:
@@ -366,7 +369,7 @@ class PaymentProcessorEndpointsV1:
         async def update_connection(
             connection_id: str,
             request: Request,
-            context: HTTPRoutingContext = Depends(lambda: None)
+            context: HTTPRoutingContext = Depends(self._require_si_role)
         ):
             try:
                 body = await request.json()
@@ -384,7 +387,8 @@ class PaymentProcessorEndpointsV1:
                     }
                 )
                 
-                return self._create_v1_response(result, f"{processor}_connection_updated")
+                data = result.get("data", result)
+                return self._create_v1_response(data, f"{processor}_connection_updated")
             except Exception as e:
                 logger.error(f"Error updating {processor} connection {connection_id} in v1: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to update {processor} connection")
@@ -394,7 +398,7 @@ class PaymentProcessorEndpointsV1:
     def _create_payment_delete_handler(self, processor: str, region: str):
         async def delete_connection(
             connection_id: str,
-            context: HTTPRoutingContext = Depends(lambda: None)
+            context: HTTPRoutingContext = Depends(self._require_si_role)
         ):
             try:
                 result = await self.message_router.route_message(
@@ -409,7 +413,8 @@ class PaymentProcessorEndpointsV1:
                     }
                 )
                 
-                return self._create_v1_response(result, f"{processor}_connection_deleted")
+                data = result.get("data", result)
+                return self._create_v1_response(data, f"{processor}_connection_deleted")
             except Exception as e:
                 logger.error(f"Error deleting {processor} connection {connection_id} in v1: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to delete {processor} connection")
@@ -422,7 +427,7 @@ class PaymentProcessorEndpointsV1:
             connection_id: Optional[str] = Query(None, description="Filter by connection"),
             start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
             end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-            context: HTTPRoutingContext = Depends(lambda: None)
+            context: HTTPRoutingContext = Depends(self._require_si_role)
         ):
             try:
                 result = await self.message_router.route_message(
@@ -449,7 +454,7 @@ class PaymentProcessorEndpointsV1:
         return get_transactions
     
     # Payment System Overview Endpoints
-    async def get_available_payment_processors(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_available_payment_processors(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get all available payment processors"""
         try:
             # Calculate totals
@@ -475,7 +480,7 @@ class PaymentProcessorEndpointsV1:
     
     async def list_all_payment_connections(self, 
                                          request: Request,
-                                         context: HTTPRoutingContext = Depends(lambda: None)):
+                                         context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List all payment processor connections"""
         try:
             result = await self.message_router.route_message(
@@ -493,7 +498,7 @@ class PaymentProcessorEndpointsV1:
             logger.error(f"Error listing all payment connections in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list all payment connections")
     
-    async def get_payment_connections_summary(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_payment_connections_summary(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get payment connections summary"""
         try:
             result = await self.message_router.route_message(
@@ -516,7 +521,7 @@ class PaymentProcessorEndpointsV1:
                                              start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
                                              end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
                                              processor: Optional[str] = Query(None, description="Filter by processor"),
-                                             context: HTTPRoutingContext = Depends(lambda: None)):
+                                             context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get unified payment transactions"""
         try:
             result = await self.message_router.route_message(
@@ -540,7 +545,7 @@ class PaymentProcessorEndpointsV1:
     
     async def get_unified_payment_summary(self, 
                                         period: Optional[str] = Query("30d", description="Summary period"),
-                                        context: HTTPRoutingContext = Depends(lambda: None)):
+                                        context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get unified payment summary"""
         try:
             result = await self.message_router.route_message(
@@ -559,7 +564,7 @@ class PaymentProcessorEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get unified payment summary")
     
     # Payment Webhook Endpoints
-    async def register_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def register_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Register payment webhooks"""
         try:
             body = await request.json()
@@ -579,7 +584,7 @@ class PaymentProcessorEndpointsV1:
             logger.error(f"Error registering payment webhooks in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to register payment webhooks")
     
-    async def list_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def list_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List payment webhooks"""
         try:
             result = await self.message_router.route_message(
@@ -598,7 +603,7 @@ class PaymentProcessorEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to list payment webhooks")
     
     # Transaction Processing Endpoints
-    async def process_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def process_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Process payment transactions"""
         try:
             body = await request.json()
@@ -618,7 +623,7 @@ class PaymentProcessorEndpointsV1:
             logger.error(f"Error processing payment transactions in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to process payment transactions")
     
-    async def bulk_import_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def bulk_import_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk import payment transactions"""
         try:
             body = await request.json()
@@ -639,7 +644,7 @@ class PaymentProcessorEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to bulk import payment transactions")
     
     # Connection Health Endpoints
-    async def test_payment_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def test_payment_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Test payment processor connection"""
         try:
             result = await self.message_router.route_message(
@@ -657,7 +662,7 @@ class PaymentProcessorEndpointsV1:
             logger.error(f"Error testing payment connection {connection_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to test payment connection")
     
-    async def get_payment_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_payment_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get payment connection health"""
         try:
             result = await self.message_router.route_message(

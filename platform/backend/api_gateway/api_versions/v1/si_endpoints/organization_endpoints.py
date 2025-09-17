@@ -14,6 +14,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from .version_models import V1ResponseModel, V1ErrorModel, V1PaginationModel
+from api_gateway.utils.v1_response import build_v1_response
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.repositories.firs_submission_repo_async import (
@@ -683,17 +684,9 @@ class OrganizationEndpointsV1:
             logger.error(f"Error getting transaction summary for organization {org_id} in v1: {e}")
             return v1_error_response(e, action="get_organization_transaction_summary")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_organization_router(role_detector: HTTPRoleDetector,

@@ -18,6 +18,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -343,13 +344,7 @@ class APPOnboardingEndpointsV1:
 
     def _create_v1_response(self, data: Any, message: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized V1 response"""
-        return V1ResponseModel(
-            success=True,
-            message=message,
-            data=data,
-            version="v1",
-            timestamp=datetime.utcnow().isoformat()
-        )
+        return build_v1_response(data, action=message)
 
 
 def create_app_onboarding_router(

@@ -14,6 +14,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from .version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from core_platform.authentication.role_manager import PlatformRole
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +29,28 @@ class ComplianceEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/compliance", tags=["Compliance V1"])
+        self.router = APIRouter(
+            prefix="/compliance",
+            tags=["Compliance V1"],
+            dependencies=[Depends(self._require_si_role)]
+        )
         
         self._setup_routes()
         logger.info("Compliance Endpoints V1 initialized")
     
+    async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
+        """Ensure System Integrator role access for v1 SI endpoints."""
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System Integrator role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/si{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "si"
+        return context
+
     def _setup_routes(self):
         """Setup compliance and reporting routes"""
         
@@ -63,18 +81,80 @@ class ComplianceEndpointsV1:
             response_model=V1ResponseModel
         )
     
-    # Placeholder implementations
-    async def validate_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Validate compliance"""
-        return self._create_v1_response({"validation_result": "passed"}, "compliance_validated")
+    # Routed implementations
+    async def validate_compliance(
+        self,
+        request: Request,
+        organization_id: Optional[str] = Query(None, description="Scope validation by organization ID"),
+        context: HTTPRoutingContext = Depends(self._require_si_role),
+    ):
+        """Validate compliance via validation services"""
+        try:
+            body = await request.json()
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="check_kyc_compliance",
+                payload={
+                    "validation_payload": body,
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                    "organization_id": organization_id,
+                }
+            )
+            return self._create_v1_response(result, "compliance_validated")
+        except Exception as e:
+            logger.error(f"Error validating compliance in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to validate compliance")
     
-    async def get_onboarding_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get onboarding report"""
-        return self._create_v1_response({"report_id": "report_123"}, "onboarding_report_generated")
-    
-    async def get_transaction_compliance_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get transaction compliance report"""
-        return self._create_v1_response({"report_id": "compliance_report_123"}, "compliance_report_generated")
+    async def get_onboarding_report(
+        self,
+        request: Request,
+        organization_id: Optional[str] = Query(None, description="Scope report by organization ID"),
+        context: HTTPRoutingContext = Depends(self._require_si_role),
+    ):
+        """Get onboarding report via reporting services"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="generate_onboarding_report",
+                payload={
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                    "organization_id": organization_id,
+                }
+            )
+            return self._create_v1_response(result, "onboarding_report_generated")
+        except Exception as e:
+            logger.error(f"Error generating onboarding report in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate onboarding report")
+
+    async def get_transaction_compliance_report(
+        self,
+        request: Request,
+        organization_id: Optional[str] = Query(None, description="Scope report by organization ID"),
+        start_date: Optional[str] = Query(None, description="Start date (ISO 8601)"),
+        end_date: Optional[str] = Query(None, description="End date (ISO 8601)"),
+        include_metrics: bool = Query(True, description="Include metrics breakdowns (daily counts, status histogram)"),
+        context: HTTPRoutingContext = Depends(self._require_si_role),
+    ):
+        """Get transaction compliance report via reporting services"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="generate_transaction_compliance_report",
+                payload={
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                    "organization_id": organization_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "include_metrics": include_metrics,
+                }
+            )
+            return self._create_v1_response(result, "compliance_report_generated")
+        except Exception as e:
+            logger.error(f"Error generating transaction compliance report in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate transaction compliance report")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

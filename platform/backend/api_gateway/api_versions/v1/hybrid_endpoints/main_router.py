@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
+from api_gateway.utils.v1_response import build_v1_response
 
 from core_platform.authentication.role_manager import PlatformRole, RoleScope
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -234,11 +235,9 @@ class HybridRouterV1:
                 operation="health_check",
                 payload={"api_version": "v1"}
             )
-            
-            return JSONResponse(content={
+            data = {
                 "status": "healthy",
                 "service": "hybrid_services",
-                "api_version": "v1",
                 "timestamp": result.get("timestamp"),
                 "version_specific": {
                     "supported_features": [
@@ -250,17 +249,12 @@ class HybridRouterV1:
                     "v1_compatibility": "full",
                     "coordination_status": "operational"
                 }
-            })
+            }
+            return self._create_v1_response(data, "hybrid_health_retrieved")
         except Exception as e:
             logger.error(f"Hybrid v1 health check failed: {e}")
-            return JSONResponse(
-                content={
-                    "status": "unhealthy",
-                    "api_version": "v1",
-                    "error": str(e)
-                },
-                status_code=503
-            )
+            data = {"status": "unhealthy", "error": str(e)}
+            return self._create_v1_response(data, "hybrid_health_unhealthy")
     
     async def get_hybrid_status(self, context: HTTPRoutingContext = Depends(_require_hybrid_role)):
         """Get hybrid status overview"""
@@ -429,17 +423,9 @@ class HybridRouterV1:
             logger.error(f"Error getting available operations in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get available operations")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_hybrid_v1_router(role_detector: HTTPRoleDetector,

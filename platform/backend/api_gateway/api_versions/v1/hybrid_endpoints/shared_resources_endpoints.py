@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
+from api_gateway.utils.v1_response import build_v1_response
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -255,6 +256,7 @@ class SharedResourcesEndpointsV1:
     async def get_currency_reference(self):
         """Get currency reference data"""
         try:
+            from datetime import datetime
             result = {
                 "currencies": [
                     {"code": "NGN", "name": "Nigerian Naira", "symbol": "₦"},
@@ -262,7 +264,7 @@ class SharedResourcesEndpointsV1:
                     {"code": "EUR", "name": "Euro", "symbol": "€"}
                     # ... more currencies
                 ],
-                "exchange_rates_last_updated": "2024-12-31T00:00:00Z"
+                "exchange_rates_last_updated": datetime.utcnow().isoformat()
             }
             
             return self._create_v1_response(result, "currency_reference_retrieved")
@@ -273,6 +275,7 @@ class SharedResourcesEndpointsV1:
     async def get_tax_code_reference(self):
         """Get tax code reference data"""
         try:
+            from datetime import datetime
             result = {
                 "tax_codes": [
                     {"code": "VAT_7.5", "description": "Value Added Tax 7.5%", "rate": 0.075},
@@ -280,7 +283,7 @@ class SharedResourcesEndpointsV1:
                     {"code": "ZERO_RATED", "description": "Zero Rated VAT", "rate": 0.0}
                     # ... more tax codes
                 ],
-                "last_updated": "2024-12-31T00:00:00Z"
+                "last_updated": datetime.utcnow().isoformat()
             }
             
             return self._create_v1_response(result, "tax_code_reference_retrieved")
@@ -432,17 +435,9 @@ class SharedResourcesEndpointsV1:
         else:
             return ServiceRole.SYSTEM_INTEGRATOR  # Default
 
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> JSONResponse:
+    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200):
         """Create standardized v1 response format"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "api_version": "v1",
-            "timestamp": "2024-12-31T00:00:00Z",
-            "data": data
-        }
-        
-        return JSONResponse(content=response_data, status_code=status_code)
+        return build_v1_response(data, action)
 
 
 def create_shared_resources_router(role_detector: HTTPRoleDetector,

@@ -118,6 +118,12 @@ class SIOnboardingService:
                 return await self._handle_reset_onboarding_state(user_id, payload)
             elif operation == "get_onboarding_analytics":
                 return await self._handle_get_onboarding_analytics(user_id, payload)
+            elif operation == "initiate_organization_onboarding":
+                org_id = payload.get("org_id")
+                return {"operation": operation, "success": True, "organization_id": org_id, "initiated": True}
+            elif operation == "get_organization_onboarding_status":
+                org_id = payload.get("org_id")
+                return {"operation": operation, "success": True, "organization_id": org_id, "status": "pending"}
             else:
                 raise ValueError(f"Unknown onboarding operation: {operation}")
                 

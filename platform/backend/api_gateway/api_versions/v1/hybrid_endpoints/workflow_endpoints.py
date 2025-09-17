@@ -16,6 +16,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..si_endpoints.version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -139,12 +140,7 @@ class WorkflowEndpointsV1:
     
     def _create_v1_response(self, data: Any, operation: str) -> V1ResponseModel:
         """Create standardized V1 response"""
-        return V1ResponseModel(
-            success=True,
-            data=data,
-            message=f"Operation '{operation}' completed successfully",
-            version="1.0"
-        )
+        return build_v1_response(data, action=f"{operation}")
     
     def _get_primary_service_role(self, context: HTTPRoutingContext) -> ServiceRole:
         """Get primary service role for workflow operations"""

@@ -48,6 +48,27 @@ try:
         )
     except ImportError:
         print("Warning: Business system models not available for migration")
+    # Import RBAC models if available
+    try:
+        from core_platform.data_management.models.rbac import (
+            Role as RBACRole,
+            Permission as RBACPermission,
+            RolePermission as RBACRolePermission,
+            PermissionHierarchy as RBACPermissionHierarchy,
+            RoleInheritance as RBACRoleInheritance,
+        )
+    except ImportError:
+        print("Warning: RBAC models not available for migration")
+    # Import payment + reconciliation models if available
+    try:
+        from core_platform.data_management.models.payment import (
+            PaymentConnection, PaymentWebhook
+        )
+        from core_platform.data_management.models.reconciliation import (
+            ReconciliationConfig,
+        )
+    except ImportError:
+        print("Warning: Payment/Reconciliation models not available for migration")
         
 except ImportError as e:
     print(f"Error importing models for migration: {e}")

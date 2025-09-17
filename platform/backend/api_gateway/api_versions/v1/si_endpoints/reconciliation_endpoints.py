@@ -360,7 +360,7 @@ class ReconciliationEndpointsV1:
     # Pattern Matching Integration
     async def test_pattern_matching(self,
                                   request: Request,
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+                                  context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Test pattern matching against sample transactions"""
         try:
             test_data = await request.json()
@@ -391,7 +391,7 @@ class ReconciliationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to test pattern matching")
 
     async def get_pattern_statistics(self,
-                                   context: HTTPRoutingContext = Depends(lambda: None)):
+                                   context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get pattern matching performance statistics"""
         try:
             result = await self.message_router.route_message(
@@ -411,7 +411,7 @@ class ReconciliationEndpointsV1:
 
     # Universal Transaction Processor Integration
     async def get_processor_integration_status(self,
-                                             context: HTTPRoutingContext = Depends(lambda: None)):
+                                             context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get Universal Transaction Processor integration status"""
         try:
             result = await self.message_router.route_message(
@@ -430,7 +430,7 @@ class ReconciliationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get processor integration status")
 
     async def sync_with_transaction_processor(self,
-                                            context: HTTPRoutingContext = Depends(lambda: None)):
+                                            context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Sync reconciliation rules with Universal Transaction Processor"""
         try:
             result = await self.message_router.route_message(
