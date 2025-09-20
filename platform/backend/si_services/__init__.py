@@ -72,6 +72,7 @@ class SIServiceRegistry:
             await self._register_reconciliation_services()
             await self._register_validation_services()
             await self._register_erp_services()
+            await self._register_odoo_business_services()
             await self._register_certificate_services()
             await self._register_document_services()
             await self._register_irn_services()
@@ -426,6 +427,56 @@ class SIServiceRegistry:
         except Exception as e:
             logger.error(f"Failed to register ERP services: {str(e)}")
             # Don't raise - continue with other services
+
+    async def _register_odoo_business_services(self):
+        """Register minimal Odoo CRM/POS/E‑commerce services (env-scoped)."""
+        try:
+            try:
+                from external_integrations.business_systems.odoo.unified_connector import OdooUnifiedConnector
+            except Exception:
+                OdooUnifiedConnector = None  # type: ignore
+
+            async def odoo_business_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+                try:
+                    if not OdooUnifiedConnector:
+                        return {"operation": operation, "success": False, "error": "odoo_connector_unavailable"}
+                    conn = OdooUnifiedConnector.from_env()
+                    if not (conn and conn.available()):
+                        return {"operation": operation, "success": False, "error": "odoo_connector_not_configured"}
+                    from datetime import datetime, timedelta
+                    end = datetime.utcnow()
+                    start = end - timedelta(days=int(payload.get("days", 30)))
+                    if operation == "get_crm_opportunities":
+                        recs = await conn.get_opportunities_by_date_range(start, end)
+                        return {"operation": operation, "success": True, "data": recs}
+                    if operation == "get_pos_orders":
+                        recs = await conn.get_pos_orders_by_date_range(start, end)
+                        return {"operation": operation, "success": True, "data": recs}
+                    if operation == "get_online_orders":
+                        recs = await conn.get_online_orders_by_date_range(start, end)
+                        return {"operation": operation, "success": True, "data": recs}
+                    return {"operation": operation, "success": False, "error": "unsupported_operation"}
+                except Exception as e:
+                    return {"operation": operation, "success": False, "error": str(e)}
+
+            endpoint_id = await self.message_router.register_service(
+                service_name="odoo_business",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=odoo_business_callback,
+                priority=4,
+                tags=["odoo", "crm", "pos", "ecommerce"],
+                metadata={
+                    "service_type": "odoo_business",
+                    "operations": [
+                        "get_crm_opportunities",
+                        "get_pos_orders",
+                        "get_online_orders"
+                    ]
+                }
+            )
+            self.service_endpoints["odoo_business"] = endpoint_id
+        except Exception as e:
+            logger.error(f"Failed to register Odoo business services: {str(e)}")
     
     async def _register_certificate_services(self):
         """Register certificate management services"""
@@ -582,6 +633,8 @@ class SIServiceRegistry:
                     "service_type": "data_extraction",
                     "operations": [
                         "extract_erp_data",
+                        "get_transactions",
+                        "get_sales_summary",
                         "process_batch",
                         "schedule_extraction",
                         "reconcile_data",
@@ -741,6 +794,37 @@ class SIServiceRegistry:
                     # Use the test_odoo_connection function
                     result = erp_service["connection_tester"](payload.get("connection_params"))
                     return {"operation": operation, "success": True, "data": result}
+                elif operation == "extract_erp_data":
+                    # Minimal non-placeholder implementation using ERPDataProcessor
+                    from .erp_integration.erp_data_processor import ERPDataProcessor, ProcessingConfig, ERPRecord
+                    config = ProcessingConfig()
+                    processor = ERPDataProcessor(config)
+                    records = payload.get("records", []) or []
+                    # Convert dict records to ERPRecord if needed
+                    erp_records = []
+                    for idx, r in enumerate(records):
+                        if isinstance(r, ERPRecord):
+                            erp_records.append(r)
+                        else:
+                            erp_records.append(
+                                ERPRecord(
+                                    record_id=r.get("record_id", f"rec-{idx}"),
+                                    record_type=r.get("record_type", "invoice"),
+                                    source_system=r.get("source_system", "erp"),
+                                    raw_data=r,
+                                )
+                            )
+                    result = await processor.process_erp_data(erp_records, processing_options=payload.get("processing_options", {}))
+                    data = {
+                        "result_id": result.result_id,
+                        "status": result.status.value,
+                        "total_records": result.total_records,
+                        "processed_records": result.processed_records,
+                        "failed_records": result.failed_records,
+                        "issues_detected": [i.__dict__ for i in result.issues_detected],
+                        "processing_duration": result.processing_duration,
+                    }
+                    return {"operation": operation, "success": True, "data": data}
                 else:
                     return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
@@ -828,6 +912,164 @@ class SIServiceRegistry:
         """Create callback for data extraction operations"""
         async def extraction_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                from core_platform.data_management.db_async import get_async_session
+                from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import FIRSFormatter
+                from si_services.firs_integration.comprehensive_invoice_generator import ComprehensiveFIRSInvoiceGenerator
+                
+                if operation == "get_transactions":
+                    # Aggregate business transactions using the generator
+                    organization_id = payload.get("organization_id")
+                    source_types = payload.get("source_types")  # optional list
+                    date_from = payload.get("date_from")
+                    date_to = payload.get("date_to")
+                    
+                    async for db in get_async_session():
+                        formatter = FIRSFormatter(
+                            supplier_info={"name": "TaxPoynt", "address": "", "tin": "", "phone": "", "email": ""}
+                        )
+                        generator = ComprehensiveFIRSInvoiceGenerator(db, formatter)
+                        date_range = None
+                        if date_from and date_to:
+                            from datetime import datetime
+                            try:
+                                date_range = (
+                                    datetime.fromisoformat(date_from),
+                                    datetime.fromisoformat(date_to),
+                                )
+                            except Exception:
+                                date_range = None
+                        txns = await generator.aggregate_business_data(organization_id=organization_id, date_range=date_range)
+                        # Optional filtering by source types
+                        if source_types:
+                            stypes = set(source_types)
+                            txns = [t for t in txns if t.source_type.value in stypes]
+                        items = [
+                            {
+                                "id": t.id,
+                                "source_type": t.source_type.value,
+                                "source_id": t.source_id,
+                                "transaction_id": t.transaction_id,
+                                "date": t.date.isoformat(),
+                                "customer_name": t.customer_name,
+                                "customer_email": t.customer_email,
+                                "amount": float(t.amount),
+                                "currency": t.currency,
+                                "description": t.description,
+                                "tax_amount": float(t.tax_amount),
+                                "payment_status": t.payment_status,
+                                "payment_method": t.payment_method,
+                                "confidence": t.confidence,
+                            }
+                            for t in txns
+                        ]
+                        return {"operation": operation, "success": True, "data": {"transactions": items, "total_count": len(items)}}
+
+                if operation == "get_sales_summary":
+                    # Build a basic sales summary from aggregated transactions
+                    organization_id = payload.get("organization_id")
+                    source_types = payload.get("source_types")
+                    async for db in get_async_session():
+                        formatter = FIRSFormatter(
+                            supplier_info={"name": "TaxPoynt", "address": "", "tin": "", "phone": "", "email": ""}
+                        )
+                        generator = ComprehensiveFIRSInvoiceGenerator(db, formatter)
+                        txns = await generator.aggregate_business_data(organization_id=organization_id)
+                        if source_types:
+                            stypes = set(source_types)
+                            txns = [t for t in txns if t.source_type.value in stypes]
+                        total = sum(float(t.amount) for t in txns)
+                        by_source = {}
+                        for t in txns:
+                            key = t.source_type.value
+                            by_source.setdefault(key, {"count": 0, "amount": 0.0})
+                            by_source[key]["count"] += 1
+                            by_source[key]["amount"] += float(t.amount)
+                        return {"operation": operation, "success": True, "data": {"total_amount": total, "by_source": by_source, "count": len(txns)}}
+
+                if operation == "extract_erp_data":
+                    # Use ERP extractor if available
+                    extractor = extraction_service.get("erp_extractor")
+                    if not extractor:
+                        return {"operation": operation, "success": False, "error": "ERP extractor not available"}
+                    filters = payload.get("filters", {})
+                    # Minimal invocation path for demo/mock
+                    from si_services.data_extraction.erp_data_extractor import ExtractionFilter
+                    ef = ExtractionFilter()
+                    invoices = await extractor.extract_invoices(ef)
+                    items = [
+                        {
+                            "invoice_number": inv.invoice_number,
+                            "total_amount": inv.total_amount,
+                            "tax_amount": inv.tax_amount,
+                            "currency": inv.currency,
+                            "customer_name": inv.customer_name,
+                            "invoice_date": inv.invoice_date.isoformat(),
+                        }
+                        for inv in invoices
+                    ]
+                    return {"operation": operation, "success": True, "data": {"invoices": items, "total_count": len(items)}}
+
+                if operation == "reconcile_data":
+                    # Start reconciliation over a window
+                    try:
+                        from si_services.data_extraction.data_reconciler import DataReconciler, ReconciliationConfig
+                        from si_services.data_extraction.erp_data_extractor import ERPDataExtractor, ERPType
+                        cfg = ReconciliationConfig()
+                        extractor = ERPDataExtractor()
+                        reconciler = DataReconciler(cfg, extractor)
+                        erp_type = ERPType[payload.get("erp_type", "ODOO").upper()]
+                        recon_id = await reconciler.start_reconciliation(erp_type)
+                        return {"operation": operation, "success": True, "data": {"reconciliation_id": recon_id}}
+                    except Exception as e:
+                        return {"operation": operation, "success": False, "error": str(e)}
+
+                if operation == "schedule_extraction":
+                    # Schedule a one-time incremental sync job and start scheduler
+                    try:
+                        from si_services.data_extraction.extraction_scheduler import (
+                            ExtractionScheduler, SchedulerConfig, ScheduledJob, ScheduleConfig, ScheduleType, JobType
+                        )
+                        from si_services.data_extraction.erp_data_extractor import ERPDataExtractor, ERPType
+                        from si_services.data_extraction.incremental_sync import IncrementalSyncService, SyncConfig
+                        from datetime import datetime, timedelta
+                        erp_type = ERPType[payload.get("erp_type", "ODOO").upper()]
+                        sched_cfg = SchedulerConfig(enable_job_persistence=False)
+                        extractor = ERPDataExtractor()
+                        sync_svc = IncrementalSyncService(SyncConfig(), extractor)
+                        scheduler = ExtractionScheduler(sched_cfg, extractor, batch_processor=None, sync_service=sync_svc)
+                        await scheduler.start_scheduler()
+                        job_id = f"job_{erp_type.value}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+                        schedule = ScheduleConfig(
+                            schedule_type=ScheduleType.ONE_TIME,
+                            start_time=datetime.utcnow() + timedelta(seconds=5)
+                        )
+                        job = ScheduledJob(
+                            job_id=job_id,
+                            job_name=f"One-time incremental sync ({erp_type.value})",
+                            job_type=JobType.INCREMENTAL_SYNC,
+                            erp_type=erp_type,
+                            schedule_config=schedule
+                        )
+                        jid = await scheduler.schedule_job(job)
+                        return {"operation": operation, "success": True, "data": {"job_id": jid, "status": "scheduled"}}
+                    except Exception as e:
+                        return {"operation": operation, "success": False, "error": str(e)}
+
+                if operation == "incremental_sync":
+                    # Start an incremental ERP sync (default Odoo)
+                    try:
+                        from si_services.data_extraction.incremental_sync import IncrementalSyncService, SyncConfig
+                        from si_services.data_extraction.erp_data_extractor import ERPDataExtractor, ERPType
+                        cfg = SyncConfig()
+                        erp_type = ERPType[payload.get("erp_type", "ODOO").upper()]
+                        extractor = ERPDataExtractor()
+                        svc = IncrementalSyncService(cfg, extractor)
+                        sync_id = await svc.start_incremental_sync(erp_type, force_full_sync=bool(payload.get("force_full_sync", False)))
+                        return {"operation": operation, "success": True, "data": {"sync_id": sync_id}}
+                    except Exception as e:
+                        return {"operation": operation, "success": False, "error": str(e)}
+
+                # Default placeholder for other operations
                 return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}

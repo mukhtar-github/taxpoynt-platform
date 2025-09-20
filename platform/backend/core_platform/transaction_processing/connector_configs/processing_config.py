@@ -356,26 +356,29 @@ def get_default_processing_configs() -> Dict[ConnectorType, ConnectorProcessingC
         configs[connector_type] = create_small_business_config(connector_type)
     
     # Customer-Facing Systems  
+    # Nigerian-focused customer-facing connectors (trimmed US/intl retail platforms)
     customer_facing_connectors = [
-        ConnectorType.CRM_SALESFORCE,
-        ConnectorType.CRM_HUBSPOT,
-        ConnectorType.CRM_MICROSOFT_DYNAMICS_CRM,
-        ConnectorType.CRM_ZOHO,
-        ConnectorType.CRM_PIPEDRIVE,
-        ConnectorType.POS_RETAIL,
-        ConnectorType.POS_HOSPITALITY,
-        ConnectorType.POS_ECOMMERCE,
-        ConnectorType.ECOMMERCE_SHOPIFY,
-        ConnectorType.ECOMMERCE_WOOCOMMERCE,
-        ConnectorType.ECOMMERCE_MAGENTO,
+        ConnectorType.CRM_ODOO,
+        ConnectorType.POS_ODOO,
+        ConnectorType.ECOMMERCE_ODOO,
         ConnectorType.ECOMMERCE_JUMIA,
-        ConnectorType.ECOMMERCE_BIGCOMMERCE,
-        ConnectorType.INVENTORY_FISHBOWL,
-        ConnectorType.INVENTORY_CIN7
     ]
     
     for connector_type in customer_facing_connectors:
         configs[connector_type] = create_customer_facing_config(connector_type)
+
+    # Fine-tune Odoo customer-facing connectors with slightly higher confidence
+    try:
+        from .connector_types import ConnectorType as _CT
+        if _CT.ECOMMERCE_ODOO in configs:
+            configs[_CT.ECOMMERCE_ODOO].minimum_confidence_threshold = 0.7
+        if _CT.POS_ODOO in configs:
+            configs[_CT.POS_ODOO].minimum_confidence_threshold = 0.65
+        if _CT.CRM_ODOO in configs:
+            configs[_CT.CRM_ODOO].minimum_confidence_threshold = 0.65
+    except Exception:
+        # If imports/types change, keep defaults
+        pass
     
     # Financial Data Sources
     financial_data_connectors = [

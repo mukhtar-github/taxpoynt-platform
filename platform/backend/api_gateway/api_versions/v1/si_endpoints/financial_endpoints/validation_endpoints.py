@@ -333,7 +333,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "available_validation_services_retrieved")
         except Exception as e:
             logger.error(f"Error getting available validation services in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get available validation services")
+            raise HTTPException(status_code=502, detail="Failed to get available validation services")
     
     # BVN Validation Endpoints
     async def validate_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
@@ -365,7 +365,7 @@ class ValidationEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error validating BVN in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to validate BVN")
+            raise HTTPException(status_code=502, detail="Failed to validate BVN")
     
     async def lookup_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Lookup BVN details"""
@@ -385,7 +385,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "bvn_looked_up")
         except Exception as e:
             logger.error(f"Error looking up BVN in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to lookup BVN")
+            raise HTTPException(status_code=502, detail="Failed to lookup BVN")
     
     async def bulk_validate_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk validate BVNs"""
@@ -405,7 +405,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "bulk_bvn_validation_initiated")
         except Exception as e:
             logger.error(f"Error bulk validating BVNs in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to bulk validate BVNs")
+            raise HTTPException(status_code=502, detail="Failed to bulk validate BVNs")
     
     async def bulk_lookup_bvn(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk lookup BVNs"""
@@ -425,7 +425,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "bulk_bvn_lookup_initiated")
         except Exception as e:
             logger.error(f"Error bulk looking up BVNs in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to bulk lookup BVNs")
+            raise HTTPException(status_code=502, detail="Failed to bulk lookup BVNs")
     
     async def get_bvn_validation_history(self, 
                                        request: Request,
@@ -450,7 +450,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "bvn_validation_history_retrieved")
         except Exception as e:
             logger.error(f"Error getting BVN validation history in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get BVN validation history")
+            raise HTTPException(status_code=502, detail="Failed to get BVN validation history")
     
     async def get_bvn_validation_status(self, validation_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get BVN validation status"""
@@ -468,7 +468,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "bvn_validation_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting BVN validation status {validation_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get BVN validation status")
+            raise HTTPException(status_code=502, detail="Failed to get BVN validation status")
     
     # KYC Processing Endpoints
     async def process_kyc(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
@@ -489,7 +489,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "kyc_processing_initiated")
         except Exception as e:
             logger.error(f"Error processing KYC in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process KYC")
+            raise HTTPException(status_code=502, detail="Failed to process KYC")
     
     async def process_bulk_kyc(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Process bulk KYC"""
@@ -509,7 +509,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "bulk_kyc_processing_initiated")
         except Exception as e:
             logger.error(f"Error processing bulk KYC in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process bulk KYC")
+            raise HTTPException(status_code=502, detail="Failed to process bulk KYC")
     
     async def verify_kyc_document(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Verify KYC document"""
@@ -529,7 +529,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "kyc_document_verified")
         except Exception as e:
             logger.error(f"Error verifying KYC document in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to verify KYC document")
+            raise HTTPException(status_code=502, detail="Failed to verify KYC document")
     
     async def get_kyc_status(self, kyc_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get KYC status"""
@@ -547,7 +547,7 @@ class ValidationEndpointsV1:
             return self._create_v1_response(result, "kyc_status_retrieved")
         except Exception as e:
             logger.error(f"Error getting KYC status {kyc_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get KYC status")
+            raise HTTPException(status_code=502, detail="Failed to get KYC status")
     
     async def get_kyc_details(self, kyc_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get KYC details"""

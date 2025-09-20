@@ -81,8 +81,24 @@ class EcommerceEndpointsV1:
         return self._create_v1_response({"systems": self.ecommerce_systems}, "available_ecommerce_systems_retrieved")
     
     async def list_ecommerce_connections(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """List E-commerce connections"""
-        return self._create_v1_response({"connections": []}, "ecommerce_connections_listed")
+        """List E-commerce orders (unified extraction)"""
+        try:
+            params = dict(request.query_params)
+            org_id = params.get("organization_id")
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_transactions",
+                payload={
+                    "organization_id": org_id,
+                    "source_types": ["ecommerce"],
+                    "filters": params,
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "ecommerce_connections_listed")
+        except Exception as e:
+            logger.error(f"Error listing e-commerce items via unified extraction: {e}")
+            raise HTTPException(status_code=502, detail="Failed to list e-commerce items")
     
     async def create_ecommerce_connection(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Create E-commerce connection"""

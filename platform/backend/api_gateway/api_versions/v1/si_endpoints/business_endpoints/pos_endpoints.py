@@ -197,7 +197,7 @@ class POSEndpointsV1:
             return self._create_v1_response(result, "available_pos_systems_retrieved")
         except Exception as e:
             logger.error(f"Error getting available POS systems in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get available POS systems")
+            raise HTTPException(status_code=502, detail="Failed to get available POS systems")
     
     # Main POS endpoints (placeholder implementations)
     async def list_pos_connections(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
@@ -222,12 +222,41 @@ class POSEndpointsV1:
         return self._create_v1_response({"connection_id": connection_id}, "pos_connection_deleted")
     
     async def get_pos_transactions(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get POS transactions - placeholder"""
-        return self._create_v1_response({"transactions": []}, "pos_transactions_retrieved")
+        """Get POS transactions via unified data extraction service"""
+        try:
+            params = dict(request.query_params)
+            org_id = params.get("organization_id")
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_transactions",
+                payload={
+                    "organization_id": org_id,
+                    "source_types": ["pos"],
+                    "filters": params,
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "pos_transactions_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting POS transactions in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to get POS transactions")
     
     async def get_pos_sales_summary(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get POS sales summary - placeholder"""
-        return self._create_v1_response({"sales_summary": {}}, "pos_sales_summary_retrieved")
+        """Get POS sales summary via unified data extraction service"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_sales_summary",
+                payload={
+                    "organization_id": None,
+                    "source_types": ["pos"],
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "pos_sales_summary_retrieved")
+        except Exception as e:
+            logger.error(f"Error getting POS sales summary in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to get POS sales summary")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""

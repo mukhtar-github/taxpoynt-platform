@@ -127,7 +127,7 @@ class TransactionEndpointsV1:
             return self._create_v1_response(payload, "transactions_listed")
         except Exception as e:
             logger.error(f"Error listing transactions in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list transactions")
+            raise HTTPException(status_code=502, detail="Failed to list transactions")
     
     async def process_transaction_batch(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Process transaction batch"""

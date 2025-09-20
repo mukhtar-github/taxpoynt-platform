@@ -81,6 +81,7 @@ class Organization(BaseModel):
     # Service configuration
     service_packages = Column(JSON, nullable=True)  # Services subscribed to
     integration_preferences = Column(JSON, nullable=True)  # User preferences
+    firs_configuration = Column(JSON, nullable=True)  # FIRS-specific configuration (service_id, environment, etc.)
     
     # Soft delete and data lifecycle management
     is_deleted = Column(Boolean, default=False, nullable=False, index=True)
@@ -94,6 +95,7 @@ class Organization(BaseModel):
     organization_users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
     integrations = relationship("Integration", back_populates="organization", cascade="all, delete-orphan")
     firs_submissions = relationship("FIRSSubmission", back_populates="organization", cascade="all, delete-orphan")
+    si_app_correlations = relationship("SIAPPCorrelation", back_populates="organization", cascade="all, delete-orphan")
     
     @property
     def display_name(self) -> str:
@@ -114,6 +116,19 @@ class Organization(BaseModel):
     def has_tax_registration(self) -> bool:
         """Check if organization has tax registration."""
         return bool(self.tin)
+    
+    def get_firs_service_id(self) -> str:
+        """Get FIRS service ID for this organization."""
+        if self.firs_configuration and 'service_id' in self.firs_configuration:
+            return self.firs_configuration['service_id']
+        # Fallback to default service ID
+        return "94ND90NR"  # Default FIRS-assigned Service ID
+    
+    def set_firs_service_id(self, service_id: str):
+        """Set FIRS service ID for this organization."""
+        if not self.firs_configuration:
+            self.firs_configuration = {}
+        self.firs_configuration['service_id'] = service_id
     
     def get_active_integrations(self):
         """Get all active integrations for this organization."""

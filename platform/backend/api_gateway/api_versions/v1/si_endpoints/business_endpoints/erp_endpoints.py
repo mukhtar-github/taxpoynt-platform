@@ -300,7 +300,7 @@ class ERPEndpointsV1:
             return self._create_v1_response(result, "available_erp_systems_retrieved")
         except Exception as e:
             logger.error(f"Error getting available ERP systems in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get available ERP systems")
+            raise HTTPException(status_code=502, detail="Failed to get available ERP systems")
     
     # ERP Connection Management
     async def list_erp_connections(self, 
@@ -337,7 +337,7 @@ class ERPEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error listing ERP connections in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list ERP connections")
+            raise HTTPException(status_code=502, detail="Failed to list ERP connections")
     
     async def create_erp_connection(self, 
                                    request: Request,
@@ -378,7 +378,7 @@ class ERPEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error creating ERP connection in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create ERP connection")
+            raise HTTPException(status_code=502, detail="Failed to create ERP connection")
     
     async def get_erp_connection(self, 
                                 connection_id: str,
@@ -405,7 +405,7 @@ class ERPEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting ERP connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get ERP connection")
+            raise HTTPException(status_code=502, detail="Failed to get ERP connection")
     
     # Placeholder implementations for remaining endpoints
     async def update_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):

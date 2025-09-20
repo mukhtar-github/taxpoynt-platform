@@ -26,6 +26,8 @@ from .dashboard_endpoints import create_dashboard_router
 from .workflow_endpoints import create_workflow_router
 from .onboarding_endpoints import create_onboarding_router
 from .ai_endpoints import create_ai_router
+from .correlation_endpoints import create_correlation_router
+from .demo_endpoints import create_demo_router
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +128,20 @@ class HybridRouterV1:
         # AI Service Routes
         ai_router = create_ai_router()
         self.router.include_router(ai_router)
+
+        # SI-APP Correlation Routes
+        correlation_router = create_correlation_router(
+            self.role_detector,
+            self.permission_guard
+        )
+        self.router.include_router(correlation_router)
+
+        # Demo Utilities Routes (e.g., Odoo seeding)
+        demo_router = create_demo_router(
+            self.role_detector,
+            self.permission_guard
+        )
+        self.router.include_router(demo_router)
         
         logger.info("Hybrid sub-routers included successfully: dashboard, workflows, onboarding")
     

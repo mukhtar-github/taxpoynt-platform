@@ -38,6 +38,17 @@ platform/
 └── tests/                 # Comprehensive testing suite
 ```
 
+### Universal Processor (Optional)
+- The platform includes a universal transaction processing pipeline for standardized validation and readiness across all sources (ERP/CRM/POS/E‑commerce/Banking).
+- Enable in SI generation with:
+  - `export USE_UNIVERSAL_PROCESSOR=true`
+- Odoo connector types supported end‑to‑end:
+  - ERP: `ERP_ODOO`
+  - CRM: `CRM_ODOO`
+  - POS: `POS_ODOO`
+  - E‑commerce: `ECOMMERCE_ODOO`
+- Defaults: these Odoo customer‑facing types have slightly higher confidence thresholds (e.g., `ECOMMERCE_ODOO` > 0.7) to improve data quality for invoice generation.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -119,11 +130,12 @@ platform/
 
 ## 🔌 Supported Integrations
 
-**ERP Systems**: SAP, Oracle, Odoo, Dynamics 365, NetSuite
-**CRM Platforms**: Salesforce, HubSpot, Dynamics CRM, Pipedrive
-**POS Systems**: Square, Toast, Shopify POS, Clover
-**Accounting**: QuickBooks, Xero, FreshBooks, Sage
-**Financial Systems**: Banking APIs, Payment Processors (Stripe, PayPal, Paystack, Flutterwave), Nigerian Banks, Mono, Interswitch
+**ERP Systems**: Odoo, SAP, Oracle, Dynamics 365, NetSuite (focus on Odoo for SMEs)
+**CRM Platforms**: Odoo CRM (Nigerian deployments)
+**POS Systems**: Odoo POS (Nigerian deployments)
+**E‑commerce**: Odoo Website/e‑commerce, Jumia
+**Accounting**: Sage (regionally common)
+**Financial Systems**: Nigerian banking APIs and processors (Paystack, Flutterwave, Interswitch, Mono)
 
 ## 🛡️ Compliance & Security
 

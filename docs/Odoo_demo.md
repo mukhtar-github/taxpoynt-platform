@@ -63,3 +63,44 @@ for i in range(1,4):
 * **After Seeding:** Invoke your existing invoice‐fetch routine—now it will retrieve the new invoices and proceed through IRN generation and validation.
 
 Choose the approach that best fits your demo flow. For a fast, hands-off setup, creating a fresh demo DB is unbeatable; for scriptable control, the OdooRPC method gives you precise test data every time.
+
+---
+
+## Ready-made Seeding Script (Recommended)
+
+We ship a simple OdooRPC-based seeder you can run locally to populate demo data across CRM, ERP, and E‑commerce (POS optional):
+
+1) Install dependency
+
+```bash
+pip install odoorpc
+```
+
+2) Set environment
+
+```bash
+export ODOO_URL=https://your-odoo-host
+export ODOO_DB=your_db
+export ODOO_USERNAME=api_user@example.com
+export ODOO_API_KEY=your_api_key   # or ODOO_PASSWORD
+# Optional
+export ODOO_POS_SESSION_ID=1       # required only if you want to seed POS orders
+```
+
+3) Run seeder
+
+```bash
+python platform/backend/scripts/odoo_seed_demo_data.py --invoices 3 --crm 5 --ecom 3
+# add --pos 2 if you provided ODOO_POS_SESSION_ID
+```
+
+Notes, expectations, and next steps
+- Defensive operation: if a module isn’t installed or accessible, the seeder logs and skips it.
+- The platform’s unified connector already fetches these models asynchronously; once seeded, your SI endpoints will discover them:
+  - ERP invoices: `account.move (out_invoice)`
+  - CRM opps: `crm.lead (probability=100)`
+  - POS orders: `pos.order (state in [paid, done])`
+  - E‑commerce: `sale.order (website_id, state in [sale, done])`
+- Optional fine-tuning:
+  - Set `ODOO_COMPANY_ID` to scope queries by company.
+  - Adjust batch sizes/fields in the seeder as needed.

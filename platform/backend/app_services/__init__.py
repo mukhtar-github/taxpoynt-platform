@@ -1051,7 +1051,43 @@ class APPServiceRegistry:
                     irn = payload.get("irn")
                     if not irn:
                         return {"operation": operation, "success": False, "error": "missing_irn"}
+                    # Update SI-APP correlation: APP submitting
+                    try:
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_app_submitting",
+                            payload={"irn": irn, "metadata": {"source": "app_service", "operation": "transmit"}}
+                        )
+                    except Exception:
+                        logger.debug("Correlation update_app_submitting skipped")
                     resp = await http_client.transmit(irn, payload.get("options"))
+                    # Update SI-APP correlation: APP submitted
+                    try:
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_app_submitted",
+                            payload={"irn": irn, "metadata": {"source": "app_service"}}
+                        )
+                    except Exception:
+                        logger.debug("Correlation update_app_submitted skipped")
+                    # Optionally push FIRS response if status/id available
+                    try:
+                        data = resp.get("data") if isinstance(resp, dict) else None
+                        firs_status = (resp.get("status") if isinstance(resp, dict) else None) or (data.get("status") if isinstance(data, dict) else None) or "submitted"
+                        firs_response_id = (data.get("submission_id") if isinstance(data, dict) else None) or (data.get("id") if isinstance(data, dict) else None)
+                        if firs_response_id:
+                            await self.message_router.route_message(
+                                service_role=ServiceRole.HYBRID,
+                                operation="update_firs_response",
+                                payload={
+                                    "irn": irn,
+                                    "firs_response_id": str(firs_response_id),
+                                    "firs_status": str(firs_status),
+                                    "response_data": data or resp,
+                                },
+                            )
+                    except Exception:
+                        logger.debug("Correlation update_firs_response skipped")
                     return {"operation": operation, "success": resp.get("success", False), "data": resp}
 
                 elif operation == "confirm_firs_receipt":

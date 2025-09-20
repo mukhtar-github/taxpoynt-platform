@@ -39,11 +39,13 @@ class ConnectorType(Enum):
     CRM_MICROSOFT_DYNAMICS_CRM = "crm_microsoft_dynamics_crm"
     CRM_ZOHO = "crm_zoho"
     CRM_PIPEDRIVE = "crm_pipedrive"
+    CRM_ODOO = "crm_odoo"
     
     # POS Systems (Retail and hospitality transactions)
     POS_RETAIL = "pos_retail"
     POS_HOSPITALITY = "pos_hospitality"
     POS_ECOMMERCE = "pos_ecommerce"
+    POS_ODOO = "pos_odoo"
     
     # E-commerce Platforms (Online sales transactions)
     ECOMMERCE_SHOPIFY = "ecommerce_shopify"
@@ -51,6 +53,7 @@ class ConnectorType(Enum):
     ECOMMERCE_MAGENTO = "ecommerce_magento"
     ECOMMERCE_JUMIA = "ecommerce_jumia"
     ECOMMERCE_BIGCOMMERCE = "ecommerce_bigcommerce"
+    ECOMMERCE_ODOO = "ecommerce_odoo"
     
     # Accounting Systems (Financial record systems)
     ACCOUNTING_QUICKBOOKS = "accounting_quickbooks"
@@ -206,6 +209,49 @@ CONNECTOR_CHARACTERISTICS: Dict[ConnectorType, ConnectorCharacteristics] = {
         typical_transaction_volume="medium",
         nigerian_compliance_requirements=[
             "ACCOUNTING_STANDARDS", "FIRS_REPORTING", "SME_COMPLIANCE"
+        ],
+        data_quality_expectations="high"
+    ),
+
+    # Odoo CRM/POS/E‑commerce (map to appropriate categories)
+    ConnectorType.CRM_ODOO: ConnectorCharacteristics(
+        category=ConnectorCategory.CUSTOMER_MANAGEMENT,
+        data_structure_level=DataStructureLevel.MODERATELY_STRUCTURED,
+        default_risk_profile=RiskProfile.MEDIUM_RISK,
+        requires_fraud_detection=False,
+        requires_customer_matching=True,
+        supports_batch_processing=True,
+        typical_transaction_volume="medium",
+        nigerian_compliance_requirements=[
+            "SERVICE_BILLING", "CUSTOMER_DATA_PROTECTION", "FIRS_REPORTING"
+        ],
+        data_quality_expectations="high"
+    ),
+
+    ConnectorType.POS_ODOO: ConnectorCharacteristics(
+        category=ConnectorCategory.SALES_CHANNEL,
+        data_structure_level=DataStructureLevel.SEMI_STRUCTURED,
+        default_risk_profile=RiskProfile.VARIABLE_RISK,
+        requires_fraud_detection=True,
+        requires_customer_matching=True,
+        supports_batch_processing=True,
+        typical_transaction_volume="high",
+        nigerian_compliance_requirements=[
+            "CONSUMER_PROTECTION", "RECEIPT_REQUIREMENTS", "FIRS_REPORTING"
+        ],
+        data_quality_expectations="medium"
+    ),
+
+    ConnectorType.ECOMMERCE_ODOO: ConnectorCharacteristics(
+        category=ConnectorCategory.SALES_CHANNEL,
+        data_structure_level=DataStructureLevel.MODERATELY_STRUCTURED,
+        default_risk_profile=RiskProfile.MEDIUM_RISK,
+        requires_fraud_detection=True,
+        requires_customer_matching=True,
+        supports_batch_processing=True,
+        typical_transaction_volume="medium",
+        nigerian_compliance_requirements=[
+            "CONSUMER_PROTECTION", "DATA_PRIVACY", "FIRS_REPORTING"
         ],
         data_quality_expectations="high"
     ),

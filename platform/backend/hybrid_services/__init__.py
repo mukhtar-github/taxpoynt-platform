@@ -57,6 +57,9 @@ from .service_access_control.quota_manager import QuotaManager
 from .workflow_orchestration.process_coordinator import ProcessCoordinator
 from .workflow_orchestration.e2e_workflow_engine import E2EWorkflowEngine
 
+# Correlation Management - new service for SI-APP correlation
+from .correlation_management.si_app_correlation_service import SIAPPCorrelationService
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,6 +108,7 @@ class HybridServiceRegistry:
             await self._register_error_management_services()
             await self._register_access_control_services()
             await self._register_workflow_services()
+            await self._register_correlation_services()
             
             self.is_initialized = True
             logger.info(f"Hybrid services initialized successfully. Registered {len(self.service_endpoints)} services.")
@@ -475,6 +479,54 @@ class HybridServiceRegistry:
         except Exception as e:
             logger.error(f"Failed to register workflow services: {str(e)}")
     
+    async def _register_correlation_services(self):
+        """Register SI-APP correlation management services"""
+        try:
+            # Initialize correlation service (will be instantiated per request with async session)
+            correlation_service_config = {
+                "service_class": SIAPPCorrelationService,
+                "operations": [
+                    "create_correlation",
+                    "update_app_received",
+                    "update_app_submitting", 
+                    "update_app_submitted",
+                    "update_firs_response",
+                    "get_correlation_statistics",
+                    "get_pending_correlations",
+                    "retry_correlation"
+                ]
+            }
+            
+            self.services["correlation"] = correlation_service_config
+            
+            # Register with message router
+            endpoint_id = await self.message_router.register_service(
+                service_name="correlation",
+                service_role=ServiceRole.HYBRID,
+                callback=self._create_correlation_callback(correlation_service_config),
+                priority=5,
+                tags=["correlation", "si-app", "status-sync", "tracking"],
+                metadata={
+                    "service_type": "correlation",
+                    "operations": [
+                        "create_correlation",
+                        "update_app_received",
+                        "update_app_submitting",
+                        "update_app_submitted", 
+                        "update_firs_response",
+                        "get_correlation_statistics",
+                        "get_pending_correlations",
+                        "retry_correlation"
+                    ]
+                }
+            )
+            
+            self.service_endpoints["correlation"] = endpoint_id
+            logger.info(f"Correlation service registered: {endpoint_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to register correlation services: {str(e)}")
+    
     # Service callback creators
     def _create_analytics_callback(self, analytics_service):
         """Create callback for analytics operations"""
@@ -607,6 +659,71 @@ class HybridServiceRegistry:
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return workflow_callback
+    
+    def _create_correlation_callback(self, correlation_service_config):
+        """Create callback for correlation operations"""
+        async def correlation_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                from core_platform.data_management.db_async import get_async_session
+                
+                # Get async session for correlation service
+                async for db_session in get_async_session():
+                    correlation_service = correlation_service_config["service_class"](db_session)
+                    
+                    if operation == "create_correlation":
+                        correlation = await correlation_service.create_correlation(**payload)
+                        return {"operation": operation, "success": True, "data": correlation.to_dict()}
+                    elif operation == "update_app_received":
+                        success = await correlation_service.update_app_received(
+                            irn=payload.get("irn"),
+                            app_submission_id=payload.get("app_submission_id"),
+                            metadata=payload.get("metadata")
+                        )
+                        return {"operation": operation, "success": success, "data": {"updated": success}}
+                    elif operation == "update_app_submitting":
+                        success = await correlation_service.update_app_submitting(
+                            irn=payload.get("irn"),
+                            metadata=payload.get("metadata")
+                        )
+                        return {"operation": operation, "success": success, "data": {"updated": success}}
+                    elif operation == "update_app_submitted":
+                        success = await correlation_service.update_app_submitted(
+                            irn=payload.get("irn"),
+                            metadata=payload.get("metadata")
+                        )
+                        return {"operation": operation, "success": success, "data": {"updated": success}}
+                    elif operation == "update_firs_response":
+                        success = await correlation_service.update_firs_response(
+                            irn=payload.get("irn"),
+                            firs_response_id=payload.get("firs_response_id"),
+                            firs_status=payload.get("firs_status"),
+                            response_data=payload.get("response_data")
+                        )
+                        return {"operation": operation, "success": success, "data": {"updated": success}}
+                    elif operation == "get_correlation_statistics":
+                        stats = await correlation_service.get_correlation_statistics(
+                            organization_id=payload.get("organization_id"),
+                            days=payload.get("days", 30)
+                        )
+                        return {"operation": operation, "success": True, "data": stats}
+                    elif operation == "get_pending_correlations":
+                        correlations = await correlation_service.get_pending_correlations(
+                            limit=payload.get("limit", 100)
+                        )
+                        correlation_data = [corr.to_dict() for corr in correlations]
+                        return {"operation": operation, "success": True, "data": correlation_data}
+                    elif operation == "retry_correlation":
+                        success = await correlation_service.retry_failed_correlation(
+                            correlation_id=payload.get("correlation_id")
+                        )
+                        return {"operation": operation, "success": success, "data": {"retried": success}}
+                    else:
+                        return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                    
+            except Exception as e:
+                return {"operation": operation, "success": False, "error": str(e)}
+                
+        return correlation_callback
     
     async def get_service_health(self) -> Dict[str, Any]:
         """Get health status of all registered Hybrid services"""

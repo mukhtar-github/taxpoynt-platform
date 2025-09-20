@@ -45,6 +45,8 @@ from .compliance_endpoints import create_compliance_router
 from .firs_invoice_endpoints import create_firs_invoice_router
 from .sdk_management_endpoints import create_sdk_management_router
 from .onboarding_endpoints import create_onboarding_router
+from .utils.si_observability import install_si_instrumentation
+from .utils.si_errors import build_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,9 @@ class SIRouterV1:
         self.router = APIRouter(prefix="/si", tags=["System Integrator V1"])
         self._setup_routes()
         self._include_sub_routers()
+        # Attach SI metrics middleware and error handler
+        install_si_instrumentation(self.router)
+        self.router.add_exception_handler(Exception, self._si_exception_handler)
         
         logger.info("SI Router V1 initialized")
     
@@ -235,6 +240,10 @@ class SIRouterV1:
         self.router.include_router(onboarding_router, tags=["Onboarding Management V1"])
         
         logger.info("SI sub-routers included successfully")
+
+    async def _si_exception_handler(self, request: Request, exc: Exception):
+        """Return standardized V1ErrorModel for unhandled exceptions."""
+        return build_error_response(request, exc)
     
     async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
         """Dependency to ensure System Integrator role access for v1"""
@@ -279,7 +288,7 @@ class SIRouterV1:
             return self._create_v1_response(result, "organizations_listed")
         except Exception as e:
             logger.error(f"Error listing organizations in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list organizations")
+            raise HTTPException(status_code=502, detail="Failed to list organizations")
     
     async def get_organization(self, org_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
         """Get specific organization details"""
@@ -297,7 +306,7 @@ class SIRouterV1:
             return self._create_v1_response(result, "organization_retrieved")
         except Exception as e:
             logger.error(f"Error getting organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get organization")
+            raise HTTPException(status_code=404, detail="Organization not found")
     
     async def create_organization(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
         """Create new organization under SI management"""
@@ -316,7 +325,7 @@ class SIRouterV1:
             return self._create_v1_response(result, "organization_created", status_code=201)
         except Exception as e:
             logger.error(f"Error creating organization in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create organization")
+            raise HTTPException(status_code=502, detail="Failed to create organization")
     
     async def update_organization(self, org_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
         """Update organization information"""
@@ -336,7 +345,7 @@ class SIRouterV1:
             return self._create_v1_response(result, "organization_updated")
         except Exception as e:
             logger.error(f"Error updating organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update organization")
+            raise HTTPException(status_code=502, detail="Failed to update organization")
     
     # Integration Management Handlers (abbreviated for brevity - similar pattern)
     # Health and utility handlers
@@ -391,7 +400,7 @@ class SIRouterV1:
             raise
         except Exception as e:
             logger.error(f"Error getting integration status in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get integration status")
+            raise HTTPException(status_code=502, detail="Failed to get integration status")
     
     # CRITICAL BRIDGE: SI → APP Invoice Forwarding
     async def forward_invoices_to_app(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):

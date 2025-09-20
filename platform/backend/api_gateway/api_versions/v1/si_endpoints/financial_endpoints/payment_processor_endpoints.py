@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
+from ..utils.si_http import route_or_http
 from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
@@ -524,7 +525,8 @@ class PaymentProcessorEndpointsV1:
                                              context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get unified payment transactions"""
         try:
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_unified_payment_transactions",
                 payload={
@@ -532,16 +534,20 @@ class PaymentProcessorEndpointsV1:
                     "filters": {
                         "start_date": start_date,
                         "end_date": end_date,
-                        "processor": processor
+                        "processor": processor,
                     },
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, "unified_payment_transactions_retrieved")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error getting unified payment transactions in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get unified payment transactions")
+            raise HTTPException(status_code=502, detail="Failed to get unified payment transactions")
     
     async def get_unified_payment_summary(self, 
                                         period: Optional[str] = Query("30d", description="Summary period"),
@@ -559,9 +565,11 @@ class PaymentProcessorEndpointsV1:
             )
             
             return self._create_v1_response(result, "unified_payment_summary_retrieved")
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error getting unified payment summary in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get unified payment summary")
+            raise HTTPException(status_code=502, detail="Failed to get unified payment summary")
     
     # Payment Webhook Endpoints
     async def register_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
@@ -580,9 +588,11 @@ class PaymentProcessorEndpointsV1:
             )
             
             return self._create_v1_response(result, "payment_webhooks_registered")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error(f"Error registering payment webhooks in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to register payment webhooks")
+            raise HTTPException(status_code=502, detail="Failed to register payment webhooks")
     
     async def list_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List payment webhooks"""
@@ -600,7 +610,7 @@ class PaymentProcessorEndpointsV1:
             return self._create_v1_response(result, "payment_webhooks_listed")
         except Exception as e:
             logger.error(f"Error listing payment webhooks in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list payment webhooks")
+            raise HTTPException(status_code=502, detail="Failed to list payment webhooks")
     
     # Transaction Processing Endpoints
     async def process_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
@@ -619,9 +629,13 @@ class PaymentProcessorEndpointsV1:
             )
             
             return self._create_v1_response(result, "payment_transactions_processing_initiated")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error processing payment transactions in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process payment transactions")
+            raise HTTPException(status_code=502, detail="Failed to process payment transactions")
     
     async def bulk_import_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Bulk import payment transactions"""
@@ -639,9 +653,13 @@ class PaymentProcessorEndpointsV1:
             )
             
             return self._create_v1_response(result, "bulk_payment_import_initiated")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error bulk importing payment transactions in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to bulk import payment transactions")
+            raise HTTPException(status_code=502, detail="Failed to bulk import payment transactions")
     
     # Connection Health Endpoints
     async def test_payment_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
@@ -658,9 +676,11 @@ class PaymentProcessorEndpointsV1:
             )
             
             return self._create_v1_response(result, "payment_connection_tested")
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error testing payment connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to test payment connection")
+            raise HTTPException(status_code=502, detail="Failed to test payment connection")
     
     async def get_payment_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get payment connection health"""
@@ -676,9 +696,11 @@ class PaymentProcessorEndpointsV1:
             )
             
             return self._create_v1_response(result, "payment_connection_health_retrieved")
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error getting payment connection health {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get payment connection health")
+            raise HTTPException(status_code=502, detail="Failed to get payment connection health")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

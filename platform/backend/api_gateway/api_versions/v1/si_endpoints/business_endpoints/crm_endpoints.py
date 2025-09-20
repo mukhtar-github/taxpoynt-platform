@@ -81,8 +81,24 @@ class CRMEndpointsV1:
         return self._create_v1_response({"systems": self.crm_systems}, "available_crm_systems_retrieved")
     
     async def list_crm_connections(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """List CRM connections"""
-        return self._create_v1_response({"connections": []}, "crm_connections_listed")
+        """List CRM items (unified extraction)"""
+        try:
+            params = dict(request.query_params)
+            org_id = params.get("organization_id")
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_transactions",
+                payload={
+                    "organization_id": org_id,
+                    "source_types": ["crm"],
+                    "filters": params,
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "crm_connections_listed")
+        except Exception as e:
+            logger.error(f"Error listing CRM connections via unified extraction: {e}")
+            raise HTTPException(status_code=502, detail="Failed to list CRM items")
     
     async def create_crm_connection(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Create CRM connection"""

@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
+from ..utils.si_http import route_or_http
 from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
@@ -252,20 +253,21 @@ class BankingEndpointsV1:
                                           context: HTTPRoutingContext = Depends(self._require_si_role)):
         """List Open Banking connections"""
         try:
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="list_open_banking_connections",
                 payload={
                     "si_id": context.user_id,
                     "filters": dict(request.query_params),
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, "open_banking_connections_listed")
         except Exception as e:
             logger.error(f"Error listing open banking connections in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to list open banking connections")
+            raise HTTPException(status_code=502, detail="Failed to list open banking connections")
     
     async def create_mono_widget_link(self,
                                      request: Request,
@@ -295,22 +297,26 @@ class BankingEndpointsV1:
                     detail=f"Missing customer fields: {', '.join(customer_missing)}"
                 )
             
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="create_mono_widget_link",
                 payload={
                     "widget_config": body,
                     "si_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, "mono_widget_link_created", status_code=201)
         except HTTPException:
             raise
+        except TimeoutError as e:
+            logger.error(f"Timeout creating Mono widget link: {e}")
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error creating Mono widget link in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create Mono widget link")
+            raise HTTPException(status_code=502, detail="Failed to create Mono widget link")
 
     async def handle_mono_callback(self,
                                    request: Request,
@@ -332,22 +338,25 @@ class BankingEndpointsV1:
                 )
             
             # Route the callback to the appropriate service
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="process_mono_callback",
                 payload={
                     "callback_data": body,
                     "si_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, "mono_callback_processed")
         except HTTPException:
             raise
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error processing Mono callback in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process Mono callback")
+            raise HTTPException(status_code=502, detail="Failed to process Mono callback")
 
     async def handle_banking_callback(self,
                                       request: Request,
@@ -364,15 +373,16 @@ class BankingEndpointsV1:
             
             # Route the callback to the appropriate service based on provider
             operation = f"process_{provider}_callback"
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation=operation,
                 payload={
                     "callback_data": body,
                     "provider": provider,
                     "si_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, f"{provider}_callback_processed")
@@ -405,14 +415,15 @@ class BankingEndpointsV1:
                     detail=f"Invalid banking provider. Available: {', '.join(self.banking_systems['open_banking']['providers'])}"
                 )
             
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="create_open_banking_connection",
                 payload={
                     "connection_data": body,
                     "si_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, "open_banking_connection_created", status_code=201)
@@ -425,14 +436,15 @@ class BankingEndpointsV1:
     async def get_open_banking_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get Open Banking connection"""
         try:
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_open_banking_connection",
                 payload={
                     "connection_id": connection_id,
                     "si_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             if not result:
@@ -441,16 +453,19 @@ class BankingEndpointsV1:
             return self._create_v1_response(result, "open_banking_connection_retrieved")
         except HTTPException:
             raise
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error getting open banking connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get open banking connection")
+            raise HTTPException(status_code=502, detail="Failed to get open banking connection")
     
     async def update_open_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Update Open Banking connection"""
         try:
             body = await request.json()
             
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="update_open_banking_connection",
                 payload={
@@ -458,31 +473,36 @@ class BankingEndpointsV1:
                     "updates": body,
                     "si_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "open_banking_connection_updated")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Upstream timeout")
         except Exception as e:
             logger.error(f"Error updating open banking connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update open banking connection")
+            raise HTTPException(status_code=502, detail="Failed to update open banking connection")
     
     async def delete_open_banking_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Delete Open Banking connection"""
         try:
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="delete_open_banking_connection",
                 payload={
                     "connection_id": connection_id,
                     "si_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "open_banking_connection_deleted")
         except Exception as e:
             logger.error(f"Error deleting open banking connection {connection_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to delete open banking connection")
+            raise HTTPException(status_code=502, detail="Failed to delete open banking connection")
     
     # Banking Transaction Endpoints
     async def get_banking_transactions(self, 
@@ -493,7 +513,8 @@ class BankingEndpointsV1:
                                      context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get banking transactions"""
         try:
-            result = await self.message_router.route_message(
+            result = await route_or_http(
+                self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_banking_transactions",
                 payload={
@@ -503,14 +524,14 @@ class BankingEndpointsV1:
                         "start_date": start_date,
                         "end_date": end_date
                     },
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                },
             )
             
             return self._create_v1_response(result, "banking_transactions_retrieved")
         except Exception as e:
             logger.error(f"Error getting banking transactions in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get banking transactions")
+            raise HTTPException(status_code=502, detail="Failed to get banking transactions")
     
     async def sync_banking_transactions(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Sync banking transactions"""
@@ -530,7 +551,7 @@ class BankingEndpointsV1:
             return self._create_v1_response(result, "banking_transactions_sync_initiated")
         except Exception as e:
             logger.error(f"Error syncing banking transactions in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to sync banking transactions")
+            raise HTTPException(status_code=502, detail="Failed to sync banking transactions")
     
     # Banking Account Management Endpoints
     async def get_banking_accounts(self, 
@@ -554,7 +575,7 @@ class BankingEndpointsV1:
             return self._create_v1_response(result, "banking_accounts_retrieved")
         except Exception as e:
             logger.error(f"Error getting banking accounts in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get banking accounts")
+            raise HTTPException(status_code=502, detail="Failed to get banking accounts")
     
     async def get_account_balance(self, account_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get account balance"""
@@ -572,7 +593,7 @@ class BankingEndpointsV1:
             return self._create_v1_response(result, "account_balance_retrieved")
         except Exception as e:
             logger.error(f"Error getting account balance {account_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get account balance")
+            raise HTTPException(status_code=502, detail="Failed to get account balance")
     
     # Connection Health Endpoints
     async def test_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
@@ -631,7 +652,7 @@ class BankingEndpointsV1:
             return self._create_v1_response(result, "banking_stats_retrieved")
         except Exception as e:
             logger.error(f"Error getting banking stats in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get banking statistics")
+            raise HTTPException(status_code=502, detail="Failed to get banking statistics")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""

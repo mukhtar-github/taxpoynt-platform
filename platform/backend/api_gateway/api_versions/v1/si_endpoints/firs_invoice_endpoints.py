@@ -20,38 +20,18 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from core_platform.authentication.role_manager import PlatformRole
-from .version_models import V1ResponseModel
+from api_gateway.api_versions.v1.si_endpoints.version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 from si_services.firs_integration.comprehensive_invoice_generator import (
     ComprehensiveFIRSInvoiceGenerator,
     FIRSInvoiceGenerationRequest,
     DataSourceType
 )
 from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import FIRSFormatter
+from sqlalchemy import select
+from core_platform.data_management.models.organization import Organization
 
 logger = logging.getLogger(__name__)
-
-def create_firs_invoice_router(
-    role_detector: HTTPRoleDetector,
-    permission_guard: APIPermissionGuard,
-) -> APIRouter:
-    """Create and configure the FIRS invoice generation router."""
-    router = APIRouter(
-        prefix="/firs/invoices",
-        tags=["FIRS Invoice Generation"],
-        dependencies=[Depends(lambda request: _require_si_role(role_detector, permission_guard, request))]
-    )
-
-    async def _require_si_role(role_detector: HTTPRoleDetector, permission_guard: APIPermissionGuard, request: Request) -> HTTPRoutingContext:
-        context = await role_detector.detect_role_context(request)
-        if not context or not context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System Integrator role required for v1 API")
-        if not await permission_guard.check_endpoint_permission(
-            context, f"v1/si{request.url.path}", request.method
-        ):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
-        context.metadata["api_version"] = "v1"
-        context.metadata["endpoint_group"] = "si"
-        return context
 
 
 # Request/Response Models
@@ -135,6 +115,33 @@ class ConnectedSourceResponse(BaseModel):
     record_count: int
 
 
+def create_firs_invoice_router(
+    role_detector: HTTPRoleDetector,
+    permission_guard: APIPermissionGuard,
+) -> APIRouter:
+    """Create and configure the FIRS invoice generation router."""
+    router = APIRouter(
+        prefix="/firs/invoices",
+        tags=["FIRS Invoice Generation"],
+    )
+
+    async def _require_si_role(role_detector: HTTPRoleDetector, permission_guard: APIPermissionGuard, request: Request) -> HTTPRoutingContext:
+        context = await role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System Integrator role required for v1 API")
+        if not await permission_guard.check_endpoint_permission(
+            context, f"v1/si{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "si"
+        return context
+
+    # Closure dependency so FastAPI treats Request properly (no query param named 'request')
+    async def require_si_role(request: Request) -> HTTPRoutingContext:
+        return await _require_si_role(role_detector, permission_guard, request)
+
+
     @router.get(
         "/sources",
         response_model=V1ResponseModel,
@@ -142,7 +149,7 @@ class ConnectedSourceResponse(BaseModel):
         description="Retrieve all connected business and financial systems available for invoice generation"
     )
     async def get_connected_sources(
-        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
+        context: HTTPRoutingContext = Depends(require_si_role),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Get all connected data sources for the organization."""
@@ -226,10 +233,9 @@ class ConnectedSourceResponse(BaseModel):
                 }
             ]
 
-            return V1ResponseModel(
-                success=True,
-                message="Connected sources retrieved successfully",
-                data={"sources": sources}
+            return build_v1_response(
+                data={"sources": sources},
+                action="get_connected_sources"
             )
 
         except HTTPException:
@@ -249,7 +255,7 @@ class ConnectedSourceResponse(BaseModel):
     )
     async def search_business_transactions(
         filters: TransactionFilterRequest,
-        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
+        context: HTTPRoutingContext = Depends(require_si_role),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Search business transactions across all connected systems."""
@@ -310,14 +316,13 @@ class ConnectedSourceResponse(BaseModel):
                 )
                 filtered_transactions.append(transaction_response)
 
-            return V1ResponseModel(
-                success=True,
-                message=f"Found {len(filtered_transactions)} transactions",
+            return build_v1_response(
                 data={
                     "transactions": [txn.dict() for txn in filtered_transactions],
                     "total_count": len(filtered_transactions),
                     "filters_applied": filters.dict()
-                }
+                },
+                action="search_business_transactions"
             )
 
         except HTTPException:
@@ -337,7 +342,7 @@ class ConnectedSourceResponse(BaseModel):
     )
     async def generate_firs_invoices(
         request: FIRSInvoiceGenerationRequestAPI,
-        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
+        context: HTTPRoutingContext = Depends(require_si_role),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Generate FIRS-compliant invoices from business transaction data."""
@@ -352,18 +357,47 @@ class ConnectedSourceResponse(BaseModel):
                 )
 
             # Initialize FIRS generator
+            # Load organization details for supplier info
+            if not context.organization_id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Organization context required")
+
+            try:
+                org_uuid = UUID(str(context.organization_id))
+            except Exception:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid organization ID in context")
+
+            org_name = "TaxPoynt Organization"
+            org_email = ""
+            org_tin = ""
+            org_phone = ""
+            org_address = ""
+            org_reg = ""
+
+            org_result = await db.execute(select(Organization).where(Organization.id == org_uuid))
+            organization = org_result.scalar_one_or_none()
+            if organization:
+                org_name = organization.display_name or organization.name or org_name
+                org_email = organization.email or ""
+                org_tin = organization.tin or ""
+                org_phone = organization.phone or ""
+                org_address = organization.address or ""
+                org_reg = organization.rc_number or ""
+
             firs_formatter = FIRSFormatter(
                 supplier_info={
-                    "name": current_user.company_name or "TaxPoynt User",
-                    "email": current_user.email,
-                    "organization_id": str(current_user.current_organization_id)
+                    "name": org_name,
+                    "address": org_address,
+                    "tin": org_tin,
+                    "phone": org_phone,
+                    "email": org_email,
+                    "business_registration": org_reg,
                 }
             )
             generator = ComprehensiveFIRSInvoiceGenerator(db, firs_formatter)
 
             # Create generation request
             generation_request = FIRSInvoiceGenerationRequest(
-                organization_id=current_user.current_organization_id,
+                organization_id=org_uuid,
                 transaction_ids=request.transaction_ids,
                 invoice_type=request.invoice_type,
                 consolidate=request.consolidate,
@@ -408,10 +442,9 @@ class ConnectedSourceResponse(BaseModel):
                 generation_stats=stats
             )
 
-            return V1ResponseModel(
-                success=True,
-                message=f"Successfully generated {len(result.invoices)} FIRS-compliant invoice(s)",
-                data=response_data.dict()
+            return build_v1_response(
+                data=response_data.dict(),
+                action="generate_firs_invoices"
             )
 
         except HTTPException:
@@ -430,7 +463,7 @@ class ConnectedSourceResponse(BaseModel):
         description="Get sample invoice data for testing FIRS generation"
     )
     async def get_sample_invoice_data(
-        context: HTTPRoutingContext = Depends(lambda request: _require_si_role(role_detector, permission_guard, request)),
+        context: HTTPRoutingContext = Depends(require_si_role),
         db: AsyncSession = Depends(get_async_session)
     ):
         """Get sample invoice data for testing FIRS generation."""
@@ -602,15 +635,14 @@ class ConnectedSourceResponse(BaseModel):
                 }
             ]
 
-            return V1ResponseModel(
-                success=True,
-                message="Sample invoice data retrieved successfully",
+            return build_v1_response(
                 data={
                     "sample_transactions": sample_transactions,
                     "total_count": len(sample_transactions),
                     "total_amount": sum(txn["amount"] for txn in sample_transactions),
                     "note": "This is sample data for testing FIRS invoice generation"
-                }
+                },
+                action="get_sample_invoice_data"
             )
 
         except HTTPException:

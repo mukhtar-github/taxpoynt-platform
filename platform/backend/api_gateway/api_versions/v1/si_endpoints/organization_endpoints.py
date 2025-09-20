@@ -542,7 +542,7 @@ class OrganizationEndpointsV1:
             return self._create_v1_response(result, "organization_onboarding_initiated")
         except Exception as e:
             logger.error(f"Error initiating onboarding for organization {org_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to initiate organization onboarding")
+            raise HTTPException(status_code=502, detail="Failed to initiate organization onboarding")
     
     async def get_onboarding_status(self, 
                                    org_id: str,

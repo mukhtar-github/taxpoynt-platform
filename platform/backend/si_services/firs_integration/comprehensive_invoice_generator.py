@@ -10,6 +10,7 @@ SI (System Integrator) role invoice generation.
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any, Optional, Tuple
@@ -24,46 +25,69 @@ from sqlalchemy import select, and_, or_
 from core_platform.data_management.models.firs_submission import (
     FIRSSubmission, SubmissionStatus, ValidationStatus
 )
+from hybrid_services.correlation_management.si_app_correlation_service import SIAPPCorrelationService
+from core_platform.data_management.models.organization import Organization
 from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import (
     FIRSFormatter, FormattingResult
 )
+# Conditional import for unified Odoo connector (org-scoped support)
+try:
+    from external_integrations.business_systems.odoo.unified_connector import OdooUnifiedConnector
+except Exception:
+    OdooUnifiedConnector = None
 # Conditional imports for connectors (graceful failure for missing connectors)
 try:
-    from external_integrations.business_systems.erp.sap_connector import SAPConnector
-except ImportError:
-    SAPConnector = None
+    from external_integrations.business_systems.erp.sap_connector import SAPConnector  # legacy path
+except Exception:
+    try:
+        from external_integrations.business_systems.erp.sap.connector import SAPConnector  # current path
+    except Exception:
+        SAPConnector = None
 
 try:
-    from external_integrations.business_systems.erp.odoo_connector import OdooConnector
-except ImportError:
-    OdooConnector = None
+    from external_integrations.business_systems.erp.odoo_connector import OdooConnector  # legacy path
+except Exception:
+    try:
+        from external_integrations.business_systems.erp.odoo.connector import OdooConnector  # current path
+    except Exception:
+        OdooConnector = None
+
+# Purged US-centric connectors (Salesforce, Square, Shopify) for Nigerian deployments
 
 try:
-    from external_integrations.business_systems.crm.salesforce_connector import SalesforceConnector
-except ImportError:
-    SalesforceConnector = None
+    from external_integrations.financial_systems.banking.mono_connector import MonoConnector  # legacy path
+except Exception:
+    try:
+        from external_integrations.financial_systems.banking.open_banking.providers.mono.connector import MonoConnector
+    except Exception:
+        MonoConnector = None
 
 try:
-    from external_integrations.business_systems.pos.square_connector import SquareConnector
-except ImportError:
-    SquareConnector = None
-
-try:
-    from external_integrations.business_systems.ecommerce.shopify_connector import ShopifyConnector
-except ImportError:
-    ShopifyConnector = None
-
-try:
-    from external_integrations.financial_systems.banking.mono_connector import MonoConnector
-except ImportError:
-    MonoConnector = None
-
-try:
-    from external_integrations.financial_systems.payments.paystack_connector import PaystackConnector
-except ImportError:
-    PaystackConnector = None
+    from external_integrations.financial_systems.payments.paystack_connector import PaystackConnector  # legacy path
+except Exception:
+    try:
+        from external_integrations.financial_systems.payments.nigerian_processors.paystack.connector import PaystackConnector
+    except Exception:
+        PaystackConnector = None
 
 logger = logging.getLogger(__name__)
+
+
+# Optional: universal processor (feature-flagged)
+try:
+    from core_platform.transaction_processing import (
+        get_transaction_processing_service,
+        initialize_transaction_processing_service,
+        ConnectorType,
+    )
+    from core_platform.transaction_processing.models.universal_transaction import UniversalTransaction
+    from core_platform.transaction_processing.models.universal_processed_transaction import ProcessingStatus
+except Exception:
+    get_transaction_processing_service = None  # type: ignore
+    initialize_transaction_processing_service = None  # type: ignore
+    ConnectorType = None  # type: ignore
+    UniversalTransaction = None  # type: ignore
+    ProcessingStatus = None  # type: ignore
 
 
 class DataSourceType(str, Enum):
@@ -141,6 +165,7 @@ class ComprehensiveFIRSInvoiceGenerator:
     ):
         self.db = db_session
         self.firs_formatter = firs_formatter
+        self.correlation_service = SIAPPCorrelationService(db_session)
         
         # Initialize connectors for all supported systems (graceful handling of missing connectors)
         self.connectors = {
@@ -148,15 +173,9 @@ class ComprehensiveFIRSInvoiceGenerator:
                 'sap': SAPConnector() if SAPConnector else None,
                 'odoo': OdooConnector() if OdooConnector else None
             },
-            DataSourceType.CRM: {
-                'salesforce': SalesforceConnector() if SalesforceConnector else None
-            },
-            DataSourceType.POS: {
-                'square': SquareConnector() if SquareConnector else None
-            },
-            DataSourceType.ECOMMERCE: {
-                'shopify': ShopifyConnector() if ShopifyConnector else None
-            },
+            DataSourceType.CRM: {},
+            DataSourceType.POS: {},
+            DataSourceType.ECOMMERCE: {},
             DataSourceType.BANKING: {
                 'mono': MonoConnector() if MonoConnector else None
             },
@@ -172,6 +191,66 @@ class ComprehensiveFIRSInvoiceGenerator:
             'total_amount_processed': Decimal('0'),
             'errors_encountered': 0
         }
+
+        # Initialize Odoo unified connector from env if available
+        self.odoo_unified = None
+        if OdooUnifiedConnector:
+            try:
+                self.odoo_unified = OdooUnifiedConnector.from_env()
+                if self.odoo_unified and not self.odoo_unified.available():
+                    self.odoo_unified = None
+            except Exception as e:
+                logger.debug(f"OdooUnifiedConnector initialization skipped: {e}")
+
+        # Org-scoped connector cache
+        self._odoo_by_org: Dict[str, Any] = {}
+
+    async def _get_odoo_unified(self, organization_id: UUID):
+        """Return an OdooUnifiedConnector for the given organization, preferring org config over env.
+        Caches per-org connector for reuse within this generator instance.
+        """
+        if not OdooUnifiedConnector:
+            return None
+        key = str(organization_id)
+        if key in self._odoo_by_org:
+            return self._odoo_by_org[key]
+
+        try:
+            org_result = await self.db.execute(select(Organization).where(Organization.id == organization_id))
+            org = org_result.scalar_one_or_none()
+            cfg = None
+            if org and org.firs_configuration and isinstance(org.firs_configuration, dict):
+                # Accept nested 'odoo' or 'odoo_config' blocks or flat keys
+                if 'odoo' in org.firs_configuration and isinstance(org.firs_configuration['odoo'], dict):
+                    cfg = org.firs_configuration['odoo']
+                elif 'odoo_config' in org.firs_configuration and isinstance(org.firs_configuration['odoo_config'], dict):
+                    cfg = org.firs_configuration['odoo_config']
+                else:
+                    cfg = org.firs_configuration
+            if cfg:
+                url = cfg.get('url') or cfg.get('host') or cfg.get('api_url') or os.getenv('ODOO_URL') or os.getenv('ODOO_API_URL')
+                # Normalize host-only values into full https URL if needed
+                if url and not url.startswith('http'):
+                    url = f"https://{url}"
+                db = cfg.get('db') or cfg.get('database') or os.getenv('ODOO_DB') or os.getenv('ODOO_DATABASE')
+                username = cfg.get('username') or os.getenv('ODOO_USERNAME')
+                api_key = cfg.get('api_key') or os.getenv('ODOO_API_KEY')
+                password = cfg.get('password') or os.getenv('ODOO_PASSWORD')
+                verify_ssl = bool(cfg.get('verify_ssl', True))
+                timeout = int(cfg.get('timeout', os.getenv('ODOO_TIMEOUT') or 120))
+                company_id = cfg.get('company_id') or os.getenv('ODOO_COMPANY_ID')
+                company_id = int(company_id) if isinstance(company_id, (int, str)) and str(company_id).isdigit() else None
+                if url and db and username and (api_key or password):
+                    connector = OdooUnifiedConnector(url=url, db=db, username=username, api_key=api_key, password=password, verify_ssl=verify_ssl, timeout=timeout, company_id=company_id)
+                    if connector.available():
+                        self._odoo_by_org[key] = connector
+                        return connector
+        except Exception as e:
+            logger.debug(f"Org-scoped Odoo config not available for {organization_id}: {e}")
+
+        # Fallback to env-level connector
+        self._odoo_by_org[key] = self.odoo_unified
+        return self.odoo_unified
 
     async def aggregate_business_data(
         self,
@@ -239,9 +318,13 @@ class ComprehensiveFIRSInvoiceGenerator:
         # SAP ERP Data
         try:
             sap_connector = self.connectors[DataSourceType.ERP]['sap']
-            sap_invoices = await sap_connector.get_invoices_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
+            if sap_connector is not None:
+                sap_invoices = await sap_connector.get_invoices_by_date_range(
+                    organization_id, date_range[0], date_range[1]
+                )
+            else:
+                logger.debug("SAP connector not available, skipping SAP data aggregation")
+                sap_invoices = []
             
             for invoice in sap_invoices:
                 transaction = BusinessTransactionData(
@@ -272,9 +355,13 @@ class ComprehensiveFIRSInvoiceGenerator:
         # Odoo ERP Data
         try:
             odoo_connector = self.connectors[DataSourceType.ERP]['odoo']
-            odoo_invoices = await odoo_connector.get_invoices_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
+            if odoo_connector is not None:
+                odoo_invoices = await odoo_connector.get_invoices_by_date_range(
+                    organization_id, date_range[0], date_range[1]
+                )
+            else:
+                logger.debug("Odoo connector not available, skipping Odoo data aggregation")
+                odoo_invoices = []
             
             for invoice in odoo_invoices:
                 transaction = BusinessTransactionData(
@@ -302,6 +389,46 @@ class ComprehensiveFIRSInvoiceGenerator:
         except Exception as e:
             logger.error(f"Failed to aggregate Odoo data: {e}")
 
+        # Odoo ERP Data via unified connector (org-scoped)
+        try:
+            odoo_conn = await self._get_odoo_unified(organization_id)
+            if odoo_conn is not None:
+                odoo_invoices = await odoo_conn.get_invoices_by_date_range(date_range[0], date_range[1])
+            else:
+                odoo_invoices = []
+            for inv in odoo_invoices:
+                inv_date = inv.get('invoice_date')
+                if isinstance(inv_date, str):
+                    try:
+                        inv_dt = datetime.fromisoformat(inv_date)
+                    except Exception:
+                        inv_dt = datetime.utcnow()
+                else:
+                    inv_dt = inv_date or datetime.utcnow()
+                transaction = BusinessTransactionData(
+                    id=f"odoo-{inv['id']}",
+                    source_type=DataSourceType.ERP,
+                    source_id="odoo",
+                    transaction_id=inv.get('invoice_number') or inv.get('name') or str(inv['id']),
+                    date=inv_dt,
+                    customer_name=(inv.get('customer') or {}).get('name') or "Customer",
+                    customer_email=None,
+                    customer_tin=None,
+                    amount=Decimal(str(inv.get('total_amount') or 0)),
+                    currency=inv.get('currency', 'NGN'),
+                    description=inv.get('description') or 'Odoo Invoice',
+                    line_items=inv.get('line_items') or [],
+                    tax_amount=Decimal(str(inv.get('tax_amount') or 0)),
+                    vat_rate=Decimal('7.5'),
+                    payment_status=inv.get('payment_status') or 'posted',
+                    payment_method=None,
+                    confidence=96.0,
+                    raw_data=inv
+                )
+                transactions.append(transaction)
+        except Exception as e:
+            logger.error(f"Failed to aggregate Odoo ERP data: {e}")
+
         return transactions
 
     async def _aggregate_crm_data(
@@ -315,9 +442,13 @@ class ComprehensiveFIRSInvoiceGenerator:
         # Salesforce CRM Data
         try:
             sf_connector = self.connectors[DataSourceType.CRM]['salesforce']
-            sf_deals = await sf_connector.get_closed_deals_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
+            if sf_connector is not None:
+                sf_deals = await sf_connector.get_closed_deals_by_date_range(
+                    organization_id, date_range[0], date_range[1]
+                )
+            else:
+                logger.debug("Salesforce connector not available, skipping Salesforce data aggregation")
+                sf_deals = []
             
             for deal in sf_deals:
                 if deal.get('amount') and deal.get('stage') == 'Closed Won':
@@ -353,6 +484,53 @@ class ComprehensiveFIRSInvoiceGenerator:
         except Exception as e:
             logger.error(f"Failed to aggregate Salesforce data: {e}")
 
+        # Odoo CRM Data via unified connector (org-scoped)
+        try:
+            odoo_conn = await self._get_odoo_unified(organization_id)
+            if odoo_conn is not None:
+                odoo_opps = await odoo_conn.get_opportunities_by_date_range(date_range[0], date_range[1])
+            else:
+                odoo_opps = []
+            for deal in odoo_opps:
+                close_date = deal.get('close_date')
+                if isinstance(close_date, str):
+                    try:
+                        crm_dt = datetime.fromisoformat(close_date)
+                    except Exception:
+                        crm_dt = datetime.utcnow()
+                else:
+                    crm_dt = close_date or datetime.utcnow()
+                transaction = BusinessTransactionData(
+                    id=f"odoo-crm-{deal['id']}",
+                    source_type=DataSourceType.CRM,
+                    source_id="odoo",
+                    transaction_id=deal.get('name') or str(deal['id']),
+                    date=crm_dt,
+                    customer_name=(deal.get('account') or {}).get('name') or "CRM Customer",
+                    customer_email=None,
+                    customer_tin=None,
+                    amount=Decimal(str(deal.get('amount') or 0)),
+                    currency='NGN',
+                    description=deal.get('name') or 'CRM Opportunity',
+                    line_items=[{
+                        'description': deal.get('name'),
+                        'quantity': 1,
+                        'unit_price': float(deal.get('amount') or 0),
+                        'total': float(deal.get('amount') or 0),
+                        'tax_rate': 7.5,
+                        'tax_amount': float(deal.get('amount') or 0) * 0.075
+                    }],
+                    tax_amount=Decimal(str(deal.get('amount') or 0)) * Decimal('0.075'),
+                    vat_rate=Decimal('7.5'),
+                    payment_status='pending',
+                    payment_method=None,
+                    confidence=93.0,
+                    raw_data=deal
+                )
+                transactions.append(transaction)
+        except Exception as e:
+            logger.error(f"Failed to aggregate Odoo CRM data: {e}")
+
         return transactions
 
     async def _aggregate_pos_data(
@@ -360,49 +538,49 @@ class ComprehensiveFIRSInvoiceGenerator:
         organization_id: UUID,
         date_range: Tuple[datetime, datetime]
     ) -> List[BusinessTransactionData]:
-        """Aggregate data from POS systems (Square, Shopify POS, etc.)."""
+        """Aggregate data from POS systems (Odoo POS via unified connector)."""
         transactions = []
 
-        # Square POS Data
-        try:
-            square_connector = self.connectors[DataSourceType.POS]['square']
-            square_payments = await square_connector.get_payments_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
-            
-            for payment in square_payments:
-                if payment.get('status') == 'COMPLETED':
-                    transaction = BusinessTransactionData(
-                        id=f"square-{payment['id']}",
-                        source_type=DataSourceType.POS,
-                        source_id="square",
-                        transaction_id=payment['id'],
-                        date=payment['created_at'],
-                        customer_name=payment.get('buyer_email_address', 'Walk-in Customer'),
-                        customer_email=payment.get('buyer_email_address'),
-                        customer_tin=None,
-                        amount=Decimal(str(payment['amount_money']['amount'])) / 100,  # Square uses cents
-                        currency=payment['amount_money']['currency'],
-                        description='Square POS Sale',
-                        line_items=[{
-                            'description': 'POS Sale',
-                            'quantity': 1,
-                            'unit_price': float(payment['amount_money']['amount']) / 100,
-                            'total': float(payment['amount_money']['amount']) / 100,
-                            'tax_rate': 7.5,
-                            'tax_amount': (float(payment['amount_money']['amount']) / 100) * 0.075
-                        }],
-                        tax_amount=Decimal(str(payment['amount_money']['amount'])) / 100 * Decimal('0.075'),
-                        vat_rate=Decimal('7.5'),
-                        payment_status='paid',
-                        payment_method='Card Payment',
-                        confidence=99.1,
-                        raw_data=payment
-                    )
-                    transactions.append(transaction)
 
+        # Odoo POS Data via unified connector (org-scoped)
+        try:
+            odoo_conn = await self._get_odoo_unified(organization_id)
+            if odoo_conn is not None:
+                odoo_pos = await odoo_conn.get_pos_orders_by_date_range(date_range[0], date_range[1])
+            else:
+                odoo_pos = []
+            for order in odoo_pos:
+                pos_date = order.get('date_order')
+                if isinstance(pos_date, str):
+                    try:
+                        pos_dt = datetime.fromisoformat(pos_date.replace('Z', '+00:00'))
+                    except Exception:
+                        pos_dt = datetime.utcnow()
+                else:
+                    pos_dt = pos_date or datetime.utcnow()
+                transaction = BusinessTransactionData(
+                    id=f"odoo-pos-{order['id']}",
+                    source_type=DataSourceType.POS,
+                    source_id="odoo_pos",
+                    transaction_id=order.get('transaction_id') or str(order['id']),
+                    date=pos_dt,
+                    customer_name=order.get('customer_name') or 'POS Customer',
+                    customer_email=None,
+                    customer_tin=None,
+                    amount=Decimal(str(order.get('amount') or 0)),
+                    currency=order.get('currency', 'NGN'),
+                    description=order.get('name') or 'POS Order',
+                    line_items=[],
+                    tax_amount=Decimal(str(order.get('tax_amount') or 0)),
+                    vat_rate=Decimal('7.5'),
+                    payment_status=order.get('payment_status') or 'paid',
+                    payment_method=order.get('payment_method') or 'POS',
+                    confidence=95.0,
+                    raw_data=order
+                )
+                transactions.append(transaction)
         except Exception as e:
-            logger.error(f"Failed to aggregate Square data: {e}")
+            logger.error(f"Failed to aggregate Odoo POS data: {e}")
 
         return transactions
 
@@ -411,49 +589,49 @@ class ComprehensiveFIRSInvoiceGenerator:
         organization_id: UUID,
         date_range: Tuple[datetime, datetime]
     ) -> List[BusinessTransactionData]:
-        """Aggregate data from E-commerce systems (Shopify, WooCommerce, etc.)."""
+        """Aggregate data from E-commerce systems (Odoo website/e‑commerce via unified connector)."""
         transactions = []
 
-        # Shopify Store Data
-        try:
-            shopify_connector = self.connectors[DataSourceType.ECOMMERCE]['shopify']
-            shopify_orders = await shopify_connector.get_orders_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
-            
-            for order in shopify_orders:
-                if order.get('financial_status') == 'paid':
-                    transaction = BusinessTransactionData(
-                        id=f"shopify-{order['id']}",
-                        source_type=DataSourceType.ECOMMERCE,
-                        source_id="shopify",
-                        transaction_id=order['order_number'],
-                        date=order['created_at'],
-                        customer_name=f"{order['customer']['first_name']} {order['customer']['last_name']}",
-                        customer_email=order['customer']['email'],
-                        customer_tin=None,
-                        amount=Decimal(str(order['total_price'])),
-                        currency=order['currency'],
-                        description=f"E-commerce Order #{order['order_number']}",
-                        line_items=[{
-                            'description': item['title'],
-                            'quantity': item['quantity'],
-                            'unit_price': float(item['price']),
-                            'total': float(item['price']) * item['quantity'],
-                            'tax_rate': 7.5,
-                            'tax_amount': float(item['price']) * item['quantity'] * 0.075
-                        } for item in order['line_items']],
-                        tax_amount=Decimal(str(order['total_tax'])),
-                        vat_rate=Decimal('7.5'),
-                        payment_status='paid',
-                        payment_method=order.get('gateway', 'Online Payment'),
-                        confidence=97.8,
-                        raw_data=order
-                    )
-                    transactions.append(transaction)
 
+        # Odoo eCommerce Data via unified connector (org-scoped)
+        try:
+            odoo_conn = await self._get_odoo_unified(organization_id)
+            if odoo_conn is not None:
+                odoo_so = await odoo_conn.get_online_orders_by_date_range(date_range[0], date_range[1])
+            else:
+                odoo_so = []
+            for order in odoo_so:
+                so_date = order.get('date_order')
+                if isinstance(so_date, str):
+                    try:
+                        so_dt = datetime.fromisoformat(so_date.replace('Z', '+00:00'))
+                    except Exception:
+                        so_dt = datetime.utcnow()
+                else:
+                    so_dt = so_date or datetime.utcnow()
+                transaction = BusinessTransactionData(
+                    id=f"odoo-ecom-{order['id']}",
+                    source_type=DataSourceType.ECOMMERCE,
+                    source_id="odoo_ecommerce",
+                    transaction_id=order.get('transaction_id') or str(order['id']),
+                    date=so_dt,
+                    customer_name=order.get('customer_name') or 'Online Customer',
+                    customer_email=None,
+                    customer_tin=None,
+                    amount=Decimal(str(order.get('amount') or 0)),
+                    currency=order.get('currency', 'NGN'),
+                    description=order.get('name') or 'Online Order',
+                    line_items=[],
+                    tax_amount=Decimal(str(order.get('tax_amount') or 0)),
+                    vat_rate=Decimal('7.5'),
+                    payment_status=order.get('payment_status') or 'paid',
+                    payment_method=order.get('payment_method') or 'Online',
+                    confidence=95.0,
+                    raw_data=order
+                )
+                transactions.append(transaction)
         except Exception as e:
-            logger.error(f"Failed to aggregate Shopify data: {e}")
+            logger.error(f"Failed to aggregate Odoo eCommerce data: {e}")
 
         return transactions
 
@@ -468,9 +646,13 @@ class ComprehensiveFIRSInvoiceGenerator:
         # Mono Banking Data
         try:
             mono_connector = self.connectors[DataSourceType.BANKING]['mono']
-            mono_transactions = await mono_connector.get_transactions_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
+            if mono_connector is not None:
+                mono_transactions = await mono_connector.get_transactions_by_date_range(
+                    organization_id, date_range[0], date_range[1]
+                )
+            else:
+                logger.debug("Mono connector not available, skipping Mono banking data aggregation")
+                mono_transactions = []
             
             for txn in mono_transactions:
                 if txn.get('type') == 'credit' and txn.get('amount', 0) > 0:
@@ -519,9 +701,13 @@ class ComprehensiveFIRSInvoiceGenerator:
         # Paystack Payment Data
         try:
             paystack_connector = self.connectors[DataSourceType.PAYMENT]['paystack']
-            paystack_transactions = await paystack_connector.get_successful_transactions_by_date_range(
-                organization_id, date_range[0], date_range[1]
-            )
+            if paystack_connector is not None:
+                paystack_transactions = await paystack_connector.get_successful_transactions_by_date_range(
+                    organization_id, date_range[0], date_range[1]
+                )
+            else:
+                logger.debug("Paystack connector not available, skipping Paystack data aggregation")
+                paystack_transactions = []
             
             for txn in paystack_transactions:
                 if txn.get('status') == 'success':
@@ -608,6 +794,78 @@ class ComprehensiveFIRSInvoiceGenerator:
         logger.info(f"Cross-referenced {len(transactions)} transactions into {len(reconciled)} reconciled transactions")
         return reconciled
 
+    def _map_connector_type(self, txn: BusinessTransactionData):
+        """Map BusinessTransactionData to universal ConnectorType."""
+        if not ConnectorType:
+            raise RuntimeError("Universal processor not available")
+        s = (txn.source_type.value or "").lower()
+        sid = (txn.source_id or "").lower()
+        if s == "erp":
+            if "odoo" in sid:
+                return ConnectorType.ERP_ODOO
+            if "sap" in sid:
+                return ConnectorType.ERP_SAP
+            return ConnectorType.ERP_ODOO
+        if s == "crm":
+            if "odoo" in sid:
+                return ConnectorType.CRM_ODOO
+            # Default to Odoo CRM profile in Nigerian deployments
+            return ConnectorType.CRM_ODOO
+        if s == "pos":
+            if "odoo" in sid:
+                return ConnectorType.POS_ODOO
+            return ConnectorType.POS_ECOMMERCE
+        if s == "ecommerce":
+            if "odoo" in sid:
+                return ConnectorType.ECOMMERCE_ODOO
+            # Default to Odoo e‑commerce profile in Nigerian deployments
+            return ConnectorType.ECOMMERCE_ODOO
+        if s == "banking":
+            return ConnectorType.BANKING_OPEN_BANKING
+        if s == "payment":
+            if "paystack" in sid:
+                return ConnectorType.PAYMENT_PAYSTACK
+            return ConnectorType.PAYMENT_FLUTTERWAVE
+        return ConnectorType.ERP_ODOO
+
+    def _to_universal_txn(self, txn: BusinessTransactionData):
+        """Convert BusinessTransactionData to UniversalTransaction."""
+        if not UniversalTransaction:
+            raise RuntimeError("Universal processor not available")
+        meta_kwargs = {
+            'erp_metadata': {},
+            'crm_metadata': {},
+            'pos_metadata': {},
+            'ecommerce_metadata': {},
+            'banking_metadata': {},
+        }
+        bucket = txn.source_type.value
+        if bucket == 'erp':
+            meta_kwargs['erp_metadata'] = {'transaction_id': txn.transaction_id}
+        elif bucket == 'crm':
+            meta_kwargs['crm_metadata'] = {'transaction_id': txn.transaction_id}
+        elif bucket == 'pos':
+            meta_kwargs['pos_metadata'] = {'transaction_id': txn.transaction_id}
+        elif bucket == 'ecommerce':
+            meta_kwargs['ecommerce_metadata'] = {'transaction_id': txn.transaction_id}
+        elif bucket == 'banking':
+            meta_kwargs['banking_metadata'] = {'transaction_id': txn.transaction_id}
+
+        return UniversalTransaction(
+            id=txn.id,
+            amount=float(txn.amount),
+            currency=txn.currency or 'NGN',
+            date=txn.date,
+            description=txn.description or (txn.source_id or 'Transaction'),
+            account_number=txn.customer_tin or None,
+            reference=txn.transaction_id,
+            category=bucket,
+            source_system=bucket,
+            source_connector=txn.source_id or 'unknown',
+            raw_data=txn.raw_data or {},
+            **meta_kwargs
+        )
+
     async def generate_firs_invoices(
         self,
         request: FIRSInvoiceGenerationRequest
@@ -642,6 +900,39 @@ class ComprehensiveFIRSInvoiceGenerator:
                     total_amount=Decimal('0'),
                     irns_generated=[]
                 )
+
+            # Optional: route through universal processing pipeline (feature-flagged)
+            use_universal = str(os.getenv("USE_UNIVERSAL_PROCESSOR", "false")).lower() in ("1", "true", "yes", "on")
+            if use_universal and UniversalTransaction and ConnectorType and (get_transaction_processing_service or initialize_transaction_processing_service):
+                try:
+                    svc = get_transaction_processing_service() if get_transaction_processing_service else None  # type: ignore
+                    if svc is None and initialize_transaction_processing_service:
+                        svc = initialize_transaction_processing_service()  # type: ignore
+                    if svc and hasattr(svc, "process_mixed_batch"):
+                        mixed = []
+                        for t in selected_transactions:
+                            try:
+                                mixed.append((self._to_universal_txn(t), self._map_connector_type(t)))
+                            except Exception as e:
+                                logger.debug(f"Universal mapping skipped for {t.id}: {e}")
+                        if mixed:
+                            results = await svc.process_mixed_batch(mixed)  # type: ignore[attr-defined]
+                            allowed_ids = set()
+                            for r in (results or []):
+                                try:
+                                    if r.success and r.processed_transaction and (
+                                        r.processed_transaction.status == ProcessingStatus.READY_FOR_INVOICE
+                                        or r.processed_transaction.processing_metadata.validation_passed
+                                    ):
+                                        allowed_ids.add(r.transaction_id)
+                                except Exception:
+                                    continue
+                            if allowed_ids:
+                                before = len(selected_transactions)
+                                selected_transactions = [t for t in selected_transactions if t.id in allowed_ids]
+                                logger.info(f"Universal processing filtered {before} → {len(selected_transactions)} transactions ready for invoice")
+                except Exception as e:
+                    logger.warning(f"Universal processor path skipped due to error: {e}")
 
             invoices = []
             irns_generated = []
@@ -754,6 +1045,26 @@ class ComprehensiveFIRSInvoiceGenerator:
         self.db.add(firs_submission)
         await self.db.commit()
 
+        # Create SI-APP correlation for status tracking
+        try:
+            await self.correlation_service.create_correlation(
+                organization_id=request.organization_id,
+                si_invoice_id=invoice_data['invoice_number'],
+                si_transaction_ids=[transaction.id],
+                irn=irn,
+                invoice_number=invoice_data['invoice_number'],
+                total_amount=float(transaction.amount),
+                currency=transaction.currency,
+                customer_name=transaction.customer_name,
+                customer_email=transaction.customer_email,
+                customer_tin=transaction.customer_tin,
+                invoice_data=invoice_data
+            )
+            logger.info(f"Created SI-APP correlation for IRN {irn}")
+        except Exception as e:
+            logger.warning(f"Failed to create SI-APP correlation for IRN {irn}: {e}")
+            # Don't fail the invoice generation if correlation creation fails
+
         return invoice_data
 
     async def _generate_consolidated_invoice(
@@ -823,6 +1134,26 @@ class ComprehensiveFIRSInvoiceGenerator:
         self.db.add(firs_submission)
         await self.db.commit()
 
+        # Create SI-APP correlation for consolidated invoice
+        try:
+            await self.correlation_service.create_correlation(
+                organization_id=request.organization_id,
+                si_invoice_id=invoice_data['invoice_number'],
+                si_transaction_ids=[txn.id for txn in transactions],
+                irn=irn,
+                invoice_number=invoice_data['invoice_number'],
+                total_amount=float(total_amount),
+                currency=primary_transaction.currency,
+                customer_name=invoice_data['customer']['name'],
+                customer_email=invoice_data['customer']['email'],
+                customer_tin=invoice_data['customer']['tin'],
+                invoice_data=invoice_data
+            )
+            logger.info(f"Created SI-APP correlation for consolidated IRN {irn}")
+        except Exception as e:
+            logger.warning(f"Failed to create SI-APP correlation for consolidated IRN {irn}: {e}")
+            # Don't fail the invoice generation if correlation creation fails
+
         return invoice_data
 
     async def _generate_irn(
@@ -833,9 +1164,22 @@ class ComprehensiveFIRSInvoiceGenerator:
     ) -> str:
         """Generate FIRS-compliant Invoice Reference Number (IRN)."""
         
+        # Get organization-specific service ID
+        from core_platform.data_management.models.organization import Organization
+        org_result = await self.db.execute(
+            select(Organization).where(Organization.id == organization_id)
+        )
+        organization = org_result.scalar_one_or_none()
+        
+        if organization:
+            service_id = organization.get_firs_service_id()
+            logger.debug(f"Using FIRS service ID '{service_id}' for organization {organization_id}")
+        else:
+            service_id = "94ND90NR"  # Fallback to default
+            logger.warning(f"Organization {organization_id} not found, using default service ID")
+        
         # IRN Format: InvoiceNumber-ServiceID-YYYYMMDD
         base_number = f"TXP-{transaction.transaction_id}" if not is_consolidated else f"TXP-CONS-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        service_id = "94ND90NR"  # FIRS-assigned Service ID
         date_part = transaction.date.strftime('%Y%m%d')
         
         irn = f"{base_number}-{service_id}-{date_part}"

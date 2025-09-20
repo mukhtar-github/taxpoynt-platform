@@ -178,7 +178,7 @@ class OnboardingEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting onboarding state in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get onboarding state")
+            raise HTTPException(status_code=502, detail="Failed to get onboarding state")
 
     async def update_onboarding_state(self,
                                       request: Request,
@@ -214,7 +214,7 @@ class OnboardingEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error updating onboarding state in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update onboarding state")
+            raise HTTPException(status_code=502, detail="Failed to update onboarding state")
 
     async def complete_onboarding_step(self,
                                        step_name: str,
@@ -240,7 +240,7 @@ class OnboardingEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error completing onboarding step in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to complete onboarding step")
+            raise HTTPException(status_code=502, detail="Failed to complete onboarding step")
 
     async def complete_onboarding(self,
                                   request: Request,
@@ -264,7 +264,7 @@ class OnboardingEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error completing onboarding in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to complete onboarding")
+            raise HTTPException(status_code=502, detail="Failed to complete onboarding")
 
     async def reset_onboarding_state(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Reset onboarding state (admin/testing only)"""
@@ -286,7 +286,7 @@ class OnboardingEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error resetting onboarding state in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to reset onboarding state")
+            raise HTTPException(status_code=502, detail="Failed to reset onboarding state")
 
     async def get_onboarding_analytics(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Get onboarding analytics and progress insights"""
@@ -305,7 +305,7 @@ class OnboardingEndpointsV1:
             raise
         except Exception as e:
             logger.error(f"Error getting onboarding analytics in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get onboarding analytics")
+            raise HTTPException(status_code=502, detail="Failed to get onboarding analytics")
 
     def _create_v1_response(self, data: Any, message: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized V1 response"""

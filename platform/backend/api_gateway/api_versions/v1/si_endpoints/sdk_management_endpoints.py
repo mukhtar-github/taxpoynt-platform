@@ -66,7 +66,7 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
             
         except Exception as e:
             logger.error(f"Failed to retrieve SDK catalog: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve SDK catalog")
+            raise HTTPException(status_code=502, detail="Failed to retrieve SDK catalog")
     
     @router.get("/catalog/{language}", response_model=V1ResponseModel)
     async def get_sdk_by_language(
@@ -93,7 +93,7 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
             raise
         except Exception as e:
             logger.error(f"Failed to retrieve SDK for {language}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve SDK information")
+            raise HTTPException(status_code=502, detail="Failed to retrieve SDK information")
     
     @router.post("/generate", response_model=V1ResponseModel)
     async def generate_sdk(
@@ -281,7 +281,7 @@ python-dotenv>=0.19.0
             raise
         except Exception as e:
             logger.error(f"Failed to retrieve documentation for {language}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve documentation")
+            raise HTTPException(status_code=502, detail="Failed to retrieve documentation")
     
     @router.get("/sandbox/scenarios", response_model=V1ResponseModel)
     async def get_sandbox_scenarios(
@@ -302,7 +302,7 @@ python-dotenv>=0.19.0
             
         except Exception as e:
             logger.error(f"Failed to retrieve sandbox scenarios: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve sandbox scenarios")
+            raise HTTPException(status_code=502, detail="Failed to retrieve sandbox scenarios")
     
     @router.post("/sandbox/test", response_model=V1ResponseModel)
     async def test_api_scenario(
@@ -364,7 +364,7 @@ python-dotenv>=0.19.0
             
         except Exception as e:
             logger.error(f"Failed to retrieve SDK analytics: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve analytics")
+            raise HTTPException(status_code=502, detail="Failed to retrieve analytics")
     
     @router.post("/feedback", response_model=V1ResponseModel)
     async def submit_sdk_feedback(
@@ -409,6 +409,6 @@ python-dotenv>=0.19.0
             raise
         except Exception as e:
             logger.error(f"Failed to submit feedback: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit feedback")
+            raise HTTPException(status_code=502, detail="Failed to submit feedback")
     
     return router
