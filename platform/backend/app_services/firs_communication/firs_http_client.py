@@ -34,7 +34,7 @@ class FIRSHttpClient:
         self.base_url = (base_url or os.getenv("FIRS_API_URL") or "").rstrip("/")
         self.api_key = os.getenv("FIRS_API_KEY", "")
         self.api_secret = os.getenv("FIRS_API_SECRET", "")
-        self.certificate_b64 = os.getenv("FIRS_CERTIFICATE_B64", "")
+        self.certificate_b64 = os.getenv("FIRS_ENCRYPTION_KEY", "")
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def start(self):

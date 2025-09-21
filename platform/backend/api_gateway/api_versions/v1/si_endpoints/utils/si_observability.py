@@ -10,26 +10,50 @@ import time
 from typing import Optional
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Histogram, REGISTRY
 
 
-SI_REQUEST_LATENCY_SECONDS = Histogram(
-    "si_request_latency_seconds",
-    "SI request latency in seconds",
-    labelnames=("method", "path", "action", "status_code"),
-)
+def _get_metric(name: str):
+    existing = getattr(REGISTRY, "_names_to_collectors", {}).get(name)
+    if existing is None:
+        raise RuntimeError(f"Metric '{name}' not found in Prometheus registry")
+    return existing
 
-SI_REQUESTS_TOTAL = Counter(
-    "si_requests_total",
-    "Total SI requests",
-    labelnames=("method", "path", "action", "status_code"),
-)
 
-SI_ERRORS_TOTAL = Counter(
-    "si_errors_total",
-    "Total SI errors",
-    labelnames=("method", "path", "action", "status_code", "error_code"),
-)
+def _build_histogram():
+    return Histogram(
+        "si_request_latency_seconds",
+        "SI request latency in seconds",
+        labelnames=("method", "path", "action", "status_code"),
+    )
+
+
+def _build_counter(name: str, documentation: str, labelnames):
+    return Counter(name, documentation, labelnames=labelnames)
+
+
+try:
+    SI_REQUEST_LATENCY_SECONDS = _build_histogram()
+except ValueError:
+    SI_REQUEST_LATENCY_SECONDS = _get_metric("si_request_latency_seconds")
+
+try:
+    SI_REQUESTS_TOTAL = _build_counter(
+        "si_requests_total",
+        "Total SI requests",
+        ("method", "path", "action", "status_code"),
+    )
+except ValueError:
+    SI_REQUESTS_TOTAL = _get_metric("si_requests_total")
+
+try:
+    SI_ERRORS_TOTAL = _build_counter(
+        "si_errors_total",
+        "Total SI errors",
+        ("method", "path", "action", "status_code", "error_code"),
+    )
+except ValueError:
+    SI_ERRORS_TOTAL = _get_metric("si_errors_total")
 
 
 def _extract_action(req: Request, resp: Optional[Response] = None) -> str:

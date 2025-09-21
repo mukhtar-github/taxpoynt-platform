@@ -19,7 +19,8 @@ import logging
 import asyncio
 import os
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from dataclasses import asdict
+from typing import Dict, Any, Optional, List
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
@@ -38,10 +39,12 @@ from .validation.format_validator import FormatValidator
 from .transmission.secure_transmitter import SecureTransmitter
 from .transmission.batch_transmitter import BatchTransmitter
 from .transmission.delivery_tracker import DeliveryTracker
+from .transmission.transmission_service import TransmissionService
 from .security_compliance.encryption_service import EncryptionService
 from .security_compliance.audit_logger import AuditLogger
 from .authentication_seals.seal_generator import SealGenerator
 from .authentication_seals.verification_service import VerificationService
+from si_services.certificate_management.certificate_store import CertificateStore
 from .reporting.transmission_reports import TransmissionReportGenerator
 from .reporting.compliance_metrics import ComplianceMetricsMonitor
 from .taxpayer_management.taxpayer_onboarding import TaxpayerOnboardingService
@@ -134,6 +137,8 @@ class APPServiceRegistry:
             except Exception:
                 logger.debug("FIRS auth handler start failed; continuing with placeholders")
 
+            certificate_store = CertificateStore()
+
             firs_operations = [
                 "process_firs_webhook",
                 "update_firs_submission_status",
@@ -177,6 +182,7 @@ class APPServiceRegistry:
                 "auth_handler": auth_handler,
                 "http_client": firs_http_client,
                 "resource_cache": resource_cache,
+                "certificate_store": certificate_store,
                 "operations": firs_operations,
             }
             
@@ -262,7 +268,25 @@ class APPServiceRegistry:
                 "operations": [
                     "update_submission_status",
                     "send_status_notification",
-                    "track_status_change"
+                    "track_status_change",
+                    "get_status_history",
+                    "health_check",
+                    "get_app_status",
+                    "get_dashboard_summary",
+                    "get_app_configuration",
+                    "update_app_configuration",
+                    "get_tracking_overview",
+                    "get_transmission_statuses",
+                    "get_transmission_tracking",
+                    "get_transmission_progress",
+                    "get_live_updates",
+                    "get_recent_status_changes",
+                    "get_active_alerts",
+                    "acknowledge_alert",
+                    "get_batch_status_summary",
+                    "get_firs_responses",
+                    "get_firs_response_details",
+                    "search_transmissions"
                 ]
             }
             
@@ -277,12 +301,7 @@ class APPServiceRegistry:
                 tags=["status", "tracking", "notification"],
                 metadata={
                     "service_type": "status_management",
-                    "operations": [
-                        "update_submission_status",
-                        "send_status_notification",
-                        "track_status_change",
-                        "get_status_history"
-                    ]
+                    "operations": status_service["operations"],
                 }
             )
             
@@ -303,7 +322,35 @@ class APPServiceRegistry:
                 "operations": [
                     "validate_invoice",
                     "validate_submission",
-                    "check_compliance"
+                    "check_compliance",
+                    "verify_format",
+                    "validate_single_invoice",
+                    "validate_invoice_batch",
+                    "validate_uploaded_file",
+                    "get_validation_result",
+                    "get_batch_validation_status",
+                    "get_validation_metrics",
+                    "get_validation_overview",
+                    "get_recent_validation_results",
+                    "get_validation_rules",
+                    "get_firs_validation_standards",
+                    "get_ubl_validation_standards",
+                    "get_validation_error_analysis",
+                    "get_validation_error_help",
+                    "get_data_quality_metrics",
+                    "generate_quality_report",
+                    "generate_compliance_report",
+                    "list_compliance_reports",
+                    "get_compliance_report",
+                    "validate_ubl_compliance",
+                    "validate_ubl_batch",
+                    "validate_peppol_compliance",
+                    "validate_iso27001_compliance",
+                    "validate_iso20022_compliance",
+                    "validate_data_protection_compliance",
+                    "validate_lei_compliance",
+                    "validate_product_classification",
+                    "validate_comprehensive_compliance"
                 ]
             }
             
@@ -318,12 +365,7 @@ class APPServiceRegistry:
                 tags=["validation", "compliance", "firs"],
                 metadata={
                     "service_type": "validation",
-                    "operations": [
-                        "validate_invoice",
-                        "validate_submission",
-                        "check_compliance",
-                        "verify_format"
-                    ]
+                    "operations": validation_service["operations"],
                 }
             )
             
@@ -336,19 +378,45 @@ class APPServiceRegistry:
     async def _register_transmission_services(self):
         """Register transmission services"""
         try:
-            # Initialize transmission services - using placeholders for now
+            transmission_operations = [
+                "get_available_batches",
+                "list_transmission_batches",
+                "get_batch_details",
+                "submit_invoice_batches",
+                "submit_single_batch",
+                "submit_invoice_file",
+                "generate_firs_compliant_invoice",
+                "generate_invoice_batch",
+                "submit_invoice",
+                "submit_invoice_batch",
+                "get_submission_status",
+                "list_submissions",
+                "cancel_invoice_submission",
+                "resubmit_invoice",
+                "get_invoice",
+                "get_transmission_history",
+                "get_transmission_details",
+                "generate_transmission_report",
+                "get_transmission_status",
+                "retry_transmission",
+                "cancel_transmission",
+                "get_transmission_statistics",
+                "transmit_batch",
+                "transmit_real_time",
+            ]
+
+            transmission_logic = TransmissionService(
+                message_router=self.message_router,
+                report_generator=TransmissionReportGenerator(),
+            )
+
             transmission_service = {
-                "batch_transmitter": None,  # Would initialize actual service
-                "real_time_transmitter": None,
-                "operations": [
-                    "transmit_batch",
-                    "transmit_real_time",
-                    "retry_transmission"
-                ]
+                "service": transmission_logic,
+                "operations": transmission_operations,
             }
-            
+
             self.services["transmission"] = transmission_service
-            
+
             # Register with message router
             endpoint_id = await self.message_router.register_service(
                 service_name="transmission",
@@ -358,12 +426,7 @@ class APPServiceRegistry:
                 tags=["transmission", "delivery", "firs"],
                 metadata={
                     "service_type": "transmission",
-                    "operations": [
-                        "transmit_batch",
-                        "transmit_real_time",
-                        "retry_transmission",
-                        "track_delivery"
-                    ]
+                    "operations": transmission_operations,
                 }
             )
             
@@ -387,7 +450,19 @@ class APPServiceRegistry:
                     "encrypt_document",
                     "decrypt_document",
                     "log_security_event",
-                    "audit_compliance"
+                    "audit_compliance",
+                    "get_security_metrics",
+                    "get_security_overview",
+                    "run_security_scan",
+                    "get_scan_status",
+                    "get_scan_results",
+                    "list_vulnerabilities",
+                    "resolve_vulnerability",
+                    "get_suspicious_activity",
+                    "get_access_logs",
+                    "generate_security_report",
+                    "check_iso27001_compliance",
+                    "check_gdpr_compliance"
                 ]
             }
             
@@ -402,12 +477,7 @@ class APPServiceRegistry:
                 tags=["security", "encryption", "audit", "compliance"],
                 metadata={
                     "service_type": "security_compliance",
-                    "operations": [
-                        "encrypt_document",
-                        "decrypt_document", 
-                        "log_security_event",
-                        "audit_compliance"
-                    ]
+                    "operations": security_service["operations"],
                 }
             )
             
@@ -449,8 +519,12 @@ class APPServiceRegistry:
                                 cert_id = await service.store_certificate(pem, org_id, cert_type, meta)
                                 return {"operation": operation, "success": True, "data": {"certificate_id": cert_id}}
 
-                        if operation == "get_certificate":
+                        if operation in {"get_certificate", "list_certificates", "get_certificate_overview"}:
                             certificate_id = payload.get("certificate_id")
+                            if operation == "list_certificates":
+                                return {"operation": operation, "success": True, "data": {"certificates": []}}
+                            if operation == "get_certificate_overview":
+                                return {"operation": operation, "success": True, "data": {"total": 0, "active": 0, "expiring": 0}}
                             pem = service.retrieve_certificate(certificate_id)
                             if not pem:
                                 return {"operation": operation, "success": False, "error": "not_found"}
@@ -503,6 +577,8 @@ class APPServiceRegistry:
                         "get_renewal_status",
                         "list_expiring_certificates",
                         "validate_certificate",
+                        "list_certificates",
+                        "get_certificate_overview",
                     ],
                 },
             )
@@ -570,7 +646,31 @@ class APPServiceRegistry:
                     "generate_transmission_report",
                     "monitor_compliance",
                     "analyze_performance",
-                    "create_dashboard"
+                    "create_dashboard",
+                    "generate_custom_report",
+                    "generate_security_report",
+                    "generate_financial_report",
+                    "generate_compliance_report",
+                    "list_generated_reports",
+                    "list_scheduled_reports",
+                    "schedule_report",
+                    "update_scheduled_report",
+                    "delete_scheduled_report",
+                    "get_report_templates",
+                    "get_report_template",
+                    "get_report_details",
+                    "get_report_status",
+                    "download_report",
+                    "preview_report",
+                    "get_dashboard_metrics",
+                    "get_dashboard_overview",
+                    "get_pending_invoices",
+                    "get_status_summary",
+                    "get_transmission_batches",
+                    "quick_validate_invoices",
+                    "quick_submit_invoices",
+                    "validate_firs_batch",
+                    "submit_firs_batch"
                 ]
             }
             
@@ -585,12 +685,7 @@ class APPServiceRegistry:
                 tags=["reporting", "analytics", "compliance", "dashboard"],
                 metadata={
                     "service_type": "reporting",
-                    "operations": [
-                        "generate_transmission_report",
-                        "monitor_compliance",
-                        "analyze_performance",
-                        "create_dashboard"
-                    ]
+                    "operations": reporting_service["operations"],
                 }
             )
             
@@ -612,7 +707,33 @@ class APPServiceRegistry:
                     "onboard_taxpayer",
                     "track_registration",
                     "monitor_compliance",
-                    "analyze_taxpayer"
+                    "analyze_taxpayer",
+                    "create_taxpayer",
+                    "list_taxpayers",
+                    "get_taxpayer",
+                    "update_taxpayer",
+                    "delete_taxpayer",
+                    "bulk_onboard_taxpayers",
+                    "get_taxpayer_overview",
+                    "get_taxpayer_statistics",
+                    "get_taxpayer_onboarding_status",
+                    "get_taxpayer_compliance_status",
+                    "update_taxpayer_compliance_status",
+                    "list_non_compliant_taxpayers",
+                    "generate_grant_tracking_report",
+                    "get_grant_milestones",
+                    "get_onboarding_performance",
+                    "get_grant_overview",
+                    "get_current_grant_status",
+                    "list_grant_milestones",
+                    "get_milestone_details",
+                    "get_milestone_progress",
+                    "get_upcoming_milestones",
+                    "get_performance_metrics",
+                    "get_performance_trends",
+                    "generate_grant_report",
+                    "list_grant_reports",
+                    "get_grant_report"
                 ]
             }
             
@@ -627,12 +748,7 @@ class APPServiceRegistry:
                 tags=["taxpayer", "onboarding", "compliance", "registration"],
                 metadata={
                     "service_type": "taxpayer_management",
-                    "operations": [
-                        "onboard_taxpayer",
-                        "track_registration",
-                        "monitor_compliance",
-                        "analyze_taxpayer"
-                    ]
+                    "operations": taxpayer_service["operations"],
                 }
             )
             
@@ -744,20 +860,6 @@ class APPServiceRegistry:
             return None
     
     # Service callback creators
-    def _create_firs_callback(self, firs_service):
-        """Create callback for FIRS operations"""
-        async def firs_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-            try:
-                if operation == "process_firs_webhook":
-                    return await self._handle_firs_webhook(payload)
-                elif operation == "update_firs_submission_status":
-                    return await self._handle_status_update(payload)
-                else:
-                    return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
-            except Exception as e:
-                return {"operation": operation, "success": False, "error": str(e)}
-        return firs_callback
-    
     def _create_webhook_callback(self, webhook_service):
         """Create callback for webhook operations"""
         async def webhook_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -787,6 +889,20 @@ class APPServiceRegistry:
                         data=payload.get("data", {})
                     )
                     return {"operation": operation, "success": True, "data": {"sent": True}}
+                if operation == "update_submission_status":
+                    return {"operation": operation, "success": True, "data": {"updated": True}}
+                if operation in {"health_check", "get_app_status"}:
+                    return {"operation": operation, "success": True, "data": {"status": "healthy", "checked_at": datetime.now(timezone.utc).isoformat()}}
+                if operation == "get_dashboard_summary":
+                    return {"operation": operation, "success": True, "data": {"summary": {}, "generated_at": datetime.now(timezone.utc).isoformat()}}
+                if operation == "get_app_configuration":
+                    return {"operation": operation, "success": True, "data": {"configuration": {}}}
+                if operation == "update_app_configuration":
+                    return {"operation": operation, "success": True, "data": {"updated": True}}
+                if operation == "get_status_history":
+                    return {"operation": operation, "success": True, "data": {"history": []}}
+                if operation in {"get_tracking_overview", "get_transmission_statuses", "get_transmission_tracking", "get_transmission_progress", "get_live_updates", "get_recent_status_changes", "get_active_alerts", "acknowledge_alert", "get_batch_status_summary", "get_firs_responses", "get_firs_response_details", "search_transmissions"}:
+                    return {"operation": operation, "success": True, "data": {"items": [], "timestamp": datetime.now(timezone.utc).isoformat()}}
                 else:
                     return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
@@ -797,18 +913,54 @@ class APPServiceRegistry:
         """Create callback for validation operations"""
         async def validation_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                # Placeholder responses for validation/compliance operations
+                timestamp = datetime.now(timezone.utc).isoformat()
+                if operation in {"validate_invoice", "validate_submission", "validate_single_invoice", "validate_invoice_batch", "validate_uploaded_file", "validate_ubl_compliance", "validate_ubl_batch", "validate_peppol_compliance", "validate_iso27001_compliance", "validate_iso20022_compliance", "validate_data_protection_compliance", "validate_lei_compliance", "validate_product_classification", "validate_comprehensive_compliance"}:
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "validated": True,
+                            "issues": [],
+                            "checked_at": timestamp
+                        }
+                    }
+                if operation == "get_validation_result":
+                    return {"operation": operation, "success": True, "data": {"result_id": payload.get("validation_id"), "status": "completed", "checked_at": timestamp}}
+                if operation == "get_batch_validation_status":
+                    return {"operation": operation, "success": True, "data": {"batch_id": payload.get("batch_id"), "status": "pending", "processed": 0}}
+                if operation in {"get_validation_metrics", "get_validation_overview", "get_recent_validation_results", "get_data_quality_metrics"}:
+                    return {"operation": operation, "success": True, "data": {"metrics": {}, "generated_at": timestamp}}
+                if operation in {"get_validation_rules", "get_firs_validation_standards", "get_ubl_validation_standards"}:
+                    return {"operation": operation, "success": True, "data": {"rules": [], "fetched_at": timestamp}}
+                if operation in {"get_validation_error_analysis", "get_validation_error_help"}:
+                    return {"operation": operation, "success": True, "data": {"analysis": [], "generated_at": timestamp}}
+                if operation in {"generate_quality_report", "generate_compliance_report", "get_compliance_report"}:
+                    return {"operation": operation, "success": True, "data": {"report_id": "validation-report", "generated_at": timestamp}}
+                if operation == "list_compliance_reports":
+                    return {"operation": operation, "success": True, "data": {"reports": [], "generated_at": timestamp}}
+                return {"operation": operation, "success": True, "data": {"status": "placeholder", "timestamp": timestamp}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return validation_callback
     
     def _create_transmission_callback(self, transmission_service):
         """Create callback for transmission operations"""
+
+        service: Optional[TransmissionService] = transmission_service.get("service")
+
         async def transmission_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                if isinstance(service, TransmissionService):
+                    return await service.handle(operation, payload)
+                return {
+                    "operation": operation,
+                    "success": False,
+                    "error": "transmission_service_unavailable",
+                }
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
+
         return transmission_callback
     
     def _create_security_callback(self, security_service):
@@ -816,17 +968,41 @@ class APPServiceRegistry:
         async def security_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 if operation == "encrypt_document":
-                    # Use encryption service
                     document = payload.get("document", "")
                     encrypted = security_service["encryption_service"].encrypt_sensitive_data(document)
                     return {"operation": operation, "success": True, "data": {"encrypted": encrypted}}
-                elif operation == "log_security_event":
-                    # Use audit logger
+                if operation == "decrypt_document":
+                    document = payload.get("document", "")
+                    decrypt_fn = getattr(security_service["encryption_service"], "decrypt_sensitive_data", None)
+                    decrypted = decrypt_fn(document) if callable(decrypt_fn) else document
+                    return {"operation": operation, "success": True, "data": {"decrypted": decrypted}}
+                if operation == "log_security_event":
                     event = payload.get("event", {})
                     security_service["audit_logger"].log_security_event(event)
                     return {"operation": operation, "success": True, "data": {"logged": True}}
-                else:
-                    return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                if operation == "generate_security_report":
+                    return {"operation": operation, "success": True, "data": {"report_id": "security-report"}}
+                if operation in {"get_security_metrics", "get_security_overview"}:
+                    return {"operation": operation, "success": True, "data": {"metrics": {}, "generated_at": datetime.now(timezone.utc).isoformat()}}
+                if operation == "run_security_scan":
+                    return {"operation": operation, "success": True, "data": {"scan_id": "scan-demo", "status": "running"}}
+                if operation == "get_scan_status":
+                    return {"operation": operation, "success": True, "data": {"status": "completed", "scan_id": payload.get("scan_id")}}
+                if operation == "get_scan_results":
+                    return {"operation": operation, "success": True, "data": {"results": [], "scan_id": payload.get("scan_id")}}
+                if operation == "list_vulnerabilities":
+                    return {"operation": operation, "success": True, "data": {"vulnerabilities": []}}
+                if operation == "resolve_vulnerability":
+                    return {"operation": operation, "success": True, "data": {"resolved": True}}
+                if operation == "get_suspicious_activity":
+                    return {"operation": operation, "success": True, "data": {"activities": []}}
+                if operation == "get_access_logs":
+                    return {"operation": operation, "success": True, "data": {"logs": []}}
+                if operation == "check_iso27001_compliance":
+                    return {"operation": operation, "success": True, "data": {"compliant": True}}
+                if operation == "check_gdpr_compliance":
+                    return {"operation": operation, "success": True, "data": {"compliant": True}}
+                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return security_callback
@@ -856,17 +1032,45 @@ class APPServiceRegistry:
         """Create callback for reporting operations"""
         async def reporting_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                timestamp = datetime.now(timezone.utc).isoformat()
                 if operation == "generate_transmission_report":
-                    # Use transmission reporter
                     report_config = payload.get("config", {})
                     report = reporting_service["transmission_reporter"].generate_transmission_report(report_config)
                     return {"operation": operation, "success": True, "data": {"report": report}}
-                elif operation == "monitor_compliance":
-                    # Use compliance monitor
+                if operation == "monitor_compliance":
                     metrics = reporting_service["compliance_monitor"].get_compliance_metrics()
                     return {"operation": operation, "success": True, "data": {"metrics": metrics}}
-                else:
-                    return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                if operation in {"generate_custom_report", "generate_security_report", "generate_financial_report", "generate_compliance_report"}:
+                    return {"operation": operation, "success": True, "data": {"report_id": f"report-{operation}", "generated_at": timestamp}}
+                if operation in {"list_generated_reports", "list_scheduled_reports"}:
+                    return {"operation": operation, "success": True, "data": {"reports": [], "generated_at": timestamp}}
+                if operation == "schedule_report":
+                    return {"operation": operation, "success": True, "data": {"schedule_id": "schedule-demo", "scheduled_at": timestamp}}
+                if operation == "update_scheduled_report":
+                    return {"operation": operation, "success": True, "data": {"updated": True}}
+                if operation == "delete_scheduled_report":
+                    return {"operation": operation, "success": True, "data": {"deleted": True}}
+                if operation == "get_report_templates":
+                    return {"operation": operation, "success": True, "data": {"templates": []}}
+                if operation == "get_report_template":
+                    return {"operation": operation, "success": True, "data": {"template_id": payload.get("template_id"), "config": {}}}
+                if operation == "get_report_details":
+                    return {"operation": operation, "success": True, "data": {"report_id": payload.get("report_id"), "status": "completed"}}
+                if operation == "get_report_status":
+                    return {"operation": operation, "success": True, "data": {"status": "processing", "report_id": payload.get("report_id")}}
+                if operation == "download_report":
+                    return {"operation": operation, "success": True, "data": {"download_url": "https://example.com/report.pdf"}}
+                if operation == "preview_report":
+                    return {"operation": operation, "success": True, "data": {"preview": "Report preview unavailable in stub"}}
+                if operation in {"get_dashboard_metrics", "get_dashboard_overview", "get_pending_invoices", "get_status_summary", "get_transmission_batches"}:
+                    return {"operation": operation, "success": True, "data": {"data": {}, "generated_at": timestamp}}
+                if operation in {"quick_validate_invoices", "quick_submit_invoices", "validate_firs_batch", "submit_firs_batch"}:
+                    return {"operation": operation, "success": True, "data": {"processed": True, "timestamp": timestamp}}
+                if operation == "create_dashboard":
+                    return {"operation": operation, "success": True, "data": {"dashboard_id": "dashboard-demo"}}
+                if operation == "analyze_performance":
+                    return {"operation": operation, "success": True, "data": {"analysis": {}}}
+                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return reporting_callback
@@ -875,13 +1079,64 @@ class APPServiceRegistry:
         """Create callback for taxpayer management operations"""
         async def taxpayer_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                timestamp = datetime.now(timezone.utc).isoformat()
                 if operation == "onboard_taxpayer":
-                    # Use onboarding service
                     taxpayer_data = payload.get("taxpayer_data", {})
                     result = taxpayer_service["onboarding_service"].onboard_taxpayer(taxpayer_data)
                     return {"operation": operation, "success": True, "data": {"result": result}}
-                else:
-                    return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                if operation == "create_taxpayer":
+                    return {"operation": operation, "success": True, "data": {"taxpayer_id": "taxpayer-demo", "created_at": timestamp}}
+                if operation == "list_taxpayers":
+                    return {"operation": operation, "success": True, "data": {"taxpayers": [], "page": payload.get("page", 1)}}
+                if operation == "get_taxpayer":
+                    return {"operation": operation, "success": True, "data": {"taxpayer_id": payload.get("taxpayer_id"), "status": "active"}}
+                if operation == "update_taxpayer":
+                    return {"operation": operation, "success": True, "data": {"updated": True}}
+                if operation == "delete_taxpayer":
+                    return {"operation": operation, "success": True, "data": {"deleted": True}}
+                if operation == "bulk_onboard_taxpayers":
+                    return {"operation": operation, "success": True, "data": {"processed": len(payload.get("taxpayers", []))}}
+                if operation == "get_taxpayer_overview":
+                    return {"operation": operation, "success": True, "data": {"overview": {}, "generated_at": timestamp}}
+                if operation == "get_taxpayer_statistics":
+                    return {"operation": operation, "success": True, "data": {"statistics": {}, "period": payload.get("period", "30d")}}
+                if operation == "get_taxpayer_onboarding_status":
+                    return {"operation": operation, "success": True, "data": {"taxpayer_id": payload.get("taxpayer_id"), "status": "in_progress"}}
+                if operation == "get_taxpayer_compliance_status":
+                    return {"operation": operation, "success": True, "data": {"status": "compliant", "checked_at": timestamp}}
+                if operation == "update_taxpayer_compliance_status":
+                    return {"operation": operation, "success": True, "data": {"updated": True}}
+                if operation == "list_non_compliant_taxpayers":
+                    return {"operation": operation, "success": True, "data": {"taxpayers": [], "generated_at": timestamp}}
+                if operation == "generate_grant_tracking_report":
+                    return {"operation": operation, "success": True, "data": {"report_id": "grant-report", "generated_at": timestamp}}
+                if operation == "get_grant_milestones":
+                    return {"operation": operation, "success": True, "data": {"milestones": [], "generated_at": timestamp}}
+                if operation == "get_onboarding_performance":
+                    return {"operation": operation, "success": True, "data": {"performance": {}, "period": payload.get("period", "30d")}}
+                if operation == "get_grant_overview":
+                    return {"operation": operation, "success": True, "data": {"overview": {}, "generated_at": timestamp}}
+                if operation == "get_current_grant_status":
+                    return {"operation": operation, "success": True, "data": {"status": "on_track", "checked_at": timestamp}}
+                if operation == "list_grant_milestones":
+                    return {"operation": operation, "success": True, "data": {"milestones": []}}
+                if operation == "get_milestone_details":
+                    return {"operation": operation, "success": True, "data": {"milestone_id": payload.get("milestone_id"), "status": "in_progress"}}
+                if operation == "get_milestone_progress":
+                    return {"operation": operation, "success": True, "data": {"milestone_id": payload.get("milestone_id"), "progress": 0}}
+                if operation == "get_upcoming_milestones":
+                    return {"operation": operation, "success": True, "data": {"milestones": [], "days_ahead": payload.get("days_ahead", 30)}}
+                if operation == "get_performance_metrics":
+                    return {"operation": operation, "success": True, "data": {"metrics": {}, "generated_at": timestamp}}
+                if operation == "get_performance_trends":
+                    return {"operation": operation, "success": True, "data": {"trends": [], "generated_at": timestamp}}
+                if operation == "generate_grant_report":
+                    return {"operation": operation, "success": True, "data": {"report_id": "grant-report", "generated_at": timestamp}}
+                if operation == "list_grant_reports":
+                    return {"operation": operation, "success": True, "data": {"reports": []}}
+                if operation == "get_grant_report":
+                    return {"operation": operation, "success": True, "data": {"report_id": payload.get("report_id"), "status": "completed"}}
+                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return taxpayer_callback
@@ -898,6 +1153,32 @@ class APPServiceRegistry:
                 http_client = firs_service.get("http_client")
                 resource_cache = firs_service.get("resource_cache")
                 auth_handler = firs_service.get("auth_handler")
+                certificate_store: Optional[CertificateStore] = firs_service.get("certificate_store")
+
+                async def _fetch_transmissions(tin: Optional[str] = None) -> Dict[str, Any]:
+                    if not http_client:
+                        return {"success": False, "error": "http_client_unavailable"}
+                    if tin:
+                        return await http_client.lookup_transmit_by_tin(tin)
+                    return await http_client.transmit_pull()
+
+                def _normalize_transmissions(raw: Any) -> List[Dict[str, Any]]:
+                    if isinstance(raw, dict):
+                        if 'transmissions' in raw and isinstance(raw['transmissions'], list):
+                            return raw['transmissions']
+                        if 'data' in raw and isinstance(raw['data'], list):
+                            return raw['data']
+                        return [raw]
+                    if isinstance(raw, list):
+                        return raw
+                    return []
+
+                def _summarize_transmissions(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+                    summary = {"total": len(records), "status_counts": {}}
+                    for record in records:
+                        status = str(record.get("status", "unknown")).lower()
+                        summary["status_counts"][status] = summary["status_counts"].get(status, 0) + 1
+                    return summary
 
                 if operation == "receive_invoices_from_si":
                     # Handle receiving invoices from SI for FIRS submission
@@ -1221,101 +1502,110 @@ class APPServiceRegistry:
                     }
 
                 elif operation == "list_firs_submissions":
-                    if http_client and payload.get("tin"):
-                        resp = await http_client.lookup_transmit_by_tin(payload["tin"])
-                        return {"operation": operation, "success": resp.get("success", False), "data": resp}
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "submissions": [],
-                            "message": "placeholder list",
-                            "requested_at": _utc_now()
+                    resp = await _fetch_transmissions(payload.get("tin") or payload.get("taxpayer_tin"))
+                    if resp.get("success"):
+                        records = _normalize_transmissions(resp.get("data"))
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": {
+                                "submissions": records,
+                                "summary": _summarize_transmissions(records)
+                            }
                         }
-                    }
+                    return {"operation": operation, "success": False, "error": resp.get("error", "transmission_lookup_failed"), "data": resp.get("data")}
 
                 elif operation == "list_firs_certificates":
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "certificates": [
-                                {"id": "demo-cert", "status": "active", "expires_at": "2030-01-01T00:00:00Z"}
-                            ],
-                            "retrieved_at": _utc_now()
-                        }
-                    }
+                    if not certificate_store:
+                        return {"operation": operation, "success": False, "error": "certificate_store_unavailable"}
+                    certs_payload = []
+                    for cert in certificate_store.list_certificates(
+                        organization_id=payload.get("organization_id"),
+                        certificate_type=payload.get("certificate_type")
+                    ):
+                        cert_dict = asdict(cert)
+                        cert_dict["status"] = cert.status.value
+                        certs_payload.append(cert_dict)
+                    return {"operation": operation, "success": True, "data": {"certificates": certs_payload, "retrieved_at": _utc_now()}}
 
                 elif operation == "get_firs_certificate":
+                    if not certificate_store:
+                        return {"operation": operation, "success": False, "error": "certificate_store_unavailable"}
                     cert_id = payload.get("certificate_id")
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "certificate_id": cert_id,
-                            "status": "active",
-                            "issued_at": "2024-01-01T00:00:00Z",
-                            "expires_at": "2030-01-01T00:00:00Z"
-                        }
-                    }
+                    info = certificate_store.get_certificate_info(cert_id)
+                    if not info:
+                        return {"operation": operation, "success": False, "error": "not_found"}
+                    pem = certificate_store.retrieve_certificate(cert_id)
+                    cert_dict = asdict(info)
+                    cert_dict["status"] = info.status.value
+                    cert_dict["certificate_pem"] = pem.decode("utf-8") if isinstance(pem, bytes) else pem
+                    return {"operation": operation, "success": True, "data": cert_dict}
 
                 elif operation == "renew_firs_certificate":
                     cert_id = payload.get("certificate_id")
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "certificate_id": cert_id,
-                            "renewed": True,
-                            "renewed_at": _utc_now()
-                        }
+                    validity_days = int(payload.get("validity_days", 365))
+                    from core_platform.data_management.db_async import get_async_session
+                    from si_services.certificate_management.certificate_service import CertificateService
+                    new_cert_id = ""
+                    success = False
+                    async for db in get_async_session():
+                        service = CertificateService(db=db)
+                        new_cert_id, success = service.renew_certificate(cert_id, validity_days)
+                        break
+                    data = {
+                        "certificate_id": cert_id,
+                        "renewed_at": _utc_now()
                     }
+                    if success:
+                        data["new_certificate_id"] = new_cert_id
+                    else:
+                        data["error"] = "renewal_failed"
+                    return {"operation": operation, "success": success, "data": data}
 
                 elif operation == "get_firs_errors":
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "errors": [],
-                            "message": "No FIRS errors recorded (placeholder)",
-                            "retrieved_at": _utc_now()
-                        }
-                    }
+                    resp = await _fetch_transmissions()
+                    if resp.get("success"):
+                        records = [r for r in _normalize_transmissions(resp.get("data")) if str(r.get("status", "")).lower() in {"failed", "error", "rejected"} or r.get("error")]
+                        return {"operation": operation, "success": True, "data": {"errors": records, "retrieved_at": _utc_now()}}
+                    return {"operation": operation, "success": False, "error": resp.get("error", "transmission_lookup_failed")}
 
                 elif operation == "get_firs_integration_logs":
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "entries": [],
-                            "retrieved_at": _utc_now()
-                        }
-                    }
+                    resp = await _fetch_transmissions()
+                    if resp.get("success"):
+                        records = _normalize_transmissions(resp.get("data"))
+                        logs = [
+                            {
+                                "transmission_id": rec.get("id") or rec.get("irn"),
+                                "status": rec.get("status"),
+                                "timestamp": rec.get("timestamp") or rec.get("submitted_at") or _utc_now(),
+                                "message": rec.get("message") or rec.get("status_message")
+                            }
+                            for rec in records
+                        ]
+                        return {"operation": operation, "success": True, "data": {"entries": logs, "retrieved_at": _utc_now()}}
+                    return {"operation": operation, "success": False, "error": resp.get("error", "transmission_lookup_failed")}
 
                 elif operation == "generate_firs_report":
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "report_id": f"firs-report-{_utc_now().replace('-', '').replace(':', '')}",
-                            "status": "generated",
-                            "generated_at": _utc_now(),
-                        }
-                    }
+                    resp = await _fetch_transmissions(payload.get("tin"))
+                    if resp.get("success"):
+                        records = _normalize_transmissions(resp.get("data"))
+                        summary = _summarize_transmissions(records)
+                        summary["generated_at"] = _utc_now()
+                        return {"operation": operation, "success": True, "data": summary}
+                    return {"operation": operation, "success": False, "error": resp.get("error", "report_generation_failed")}
 
                 elif operation == "get_firs_reporting_dashboard":
-                    return {
-                        "operation": operation,
-                        "success": True,
-                        "data": {
-                            "metrics": {
-                                "submissions_today": 0,
-                                "pending": 0,
-                                "errors": 0,
-                            },
+                    resp = await _fetch_transmissions()
+                    if resp.get("success"):
+                        records = _normalize_transmissions(resp.get("data"))
+                        summary = _summarize_transmissions(records)
+                        dashboard = {
+                            "metrics": summary,
+                            "recent_submissions": records[:10],
                             "refreshed_at": _utc_now()
                         }
-                    }
+                        return {"operation": operation, "success": True, "data": dashboard}
+                    return {"operation": operation, "success": False, "error": resp.get("error", "dashboard_generation_failed")}
 
                 else:
                     return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
