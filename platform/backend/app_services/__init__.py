@@ -111,6 +111,17 @@ class APPServiceRegistry:
             try:
                 from .firs_communication.firs_http_client import FIRSHttpClient
                 from .firs_communication.resource_cache import FIRSResourceCache
+
+                # Map existing environment naming to client expectations
+                encryption_key = os.getenv("FIRS_ENCRYPTION_KEY")
+                if encryption_key:
+                    os.environ.setdefault("FIRS_ENCRYPTION_KEY", encryption_key)
+
+                if os.getenv("FIRS_USE_SANDBOX", "false").lower() == "true":
+                    os.environ.setdefault("FIRS_API_URL", os.getenv("FIRS_SANDBOX_URL", ""))
+                    os.environ.setdefault("FIRS_API_KEY", os.getenv("FIRS_SANDBOX_API_KEY", ""))
+                    os.environ.setdefault("FIRS_API_SECRET", os.getenv("FIRS_SANDBOX_API_SECRET", ""))
+
                 firs_http_client = FIRSHttpClient()
                 resource_cache = FIRSResourceCache(firs_http_client)
             except Exception:
