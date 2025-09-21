@@ -19,7 +19,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 
-from .base import BaseModel, get_json_type
+from .base import BaseModel
+from .business_systems import get_json_type
 from enum import Enum as PyEnum
 
 

@@ -107,6 +107,12 @@ class CRMEndpointsV1:
             response_model=V1ResponseModel
         )
     
+    async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not await self.permission_guard.check_endpoint_permission(context, f"v1/si{request.url.path}", request.method):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+        return context
+    
     # Placeholder implementations
     async def get_available_crm_systems(self, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get available CRM systems"""
@@ -171,12 +177,6 @@ class CRMEndpointsV1:
                     db,
                     requester_id=str(getattr(context, 'user_id', None)) if context else None,
                     key=idem_key,
-    async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
-        context = await self.role_detector.detect_role_context(request)
-        if not context or not await self.permission_guard.check_endpoint_permission(context, f"v1/si{request.url.path}", request.method):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
-        return context
-
                     method=request.method,
                     endpoint=str(request.url.path),
                     request_hash=req_hash,

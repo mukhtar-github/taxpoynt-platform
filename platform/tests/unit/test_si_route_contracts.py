@@ -60,7 +60,7 @@ def test_all_si_routes_have_registered_handlers():
 
 
 def test_strict_mode_raises_on_unknown_op(monkeypatch):
-    """When strict mode is enabled, unknown operations must raise."""
+    """When strict mode is enabled and at least one service is registered, unknown operations must raise."""
     _prepare_path()
 
     monkeypatch.setenv("ROUTER_STRICT_OPS", "true")
@@ -71,8 +71,20 @@ def test_strict_mode_raises_on_unknown_op(monkeypatch):
 
     router = MessageRouter()
 
+    # Register a dummy service that advertises a known op
+    async def cb(op: str, payload: dict):
+        return {"operation": op, "success": True}
+
+    asyncio.get_event_loop().run_until_complete(
+        router.register_service(
+            service_name="dummy_si",
+            service_role=ServiceRole.SYSTEM_INTEGRATOR,
+            callback=cb,
+            metadata={"operations": ["some_known_op"]},
+        )
+    )
+
     with pytest.raises(RuntimeError):
         asyncio.get_event_loop().run_until_complete(
             router.route_message(ServiceRole.SYSTEM_INTEGRATOR, "totally_unknown_op", {})
         )
-
