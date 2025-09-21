@@ -11,7 +11,7 @@ import zipfile
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, HTTPException, Depends, status, UploadFile, File
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer
@@ -258,7 +258,7 @@ python-dotenv>=0.19.0
                     "title": f"TaxPoynt {language.upper()} SDK Overview",
                     "description": f"Complete integration guide for the {language.upper()} SDK",
                     "version": "1.0.0",
-                    "last_updated": "2024-12-31"
+                    "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 },
                 "quick_start": {
                     "title": "Quick Start Guide",

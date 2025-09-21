@@ -154,6 +154,8 @@ class SIServiceRegistry:
                         "delete_organization",
                         "get_organization_compliance",
                         "validate_organization_compliance",
+                        "initiate_organization_onboarding",
+                        "get_organization_onboarding_status",
                     ],
                 },
             )
@@ -186,8 +188,12 @@ class SIServiceRegistry:
                         "process_payment_transactions",
                         "bulk_import_payment_transactions",
                         "get_unified_payment_transactions",
+                        "get_unified_payment_summary",
+                        "get_payment_connections_summary",
+                        "list_all_payment_connections",
                         "test_payment_connection",
                         "get_payment_connection_health",
+                        "receive_payment_webhook",
                     ],
                 },
             )
@@ -219,9 +225,14 @@ class SIServiceRegistry:
                         "get_reconciliation_configuration",
                         "update_reconciliation_configuration",
                         "list_transaction_categories",
+                        "create_transaction_category",
+                        "update_transaction_category",
+                        "delete_transaction_category",
                         "test_pattern_matching",
                         "get_pattern_statistics",
                         "sync_with_transaction_processor",
+                        "get_processor_integration_status",
+                        "update_universal_processor_patterns",
                     ],
                 },
             )
@@ -252,16 +263,22 @@ class SIServiceRegistry:
                         "validate_bvn",
                         "lookup_bvn",
                         "bulk_validate_bvn",
+                        "bulk_lookup_bvn",
+                        "get_bvn_validation_history",
+                        "get_bvn_validation_status",
                         "process_kyc",
                         "process_bulk_kyc",
                         "verify_kyc_document",
                         "get_kyc_status",
                         "get_kyc_details",
+                        "list_kyc_processes",
                         "check_kyc_compliance",
                         "verify_identity",
                         "verify_bulk_identity",
                         "validate_identity_document",
                         "verify_biometric",
+                        "get_identity_verification_status",
+                        "get_identity_verification_history",
                         "test_validation_service",
                         "get_validation_service_health",
                     ],
@@ -293,6 +310,12 @@ class SIServiceRegistry:
                     "operations": [
                         "generate_onboarding_report",
                         "generate_transaction_compliance_report",
+                        # Bridge ops used by SI endpoints that forward to APP
+                        "receive_invoices_from_si",
+                        "receive_invoice_batch_from_si",
+                        # Read-only summaries used by POS endpoints
+                        "get_transactions",
+                        "get_sales_summary",
                     ],
                 },
             )
@@ -736,11 +759,16 @@ class SIServiceRegistry:
                 metadata={
                     "service_type": "integration_management",
                     "operations": [
+                        "health_check",
                         "manage_connections",
                         "monitor_health",
                         "collect_metrics",
                         "orchestrate_sync",
-                        "test_connections"
+                        "test_connections",
+                        # ERP connection management operations used by SI routes
+                        "list_erp_connections",
+                        "create_erp_connection",
+                        "get_erp_connection",
                     ]
                 }
             )

@@ -26,6 +26,7 @@ Architecture:
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.repositories.banking_repo_async import (
@@ -55,6 +56,11 @@ class SIBankingService:
     def __init__(self):
         """Initialize banking service"""
         self.mono_service = MonoIntegrationService()
+
+    @staticmethod
+    def _current_timestamp() -> str:
+        """Return UTC timestamp in ISO 8601 format with trailing Z."""
+        return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         
     async def handle_operation(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -358,7 +364,7 @@ class SIBankingService:
             "account_id": account_id,
             "balance": 1500000.00,  # 1.5M NGN
             "currency": "NGN",
-            "last_updated": "2024-12-31T00:00:00Z",
+            "last_updated": self._current_timestamp(),
             "si_id": si_id
         }
         
@@ -394,7 +400,7 @@ class SIBankingService:
         result = {
             "connection_id": connection_id,
             "status": "healthy",
-            "last_check": "2024-12-31T00:00:00Z",
+            "last_check": self._current_timestamp(),
             "uptime": "99.9%",
             "response_time": "150ms",
             "si_id": si_id
@@ -435,7 +441,7 @@ class SIBankingService:
                     "status": "No banking connections configured"
                 },
                 "si_id": si_id,
-                "generated_at": "2024-12-31T00:00:00Z"
+                "generated_at": self._current_timestamp()
             }
             
             return {

@@ -44,7 +44,11 @@ class InvoiceSubmissionEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/invoices", tags=["Invoice Submission V1"])
+        self.router = APIRouter(
+            prefix="/invoices",
+            tags=["Invoice Submission V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
 
         self._setup_routes()
         logger.info("Invoice Submission Endpoints V1 initialized")
@@ -155,9 +159,10 @@ class InvoiceSubmissionEndpointsV1:
         )
     
     # Invoice Generation Endpoints
-    async def generate_firs_compliant_invoice(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+    async def generate_firs_compliant_invoice(self, request: Request):
         """Generate FIRS-compliant invoice"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             # Validate required fields
@@ -186,9 +191,10 @@ class InvoiceSubmissionEndpointsV1:
             logger.error(f"Error generating FIRS-compliant invoice in v1: {e}")
             return v1_error_response(e, action="generate_firs_compliant_invoice")
     
-    async def generate_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+    async def generate_invoice_batch(self, request: Request):
         """Generate invoice batch"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -207,9 +213,10 @@ class InvoiceSubmissionEndpointsV1:
             return v1_error_response(e, action="generate_invoice_batch")
     
     # Invoice Submission Endpoints
-    async def submit_invoice(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+    async def submit_invoice(self, request: Request):
         """Submit invoice to FIRS"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             # Idempotency key handling
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")

@@ -44,7 +44,11 @@ class ComplianceValidationEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/compliance", tags=["Compliance Validation V1"])
+        self.router = APIRouter(
+            prefix="/compliance",
+            tags=["Compliance Validation V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define compliance standards
         self.compliance_standards = {
@@ -87,6 +91,18 @@ class ComplianceValidationEndpointsV1:
         
         self._setup_routes()
         logger.info("Compliance Validation Endpoints V1 initialized")
+    
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup compliance validation routes"""
@@ -218,9 +234,10 @@ class ComplianceValidationEndpointsV1:
         )
     
     # Compliance Standards Information
-    async def get_compliance_standards(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_compliance_standards(self, request: Request):
         """Get supported compliance standards"""
         try:
+            await self._require_app_role(request)
             result = {
                 "compliance_standards": self.compliance_standards,
                 "total_standards": len(self.compliance_standards),
@@ -233,9 +250,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="get_compliance_standards")
     
     # UBL Validation Endpoints
-    async def validate_ubl_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_ubl_compliance(self, request: Request):
         """Validate UBL compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             # Validate required fields
@@ -264,9 +282,10 @@ class ComplianceValidationEndpointsV1:
             logger.error(f"Error validating UBL compliance in v1: {e}")
             return v1_error_response(e, action="validate_ubl_compliance")
     
-    async def validate_ubl_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_ubl_batch(self, request: Request):
         """Validate UBL batch compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -285,9 +304,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_ubl_batch_compliance")
     
     # PEPPOL Validation Endpoints
-    async def validate_peppol_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_peppol_compliance(self, request: Request):
         """Validate PEPPOL compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -306,9 +326,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_peppol_compliance")
     
     # ISO Standards Validation Endpoints
-    async def validate_iso20022_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_iso20022_compliance(self, request: Request):
         """Validate ISO 20022 compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -326,9 +347,10 @@ class ComplianceValidationEndpointsV1:
             logger.error(f"Error validating ISO 20022 compliance in v1: {e}")
             return v1_error_response(e, action="validate_iso20022_compliance")
     
-    async def validate_iso27001_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_iso27001_compliance(self, request: Request):
         """Validate ISO 27001 compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -347,9 +369,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_iso27001_compliance")
     
     # Data Protection Validation Endpoints
-    async def validate_data_protection_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_data_protection_compliance(self, request: Request):
         """Validate GDPR/NDPA compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -368,9 +391,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_data_protection_compliance")
     
     # Product Classification Validation Endpoints
-    async def validate_product_classification(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_product_classification(self, request: Request):
         """Validate product classification"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -389,9 +413,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_product_classification")
     
     # Entity Validation Endpoints
-    async def validate_lei_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_lei_compliance(self, request: Request):
         """Validate LEI compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -410,9 +435,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_lei_compliance")
     
     # Comprehensive Compliance Validation
-    async def validate_comprehensive_compliance(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_comprehensive_compliance(self, request: Request):
         """Comprehensive compliance validation"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -431,9 +457,10 @@ class ComplianceValidationEndpointsV1:
             return v1_error_response(e, action="validate_comprehensive_compliance")
     
     # Compliance Report Endpoints
-    async def generate_compliance_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_compliance_report(self, request: Request):
         """Generate compliance report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -454,10 +481,10 @@ class ComplianceValidationEndpointsV1:
     async def list_compliance_reports(self, 
                                     request: Request,
                                     standard: Optional[str] = Query(None, description="Filter by compliance standard"),
-                                    status: Optional[str] = Query(None, description="Filter by report status"),
-                                    context: HTTPRoutingContext = Depends(lambda: None)):
+                                    status: Optional[str] = Query(None, description="Filter by report status")):
         """List compliance reports"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_compliance_reports",
@@ -476,9 +503,10 @@ class ComplianceValidationEndpointsV1:
             logger.error(f"Error listing compliance reports in v1: {e}")
             return v1_error_response(e, action="list_compliance_reports")
     
-    async def get_compliance_report(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_compliance_report(self, report_id: str, request: Request):
         """Get compliance report"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_compliance_report",

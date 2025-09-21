@@ -243,7 +243,8 @@ class POSEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            if not (result and result.get('data')):
+            # Accept router envelope in dev mode; only 404 on empty result
+            if not result:
                 raise HTTPException(status_code=404, detail="POS order not found")
             return self._create_v1_response(result, "pos_order_retrieved")
         except HTTPException:

@@ -13,9 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_platform.data_management.db_async import get_async_session
 from core_platform.idempotency.store import IdempotencyStore
-from si_services.integration_management.integration_status_service_legacy import (
-    IntegrationStatusService,
-)
 from fastapi.responses import JSONResponse
 
 from core_platform.authentication.role_manager import PlatformRole, RoleScope
@@ -74,9 +71,13 @@ class SIRouterV1:
         self.router = APIRouter(prefix="/si", tags=["System Integrator V1"])
         self._setup_routes()
         self._include_sub_routers()
-        # Attach SI metrics middleware and error handler
+        # Attach SI metrics middleware and error handler (best-effort; router may not support these)
         install_si_instrumentation(self.router)
-        self.router.add_exception_handler(Exception, self._si_exception_handler)
+        try:
+            if hasattr(self.router, "add_exception_handler"):
+                self.router.add_exception_handler(Exception, self._si_exception_handler)  # type: ignore[attr-defined]
+        except Exception:
+            pass
         
         logger.info("SI Router V1 initialized")
     
@@ -273,9 +274,10 @@ class SIRouterV1:
         return context
     
     # Organization Management Handlers
-    async def list_organizations(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def list_organizations(self, request: Request):
         """List all organizations managed by this SI"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="list_organizations",
@@ -291,9 +293,10 @@ class SIRouterV1:
             logger.error(f"Error listing organizations in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to list organizations")
     
-    async def get_organization(self, org_id: str, context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def get_organization(self, org_id: str, request: Request):
         """Get specific organization details"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_organization",
@@ -309,9 +312,10 @@ class SIRouterV1:
             logger.error(f"Error getting organization {org_id} in v1: {e}")
             raise HTTPException(status_code=404, detail="Organization not found")
     
-    async def create_organization(self, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def create_organization(self, request: Request, db: AsyncSession = Depends(get_async_session)):
         """Create new organization under SI management"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json()
             # Idempotency
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -352,9 +356,10 @@ class SIRouterV1:
             logger.error(f"Error creating organization in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to create organization")
     
-    async def update_organization(self, org_id: str, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def update_organization(self, org_id: str, request: Request, db: AsyncSession = Depends(get_async_session)):
         """Update organization information"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json()
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
             if idem_key:
@@ -438,11 +443,17 @@ class SIRouterV1:
         self,
         request: Request,
         db: AsyncSession = Depends(get_async_session),
-        context: HTTPRoutingContext = Depends(_require_si_role),
     ):
         """Get comprehensive integration status (SI)"""
         try:
-            result = await IntegrationStatusService.get_all_integration_status(db)
+            # Enforce SI guard explicitly here
+            await self._require_si_role(request)
+            # Use modern integration management service via message router
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="monitor_health",
+                payload={"api_version": "v1"}
+            )
             return self._create_v1_response(result, "integration_status_retrieved")
         except HTTPException:
             raise
@@ -451,7 +462,7 @@ class SIRouterV1:
             raise HTTPException(status_code=502, detail="Failed to get integration status")
     
     # CRITICAL BRIDGE: SI → APP Invoice Forwarding
-    async def forward_invoices_to_app(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def forward_invoices_to_app(self, request: Request):
         """
         Forward generated invoices to APP for FIRS submission.
         
@@ -459,6 +470,8 @@ class SIRouterV1:
         Uses the existing APP FIRS communication service infrastructure.
         """
         try:
+            # Enforce SI guard
+            context = await self._require_si_role(request)
             body = await request.json()
             
             # Validate required fields
@@ -496,13 +509,15 @@ class SIRouterV1:
                 detail="Failed to forward invoices to APP"
             )
     
-    async def forward_invoice_batch_to_app(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def forward_invoice_batch_to_app(self, request: Request):
         """
         Forward invoice batch to APP for FIRS submission.
         
         Uses the existing APP FIRS communication service infrastructure.
         """
         try:
+            # Enforce SI guard
+            context = await self._require_si_role(request)
             body = await request.json()
             
             # Validate required fields

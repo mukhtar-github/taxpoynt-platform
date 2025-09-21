@@ -86,10 +86,11 @@ class ComplianceEndpointsV1:
         self,
         request: Request,
         organization_id: Optional[str] = Query(None, description="Scope validation by organization ID"),
-        context: HTTPRoutingContext = Depends(self._require_si_role),
+        context: HTTPRoutingContext = Depends(lambda: None),
     ):
         """Validate compliance via validation services"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json()
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
@@ -110,10 +111,11 @@ class ComplianceEndpointsV1:
         self,
         request: Request,
         organization_id: Optional[str] = Query(None, description="Scope report by organization ID"),
-        context: HTTPRoutingContext = Depends(self._require_si_role),
+        context: HTTPRoutingContext = Depends(lambda: None),
     ):
         """Get onboarding report via reporting services"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="generate_onboarding_report",
@@ -135,10 +137,11 @@ class ComplianceEndpointsV1:
         start_date: Optional[str] = Query(None, description="Start date (ISO 8601)"),
         end_date: Optional[str] = Query(None, description="End date (ISO 8601)"),
         include_metrics: bool = Query(True, description="Include metrics breakdowns (daily counts, status histogram)"),
-        context: HTTPRoutingContext = Depends(self._require_si_role),
+        context: HTTPRoutingContext = Depends(lambda: None),
     ):
         """Get transaction compliance report via reporting services"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="generate_transaction_compliance_report",

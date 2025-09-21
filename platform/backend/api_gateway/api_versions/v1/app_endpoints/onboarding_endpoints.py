@@ -56,7 +56,11 @@ class APPOnboardingEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/onboarding", tags=["APP Onboarding Management"])
+        self.router = APIRouter(
+            prefix="/onboarding",
+            tags=["APP Onboarding Management"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Track endpoints for monitoring
         self.endpoint_stats = {
@@ -69,6 +73,18 @@ class APPOnboardingEndpointsV1:
         self._setup_routes()
 
         logger.info("APP Onboarding Endpoints V1 initialized")
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup APP onboarding state management routes"""
@@ -154,12 +170,13 @@ class APPOnboardingEndpointsV1:
         )
 
     # Core APP Onboarding State Management
-    async def get_onboarding_state(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_onboarding_state(self, request: Request):
         """Get current onboarding state for the authenticated APP user"""
         try:
             self.endpoint_stats["get_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_onboarding_state",
@@ -177,13 +194,13 @@ class APPOnboardingEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get APP onboarding state")
 
     async def update_onboarding_state(self,
-                                      request: Request,
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+                                      request: Request):
         """Update APP onboarding state with new progress"""
         try:
             self.endpoint_stats["update_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
+            context = await self._require_app_role(request)
             body = await request.json()
             
             # Validate required fields
@@ -215,11 +232,12 @@ class APPOnboardingEndpointsV1:
     async def complete_onboarding_step(self,
                                        step_name: str,
                                        request: Request,
-                                       context: HTTPRoutingContext = Depends(lambda: None)):
+                                       ):
         """Mark a specific APP onboarding step as complete"""
         try:
             body = await request.json() if hasattr(request, 'json') else {}
             
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="complete_onboarding_step",
@@ -262,9 +280,10 @@ class APPOnboardingEndpointsV1:
             logger.error(f"Error completing APP onboarding in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to complete APP onboarding")
 
-    async def reset_onboarding_state(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def reset_onboarding_state(self, request: Request):
         """Reset APP onboarding state (admin/testing only)"""
         try:
+            context = await self._require_app_role(request)
             self.endpoint_stats["reset_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
@@ -284,9 +303,10 @@ class APPOnboardingEndpointsV1:
             logger.error(f"Error resetting APP onboarding state in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to reset APP onboarding state")
 
-    async def get_onboarding_analytics(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_onboarding_analytics(self, request: Request):
         """Get APP onboarding analytics and progress insights"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_onboarding_analytics",
@@ -304,9 +324,10 @@ class APPOnboardingEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get APP onboarding analytics")
 
     # APP-Specific Onboarding Status Endpoints
-    async def get_business_verification_status(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_business_verification_status(self, request: Request):
         """Get business verification status for APP onboarding"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_business_verification_status",
@@ -323,9 +344,10 @@ class APPOnboardingEndpointsV1:
             logger.error(f"Error getting business verification status in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get business verification status")
 
-    async def get_firs_integration_status(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_integration_status(self, request: Request):
         """Get FIRS integration setup status for APP onboarding"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_firs_integration_status",

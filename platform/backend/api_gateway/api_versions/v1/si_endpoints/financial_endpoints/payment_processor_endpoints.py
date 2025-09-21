@@ -164,6 +164,16 @@ class PaymentProcessorEndpointsV1:
             response_model=V1ResponseModel
         )
         
+        # Inbound payment webhooks (provider callbacks)
+        self.router.add_api_route(
+            "/webhooks/inbound/{provider}",
+            self.inbound_payment_webhook,
+            methods=["POST"],
+            summary="Receive inbound payment webhook",
+            description="Inbound webhook receiver for payment processors (minimal signature check)",
+            response_model=V1ResponseModel
+        )
+        
         # Transaction Processing Routes
         self.router.add_api_route(
             "/transactions/process",
@@ -455,9 +465,11 @@ class PaymentProcessorEndpointsV1:
         return get_transactions
     
     # Payment System Overview Endpoints
-    async def get_available_payment_processors(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def get_available_payment_processors(self, request: Request):
         """Get all available payment processors"""
         try:
+            # Ensure SI context and permissions (router dependency already enforces)
+            await self._require_si_role(request)
             # Calculate totals
             nigerian_count = len(self.payment_processors["nigerian"]["processors"])
             african_count = len(self.payment_processors["african"]["processors"])
@@ -484,6 +496,8 @@ class PaymentProcessorEndpointsV1:
                                          context: HTTPRoutingContext = Depends(lambda: None)):
         """List all payment processor connections"""
         try:
+            # Derive SI context explicitly to use in payload
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="list_all_payment_connections",
@@ -499,9 +513,10 @@ class PaymentProcessorEndpointsV1:
             logger.error(f"Error listing all payment connections in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list all payment connections")
     
-    async def get_payment_connections_summary(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_payment_connections_summary(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get payment connections summary"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_payment_connections_summary",
@@ -525,6 +540,7 @@ class PaymentProcessorEndpointsV1:
                                              context: HTTPRoutingContext = Depends(lambda: None)):
         """Get unified payment transactions"""
         try:
+            context = await self._require_si_role(request)
             result = await route_or_http(
                 self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
@@ -550,10 +566,12 @@ class PaymentProcessorEndpointsV1:
             raise HTTPException(status_code=502, detail="Failed to get unified payment transactions")
     
     async def get_unified_payment_summary(self, 
+                                       request: Request,
                                        period: Optional[str] = Query("30d", description="Summary period"),
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Get unified payment summary"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_unified_payment_summary",
@@ -575,6 +593,7 @@ class PaymentProcessorEndpointsV1:
     async def register_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Register payment webhooks"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -597,6 +616,7 @@ class PaymentProcessorEndpointsV1:
     async def list_payment_webhooks(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """List payment webhooks"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="list_payment_webhooks",
@@ -611,11 +631,49 @@ class PaymentProcessorEndpointsV1:
         except Exception as e:
             logger.error(f"Error listing payment webhooks in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to list payment webhooks")
+
+    async def inbound_payment_webhook(self, provider: str, request: Request):
+        """Inbound payment webhook receiver (minimal signature check)."""
+        try:
+            # Basic provider validation
+            valid_providers = set(self.payment_processors["nigerian"]["processors"]) | \
+                              set(self.payment_processors["african"]["processors"]) | \
+                              set(self.payment_processors["global"]["processors"])
+            if provider.lower() not in valid_providers:
+                raise HTTPException(status_code=400, detail="Unknown payment provider")
+
+            # Minimal signature header check
+            signature = request.headers.get("x-webhook-signature") or request.headers.get("x-signature")
+            if not signature:
+                raise HTTPException(status_code=401, detail="Missing webhook signature")
+
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="receive_payment_webhook",
+                payload={
+                    "provider": provider.lower(),
+                    "headers": {k: v for k, v in request.headers.items()},
+                    "payload": body,
+                    "api_version": "v1",
+                },
+            )
+            return self._create_v1_response(result or {"accepted": True}, "payment_webhook_received")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error receiving inbound payment webhook from {provider}: {e}")
+            raise HTTPException(status_code=502, detail="Failed to process payment webhook")
     
     # Transaction Processing Endpoints
     async def process_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Process payment transactions"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -640,6 +698,7 @@ class PaymentProcessorEndpointsV1:
     async def bulk_import_payment_transactions(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Bulk import payment transactions"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -665,6 +724,7 @@ class PaymentProcessorEndpointsV1:
     async def test_payment_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Test payment processor connection"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="test_payment_connection",
@@ -682,9 +742,10 @@ class PaymentProcessorEndpointsV1:
             logger.error(f"Error testing payment connection {connection_id} in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to test payment connection")
     
-    async def get_payment_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_payment_connection_health(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get payment connection health"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_payment_connection_health",

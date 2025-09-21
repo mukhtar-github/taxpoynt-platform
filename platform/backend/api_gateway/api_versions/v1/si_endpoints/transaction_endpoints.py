@@ -129,15 +129,15 @@ class TransactionEndpointsV1:
             logger.error(f"Error listing transactions in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to list transactions")
     
-    async def process_transaction_batch(self, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def process_transaction_batch(self, request: Request):
         """Process transaction batch"""
         return self._create_v1_response({"batch_id": "batch_123"}, "transaction_batch_processed")
     
-    async def get_transaction(self, transaction_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def get_transaction(self, transaction_id: str):
         """Get transaction"""
         return self._create_v1_response({"transaction_id": transaction_id}, "transaction_retrieved")
     
-    async def get_transaction_status(self, transaction_id: str, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def get_transaction_status(self, transaction_id: str):
         """Get transaction status"""
         return self._create_v1_response({"status": "processed"}, "transaction_status_retrieved")
     

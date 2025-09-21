@@ -51,7 +51,11 @@ class ReportGenerationEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/reports", tags=["Report Generation V1"])
+        self.router = APIRouter(
+            prefix="/reports",
+            tags=["Report Generation V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define report generation capabilities
         self.report_capabilities = {
@@ -75,6 +79,18 @@ class ReportGenerationEndpointsV1:
         
         self._setup_routes()
         logger.info("Report Generation Endpoints V1 initialized")
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup report generation routes"""
@@ -229,9 +245,10 @@ class ReportGenerationEndpointsV1:
         )
     
     # Report Generation Endpoints
-    async def generate_custom_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_custom_report(self, request: Request):
         """Generate custom report with specified parameters"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -263,9 +280,10 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error generating custom report in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to generate custom report")
     
-    async def get_report_templates(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_report_templates(self, request: Request):
         """Get available report templates"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_report_templates",
@@ -306,9 +324,10 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error getting report templates in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get report templates")
     
-    async def get_report_template(self, template_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_report_template(self, template_id: str, request: Request):
         """Get specific report template configuration"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_report_template",
@@ -325,9 +344,10 @@ class ReportGenerationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get report template")
     
     # Specific Report Type Endpoints
-    async def generate_compliance_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_compliance_report(self, request: Request):
         """Generate regulatory compliance report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -345,9 +365,10 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error generating compliance report in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to generate compliance report")
     
-    async def generate_transmission_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_transmission_report(self, request: Request):
         """Generate transmission performance report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(

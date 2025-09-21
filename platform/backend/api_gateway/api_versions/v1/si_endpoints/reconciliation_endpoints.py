@@ -182,6 +182,7 @@ class ReconciliationEndpointsV1:
                                               context: HTTPRoutingContext = Depends(lambda: None)):
         """Save auto-reconciliation configuration"""
         try:
+            context = await self._require_si_role(request)
             config_data = await request.json()
             
             # Validate configuration structure
@@ -242,9 +243,11 @@ class ReconciliationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to save reconciliation configuration")
 
     async def get_reconciliation_configuration(self,
+                                             request: Request,
                                              context: HTTPRoutingContext = Depends(lambda: None)):
         """Get current reconciliation configuration"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_reconciliation_configuration",
@@ -266,6 +269,7 @@ class ReconciliationEndpointsV1:
                                                 context: HTTPRoutingContext = Depends(lambda: None)):
         """Update reconciliation configuration"""
         try:
+            context = await self._require_si_role(request)
             updates = await request.json()
             
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -313,9 +317,11 @@ class ReconciliationEndpointsV1:
 
     # Category Management Endpoints
     async def list_transaction_categories(self,
+                                        request: Request,
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """List all transaction categories"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="list_transaction_categories",
@@ -337,6 +343,7 @@ class ReconciliationEndpointsV1:
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Create new transaction category"""
         try:
+            context = await self._require_si_role(request)
             category_data = await request.json()
             
             # Validate category data
@@ -397,6 +404,7 @@ class ReconciliationEndpointsV1:
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Update transaction category"""
         try:
+            context = await self._require_si_role(request)
             updates = await request.json()
             
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -448,6 +456,7 @@ class ReconciliationEndpointsV1:
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Delete transaction category"""
         try:
+            context = await self._require_si_role(request)
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
             if idem_key:
                 req_hash = IdempotencyStore.compute_request_hash({"category_id": category_id})
@@ -491,9 +500,10 @@ class ReconciliationEndpointsV1:
     # Pattern Matching Integration
     async def test_pattern_matching(self,
                                   request: Request,
-                                  context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                  context: HTTPRoutingContext = Depends(lambda: None)):
         """Test pattern matching against sample transactions"""
         try:
+            context = await self._require_si_role(request)
             test_data = await request.json()
             
             # Validate test data
@@ -522,9 +532,11 @@ class ReconciliationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to test pattern matching")
 
     async def get_pattern_statistics(self,
-                                   context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                   request: Request,
+                                   context: HTTPRoutingContext = Depends(lambda: None)):
         """Get pattern matching performance statistics"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_pattern_statistics",
@@ -542,9 +554,11 @@ class ReconciliationEndpointsV1:
 
     # Universal Transaction Processor Integration
     async def get_processor_integration_status(self,
-                                             context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                             request: Request,
+                                             context: HTTPRoutingContext = Depends(lambda: None)):
         """Get Universal Transaction Processor integration status"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_processor_integration_status",
@@ -561,9 +575,11 @@ class ReconciliationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get processor integration status")
 
     async def sync_with_transaction_processor(self,
-                                            context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                            request: Request,
+                                            context: HTTPRoutingContext = Depends(lambda: None)):
         """Sync reconciliation rules with Universal Transaction Processor"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="sync_with_transaction_processor",

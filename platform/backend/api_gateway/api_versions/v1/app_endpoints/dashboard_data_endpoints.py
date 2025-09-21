@@ -48,7 +48,10 @@ class DashboardDataEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(tags=["Dashboard Data V1"])  # No prefix to handle root level endpoints
+        self.router = APIRouter(
+            tags=["Dashboard Data V1"],  # No prefix to handle root level endpoints
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define dashboard capabilities
         self.dashboard_capabilities = {
@@ -68,6 +71,18 @@ class DashboardDataEndpointsV1:
         
         self._setup_routes()
         logger.info("Dashboard Data Endpoints V1 initialized")
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup dashboard data routes"""

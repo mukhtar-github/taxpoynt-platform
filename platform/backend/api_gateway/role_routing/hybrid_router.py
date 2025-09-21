@@ -5,6 +5,7 @@ FastAPI router for cross-role endpoints that can be accessed by multiple roles
 with different permission levels and functionality exposure.
 """
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Set, Union
 from fastapi import APIRouter, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
@@ -235,7 +236,7 @@ class HybridServicesRouter:
             "status": "healthy",
             "service": "taxpoynt_platform",
             "version": "1.0.0",
-            "timestamp": "2024-12-31T00:00:00Z"
+            "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         })
     
     async def get_api_version(self):

@@ -154,9 +154,10 @@ class OnboardingEndpointsV1:
         )
 
     # Core Onboarding State Management
-    async def get_onboarding_state(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def get_onboarding_state(self, request: Request):
         """Get current onboarding state for the authenticated user"""
         try:
+            await self._require_si_role(request)
             self.endpoint_stats["get_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
@@ -186,12 +187,13 @@ class OnboardingEndpointsV1:
     async def update_onboarding_state(self,
                                       request: Request,
                                       db: AsyncSession = Depends(get_async_session),
-                                      context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                      context: HTTPRoutingContext = Depends(lambda: None)):
         """Update onboarding state with new progress"""
         try:
             self.endpoint_stats["update_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
+            context = await self._require_si_role(request)
             body = await request.json()
             
             # Validate required fields
@@ -248,9 +250,10 @@ class OnboardingEndpointsV1:
                                        step_name: str,
                                        request: Request,
                                        db: AsyncSession = Depends(get_async_session),
-                                       context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                       context: HTTPRoutingContext = Depends(lambda: None)):
         """Mark a specific onboarding step as complete"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json() if hasattr(request, 'json') else {}
             
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -298,9 +301,10 @@ class OnboardingEndpointsV1:
     async def complete_onboarding(self,
                                   request: Request,
                                   db: AsyncSession = Depends(get_async_session),
-                                  context: HTTPRoutingContext = Depends(self._require_si_role)):
+                                  context: HTTPRoutingContext = Depends(lambda: None)):
         """Mark entire onboarding as complete"""
         try:
+            context = await self._require_si_role(request)
             body = await request.json() if hasattr(request, 'json') else {}
             
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -343,9 +347,10 @@ class OnboardingEndpointsV1:
             logger.error(f"Error completing onboarding in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to complete onboarding")
 
-    async def reset_onboarding_state(self, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def reset_onboarding_state(self, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(lambda: None)):
         """Reset onboarding state (admin/testing only)"""
         try:
+            context = await self._require_si_role(request)
             self.endpoint_stats["reset_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
@@ -390,9 +395,10 @@ class OnboardingEndpointsV1:
             logger.error(f"Error resetting onboarding state in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to reset onboarding state")
 
-    async def get_onboarding_analytics(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def get_onboarding_analytics(self, request: Request):
         """Get onboarding analytics and progress insights"""
         try:
+            context = await self._require_si_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="get_onboarding_analytics",

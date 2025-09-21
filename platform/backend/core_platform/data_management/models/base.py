@@ -4,7 +4,11 @@ TaxPoynt Platform - Database Base Model
 Base SQLAlchemy model with common functionality for all platform models.
 """
 
-from sqlalchemy.ext.declarative import declarative_base
+try:
+    # SQLAlchemy 2.x
+    from sqlalchemy.orm import declarative_base
+except ImportError:  # pragma: no cover - fallback for older SQLAlchemy
+    from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, DateTime, func
 from typing import Any
 import uuid

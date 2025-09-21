@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import inspect
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Set
 from fastapi import APIRouter, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
@@ -348,7 +349,7 @@ class MainGatewayRouter:
                 content={
                     "status": "healthy" if overall_healthy else "degraded",
                     "service": "api_gateway",
-                    "timestamp": "2024-12-31T00:00:00Z",
+                    "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
                     "versions": version_health,
                     "gateway_info": {
                         "default_version": self.version_coordinator.default_version,
