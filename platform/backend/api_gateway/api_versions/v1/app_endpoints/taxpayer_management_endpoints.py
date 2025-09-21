@@ -47,7 +47,11 @@ class TaxpayerManagementEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/taxpayers", tags=["Taxpayer Management V1"])
+        self.router = APIRouter(
+            prefix="/taxpayers",
+            tags=["Taxpayer Management V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define taxpayer management capabilities
         self.taxpayer_capabilities = {
@@ -71,6 +75,18 @@ class TaxpayerManagementEndpointsV1:
         
         self._setup_routes()
         logger.info("Taxpayer Management Endpoints V1 initialized")
+    
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup taxpayer management routes"""
@@ -311,9 +327,10 @@ class TaxpayerManagementEndpointsV1:
         )
     
     # Taxpayer Overview Endpoints
-    async def get_taxpayer_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_taxpayer_overview(self, request: Request):
         """Get taxpayer overview"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_taxpayer_overview",
@@ -332,10 +349,11 @@ class TaxpayerManagementEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get taxpayer overview")
     
     async def get_taxpayer_statistics(self, 
-                                    period: Optional[str] = Query("30d", description="Statistics period"),
-                                    context: HTTPRoutingContext = Depends(lambda: None)):
+                                    request: Request,
+                                    period: Optional[str] = Query("30d", description="Statistics period")):
         """Get taxpayer statistics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_taxpayer_statistics",
@@ -357,9 +375,10 @@ class TaxpayerManagementEndpointsV1:
                             status: Optional[str] = Query(None, description="Filter by taxpayer status"),
                             compliance_status: Optional[str] = Query(None, description="Filter by compliance status"),
                             onboarding_status: Optional[str] = Query(None, description="Filter by onboarding status"),
-                            context: HTTPRoutingContext = Depends(lambda: None)):
+                            ):
         """List taxpayers"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_taxpayers",
@@ -574,10 +593,10 @@ class TaxpayerManagementEndpointsV1:
     
     async def list_non_compliant_taxpayers(self, 
                                          request: Request,
-                                         violation_type: Optional[str] = Query(None, description="Filter by violation type"),
-                                         context: HTTPRoutingContext = Depends(lambda: None)):
+                                         violation_type: Optional[str] = Query(None, description="Filter by violation type")):
         """List non-compliant taxpayers"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_non_compliant_taxpayers",
@@ -596,9 +615,10 @@ class TaxpayerManagementEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to list non-compliant taxpayers")
     
     # Grant Tracking Endpoints
-    async def get_grant_milestones(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_grant_milestones(self, request: Request):
         """Get FIRS grant milestones"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_grant_milestones",
@@ -614,10 +634,11 @@ class TaxpayerManagementEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get grant milestones")
     
     async def get_onboarding_performance(self, 
-                                       period: Optional[str] = Query("30d", description="Performance period"),
-                                       context: HTTPRoutingContext = Depends(lambda: None)):
+                                       request: Request,
+                                       period: Optional[str] = Query("30d", description="Performance period")):
         """Get onboarding performance metrics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_onboarding_performance",
@@ -633,9 +654,10 @@ class TaxpayerManagementEndpointsV1:
             logger.error(f"Error getting onboarding performance in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get onboarding performance")
     
-    async def generate_grant_tracking_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_grant_tracking_report(self, request: Request):
         """Generate grant tracking report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -654,31 +676,31 @@ class TaxpayerManagementEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to generate grant tracking report")
     
     # Placeholder implementations for remaining endpoints
-    async def list_taxpayer_documents(self, taxpayer_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def list_taxpayer_documents(self, taxpayer_id: str):
         """List taxpayer documents - placeholder"""
         return self._create_v1_response({"documents": []}, "taxpayer_documents_listed")
-    
-    async def upload_taxpayer_document(self, taxpayer_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+
+    async def upload_taxpayer_document(self, taxpayer_id: str, request: Request):
         """Upload taxpayer document - placeholder"""
         return self._create_v1_response({"document_id": "doc_123"}, "taxpayer_document_uploaded")
-    
-    async def get_taxpayer_document(self, taxpayer_id: str, document_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+
+    async def get_taxpayer_document(self, taxpayer_id: str, document_id: str):
         """Get taxpayer document - placeholder"""
         return self._create_v1_response({"document_id": document_id}, "taxpayer_document_retrieved")
-    
-    async def delete_taxpayer_document(self, taxpayer_id: str, document_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+
+    async def delete_taxpayer_document(self, taxpayer_id: str, document_id: str):
         """Delete taxpayer document - placeholder"""
         return self._create_v1_response({"document_id": document_id}, "taxpayer_document_deleted")
-    
-    async def bulk_import_taxpayers(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+
+    async def bulk_import_taxpayers(self, request: Request):
         """Bulk import taxpayers - placeholder"""
         return self._create_v1_response({"import_id": "import_123"}, "bulk_taxpayer_import_initiated")
-    
-    async def bulk_export_taxpayers(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+
+    async def bulk_export_taxpayers(self, request: Request):
         """Bulk export taxpayers - placeholder"""
         return self._create_v1_response({"export_id": "export_123"}, "bulk_taxpayer_export_initiated")
-    
-    async def bulk_update_taxpayer_status(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+
+    async def bulk_update_taxpayer_status(self, request: Request):
         """Bulk update taxpayer status - placeholder"""
         return self._create_v1_response({"update_id": "update_123"}, "bulk_taxpayer_status_update_initiated")
     

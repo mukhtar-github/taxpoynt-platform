@@ -47,7 +47,11 @@ class SecurityManagementEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/security", tags=["Security Management V1"])
+        self.router = APIRouter(
+            prefix="/security",
+            tags=["Security Management V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define security capabilities
         self.security_capabilities = {
@@ -71,6 +75,18 @@ class SecurityManagementEndpointsV1:
         
         self._setup_routes()
         logger.info("Security Management Endpoints V1 initialized")
+    
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup security management routes"""
@@ -190,9 +206,10 @@ class SecurityManagementEndpointsV1:
         )
     
     # Security Metrics Endpoints
-    async def get_security_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_security_metrics(self, request: Request):
         """Get comprehensive security metrics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_security_metrics",
@@ -243,9 +260,10 @@ class SecurityManagementEndpointsV1:
             from api_gateway.utils.error_mapping import v1_error_response
             return v1_error_response(e, action="get_security_metrics")
     
-    async def get_security_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_security_overview(self, request: Request):
         """Get security overview"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_security_overview",
@@ -262,9 +280,10 @@ class SecurityManagementEndpointsV1:
             return v1_error_response(e, action="get_security_overview")
     
     # Security Scanning Endpoints
-    async def run_security_scan(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def run_security_scan(self, request: Request):
         """Run comprehensive security scan"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -378,11 +397,12 @@ class SecurityManagementEndpointsV1:
     
     # Access Monitoring Endpoints
     async def get_access_logs(self, 
+                            request: Request,
                             hours: Optional[int] = Query(24, description="Hours of logs to retrieve"),
-                            ip_filter: Optional[str] = Query(None, description="Filter by IP address"),
-                            context: HTTPRoutingContext = Depends(lambda: None)):
+                            ip_filter: Optional[str] = Query(None, description="Filter by IP address")):
         """Get access logs"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_access_logs",
@@ -400,9 +420,10 @@ class SecurityManagementEndpointsV1:
             from api_gateway.utils.error_mapping import v1_error_response
             return v1_error_response(e, action="get_access_logs")
     
-    async def get_suspicious_activity(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_suspicious_activity(self, request: Request):
         """Get suspicious activity"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_suspicious_activity",
@@ -419,9 +440,10 @@ class SecurityManagementEndpointsV1:
             return v1_error_response(e, action="get_suspicious_activity")
     
     # Compliance Monitoring Endpoints
-    async def check_iso27001_compliance(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def check_iso27001_compliance(self, request: Request):
         """Check ISO 27001 compliance"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="check_iso27001_compliance",
@@ -437,9 +459,10 @@ class SecurityManagementEndpointsV1:
             from api_gateway.utils.error_mapping import v1_error_response
             return v1_error_response(e, action="check_iso27001_compliance")
     
-    async def check_gdpr_compliance(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def check_gdpr_compliance(self, request: Request):
         """Check GDPR compliance"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="check_gdpr_compliance",
@@ -456,9 +479,10 @@ class SecurityManagementEndpointsV1:
             return v1_error_response(e, action="check_gdpr_compliance")
     
     # Security Reporting Endpoints
-    async def generate_security_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_security_report(self, request: Request):
         """Generate security report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(

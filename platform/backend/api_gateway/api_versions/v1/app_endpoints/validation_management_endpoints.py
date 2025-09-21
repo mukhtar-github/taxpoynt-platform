@@ -50,7 +50,11 @@ class ValidationManagementEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/validation", tags=["Validation Management V1"])
+        self.router = APIRouter(
+            prefix="/validation",
+            tags=["Validation Management V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define validation capabilities
         self.validation_capabilities = {
@@ -76,6 +80,18 @@ class ValidationManagementEndpointsV1:
         logger.info("Validation Management Endpoints V1 initialized")
         # Minimal idempotency store (in-memory per process)
         self._idempotency_store = {}
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup validation management routes"""
@@ -224,9 +240,10 @@ class ValidationManagementEndpointsV1:
         )
     
     # Validation Metrics Endpoints
-    async def get_validation_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_validation_metrics(self, request: Request):
         """Get comprehensive validation metrics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_validation_metrics",
@@ -258,9 +275,10 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting validation metrics in v1: {e}")
             return v1_error_response(e, action="get_validation_metrics")
     
-    async def get_validation_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_validation_overview(self, request: Request):
         """Get validation overview"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_validation_overview",
@@ -328,9 +346,10 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting recent validation results in v1: {e}")
             return v1_error_response(e, action="get_recent_validation_results")
     
-    async def get_validation_result(self, validation_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_validation_result(self, validation_id: str, request: Request):
         """Get detailed validation result"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_validation_result",
@@ -347,9 +366,10 @@ class ValidationManagementEndpointsV1:
             return v1_error_response(e, action="get_validation_result")
     
     # Invoice Validation Endpoints
-    async def validate_single_invoice(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_single_invoice(self, request: Request):
         """Validate single invoice"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
             if idem_key:
@@ -372,7 +392,7 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error validating single invoice in v1: {e}")
             return v1_error_response(e, action="validate_single_invoice")
     
-    async def validate_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_invoice_batch(self, request: Request):
         """Validate invoice batch"""
         try:
             # Handle both JSON and file upload
@@ -416,9 +436,10 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error validating invoice batch in v1: {e}")
             return v1_error_response(e, action="validate_invoice_batch")
     
-    async def get_batch_validation_status(self, batch_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_batch_validation_status(self, batch_id: str, request: Request):
         """Get batch validation status"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_batch_validation_status",
@@ -473,9 +494,10 @@ class ValidationManagementEndpointsV1:
             return v1_error_response(e, action="validate_uploaded_file")
     
     # Validation Rules and Standards Endpoints
-    async def get_validation_rules(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_validation_rules(self, request: Request):
         """Get validation rules"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_validation_rules",
@@ -490,9 +512,10 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting validation rules in v1: {e}")
             return v1_error_response(e, action="get_validation_rules")
     
-    async def get_ubl_validation_standards(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_ubl_validation_standards(self, request: Request):
         """Get UBL validation standards"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_ubl_validation_standards",
@@ -507,9 +530,10 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting UBL validation standards in v1: {e}")
             return v1_error_response(e, action="get_ubl_validation_standards")
     
-    async def get_firs_validation_standards(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_validation_standards(self, request: Request):
         """Get FIRS validation standards"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_firs_validation_standards",
@@ -526,10 +550,11 @@ class ValidationManagementEndpointsV1:
     
     # Error Analysis Endpoints
     async def get_validation_error_analysis(self, 
-                                          period: Optional[str] = Query("30d", description="Analysis period"),
-                                          context: HTTPRoutingContext = Depends(lambda: None)):
+                                          request: Request,
+                                          period: Optional[str] = Query("30d", description="Analysis period")):
         """Get validation error analysis"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_validation_error_analysis",
@@ -545,9 +570,10 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting validation error analysis in v1: {e}")
             return v1_error_response(e, action="get_validation_error_analysis")
     
-    async def get_validation_error_help(self, error_code: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_validation_error_help(self, error_code: str, request: Request):
         """Get validation error help"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_validation_error_help",
@@ -564,9 +590,10 @@ class ValidationManagementEndpointsV1:
             return v1_error_response(e, action="get_validation_error_help")
     
     # Quality Metrics Endpoints
-    async def get_data_quality_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_data_quality_metrics(self, request: Request):
         """Get data quality metrics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_data_quality_metrics",
@@ -581,9 +608,11 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting data quality metrics in v1: {e}")
             return v1_error_response(e, action="get_data_quality_metrics")
     
-    async def generate_quality_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_quality_report(self, request: Request):
         """Generate quality report"""
         try:
+            context = await self._require_app_role(request)
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(

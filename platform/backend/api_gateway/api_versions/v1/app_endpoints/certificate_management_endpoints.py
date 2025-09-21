@@ -43,10 +43,26 @@ class CertificateManagementEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/certificates", tags=["Certificate Management V1"])
+        self.router = APIRouter(
+            prefix="/certificates",
+            tags=["Certificate Management V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         self._setup_routes()
         logger.info("Certificate Management Endpoints V1 initialized")
+    
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup certificate management routes"""
@@ -175,9 +191,10 @@ class CertificateManagementEndpointsV1:
         )
     
     # Certificate Overview Endpoints
-    async def get_certificate_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_certificate_overview(self, request: Request):
         """Get certificate overview"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_certificate_overview",
@@ -195,10 +212,10 @@ class CertificateManagementEndpointsV1:
     # Certificate Lifecycle Endpoints
     async def list_certificates(self, 
                               request: Request,
-                              status: Optional[str] = Query(None, description="Filter by certificate status"),
-                              context: HTTPRoutingContext = Depends(lambda: None)):
+                              status: Optional[str] = Query(None, description="Filter by certificate status")):
         """List certificates"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_certificates",
@@ -216,9 +233,10 @@ class CertificateManagementEndpointsV1:
             logger.error(f"Error listing certificates in v1: {e}")
             return v1_error_response(e, action="list_certificates")
     
-    async def create_certificate(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def create_certificate(self, request: Request):
         """Create certificate"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -236,9 +254,10 @@ class CertificateManagementEndpointsV1:
             logger.error(f"Error creating certificate in v1: {e}")
             return v1_error_response(e, action="create_certificate")
     
-    async def get_certificate(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_certificate(self, certificate_id: str, request: Request):
         """Get certificate details"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_certificate",
@@ -254,9 +273,10 @@ class CertificateManagementEndpointsV1:
             logger.error(f"Error getting certificate {certificate_id} in v1: {e}")
             return v1_error_response(e, action="get_certificate")
     
-    async def update_certificate(self, certificate_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def update_certificate(self, certificate_id: str, request: Request):
         """Update certificate"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -275,9 +295,10 @@ class CertificateManagementEndpointsV1:
             logger.error(f"Error updating certificate {certificate_id} in v1: {e}")
             return v1_error_response(e, action="update_certificate")
     
-    async def delete_certificate(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def delete_certificate(self, certificate_id: str, request: Request):
         """Delete certificate (revoke)"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="delete_certificate",
@@ -294,9 +315,10 @@ class CertificateManagementEndpointsV1:
             return v1_error_response(e, action="delete_certificate")
     
     # Certificate Renewal Endpoints
-    async def renew_certificate(self, certificate_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def renew_certificate(self, certificate_id: str, request: Request):
         """Renew certificate"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="renew_certificate",
@@ -312,9 +334,10 @@ class CertificateManagementEndpointsV1:
             logger.error(f"Error renewing certificate {certificate_id} in v1: {e}")
             return v1_error_response(e, action="renew_certificate")
     
-    async def get_renewal_status(self, certificate_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_renewal_status(self, certificate_id: str, request: Request):
         """Get renewal status"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_renewal_status",
@@ -331,10 +354,11 @@ class CertificateManagementEndpointsV1:
             return v1_error_response(e, action="get_renewal_status")
     
     async def list_expiring_certificates(self, 
-                                       days_ahead: Optional[int] = Query(30, description="Days ahead to check for expiration"),
-                                       context: HTTPRoutingContext = Depends(lambda: None)):
+                                       request: Request,
+                                       days_ahead: Optional[int] = Query(30, description="Days ahead to check for expiration")):
         """List expiring certificates"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_expiring_certificates",

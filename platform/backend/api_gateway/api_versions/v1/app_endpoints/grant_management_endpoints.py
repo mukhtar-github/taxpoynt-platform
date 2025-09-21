@@ -48,10 +48,26 @@ class GrantManagementEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/grants", tags=["Grant Management V1"])
+        self.router = APIRouter(
+            prefix="/grants",
+            tags=["Grant Management V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         self._setup_routes()
         logger.info("Grant Management Endpoints V1 initialized")
+    
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Point Provider role required for v1 API")
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
     
     def _setup_routes(self):
         """Setup grant management routes"""
@@ -216,9 +232,10 @@ class GrantManagementEndpointsV1:
         )
     
     # Grant Overview Endpoints
-    async def get_grant_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_grant_overview(self, request: Request):
         """Get grant overview"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_grant_overview",
@@ -233,9 +250,10 @@ class GrantManagementEndpointsV1:
             logger.error(f"Error getting grant overview in v1: {e}")
             return v1_error_response(e, action="get_grant_overview")
     
-    async def get_current_grant_status(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_current_grant_status(self, request: Request):
         """Get current grant status"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_current_grant_status",
@@ -253,10 +271,10 @@ class GrantManagementEndpointsV1:
     # Milestone Management Endpoints
     async def list_grant_milestones(self, 
                                   request: Request,
-                                  status: Optional[str] = Query(None, description="Filter by milestone status"),
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+                                  status: Optional[str] = Query(None, description="Filter by milestone status")):
         """List grant milestones"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_grant_milestones",
@@ -274,9 +292,10 @@ class GrantManagementEndpointsV1:
             logger.error(f"Error listing grant milestones in v1: {e}")
             return v1_error_response(e, action="list_grant_milestones")
     
-    async def get_milestone_details(self, milestone_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_milestone_details(self, milestone_id: str, request: Request):
         """Get milestone details"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_milestone_details",
@@ -292,9 +311,10 @@ class GrantManagementEndpointsV1:
             logger.error(f"Error getting milestone details {milestone_id} in v1: {e}")
             return v1_error_response(e, action="get_milestone_details")
     
-    async def get_milestone_progress(self, milestone_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_milestone_progress(self, milestone_id: str, request: Request):
         """Get milestone progress"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_milestone_progress",
@@ -311,10 +331,11 @@ class GrantManagementEndpointsV1:
             return v1_error_response(e, action="get_milestone_progress")
     
     async def get_upcoming_milestones(self, 
-                                    days_ahead: Optional[int] = Query(30, description="Days ahead to check for milestones"),
-                                    context: HTTPRoutingContext = Depends(lambda: None)):
+                                    request: Request,
+                                    days_ahead: Optional[int] = Query(30, description="Days ahead to check for milestones")):
         """Get upcoming milestones"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_upcoming_milestones",
@@ -332,10 +353,11 @@ class GrantManagementEndpointsV1:
     
     # Performance Metrics Endpoints
     async def get_performance_metrics(self, 
-                                    period: Optional[str] = Query("30d", description="Metrics period"),
-                                    context: HTTPRoutingContext = Depends(lambda: None)):
+                                    request: Request,
+                                    period: Optional[str] = Query("30d", description="Metrics period")):
         """Get performance metrics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_performance_metrics",
@@ -352,10 +374,11 @@ class GrantManagementEndpointsV1:
             return v1_error_response(e, action="get_performance_metrics")
     
     async def get_onboarding_performance(self, 
-                                       period: Optional[str] = Query("30d", description="Performance period"),
-                                       context: HTTPRoutingContext = Depends(lambda: None)):
+                                       request: Request,
+                                       period: Optional[str] = Query("30d", description="Performance period")):
         """Get onboarding performance"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_onboarding_performance",
@@ -372,10 +395,11 @@ class GrantManagementEndpointsV1:
             return v1_error_response(e, action="get_onboarding_performance")
     
     async def get_performance_trends(self, 
-                                   period: Optional[str] = Query("90d", description="Trends period"),
-                                   context: HTTPRoutingContext = Depends(lambda: None)):
+                                   request: Request,
+                                   period: Optional[str] = Query("90d", description="Trends period")):
         """Get performance trends"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_performance_trends",
@@ -392,9 +416,10 @@ class GrantManagementEndpointsV1:
             return v1_error_response(e, action="get_performance_trends")
     
     # Grant Reporting Endpoints
-    async def generate_grant_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_grant_report(self, request: Request):
         """Generate grant report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -414,10 +439,10 @@ class GrantManagementEndpointsV1:
     
     async def list_grant_reports(self, 
                                request: Request,
-                               report_type: Optional[str] = Query(None, description="Filter by report type"),
-                               context: HTTPRoutingContext = Depends(lambda: None)):
+                               report_type: Optional[str] = Query(None, description="Filter by report type")):
         """List grant reports"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_grant_reports",
@@ -435,9 +460,10 @@ class GrantManagementEndpointsV1:
             logger.error(f"Error listing grant reports in v1: {e}")
             return v1_error_response(e, action="list_grant_reports")
     
-    async def get_grant_report(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_grant_report(self, report_id: str, request: Request):
         """Get grant report"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_grant_report",

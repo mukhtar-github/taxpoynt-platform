@@ -52,7 +52,11 @@ class TransmissionManagementEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/transmission", tags=["Transmission Management V1"])
+        self.router = APIRouter(
+            prefix="/transmission",
+            tags=["Transmission Management V1"],
+            dependencies=[Depends(self._require_app_role)]
+        )
         
         # Define transmission capabilities
         self.transmission_capabilities = {
@@ -76,7 +80,26 @@ class TransmissionManagementEndpointsV1:
         
         self._setup_routes()
         logger.info("Transmission Management Endpoints V1 initialized")
-    
+
+    async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
+        """Ensure caller has APP role and required permissions for v1 routes."""
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.has_role(PlatformRole.ACCESS_POINT_PROVIDER):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Point Provider role required for v1 API"
+            )
+        if not await self.permission_guard.check_endpoint_permission(
+            context, f"v1/app{request.url.path}", request.method
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions for APP v1 endpoint"
+            )
+        context.metadata["api_version"] = "v1"
+        context.metadata["endpoint_group"] = "app"
+        return context
+
     def _setup_routes(self):
         """Setup transmission management routes"""
         
@@ -205,10 +228,11 @@ class TransmissionManagementEndpointsV1:
     
     # Batch Management Endpoints
     async def get_available_batches(self, 
-                                  status: Optional[str] = Query("validated", description="Filter by batch status"),
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+                                  request: Request,
+                                  status: Optional[str] = Query("validated", description="Filter by batch status")):
         """Get available batches ready for transmission"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_available_batches",
@@ -263,11 +287,12 @@ class TransmissionManagementEndpointsV1:
             return v1_error_response(e, action="get_available_batches")
     
     async def list_transmission_batches(self, 
+                                      request: Request,
                                       status: Optional[str] = Query(None, description="Filter by status"),
-                                      limit: Optional[int] = Query(50, description="Number of batches to return"),
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+                                      limit: Optional[int] = Query(50, description="Number of batches to return")):
         """List transmission batches"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_transmission_batches",
@@ -284,9 +309,10 @@ class TransmissionManagementEndpointsV1:
             logger.error(f"Error listing transmission batches in v1: {e}")
             return v1_error_response(e, action="list_transmission_batches")
     
-    async def get_batch_details(self, batch_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_batch_details(self, batch_id: str, request: Request):
         """Get detailed batch information"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_batch_details",
@@ -303,9 +329,10 @@ class TransmissionManagementEndpointsV1:
             return v1_error_response(e, action="get_batch_details")
     
     # Transmission Submission Endpoints
-    async def submit_invoice_batches(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_invoice_batches(self, request: Request):
         """Submit multiple invoice batches to FIRS"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -336,12 +363,13 @@ class TransmissionManagementEndpointsV1:
             return v1_error_response(e, action="submit_invoice_batches")
     
     async def submit_invoice_file(self, 
+                                request: Request,
                                 file: UploadFile = File(...),
                                 auto_validate: bool = True,
-                                priority: str = "normal",
-                                context: HTTPRoutingContext = Depends(lambda: None)):
+                                priority: str = "normal"):
         """Submit invoice file directly to FIRS"""
         try:
+            context = await self._require_app_role(request)
             # Process uploaded file
             content = await file.read()
             
@@ -373,9 +401,10 @@ class TransmissionManagementEndpointsV1:
             logger.error(f"Error submitting invoice file in v1: {e}")
             return v1_error_response(e, action="submit_invoice_file")
     
-    async def submit_single_batch(self, batch_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_single_batch(self, batch_id: str, request: Request):
         """Submit single batch to FIRS"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -396,13 +425,14 @@ class TransmissionManagementEndpointsV1:
     
     # Transmission History Endpoints
     async def get_transmission_history(self, 
+                                     request: Request,
                                      page: Optional[int] = Query(1, description="Page number"),
                                      limit: Optional[int] = Query(10, description="Items per page"),
                                      status: Optional[str] = Query(None, description="Filter by status"),
-                                     date_range: Optional[str] = Query(None, description="Filter by date range"),
-                                     context: HTTPRoutingContext = Depends(lambda: None)):
+                                     date_range: Optional[str] = Query(None, description="Filter by date range")):
         """Get transmission history with pagination"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_transmission_history",
@@ -451,9 +481,10 @@ class TransmissionManagementEndpointsV1:
             logger.error(f"Error getting transmission history in v1: {e}")
             return v1_error_response(e, action="get_transmission_history")
     
-    async def get_transmission_details(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_transmission_details(self, transmission_id: str, request: Request):
         """Get detailed transmission information"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_transmission_details",
@@ -470,9 +501,10 @@ class TransmissionManagementEndpointsV1:
             return v1_error_response(e, action="get_transmission_details")
     
     # Reports and Downloads
-    async def download_transmission_report(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def download_transmission_report(self, transmission_id: str, request: Request):
         """Download transmission report as PDF"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="generate_transmission_report",
@@ -499,9 +531,10 @@ class TransmissionManagementEndpointsV1:
             logger.error(f"Error downloading transmission report {transmission_id} in v1: {e}")
             return v1_error_response(e, action="download_transmission_report")
     
-    async def get_transmission_status(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_transmission_status(self, transmission_id: str, request: Request):
         """Get current transmission status"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_transmission_status",
@@ -518,9 +551,10 @@ class TransmissionManagementEndpointsV1:
             return v1_error_response(e, action="get_transmission_status")
     
     # Retry and Recovery Endpoints
-    async def retry_transmission(self, transmission_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def retry_transmission(self, transmission_id: str, request: Request):
         """Retry failed transmission"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -539,9 +573,10 @@ class TransmissionManagementEndpointsV1:
             logger.error(f"Error retrying transmission {transmission_id} in v1: {e}")
             return v1_error_response(e, action="retry_transmission")
     
-    async def cancel_transmission(self, transmission_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def cancel_transmission(self, transmission_id: str, request: Request):
         """Cancel pending transmission"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
             result = await self.message_router.route_message(
@@ -562,10 +597,11 @@ class TransmissionManagementEndpointsV1:
     
     # Statistics Endpoints
     async def get_transmission_statistics(self, 
-                                        period: Optional[str] = Query("30d", description="Statistics period"),
-                                        context: HTTPRoutingContext = Depends(lambda: None)):
+                                        request: Request,
+                                        period: Optional[str] = Query("30d", description="Statistics period")):
         """Get transmission performance statistics"""
         try:
+            context = await self._require_app_role(request)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_transmission_statistics",
