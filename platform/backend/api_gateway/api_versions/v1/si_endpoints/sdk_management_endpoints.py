@@ -30,6 +30,8 @@ from core_platform.data_management.models import (
 )
 from core_platform.services.sdk_management_service import SDKManagementService
 from core_platform.data_management.db_async import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.idempotency.store import IdempotencyStore
 from ..version_models import V1ResponseModel, V1ErrorModel  # pyright: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
@@ -101,13 +103,40 @@ def create_sdk_management_router(role_detector, permission_guard: APIPermissionG
         language: str,
         custom_config: Optional[Dict[str, Any]] = None,
         context: HTTPRoutingContext = Depends(lambda: permission_guard.require_role(PlatformRole.SI_SERVICE)),
-        db = Depends(get_async_session),
+        db: AsyncSession = Depends(get_async_session),
     ):
         """Generate a new SDK based on configuration"""
         try:
+            body = {"language": language, "custom_config": custom_config or {}}
+            # Idempotency
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and getattr(context, 'user_id', None) else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return V1ResponseModel(success=True, data=stored, message="SDK generated successfully")
+
             sdk_service = SDKManagementService(db)
             sdk_data = await sdk_service.generate_sdk_package(language, custom_config)
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and getattr(context, 'user_id', None) else None,
+                    key=idem_key,
+                    response=sdk_data if isinstance(sdk_data, dict) else {"sdk": sdk_data},
+                    status_code=200,
+                )
+
             return V1ResponseModel(
                 success=True,
                 data=sdk_data,

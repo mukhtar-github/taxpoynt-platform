@@ -16,6 +16,8 @@ import uuid as _uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core_platform.data_management.models.organization import Organization, OrganizationStatus
+from core_platform.data_management.models import AuditEventType
+from si_services.utils.audit import record_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,18 @@ class SIOrganizationService:
                 db.add(org)
                 await db.commit()
                 await db.refresh(org)
+                # Audit
+                await record_audit_event(
+                    db,
+                    event_type=AuditEventType.SYSTEM_CONFIGURATION,
+                    description="organization_created",
+                    user_id=None,
+                    organization_id=org.id,
+                    target_type="organization",
+                    target_id=str(org.id),
+                    new_values={"name": org.name},
+                    correlation_id=payload.get("correlation_id"),
+                )
                 return {"operation": operation, "success": True, "organization": {"id": str(org.id), "name": org.name}}
 
             if operation == "get_organization":
@@ -61,10 +75,23 @@ class SIOrganizationService:
                 row = (await db.execute(select(Organization).where(Organization.id == oid))).scalars().first()
                 if not row:
                     return {"operation": operation, "success": False, "error": "not_found"}
+                old_values = {"name": row.name, "status": row.status.value if row.status else None}
                 for key in ("name", "business_type", "tin", "rc_number", "email", "phone", "website", "status"):
                     if key in updates:
                         setattr(row, key, updates[key])
                 await db.commit()
+                await record_audit_event(
+                    db,
+                    event_type=AuditEventType.SYSTEM_CONFIGURATION,
+                    description="organization_updated",
+                    user_id=None,
+                    organization_id=row.id,
+                    target_type="organization",
+                    target_id=str(row.id),
+                    old_values=old_values,
+                    new_values=updates,
+                    correlation_id=payload.get("correlation_id"),
+                )
                 return {"operation": operation, "success": True, "organization": {"id": str(row.id), "updated": True}}
 
             if operation == "delete_organization":
@@ -79,6 +106,18 @@ class SIOrganizationService:
                 row.status = OrganizationStatus.INACTIVE
                 row.deleted_at = datetime.utcnow()
                 await db.commit()
+                await record_audit_event(
+                    db,
+                    event_type=AuditEventType.SYSTEM_CONFIGURATION,
+                    description="organization_deleted",
+                    user_id=None,
+                    organization_id=row.id,
+                    target_type="organization",
+                    target_id=str(row.id),
+                    old_values={"is_deleted": False},
+                    new_values={"is_deleted": True},
+                    correlation_id=payload.get("correlation_id"),
+                )
                 return {"operation": operation, "success": True, "organization": {"id": str(row.id), "deleted": True}}
 
             if operation == "get_organization_compliance":

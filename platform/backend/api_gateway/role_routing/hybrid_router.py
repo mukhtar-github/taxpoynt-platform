@@ -482,7 +482,21 @@ class HybridServicesRouter:
             logger.error(f"Error exporting report: {e}")
             raise HTTPException(status_code=500, detail="Failed to export report")
     
-    # Administrator Routes
+        # Administrator Routes
+        self.router.add_api_route(
+            "/admin/system-status",
+            self.get_system_status,
+            methods=["GET"],
+            summary="Get system status (admin)",
+            dependencies=[Depends(self._require_admin_role)]
+        )
+        self.router.add_api_route(
+            "/admin/idempotency/cleanup",
+            self.trigger_idempotency_cleanup,
+            methods=["POST"],
+            summary="Cleanup idempotency keys (admin)",
+            dependencies=[Depends(self._require_admin_role)]
+        )
     async def get_system_status(self, context: HTTPRoutingContext = Depends(_require_admin_role)):
         """Get comprehensive system status (admin only)"""
         try:
@@ -521,6 +535,32 @@ class HybridServicesRouter:
         except Exception as e:
             logger.error(f"Error getting audit logs: {e}")
             raise HTTPException(status_code=500, detail="Failed to get audit logs")
+
+    async def trigger_idempotency_cleanup(self, request: Request, context: HTTPRoutingContext = Depends(_require_admin_role)):
+        """Admin endpoint to trigger IdempotencyStore cleanup immediately."""
+        try:
+            body = {}
+            try:
+                body = await request.json()
+            except Exception:
+                pass
+            older_than_days = int(body.get("older_than_days", 7))
+
+            from core_platform.data_management.db_async import get_async_session
+            from core_platform.idempotency.store import IdempotencyStore
+
+            deleted = 0
+            async for db in get_async_session():
+                deleted = await IdempotencyStore.cleanup(db, older_than_days=older_than_days)
+                break
+            return JSONResponse({
+                "success": True,
+                "deleted": deleted,
+                "older_than_days": older_than_days
+            })
+        except Exception as e:
+            logger.error(f"Failed to cleanup idempotency keys: {e}")
+            raise HTTPException(status_code=500, detail="Failed to cleanup idempotency keys")
     
     # Helper Methods
     def _get_primary_service_role(self, context: HTTPRoutingContext) -> ServiceRole:

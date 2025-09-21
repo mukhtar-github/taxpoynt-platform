@@ -17,6 +17,9 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from core_platform.data_management.db_async import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.idempotency.store import IdempotencyStore
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +178,7 @@ class ReconciliationEndpointsV1:
     # Configuration Management Endpoints
     async def save_reconciliation_configuration(self,
                                               request: Request,
+                                              db: AsyncSession = Depends(get_async_session),
                                               context: HTTPRoutingContext = Depends(lambda: None)):
         """Save auto-reconciliation configuration"""
         try:
@@ -190,6 +194,23 @@ class ReconciliationEndpointsV1:
                 )
             
             # Route to SI services for processing and storage
+            # Idempotency
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(config_data)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "reconciliation_configuration_saved", status_code=stored_code or 201)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="save_reconciliation_configuration",
@@ -204,6 +225,14 @@ class ReconciliationEndpointsV1:
             # Update Universal Transaction Processor with new rules
             await self._update_transaction_processor_rules(config_data, context.user_id)
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=201,
+                )
             return self._create_v1_response(result, "reconciliation_configuration_saved", status_code=201)
             
         except HTTPException:
@@ -233,11 +262,28 @@ class ReconciliationEndpointsV1:
 
     async def update_reconciliation_configuration(self,
                                                 request: Request,
+                                                db: AsyncSession = Depends(get_async_session),
                                                 context: HTTPRoutingContext = Depends(lambda: None)):
         """Update reconciliation configuration"""
         try:
             updates = await request.json()
             
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(updates)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "reconciliation_configuration_updated", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="update_reconciliation_configuration",
@@ -251,6 +297,14 @@ class ReconciliationEndpointsV1:
             # Sync changes with Universal Transaction Processor
             await self._update_transaction_processor_rules(updates, context.user_id)
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "reconciliation_configuration_updated")
             
         except Exception as e:
@@ -279,6 +333,7 @@ class ReconciliationEndpointsV1:
 
     async def create_transaction_category(self,
                                         request: Request,
+                                        db: AsyncSession = Depends(get_async_session),
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Create new transaction category"""
         try:
@@ -293,6 +348,22 @@ class ReconciliationEndpointsV1:
                     detail=f"Missing required fields: {', '.join(missing_fields)}"
                 )
             
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(category_data)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "transaction_category_created", status_code=stored_code or 201)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="create_transaction_category",
@@ -303,6 +374,14 @@ class ReconciliationEndpointsV1:
                 }
             )
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=201,
+                )
             return self._create_v1_response(result, "transaction_category_created", status_code=201)
             
         except HTTPException:
@@ -314,11 +393,29 @@ class ReconciliationEndpointsV1:
     async def update_transaction_category(self,
                                         category_id: str,
                                         request: Request,
+                                        db: AsyncSession = Depends(get_async_session),
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Update transaction category"""
         try:
             updates = await request.json()
             
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                composite = {"category_id": category_id, "updates": updates}
+                req_hash = IdempotencyStore.compute_request_hash(composite)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "transaction_category_updated", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="update_transaction_category",
@@ -330,6 +427,14 @@ class ReconciliationEndpointsV1:
                 }
             )
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "transaction_category_updated")
             
         except Exception as e:
@@ -338,9 +443,27 @@ class ReconciliationEndpointsV1:
 
     async def delete_transaction_category(self,
                                         category_id: str,
+                                        request: Request,
+                                        db: AsyncSession = Depends(get_async_session),
                                         context: HTTPRoutingContext = Depends(lambda: None)):
         """Delete transaction category"""
         try:
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash({"category_id": category_id})
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "transaction_category_deleted", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="delete_transaction_category",
@@ -351,6 +474,14 @@ class ReconciliationEndpointsV1:
                 }
             )
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "transaction_category_deleted")
             
         except Exception as e:

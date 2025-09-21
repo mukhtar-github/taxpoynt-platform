@@ -15,6 +15,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from fastapi import status
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class POSEndpointsV1:
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
-        self.router = APIRouter(prefix="/pos", tags=["POS Systems V1"])
+        self.router = APIRouter(prefix="/pos", tags=["POS Systems V1"], dependencies=[Depends(self._require_si_role)])
         
         # Available POS systems categorized by region
         self.pos_systems = {
@@ -70,11 +71,11 @@ class POSEndpointsV1:
         
         # POS Connection Management
         self.router.add_api_route(
-            "/connections",
-            self.list_pos_connections,
+            "/orders",
+            self.list_pos_orders,
             methods=["GET"],
-            summary="List POS connections",
-            description="Get all POS system connections",
+            summary="List POS orders (Odoo)",
+            description="List POS orders from Odoo",
             response_model=V1ResponseModel
         )
         
@@ -89,11 +90,11 @@ class POSEndpointsV1:
         )
         
         self.router.add_api_route(
-            "/connections/{connection_id}",
-            self.get_pos_connection,
+            "/orders/{order_id}",
+            self.get_pos_order,
             methods=["GET"],
-            summary="Get POS connection",
-            description="Get specific POS connection details",
+            summary="Get POS order",
+            description="Get a POS order from Odoo",
             response_model=V1ResponseModel
         )
         
@@ -137,6 +138,12 @@ class POSEndpointsV1:
         # Regional POS Routes
         for region in self.pos_systems.keys():
             self._setup_regional_routes(region)
+
+    async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not await self.permission_guard.check_endpoint_permission(context, f"v1/si{request.url.path}", request.method):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+        return context
     
     def _setup_regional_routes(self, region: str):
         """Setup region-specific POS routes"""
@@ -200,18 +207,50 @@ class POSEndpointsV1:
             raise HTTPException(status_code=502, detail="Failed to get available POS systems")
     
     # Main POS endpoints (placeholder implementations)
-    async def list_pos_connections(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """List POS connections - placeholder"""
-        return self._create_v1_response({"connections": []}, "pos_connections_listed")
+    async def list_pos_orders(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+        """List Odoo POS orders (SI → Odoo)"""
+        try:
+            params = dict(request.query_params)
+            limit = int(params.get("limit", 50))
+            offset = int(params.get("offset", 0))
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_pos_orders",
+                payload={
+                    "limit": limit,
+                    "offset": offset,
+                    "api_version": "v1"
+                }
+            )
+            return self._create_v1_response(result, "pos_orders_listed")
+        except Exception as e:
+            logger.error(f"Error listing POS orders: {e}")
+            raise HTTPException(status_code=502, detail="Failed to list POS orders")
     
     async def create_pos_connection(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Create POS connection - placeholder"""
         body = await request.json()
         return self._create_v1_response({"connection_id": "pos_123"}, "pos_connection_created", status_code=201)
     
-    async def get_pos_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Get POS connection - placeholder"""
-        return self._create_v1_response({"connection_id": connection_id}, "pos_connection_retrieved")
+    async def get_pos_order(self, order_id: int, context: HTTPRoutingContext = Depends(lambda: None)):
+        """Get Odoo POS order"""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_pos_order",
+                payload={
+                    "order_id": int(order_id),
+                    "api_version": "v1"
+                }
+            )
+            if not (result and result.get('data')):
+                raise HTTPException(status_code=404, detail="POS order not found")
+            return self._create_v1_response(result, "pos_order_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting POS order {order_id}: {e}")
+            raise HTTPException(status_code=502, detail="Failed to get POS order")
     
     async def update_pos_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Update POS connection - placeholder"""

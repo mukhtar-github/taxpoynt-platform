@@ -42,6 +42,7 @@ from .business_systems import (
     SyncStatus, CertificateType, CertificateStatus, DocumentType,
     TaxpayerStatus, WebhookEventType, AuditEventType
 )
+from .idempotency import IdempotencyKey, IdempotencyStatus
 
 # SDK Management Models
 from .sdk_management import (
@@ -102,6 +103,8 @@ __all__ = [
     "TaxpayerStatus",
     "WebhookEventType",
     "AuditEventType",
+    "IdempotencyKey",
+    "IdempotencyStatus",
     # SDK Management Models
     "SDK",
     "SDKVersion", 

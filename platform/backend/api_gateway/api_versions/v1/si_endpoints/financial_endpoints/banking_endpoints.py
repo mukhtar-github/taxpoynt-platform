@@ -17,6 +17,9 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from core_platform.data_management.db_async import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.idempotency.store import IdempotencyStore
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +397,7 @@ class BankingEndpointsV1:
 
     async def create_open_banking_connection(self, 
                                            request: Request,
+                                           db: AsyncSession = Depends(get_async_session),
                                            context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Create Open Banking connection"""
         try:
@@ -415,6 +419,23 @@ class BankingEndpointsV1:
                     detail=f"Invalid banking provider. Available: {', '.join(self.banking_systems['open_banking']['providers'])}"
                 )
             
+            # Idempotency support
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "open_banking_connection_created", status_code=stored_code or 201)
+
             result = await route_or_http(
                 self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
@@ -426,6 +447,14 @@ class BankingEndpointsV1:
                 },
             )
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=201,
+                )
             return self._create_v1_response(result, "open_banking_connection_created", status_code=201)
         except HTTPException:
             raise
@@ -459,11 +488,28 @@ class BankingEndpointsV1:
             logger.error(f"Error getting open banking connection {connection_id} in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to get open banking connection")
     
-    async def update_open_banking_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def update_open_banking_connection(self, connection_id: str, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Update Open Banking connection"""
         try:
             body = await request.json()
-            
+            # Idempotency support
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                composite = {"connection_id": connection_id, "updates": body}
+                req_hash = IdempotencyStore.compute_request_hash(composite)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "open_banking_connection_updated", status_code=stored_code or 200)
+
             result = await route_or_http(
                 self.message_router,
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
@@ -476,6 +522,14 @@ class BankingEndpointsV1:
                 },
             )
             
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "open_banking_connection_updated")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))

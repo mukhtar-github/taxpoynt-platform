@@ -438,23 +438,78 @@ class SIServiceRegistry:
 
             async def odoo_business_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                 try:
-                    if not OdooUnifiedConnector:
-                        return {"operation": operation, "success": False, "error": "odoo_connector_unavailable"}
-                    conn = OdooUnifiedConnector.from_env()
-                    if not (conn and conn.available()):
-                        return {"operation": operation, "success": False, "error": "odoo_connector_not_configured"}
-                    from datetime import datetime, timedelta
-                    end = datetime.utcnow()
-                    start = end - timedelta(days=int(payload.get("days", 30)))
+                    # Prefer direct Odoo services for CRM/POS
+                    from .erp_integration.odoo_crm_pos_services import OdooCRMService, OdooPOSService
                     if operation == "get_crm_opportunities":
-                        recs = await conn.get_opportunities_by_date_range(start, end)
+                        limit = int(payload.get("limit", 50))
+                        offset = int(payload.get("offset", 0))
+                        recs = await OdooCRMService.list_opportunities(limit=limit, offset=offset)
                         return {"operation": operation, "success": True, "data": recs}
+                    if operation == "get_crm_opportunity":
+                        oid = int(payload.get("opportunity_id"))
+                        rec = await OdooCRMService.get_opportunity(oid)
+                        return {"operation": operation, "success": rec is not None, "data": rec or {"error": "not_found"}}
+                    if operation == "create_crm_opportunity":
+                        data = payload.get("data", {})
+                        created = await OdooCRMService.create_opportunity(data)
+                        # Audit
+                        try:
+                            from si_services.utils.audit import record_audit_event
+                            from core_platform.data_management.db_async import get_async_session
+                            from core_platform.data_management.models import AuditEventType
+                            async for db in get_async_session():
+                                await record_audit_event(
+                                    db,
+                                    event_type=AuditEventType.INTEGRATION_CHANGE,
+                                    description="crm_opportunity_created",
+                                    target_type="crm.opportunity",
+                                    target_id=str(created.get('id')),
+                                    new_values=created,
+                                    correlation_id=payload.get("correlation_id"),
+                                )
+                        except Exception:
+                            pass
+                        return {"operation": operation, "success": True, "data": created}
+                    if operation == "update_crm_opportunity":
+                        oid = int(payload.get("opportunity_id"))
+                        updates = payload.get("updates", {})
+                        updated = await OdooCRMService.update_opportunity(oid, updates)
+                        try:
+                            from si_services.utils.audit import record_audit_event
+                            from core_platform.data_management.db_async import get_async_session
+                            from core_platform.data_management.models import AuditEventType
+                            async for db in get_async_session():
+                                await record_audit_event(
+                                    db,
+                                    event_type=AuditEventType.INTEGRATION_CHANGE,
+                                    description="crm_opportunity_updated",
+                                    target_type="crm.opportunity",
+                                    target_id=str(oid),
+                                    new_values=updates,
+                                    correlation_id=payload.get("correlation_id"),
+                                )
+                        except Exception:
+                            pass
+                        return {"operation": operation, "success": updated is not None, "data": updated or {"error": "not_found"}}
                     if operation == "get_pos_orders":
-                        recs = await conn.get_pos_orders_by_date_range(start, end)
+                        limit = int(payload.get("limit", 50))
+                        offset = int(payload.get("offset", 0))
+                        recs = await OdooPOSService.list_orders(limit=limit, offset=offset)
                         return {"operation": operation, "success": True, "data": recs}
-                    if operation == "get_online_orders":
-                        recs = await conn.get_online_orders_by_date_range(start, end)
-                        return {"operation": operation, "success": True, "data": recs}
+                    if operation == "get_pos_order":
+                        oid = int(payload.get("order_id"))
+                        rec = await OdooPOSService.get_order(oid)
+                        return {"operation": operation, "success": rec is not None, "data": rec or {"error": "not_found"}}
+                    # Fallback unified connector for online orders if available
+                    if operation == "get_online_orders" and OdooUnifiedConnector:
+                        conn = OdooUnifiedConnector.from_env()
+                        if conn and conn.available():
+                            from datetime import datetime, timedelta
+                            end = datetime.utcnow()
+                            start = end - timedelta(days=int(payload.get("days", 30)))
+                            recs = await conn.get_online_orders_by_date_range(start, end)
+                            return {"operation": operation, "success": True, "data": recs}
+                        return {"operation": operation, "success": False, "error": "odoo_connector_not_configured"}
                     return {"operation": operation, "success": False, "error": "unsupported_operation"}
                 except Exception as e:
                     return {"operation": operation, "success": False, "error": str(e)}
@@ -469,7 +524,11 @@ class SIServiceRegistry:
                     "service_type": "odoo_business",
                     "operations": [
                         "get_crm_opportunities",
+                        "get_crm_opportunity",
+                        "create_crm_opportunity",
+                        "update_crm_opportunity",
                         "get_pos_orders",
+                        "get_pos_order",
                         "get_online_orders"
                     ]
                 }

@@ -151,6 +151,13 @@ SI Dashboard → Navigation Menu → FIRS Invoice Generator → API Integration 
 - ✅ Navigation properly integrated
 - ✅ API endpoints correctly registered
 
+### **Database Migrations (Prod/Staging)**
+- ✅ Run DB migrations as a CI/CD pre-deploy step:
+  - `cd platform/backend && ./scripts/migrate.sh` (requires `DATABASE_URL`)
+- ✅ Deploy app instances with `ALEMBIC_RUN_ON_STARTUP=false`
+- ✅ For dev/single-instance, keep `ALEMBIC_RUN_ON_STARTUP=true` to apply on startup (or run the script manually)
+- 🔧 Optional: point `ALEMBIC_MIGRATIONS_PATH` to a custom location if you move migrations
+
 ### **Deployment Command:**
 ```bash
 # All services are properly integrated and ready for deployment

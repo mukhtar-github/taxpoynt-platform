@@ -570,6 +570,30 @@ async def initialize_services():
             # Initialize basic messaging as fallback
             app.state.messaging = None
             logger.warning("⚠️  Operating with basic messaging functionality")
+
+        # Start periodic idempotency cleanup task
+        try:
+            from core_platform.idempotency.store import IdempotencyStore
+            from core_platform.data_management.db_async import get_async_session
+
+            cleanup_days = int(os.getenv("IDEMPOTENCY_CLEANUP_DAYS", "7"))
+            interval_seconds = int(os.getenv("IDEMPOTENCY_CLEANUP_INTERVAL_SECONDS", "86400"))  # daily
+
+            async def _idem_cleanup_loop():
+                while True:
+                    try:
+                        async for db in get_async_session():
+                            deleted = await IdempotencyStore.cleanup(db, older_than_days=cleanup_days)
+                            if deleted:
+                                logger.info(f"🧹 Idempotency cleanup removed {deleted} rows older than {cleanup_days} days")
+                    except Exception as ce:
+                        logger.warning(f"Idempotency cleanup failed: {ce}")
+                    await asyncio.sleep(interval_seconds)
+
+            app.state.idem_cleanup_task = asyncio.create_task(_idem_cleanup_loop())
+            logger.info("🧹 Scheduled idempotency cleanup task")
+        except Exception as tce:
+            logger.warning(f"Could not schedule idempotency cleanup task: {tce}")
         
         # Initialize Phase 4 Production Observability
         logger.info("📊 Initializing Phase 4 Production Observability...")
@@ -900,6 +924,13 @@ async def startup_event():
 async def shutdown_event():
     """Application shutdown"""
     logger.info("👋 TaxPoynt Platform Backend shutting down...")
+    # Cancel idempotency cleanup task
+    try:
+        task = getattr(app.state, 'idem_cleanup_task', None)
+        if task:
+            task.cancel()
+    except Exception:
+        pass
     await cleanup_services()
 
 # FIRS endpoints are now handled by the API Gateway APP router

@@ -130,7 +130,9 @@ class DatabaseInitializer:
         """Initialize database schema (migrations or dev create_all)."""
         try:
             is_postgres = "postgresql" in (self.database_url or "").lower() or "postgres://" in (self.database_url or "").lower()
-            enable_alembic = os.getenv("ALEMBIC_RUN_ON_STARTUP", "true").lower() == "true"
+            # Default behavior: disable auto-run in production/staging unless explicitly enabled
+            default_flag = "false" if str(self.environment).lower() in ("production", "staging") else "true"
+            enable_alembic = os.getenv("ALEMBIC_RUN_ON_STARTUP", default_flag).lower() == "true"
             allow_create_all = os.getenv("ALLOW_CREATE_ALL", "false").lower() == "true"
 
             if is_postgres and enable_alembic:

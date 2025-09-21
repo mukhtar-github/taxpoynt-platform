@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 import odoorpc
+from si_services.utils.retry import retry_sync
 
 from app.services.firs_si.odoo_connector import OdooConnector, OdooConnectionError, OdooAuthenticationError, OdooDataError
 from app.schemas.integration import OdooAuthMethod, OdooConnectionTestRequest, OdooConfig, IntegrationTestResult
@@ -18,6 +19,7 @@ from app.schemas.integration import OdooAuthMethod, OdooConnectionTestRequest, O
 logger = logging.getLogger(__name__)
 
 
+@retry_sync(max_attempts=3, base_delay=0.5, max_delay=3.0, retry_on=(OdooConnectionError,))
 def test_odoo_connection(connection_params: Union[OdooConnectionTestRequest, OdooConfig]) -> IntegrationTestResult:
     """
     Test connection to an Odoo server using the OdooConnector.
@@ -173,6 +175,7 @@ def _create_error_response(page: int, page_size: int, error_data: Dict[str, Any]
     }
 
 
+@retry_sync(max_attempts=3, base_delay=0.5, max_delay=3.0, retry_on=(OdooConnectionError,))
 def fetch_odoo_invoices(
     config: OdooConfig,
     from_date: Optional[datetime] = None,

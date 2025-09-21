@@ -35,6 +35,7 @@ from external_integrations.financial_systems.banking.open_banking.providers.mono
     MonoConnectionError,
     MonoValidationError
 )
+from si_services.utils.retry import retry_async
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ class MonoIntegrationService:
             await self.mono_connector.__aenter__()
         return self.mono_connector
     
+    @retry_async(max_attempts=3, base_delay=0.5, max_delay=3.0, retry_on=(MonoConnectionError, TimeoutError, ConnectionError))
     async def create_mono_widget_link(self, si_id: str, widget_config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create Mono widget link for account linking.
@@ -143,6 +145,7 @@ class MonoIntegrationService:
             logger.error(f"Unexpected error creating Mono widget link for SI {si_id}: {str(e)}", exc_info=True)
             raise RuntimeError(f"Widget link creation failed: {str(e)}")
     
+    @retry_async(max_attempts=3, base_delay=0.5, max_delay=3.0, retry_on=(MonoConnectionError, TimeoutError, ConnectionError))
     async def process_mono_callback(self, si_id: str, callback_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process Mono banking callback after user completes account linking.
@@ -305,6 +308,7 @@ class MonoIntegrationService:
             logger.error(f"Error creating connection for SI {si_id}: {str(e)}")
             raise RuntimeError(f"Failed to create connection: {str(e)}")
     
+    @retry_async(max_attempts=3, base_delay=0.5, max_delay=3.0, retry_on=(MonoConnectionError, TimeoutError, ConnectionError))
     async def get_banking_accounts(self, si_id: str, filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Get banking accounts for a System Integrator.
@@ -331,6 +335,7 @@ class MonoIntegrationService:
             logger.error(f"Error getting accounts for SI {si_id}: {str(e)}")
             raise RuntimeError(f"Failed to get accounts: {str(e)}")
     
+    @retry_async(max_attempts=3, base_delay=0.5, max_delay=3.0, retry_on=(MonoConnectionError, TimeoutError, ConnectionError))
     async def get_banking_transactions(self, si_id: str, filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Get banking transactions for a System Integrator.
@@ -357,6 +362,7 @@ class MonoIntegrationService:
             logger.error(f"Error getting transactions for SI {si_id}: {str(e)}")
             raise RuntimeError(f"Failed to get transactions: {str(e)}")
     
+    @retry_async(max_attempts=2, base_delay=0.5, max_delay=2.0, retry_on=(MonoConnectionError, TimeoutError, ConnectionError))
     async def test_banking_connection(self, si_id: str, connection_id: str) -> Dict[str, Any]:
         """
         Test banking connection.

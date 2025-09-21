@@ -37,6 +37,9 @@ from core_platform.data_management.repositories.banking_repo_async import (
 )
 
 from .mono_integration_service import MonoIntegrationService
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models import AuditEventType
+from si_services.utils.audit import record_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +208,20 @@ class SIBankingService:
                 metadata=connection_data.get("connection_config", {}),
             )
             await db.commit()
+            try:
+                await record_audit_event(
+                    db,
+                    event_type=AuditEventType.INTEGRATION_CHANGE,
+                    description="open_banking_connection_created",
+                    user_id=None,
+                    organization_id=created.get("organization_id") if isinstance(created, dict) else None,
+                    target_type="banking_connection",
+                    target_id=str(created.get("id")) if isinstance(created, dict) and created.get("id") else created.get("provider_connection_id", "unknown") if isinstance(created, dict) else "unknown",
+                    new_values={"provider": created.get("provider")} if isinstance(created, dict) else {},
+                    correlation_id=payload.get("correlation_id"),
+                )
+            except Exception:
+                pass
             return {
                 "operation": "create_open_banking_connection",
                 "success": True,
@@ -236,6 +253,20 @@ class SIBankingService:
         async for db in get_async_session():
             updated = await update_banking_connection(db, connection_id, updates)
             await db.commit()
+            try:
+                await record_audit_event(
+                    db,
+                    event_type=AuditEventType.INTEGRATION_CHANGE,
+                    description="open_banking_connection_updated",
+                    user_id=None,
+                    organization_id=updated.get("organization_id") if isinstance(updated, dict) else None,
+                    target_type="banking_connection",
+                    target_id=str(connection_id),
+                    new_values=updates,
+                    correlation_id=payload.get("correlation_id"),
+                )
+            except Exception:
+                pass
             return {
                 "operation": "update_open_banking_connection",
                 "success": updated is not None,
@@ -251,6 +282,19 @@ class SIBankingService:
         async for db in get_async_session():
             await delete_banking_connection(db, connection_id)
             await db.commit()
+            try:
+                await record_audit_event(
+                    db,
+                    event_type=AuditEventType.INTEGRATION_CHANGE,
+                    description="open_banking_connection_deleted",
+                    user_id=None,
+                    organization_id=None,
+                    target_type="banking_connection",
+                    target_id=str(connection_id),
+                    correlation_id=payload.get("correlation_id"),
+                )
+            except Exception:
+                pass
             return {
                 "operation": "delete_open_banking_connection",
                 "success": True,

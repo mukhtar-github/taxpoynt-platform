@@ -12,6 +12,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_platform.data_management.db_async import get_async_session
+from core_platform.idempotency.store import IdempotencyStore
 from si_services.integration_management.integration_status_service_legacy import (
     IntegrationStatusService,
 )
@@ -308,10 +309,26 @@ class SIRouterV1:
             logger.error(f"Error getting organization {org_id} in v1: {e}")
             raise HTTPException(status_code=404, detail="Organization not found")
     
-    async def create_organization(self, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def create_organization(self, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(_require_si_role)):
         """Create new organization under SI management"""
         try:
             body = await request.json()
+            # Idempotency
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "organization_created", status_code=stored_code or 201)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="create_organization",
@@ -321,16 +338,40 @@ class SIRouterV1:
                     "api_version": "v1"
                 }
             )
-            
+            # Save idempotent result
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=201,
+                )
             return self._create_v1_response(result, "organization_created", status_code=201)
         except Exception as e:
             logger.error(f"Error creating organization in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to create organization")
     
-    async def update_organization(self, org_id: str, request: Request, context: HTTPRoutingContext = Depends(_require_si_role)):
+    async def update_organization(self, org_id: str, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(_require_si_role)):
         """Update organization information"""
         try:
             body = await request.json()
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                composite = {"org_id": org_id, "updates": body}
+                req_hash = IdempotencyStore.compute_request_hash(composite)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "organization_updated", status_code=stored_code or 200)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="update_organization",
@@ -341,7 +382,14 @@ class SIRouterV1:
                     "api_version": "v1"
                 }
             )
-            
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "organization_updated")
         except Exception as e:
             logger.error(f"Error updating organization {org_id} in v1: {e}")

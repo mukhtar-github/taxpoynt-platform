@@ -19,6 +19,9 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from core_platform.data_management.db_async import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.idempotency.store import IdempotencyStore
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +185,7 @@ class OnboardingEndpointsV1:
 
     async def update_onboarding_state(self,
                                       request: Request,
+                                      db: AsyncSession = Depends(get_async_session),
                                       context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Update onboarding state with new progress"""
         try:
@@ -199,6 +203,23 @@ class OnboardingEndpointsV1:
                     detail=f"Missing required fields: {', '.join(missing_fields)}"
                 )
             
+            # Idempotency
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "onboarding_state_updated", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="update_onboarding_state",
@@ -208,7 +229,14 @@ class OnboardingEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "onboarding_state_updated")
         except HTTPException:
             raise
@@ -219,11 +247,29 @@ class OnboardingEndpointsV1:
     async def complete_onboarding_step(self,
                                        step_name: str,
                                        request: Request,
+                                       db: AsyncSession = Depends(get_async_session),
                                        context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Mark a specific onboarding step as complete"""
         try:
             body = await request.json() if hasattr(request, 'json') else {}
             
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                composite = {"step_name": step_name, "metadata": body.get("metadata", {})}
+                req_hash = IdempotencyStore.compute_request_hash(composite)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "onboarding_step_completed", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="complete_onboarding_step",
@@ -234,7 +280,14 @@ class OnboardingEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "onboarding_step_completed")
         except HTTPException:
             raise
@@ -244,11 +297,28 @@ class OnboardingEndpointsV1:
 
     async def complete_onboarding(self,
                                   request: Request,
+                                  db: AsyncSession = Depends(get_async_session),
                                   context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Mark entire onboarding as complete"""
         try:
             body = await request.json() if hasattr(request, 'json') else {}
             
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "onboarding_completed", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="complete_onboarding",
@@ -258,7 +328,14 @@ class OnboardingEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "onboarding_completed")
         except HTTPException:
             raise
@@ -266,12 +343,30 @@ class OnboardingEndpointsV1:
             logger.error(f"Error completing onboarding in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to complete onboarding")
 
-    async def reset_onboarding_state(self, context: HTTPRoutingContext = Depends(self._require_si_role)):
+    async def reset_onboarding_state(self, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(self._require_si_role)):
         """Reset onboarding state (admin/testing only)"""
         try:
             self.endpoint_stats["reset_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
+            # Optional idempotency for destructive reset
+            # A reset with the same key will be a no-op replay
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash({"action": "reset_onboarding_state"})
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    method="DELETE",
+                    endpoint="/onboarding/state/reset",
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "onboarding_state_reset", status_code=stored_code or 200)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.SYSTEM_INTEGRATOR,
                 operation="reset_onboarding_state",
@@ -280,7 +375,14 @@ class OnboardingEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=str(context.user_id) if context and context.user_id else None,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
             return self._create_v1_response(result, "onboarding_state_reset")
         except HTTPException:
             raise

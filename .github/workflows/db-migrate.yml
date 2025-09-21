@@ -1,0 +1,42 @@
+name: Database Migrate (Pre-Deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (production/staging)"
+        required: true
+        default: "staging"
+
+jobs:
+  migrate:
+    name: Alembic Upgrade Head
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment }}
+      ALEMBIC_RUN_ON_STARTUP: "false"
+      # Provide DATABASE_URL via GitHub Secrets or environment protection rules
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            platform/backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r platform/backend/requirements.txt
+
+      - name: Run migrations (upgrade head)
+        working-directory: platform/backend
+        run: |
+          ./scripts/migrate.sh
+
