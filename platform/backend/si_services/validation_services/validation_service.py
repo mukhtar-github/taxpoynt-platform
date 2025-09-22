@@ -57,7 +57,10 @@ class SIValidationService:
                     if getattr(row, "is_deleted", False):
                         compliant = False
                         reasons.append("organization_deleted")
-                    if getattr(row, "status", None) != OrganizationStatus.ACTIVE:
+                    status_attr = getattr(row, "status", None)
+                    status_value = getattr(status_attr, "value", status_attr)
+                    status_value_normalized = (str(status_value or "")).lower()
+                    if status_value_normalized != OrganizationStatus.ACTIVE.value:
                         compliant = False
                         reasons.append("organization_not_active")
                     tin_present = bool(getattr(row, "tin", None))

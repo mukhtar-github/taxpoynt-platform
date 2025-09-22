@@ -84,8 +84,26 @@ class SIReportingService:
 
                     rows = (await db.execute(stmt)).scalars().all()
                     summary["total"] = len(rows)
-                    summary["compliant"] = sum(1 for r in rows if r.status in [SubmissionStatus.ACCEPTED, SubmissionStatus.SUBMITTED])
-                    summary["non_compliant"] = sum(1 for r in rows if r.status in [SubmissionStatus.REJECTED, SubmissionStatus.FAILED])
+
+                    def _status_value(status_obj: Any) -> str:
+                        value = getattr(status_obj, "value", status_obj)
+                        return str(value).lower() if value is not None else "unknown"
+
+                    compliant_values = {
+                        SubmissionStatus.ACCEPTED.value.lower(),
+                        SubmissionStatus.SUBMITTED.value.lower(),
+                    }
+                    non_compliant_values = {
+                        SubmissionStatus.REJECTED.value.lower(),
+                        SubmissionStatus.FAILED.value.lower(),
+                    }
+
+                    for submission in rows:
+                        status_val = _status_value(getattr(submission, "status", None))
+                        if status_val in compliant_values:
+                            summary["compliant"] += 1
+                        elif status_val in non_compliant_values:
+                            summary["non_compliant"] += 1
                     # Derive common error messages if any
                     errors = {}
                     for r in rows:
@@ -106,7 +124,7 @@ class SIReportingService:
                                 day = d.date().isoformat()
                                 daily_counts[day] = daily_counts.get(day, 0) + 1
                             st = getattr(r, "status", None)
-                            key = st.value if st else "unknown"
+                            key = _status_value(st)
                             status_histogram[key] = status_histogram.get(key, 0) + 1
                             inv_t = getattr(r, "invoice_type", None)
                             inv_key = inv_t.value if getattr(inv_t, "value", None) else (inv_t or "unknown")

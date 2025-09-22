@@ -15,10 +15,15 @@ import io
 import base64
 from collections import defaultdict, Counter
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from matplotlib.backends.backend_agg import FigureCanvasAgg
+try:
+    import matplotlib.pyplot as plt  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    plt = None  # type: ignore
+
+try:
+    import seaborn as sns  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    sns = None  # type: ignore
 
 
 class ReportFormat(str, Enum):
@@ -430,9 +435,13 @@ class TransmissionReportGenerator:
         """Generate charts for the report"""
         charts = {}
         
+        if plt is None:
+            self.logger.debug("Matplotlib not available; skipping chart generation")
+            return charts
+        
         try:
-            # Set style
-            plt.style.use('seaborn-v0_8')
+            if sns is not None:
+                plt.style.use('seaborn-v0_8')
             
             # Status distribution chart
             if summary.status_breakdown:
