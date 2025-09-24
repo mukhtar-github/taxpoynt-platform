@@ -179,6 +179,7 @@ class MessageQueue:
         self.consumers: Dict[str, Callable] = {}
         self.active_workers: Set[str] = set()
         self.worker_tasks: Set[asyncio.Task] = set()
+        self.background_tasks: Set[asyncio.Task] = set()
         
         # Batch processing
         self.batch_buffer: List[QueuedMessage] = []
@@ -214,30 +215,44 @@ class MessageQueue:
             task = asyncio.create_task(self._worker_loop(worker_id))
             self.worker_tasks.add(task)
             task.add_done_callback(self.worker_tasks.discard)
-        
-        # Start maintenance tasks
-        asyncio.create_task(self._maintenance_loop())
-        asyncio.create_task(self._batch_processor_loop())
-        asyncio.create_task(self._metrics_loop())
+
+        # Start maintenance tasks and track them so shutdown can cancel promptly
+        self._start_background_task(self._maintenance_loop())
+        self._start_background_task(self._batch_processor_loop())
+        self._start_background_task(self._metrics_loop())
         
         self.logger.info(f"Queue started: {self.queue_name}")
     
+    def _start_background_task(self, coro: Any) -> None:
+        """Create and track a background task."""
+        task = asyncio.create_task(coro)
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
+
     async def stop(self):
         """Stop queue processing"""
         if not self.is_running:
             return
-        
+
         self.logger.info(f"Stopping queue: {self.queue_name}")
         self.is_running = False
         
         # Cancel worker tasks
-        for task in self.worker_tasks:
+        for task in list(self.worker_tasks):
             task.cancel()
-        
+
         # Wait for workers to finish
         if self.worker_tasks:
             await asyncio.gather(*self.worker_tasks, return_exceptions=True)
-        
+        self.worker_tasks.clear()
+
+        # Cancel background tasks (maintenance/metrics loops) so tests don't wait on sleeps
+        for task in list(self.background_tasks):
+            task.cancel()
+        if self.background_tasks:
+            await asyncio.gather(*self.background_tasks, return_exceptions=True)
+        self.background_tasks.clear()
+
         # Persist remaining messages
         if self.config.enable_persistence:
             await self._persist_messages()
@@ -508,6 +523,9 @@ class MessageQueue:
                     if message:
                         # Process message
                         await self._process_message(message, worker_id)
+                    else:
+                        # Yield control so priority queues don't busy-spin when idle
+                        await asyncio.sleep(0.05)
                     
                 except Exception as e:
                     self.logger.error(f"Error in worker {worker_id}: {str(e)}")
@@ -748,6 +766,24 @@ class MessageQueue:
                 
                 self.metrics.last_updated = datetime.now(timezone.utc)
                 self.metrics.current_queue_size = len(self.message_registry)
+                # Push Prometheus gauges for ap_outbound queue
+                try:
+                    if self.queue_name == "ap_outbound":
+                        from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                        prom = get_prometheus_integration()
+                        if prom:
+                            prom.record_metric("taxpoynt_ap_outbound_current_queue_size", float(self.metrics.current_queue_size), {"queue": "ap_outbound"})
+                            # Oldest message age seconds
+                            oldest_ts = None
+                            for m in self.message_registry.values():
+                                ts = getattr(m, 'scheduled_time', None) or getattr(m, 'created_time', None)
+                                if ts and (oldest_ts is None or ts < oldest_ts):
+                                    oldest_ts = ts
+                            if oldest_ts:
+                                age = max(0.0, (datetime.now(timezone.utc) - oldest_ts).total_seconds())
+                                prom.record_metric("taxpoynt_ap_outbound_oldest_message_age_seconds", float(age))
+                except Exception:
+                    pass
                 
             except Exception as e:
                 self.logger.error(f"Error updating metrics: {str(e)}")
@@ -858,6 +894,18 @@ class QueueManager:
         self.is_initialized = False
         # Retry policy registry (overrides per queue)
         self.retry_policies: Dict[str, Dict[str, Any]] = {}
+        # Manager-level background tasks (e.g., metrics loop)
+        self._running: bool = False
+        self._manager_tasks: Set[asyncio.Task] = set()
+
+    def _start_background_task(self, coro: Any) -> None:
+        """Create and track a background task for the manager."""
+        try:
+            task = asyncio.create_task(coro)
+            self._manager_tasks.add(task)
+            task.add_done_callback(self._manager_tasks.discard)
+        except Exception as e:
+            self.logger.warning(f"Failed to start background task: {e}")
 
     def register_retry_policy(self, queue_name: str, *, max_retries: Optional[int] = None, retry_delays: Optional[List[float]] = None) -> None:
         """Register or update a per-queue retry policy.
@@ -893,6 +941,9 @@ class QueueManager:
         
         # Set up default queues
         await self._setup_default_queues()
+        # Start manager-level metrics loop (DLQ gauge, backup gauges)
+        self._running = True
+        self._start_background_task(self._manager_metrics_loop())
         
         self.is_initialized = True
         self.logger.info("Queue Manager initialized")
@@ -1069,6 +1120,18 @@ class QueueManager:
                 max_retries=8,
                 dead_letter_queue="dead_letter",
             ),
+            # Four-corner outbound delivery (store-and-forward)
+            QueueConfiguration(
+                queue_name="ap_outbound",
+                queue_type=QueueType.FIFO,
+                max_workers=4,
+                strategy=QueueStrategy.ROUND_ROBIN,
+                message_ttl=timedelta(hours=12),
+                retry_delays=[5.0, 30.0, 120.0, 600.0, 1800.0],
+                max_retries=6,
+                dead_letter_queue="dead_letter",
+                enable_persistence=True,
+            ),
         ]
 
         for config in default_queues:
@@ -1123,6 +1186,13 @@ class QueueManager:
     async def shutdown(self):
         """Shutdown all queues"""
         self.logger.info("Shutting down Queue Manager")
+        # Stop manager loops first
+        self._running = False
+        for task in list(self._manager_tasks):
+            task.cancel()
+        if self._manager_tasks:
+            await asyncio.gather(*self._manager_tasks, return_exceptions=True)
+        self._manager_tasks.clear()
         
         shutdown_tasks = []
         for queue in self.queues.values():
@@ -1135,6 +1205,32 @@ class QueueManager:
         self.queue_configs.clear()
         
         self.logger.info("Queue Manager shutdown complete")
+
+    async def _manager_metrics_loop(self):
+        """Periodically publish DLQ and outbound gauges to Prometheus independent of status polling."""
+        while self._running:
+            try:
+                await asyncio.sleep(30)
+                try:
+                    from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                    prom = get_prometheus_integration()
+                    if not prom:
+                        continue
+                    # Dead-letter queue size
+                    dlq = self.queues.get("dead_letter")
+                    if dlq:
+                        dlq_size = int(dlq.get_metrics().current_queue_size)
+                        prom.record_metric("taxpoynt_ap_outbound_dead_letter_count", float(dlq_size), {"queue": "dead_letter"})
+                    # Also record ap_outbound size as a backup source of truth
+                    ap = self.queues.get("ap_outbound")
+                    if ap:
+                        ap_size = int(ap.get_metrics().current_queue_size)
+                        prom.record_metric("taxpoynt_ap_outbound_current_queue_size", float(ap_size), {"queue": "ap_outbound"})
+                except Exception:
+                    # Soft-fail metrics
+                    pass
+            except Exception as e:
+                self.logger.error(f"Error in manager metrics loop: {str(e)}")
 
 
 # Global queue manager instance

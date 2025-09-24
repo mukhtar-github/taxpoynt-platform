@@ -1,0 +1,60 @@
+{
+  "id": 12345,
+  "name": "INV-TEST-2025-001",
+  "invoice_date": "2025-05-21",
+  "invoice_date_due": "2025-06-20",
+  "narration": "Test invoice for FIRS submission",
+  "invoice_type_code": "380",
+  "currency_id": {
+    "id": 1,
+    "name": "NGN",
+    "symbol": "₦"
+  },
+  "partner_id": {
+    "id": 101,
+    "name": "Test Customer Ltd",
+    "vat": "0987654321",
+    "street": "123 Customer Road",
+    "city": "Lagos",
+    "country_id": {
+      "id": 1,
+      "name": "Nigeria",
+      "code": "NG"
+    }
+  },
+  "company_id": {
+    "id": 1,
+    "name": "Test Supplier Ltd",
+    "vat": "1234567890",
+    "street": "456 Supplier Avenue",
+    "city": "Abuja",
+    "country_id": {
+      "id": 1,
+      "name": "Nigeria",
+      "code": "NG"
+    }
+  },
+  "invoice_line_ids": [
+    {
+      "id": 1001,
+      "name": "Test Product",
+      "quantity": 2,
+      "price_unit": 100.0,
+      "tax_ids": [
+        {
+          "id": 1,
+          "name": "VAT 7.5%",
+          "amount": 7.5
+        }
+      ],
+      "price_subtotal": 200.0,
+      "price_total": 215.0
+    }
+  ],
+  "amount_untaxed": 200.0,
+  "amount_tax": 15.0,
+  "amount_total": 215.0,
+  "payment_reference": "REF-12345",
+  "payment_state": "not_paid"
+}
+

@@ -20,7 +20,7 @@ import asyncio
 import os
 from datetime import datetime, timezone
 from dataclasses import asdict
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
@@ -36,19 +36,19 @@ from .firs_communication.authentication_handler import FIRSAuthenticationHandler
 from .validation.firs_validator import FIRSValidator
 from .validation.submission_validator import SubmissionValidator
 from .validation.format_validator import FormatValidator
-from .transmission.secure_transmitter import SecureTransmitter
-from .transmission.batch_transmitter import BatchTransmitter
-from .transmission.delivery_tracker import DeliveryTracker
 from .transmission.transmission_service import TransmissionService
+from .reporting.transmission_reports import TransmissionReportGenerator
 from .security_compliance.encryption_service import EncryptionService
 from .security_compliance.audit_logger import AuditLogger
 from .authentication_seals.seal_generator import SealGenerator
 from .authentication_seals.verification_service import VerificationService
-from si_services.certificate_management.certificate_store import CertificateStore
-from .reporting.transmission_reports import TransmissionReportGenerator
 from .reporting.compliance_metrics import ComplianceMetricsMonitor
 from .taxpayer_management.taxpayer_onboarding import TaxpayerOnboardingService
 from .onboarding_management.app_onboarding_service import APPOnboardingService
+
+if TYPE_CHECKING:
+    # Type-only import to avoid pulling SI modules at import time
+    from si_services.certificate_management.certificate_store import CertificateStore  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
@@ -79,13 +79,21 @@ class APPServiceRegistry:
         """
         try:
             logger.info("Initializing APP services...")
-            
+            # Minimal init path for tests or lightweight runs
+            minimal_mode = str(os.getenv("APP_INIT_MINIMAL", "false")).lower() in ("1", "true", "yes", "on")
+            if minimal_mode:
+                await self._register_network_services()
+                self.is_initialized = True
+                logger.info("APP services initialized in minimal mode (network only)")
+                return self.service_endpoints
+
             # Initialize core APP services
             await self._register_firs_services()
             await self._register_webhook_services()
             await self._register_status_management_services()
             await self._register_validation_services()
             await self._register_transmission_services()
+            await self._register_network_services()
             await self._register_security_services()
             await self._register_authentication_services()
             await self._register_reporting_services()
@@ -101,6 +109,310 @@ class APPServiceRegistry:
         except Exception as e:
             logger.error(f"Failed to initialize APP services: {str(e)}", exc_info=True)
             raise RuntimeError(f"APP service initialization failed: {str(e)}")
+
+    async def _register_network_services(self):
+        """Register participant registry (four-corner) services."""
+        try:
+            network_service = {
+                "operations": [
+                    "register_participant",
+                    "update_participant",
+                    "list_participants",
+                    "get_participant",
+                    "resolve_participant",
+                ]
+            }
+
+            self.services["network_routing"] = network_service
+
+            endpoint_id = await self.message_router.register_service(
+                service_name="network_routing",
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                callback=self._create_network_callback(network_service),
+                priority=3,
+                tags=["network", "participants", "routing", "four_corner"],
+                metadata={
+                    "service_type": "network_routing",
+                    "operations": network_service["operations"],
+                },
+            )
+            self.service_endpoints["network_routing"] = endpoint_id
+            logger.info(f"Network routing service registered: {endpoint_id}")
+
+            # Register store-and-forward consumer for outbound deliveries
+            try:
+                from core_platform.messaging.queue_manager import get_queue_manager
+                qm = get_queue_manager()
+                await qm.initialize()
+                # Optional: override retry policy from environment for ap_outbound
+                try:
+                    delays_env = os.getenv("OUTBOUND_RETRY_DELAYS")
+                    max_retries_env = os.getenv("OUTBOUND_MAX_RETRIES")
+                    if delays_env or max_retries_env:
+                        delays = None
+                        if delays_env:
+                            delays = [float(x.strip()) for x in delays_env.split(",") if x.strip()]
+                        max_retries = int(max_retries_env) if max_retries_env else None
+                        qm.register_retry_policy("ap_outbound", max_retries=max_retries, retry_delays=delays)
+                        logger.info("Applied outbound retry policy overrides from environment")
+                except Exception as _e:
+                    logger.warning(f"Could not apply outbound retry policy overrides: {_e}")
+
+                async def _ap_outbound_consumer(message):
+                    try:
+                        payload = getattr(message, 'payload', {}) or {}
+                        endpoint_url = payload.get('endpoint_url') or payload.get('ap_endpoint_url')
+                        identifier = payload.get('identifier')
+                        # Resolve endpoint if not provided
+                        if not endpoint_url and identifier:
+                            import time
+                            from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                            prom = get_prometheus_integration()
+                            _r0 = time.perf_counter()
+                            try:
+                                res = await self.message_router.route_message(
+                                    service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                                    operation="resolve_participant",
+                                    payload={"identifier": identifier},
+                                )
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_resolve_attempts_total", 1, {"outcome": "success" if (isinstance(res, dict) and res.get('success')) else "failure"})
+                                    prom.record_metric("taxpoynt_ap_outbound_resolve_duration_seconds", float(max(0.0, time.perf_counter() - _r0)), {"outcome": "success" if (isinstance(res, dict) and res.get('success')) else "failure"})
+                            except Exception:
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_resolve_attempts_total", 1, {"outcome": "exception"})
+                                    prom.record_metric("taxpoynt_ap_outbound_resolve_duration_seconds", float(max(0.0, time.perf_counter() - _r0)), {"outcome": "exception"})
+                                res = None
+                            if isinstance(res, dict) and res.get('success'):
+                                endpoint_url = ((res.get('data') or {}).get('ap_endpoint_url'))
+                        if not endpoint_url:
+                            # No endpoint to deliver to – treat as client failure, ack to avoid retry, send to DLQ for visibility
+                            try:
+                                from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                                prom = get_prometheus_integration()
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_delivery_failure_total", 1, {"error_type": "resolve_failed", "status_code": "0"})
+                            except Exception:
+                                pass
+                            try:
+                                # Manually enqueue to dead_letter to avoid useless retries
+                                await qm.enqueue_message("dead_letter", {
+                                    "type": "ap_outbound_delivery",
+                                    "reason": "resolve_failed",
+                                    "endpoint_url": endpoint_url,
+                                    "identifier": identifier,
+                                    "original_payload": payload,
+                                })
+                            except Exception:
+                                pass
+                            return True
+                        # Policy checks (allowed domain, TLS)
+                        try:
+                            from urllib.parse import urlparse
+                            from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                            prom = get_prometheus_integration()
+                            u = urlparse(endpoint_url)
+                            scheme = (u.scheme or '').lower()
+                            host = (u.hostname or '').lower()
+                            allow_http = str(os.getenv("OUTBOUND_ALLOW_HTTP", "false")).lower() in ("1", "true", "yes", "on")
+                            allowed_env = os.getenv("OUTBOUND_ALLOWED_DOMAINS", "")
+                            allowed = [d.strip().lower() for d in allowed_env.split(',') if d.strip()]
+                            violation = None
+                            if scheme != 'https' and not allow_http:
+                                violation = 'insecure_scheme'
+                            if not violation and allowed:
+                                # Match exact or subdomain suffix
+                                ok = any(host == d or host.endswith('.' + d) for d in allowed)
+                                if not ok:
+                                    violation = 'domain_not_allowed'
+                            if violation:
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_delivery_failure_total", 1, {"error_type": "policy_violation", "status_code": "0"})
+                                try:
+                                    await qm.enqueue_message("dead_letter", {
+                                        "type": "ap_outbound_delivery",
+                                        "reason": violation,
+                                        "endpoint_url": endpoint_url,
+                                        "identifier": identifier,
+                                        "original_payload": payload,
+                                    })
+                                except Exception:
+                                    pass
+                                return True
+                        except Exception:
+                            pass
+                        # Deliver via HTTP POST
+                        try:
+                            import aiohttp
+                            from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                            import time, json
+                            timeout = aiohttp.ClientTimeout(total=15)
+                            async with aiohttp.ClientSession(timeout=timeout) as session:
+                                prom = get_prometheus_integration()
+                                # Count attempt only when actually performing POST
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_delivery_attempts_total", 1)
+                                    # Body size histogram (best-effort)
+                                    try:
+                                        body = payload.get('document') or payload
+                                        size_bytes = 0
+                                        try:
+                                            size_bytes = len(json.dumps(body).encode('utf-8'))
+                                        except Exception:
+                                            size_bytes = len(str(body).encode('utf-8'))
+                                        prom.record_metric("taxpoynt_ap_outbound_delivery_body_bytes", float(size_bytes))
+                                    except Exception:
+                                        pass
+                                _t0 = time.perf_counter()
+                                async with session.post(endpoint_url, json=payload.get('document') or payload) as resp:
+                                    status = resp.status
+                                    duration = max(0.0, time.perf_counter() - _t0)
+                                    if prom:
+                                        prom.record_metric("taxpoynt_ap_outbound_delivery_duration_seconds", float(duration), {"status_code": str(status)})
+                                    if 200 <= status < 300:
+                                        if prom:
+                                            prom.record_metric("taxpoynt_ap_outbound_delivery_success_total", 1, {"status_code": str(status)})
+                                        return True
+                                    # 4xx: ack and optionally move to DLQ to avoid retries
+                                    if 400 <= status < 500:
+                                        if prom:
+                                            prom.record_metric("taxpoynt_ap_outbound_delivery_failure_total", 1, {"error_type": "client_error", "status_code": str(status)})
+                                        try:
+                                            await qm.enqueue_message("dead_letter", {
+                                                "type": "ap_outbound_delivery",
+                                                "reason": "client_error",
+                                                "http_status": status,
+                                                "endpoint_url": endpoint_url,
+                                                "identifier": identifier,
+                                                "original_message_id": getattr(message, 'message_id', None),
+                                                "original_payload": payload,
+                                            })
+                                        except Exception:
+                                            pass
+                                        return True
+                                    # 5xx: nack (retry)
+                                    if prom:
+                                        prom.record_metric("taxpoynt_ap_outbound_delivery_failure_total", 1, {"error_type": "server_error", "status_code": str(status)})
+                                    return False
+                        except Exception:
+                            try:
+                                from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                                import time
+                                prom = get_prometheus_integration()
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_delivery_failure_total", 1, {"error_type": "timeout_or_exception", "status_code": "0"})
+                                    # Record a duration for the failed attempt if we can approximate
+                                    try:
+                                        # If _t0 exists in scope, we record elapsed; otherwise skip
+                                        if '_t0' in locals():
+                                            prom.record_metric("taxpoynt_ap_outbound_delivery_duration_seconds", float(max(0.0, time.perf_counter() - _t0)), {"status_code": "0"})
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        return False
+
+                await qm.register_consumer("ap_outbound", "ap_outbound_worker", _ap_outbound_consumer)
+                logger.info("AP outbound consumer registered for store-and-forward routing")
+            except Exception as ce:
+                logger.warning(f"Could not register AP outbound consumer: {ce}")
+        except Exception as e:
+            logger.error(f"Failed to register network services: {str(e)}")
+
+    def _create_network_callback(self, _svc):
+        """Create callback for participant registry operations."""
+        async def network_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                from core_platform.data_management.db_async import get_async_session
+                from core_platform.data_management.repositories import participant_repo_async as repo  # type: ignore
+                from core_platform.data_management.models.network import Participant
+                from sqlalchemy import select
+
+                def _serialize(p: Participant) -> Dict[str, Any]:
+                    return {
+                        "id": str(getattr(p, "id", None)),
+                        "organization_id": str(getattr(p, "organization_id", "")) if getattr(p, "organization_id", None) else None,
+                        "identifier": getattr(p, "identifier", None),
+                        "role": getattr(p, "role", None).value if getattr(p, "role", None) else None,
+                        "status": getattr(p, "status", None).value if getattr(p, "status", None) else None,
+                        "ap_endpoint_url": getattr(p, "ap_endpoint_url", None),
+                        "preferred_protocol": getattr(p, "preferred_protocol", None).value if getattr(p, "preferred_protocol", None) else None,
+                        "last_seen_at": getattr(p, "last_seen_at", None).isoformat() if getattr(p, "last_seen_at", None) else None,
+                        "metadata": getattr(p, "metadata_json", {}) or {},
+                    }
+
+                if operation == "register_participant":
+                    data = payload.get("participant") or payload
+                    async for session in get_async_session():
+                        row = await repo.create_participant(
+                            session,
+                            identifier=data.get("identifier"),
+                            role=data.get("role"),
+                            ap_endpoint_url=data.get("ap_endpoint_url"),
+                            preferred_protocol=data.get("preferred_protocol", "http"),
+                            organization_id=data.get("organization_id"),
+                            public_key=data.get("public_key"),
+                            certificate_pem=data.get("certificate_pem"),
+                            metadata=data.get("metadata"),
+                        )
+                        return {"operation": operation, "success": True, "data": {"participant": _serialize(row)}}
+
+                if operation == "list_participants":
+                    limit = int(payload.get("limit", 50))
+                    page = int(payload.get("page", 1))
+                    offset = max(page - 1, 0) * limit
+                    async for session in get_async_session():
+                        rows = await repo.list_participants(
+                            session,
+                            limit=limit,
+                            offset=offset,
+                            status=payload.get("status"),
+                            role=payload.get("role"),
+                            organization_id=payload.get("organization_id"),
+                        )
+                        return {"operation": operation, "success": True, "data": {"participants": [_serialize(r) for r in rows], "page": page, "limit": limit}}
+
+                if operation == "get_participant":
+                    identifier = payload.get("identifier")
+                    participant_id = payload.get("participant_id")
+                    async for session in get_async_session():
+                        row = None
+                        if identifier:
+                            row = await repo.get_participant_by_identifier(session, identifier)
+                        elif participant_id:
+                            from core_platform.data_management.models.network import Participant
+                            row = (await session.execute(select(Participant).where(Participant.id == participant_id))).scalars().first()
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        return {"operation": operation, "success": True, "data": {"participant": _serialize(row)}}
+
+                if operation == "update_participant":
+                    participant_id = payload.get("participant_id")
+                    updates = payload.get("updates") or {}
+                    async for session in get_async_session():
+                        row = await repo.update_participant(session, participant_id, updates)
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        return {"operation": operation, "success": True, "data": {"participant": _serialize(row)}}
+
+                if operation == "resolve_participant":
+                    identifier = payload.get("identifier")
+                    if not identifier:
+                        return {"operation": operation, "success": False, "error": "missing_identifier"}
+                    async for session in get_async_session():
+                        row = await repo.get_participant_by_identifier(session, identifier)
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        data = _serialize(row)
+                        return {"operation": operation, "success": True, "data": {"identifier": identifier, "ap_endpoint_url": data["ap_endpoint_url"], "preferred_protocol": data["preferred_protocol"], "status": data["status"], "participant": data}}
+
+                return {"operation": operation, "success": False, "error": "unsupported_operation"}
+            except Exception as e:
+                return {"operation": operation, "success": False, "error": str(e)}
+
+        return network_callback
     
     async def _register_firs_services(self):
         """Register FIRS communication services"""
@@ -137,7 +449,13 @@ class APPServiceRegistry:
             except Exception:
                 logger.debug("FIRS auth handler start failed; continuing with placeholders")
 
-            certificate_store = CertificateStore()
+            # Lazy import to avoid SI module import at app import time
+            try:
+                from si_services.certificate_management.certificate_store import CertificateStore as _CertificateStore  # type: ignore
+                certificate_store = _CertificateStore()
+            except Exception:
+                certificate_store = None
+                logger.debug("Certificate store unavailable; continuing without it")
 
             firs_operations = [
                 "process_firs_webhook",
@@ -405,10 +723,7 @@ class APPServiceRegistry:
                 "transmit_real_time",
             ]
 
-            transmission_logic = TransmissionService(
-                message_router=self.message_router,
-                report_generator=TransmissionReportGenerator(),
-            )
+            transmission_logic = TransmissionService(self.message_router)
 
             transmission_service = {
                 "service": transmission_logic,
@@ -892,7 +1207,67 @@ class APPServiceRegistry:
                 if operation == "update_submission_status":
                     return {"operation": operation, "success": True, "data": {"updated": True}}
                 if operation in {"health_check", "get_app_status"}:
-                    return {"operation": operation, "success": True, "data": {"status": "healthy", "checked_at": datetime.now(timezone.utc).isoformat()}}
+                    # Enrich with queue stats (ap_outbound and dead_letter)
+                    status_payload: Dict[str, Any] = {"status": "healthy", "checked_at": datetime.now(timezone.utc).isoformat()}
+                    try:
+                        from core_platform.messaging.queue_manager import get_queue_manager
+                        qm = get_queue_manager()
+                        await qm.initialize()
+                        queues = await qm.get_all_queue_status()
+                        ap_out = queues.get("ap_outbound") or {}
+                        dlq = queues.get("dead_letter") or {}
+                        status_payload["queues"] = {
+                            "ap_outbound": ap_out,
+                            "dead_letter": dlq,
+                        }
+                        # Alerts: DLQ messages > 0 or large backlog on outbound
+                        alerts: List[str] = []
+                        try:
+                            ap_metrics = ap_out.get("metrics") or {}
+                            dlq_metrics = dlq.get("metrics") or {}
+                            if (dlq_metrics.get("current_queue_size") or 0) > 0:
+                                alerts.append("dead_letter_queue_non_empty")
+                            if (ap_metrics.get("current_queue_size") or 0) > 1000:
+                                alerts.append("ap_outbound_backlog_high")
+                            # Oldest message age alert
+                            try:
+                                from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                                prom = get_prometheus_integration()
+                                # Compute oldest age from queue object for accuracy
+                                q = getattr(qm, 'queues', {}).get('ap_outbound')
+                                oldest_age_sec = 0.0
+                                if q and getattr(q, 'message_registry', None):
+                                    from datetime import datetime, timezone
+                                    now = datetime.now(timezone.utc)
+                                    oldest_ts = None
+                                    for m in q.message_registry.values():
+                                        ts = getattr(m, 'scheduled_time', None) or getattr(m, 'created_time', None)
+                                        if ts and (oldest_ts is None or ts < oldest_ts):
+                                            oldest_ts = ts
+                                    if oldest_ts:
+                                        oldest_age_sec = max(0.0, (now - oldest_ts).total_seconds())
+                                # Record gauges
+                                if prom:
+                                    prom.record_metric("taxpoynt_ap_outbound_current_queue_size", float(ap_metrics.get("current_queue_size") or 0), {"queue": "ap_outbound"})
+                                    prom.record_metric("taxpoynt_ap_outbound_dead_letter_count", float(dlq_metrics.get("current_queue_size") or 0), {"queue": "dead_letter"})
+                                    prom.record_metric("taxpoynt_ap_outbound_oldest_message_age_seconds", float(oldest_age_sec))
+                                # Threshold alert
+                                import os
+                                max_age = float(os.getenv("AP_OUTBOUND_MAX_AGE_SECONDS", "0") or 0)
+                                if max_age and oldest_age_sec > max_age:
+                                    alerts.append("ap_outbound_message_age_exceeded")
+                                    status_payload["oldest_message_age_seconds"] = oldest_age_sec
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+                        if alerts:
+                            status_payload["alerts"] = alerts
+                            status_payload["status"] = "degraded"
+                    except Exception:
+                        # If queue manager not available, still return basic status
+                        pass
+                    return {"operation": operation, "success": True, "data": status_payload}
                 if operation == "get_dashboard_summary":
                     return {"operation": operation, "success": True, "data": {"summary": {}, "generated_at": datetime.now(timezone.utc).isoformat()}}
                 if operation == "get_app_configuration":
@@ -1079,21 +1454,122 @@ class APPServiceRegistry:
         """Create callback for taxpayer management operations"""
         async def taxpayer_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                from core_platform.data_management.db_async import get_async_session
+                from core_platform.data_management.models.business_systems import Taxpayer, TaxpayerStatus
+                from sqlalchemy import select
                 timestamp = datetime.now(timezone.utc).isoformat()
+
+                async def _serialize_taxpayer(t: Taxpayer) -> Dict[str, Any]:
+                    return {
+                        "id": str(getattr(t, "id", None)),
+                        "organization_id": str(getattr(t, "organization_id", "")),
+                        "tin": getattr(t, "tin", None),
+                        "business_name": getattr(t, "business_name", None),
+                        "registration_status": getattr(t, "registration_status", None).value if getattr(t, "registration_status", None) else None,
+                        "registration_date": getattr(t, "registration_date", None).isoformat() if getattr(t, "registration_date", None) else None,
+                        "sector": getattr(t, "sector", None),
+                        "vat_registered": bool(getattr(t, "vat_registered", False)),
+                        "compliance_level": getattr(t, "compliance_level", None),
+                        "metadata": getattr(t, "taxpayer_metadata", {}) or {},
+                        "last_updated_from_firs": getattr(t, "last_updated_from_firs", None).isoformat() if getattr(t, "last_updated_from_firs", None) else None,
+                    }
+
                 if operation == "onboard_taxpayer":
                     taxpayer_data = payload.get("taxpayer_data", {})
                     result = taxpayer_service["onboarding_service"].onboard_taxpayer(taxpayer_data)
                     return {"operation": operation, "success": True, "data": {"result": result}}
+
                 if operation == "create_taxpayer":
-                    return {"operation": operation, "success": True, "data": {"taxpayer_id": "taxpayer-demo", "created_at": timestamp}}
+                    data = payload.get("taxpayer_data") or {}
+                    org_id = data.get("organization_id") or payload.get("organization_id")
+                    tin = data.get("tax_id") or data.get("tin")
+                    name = data.get("name") or data.get("business_name")
+                    if not org_id or not tin or not name:
+                        return {"operation": operation, "success": False, "error": "missing_required_fields: organization_id,tax_id/name"}
+                    async for session in get_async_session():
+                        # Check duplicate by TIN
+                        exists = (await session.execute(select(Taxpayer).where(Taxpayer.tin == tin))).scalars().first()
+                        if exists:
+                            return {"operation": operation, "success": False, "error": "taxpayer_already_exists"}
+                        tp = Taxpayer(
+                            organization_id=org_id,
+                            tin=tin,
+                            business_name=name,
+                            registration_status=TaxpayerStatus.PENDING_REGISTRATION,
+                            business_type=data.get("business_type"),
+                            sector=data.get("sector"),
+                            business_address=(data.get("contact_info", {}) or {}).get("address"),
+                            contact_person=(data.get("contact_info", {}) or {}).get("person"),
+                            contact_email=(data.get("contact_info", {}) or {}).get("email"),
+                            contact_phone=(data.get("contact_info", {}) or {}).get("phone"),
+                            vat_registered=bool(data.get("vat_registered", False)),
+                            vat_number=data.get("vat_number"),
+                            taxpayer_metadata={"source": "api", **(data.get("metadata", {}) or {})},
+                        )
+                        session.add(tp)
+                        await session.commit()
+                        await session.refresh(tp)
+                        return {"operation": operation, "success": True, "data": {"taxpayer": await _serialize_taxpayer(tp), "created_at": timestamp}}
+
                 if operation == "list_taxpayers":
-                    return {"operation": operation, "success": True, "data": {"taxpayers": [], "page": payload.get("page", 1)}}
+                    page = int(payload.get("page", 1))
+                    limit = int(payload.get("limit", 50))
+                    offset = max(page - 1, 0) * limit
+                    async for session in get_async_session():
+                        q = select(Taxpayer).offset(offset).limit(limit)
+                        rows = (await session.execute(q)).scalars().all()
+                        items = [await _serialize_taxpayer(r) for r in rows]
+                        return {"operation": operation, "success": True, "data": {"taxpayers": items, "page": page, "limit": limit}}
+
                 if operation == "get_taxpayer":
-                    return {"operation": operation, "success": True, "data": {"taxpayer_id": payload.get("taxpayer_id"), "status": "active"}}
+                    taxpayer_id = payload.get("taxpayer_id")
+                    async for session in get_async_session():
+                        row = (await session.execute(select(Taxpayer).where(Taxpayer.id == taxpayer_id))).scalars().first()
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        return {"operation": operation, "success": True, "data": {"taxpayer": await _serialize_taxpayer(row)}}
+
                 if operation == "update_taxpayer":
-                    return {"operation": operation, "success": True, "data": {"updated": True}}
+                    taxpayer_id = payload.get("taxpayer_id")
+                    updates = payload.get("updates") or {}
+                    async for session in get_async_session():
+                        row = (await session.execute(select(Taxpayer).where(Taxpayer.id == taxpayer_id))).scalars().first()
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        # Apply simple updates
+                        for src_key, model_key in [
+                            ("business_name", "business_name"),
+                            ("sector", "sector"),
+                            ("business_type", "business_type"),
+                            ("contact_email", "contact_email"),
+                            ("contact_phone", "contact_phone"),
+                            ("vat_registered", "vat_registered"),
+                            ("vat_number", "vat_number"),
+                            ("compliance_level", "compliance_level"),
+                        ]:
+                            if src_key in updates:
+                                setattr(row, model_key, updates[src_key])
+                        # Merge metadata
+                        if isinstance(updates.get("metadata"), dict):
+                            meta = getattr(row, "taxpayer_metadata", {}) or {}
+                            meta.update(updates["metadata"])
+                            row.taxpayer_metadata = meta
+                        await session.commit()
+                        await session.refresh(row)
+                        return {"operation": operation, "success": True, "data": {"taxpayer": await _serialize_taxpayer(row)}}
+
                 if operation == "delete_taxpayer":
-                    return {"operation": operation, "success": True, "data": {"deleted": True}}
+                    taxpayer_id = payload.get("taxpayer_id")
+                    async for session in get_async_session():
+                        row = (await session.execute(select(Taxpayer).where(Taxpayer.id == taxpayer_id))).scalars().first()
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        # Soft-delete via metadata flag
+                        meta = getattr(row, "taxpayer_metadata", {}) or {}
+                        meta["deleted"] = True
+                        row.taxpayer_metadata = meta
+                        await session.commit()
+                        return {"operation": operation, "success": True, "data": {"deleted": True}}
                 if operation == "bulk_onboard_taxpayers":
                     return {"operation": operation, "success": True, "data": {"processed": len(payload.get("taxpayers", []))}}
                 if operation == "get_taxpayer_overview":
@@ -1109,11 +1585,34 @@ class APPServiceRegistry:
                 if operation == "list_non_compliant_taxpayers":
                     return {"operation": operation, "success": True, "data": {"taxpayers": [], "generated_at": timestamp}}
                 if operation == "generate_grant_tracking_report":
-                    return {"operation": operation, "success": True, "data": {"report_id": "grant-report", "generated_at": timestamp}}
+                    # Use grant tracking repository for progress + analytics
+                    from core_platform.data_management.grant_tracking_repository import GrantTrackingRepository
+                    from core_platform.data_management.database_init import get_db_session
+                    repo = GrantTrackingRepository(get_db_session())
+                    tenant_id = payload.get("organization_id") or payload.get("tenant_id")
+                    if not tenant_id:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    progress = await repo.get_milestone_progress(tenant_id)
+                    analytics = await repo.get_taxpayer_analytics(tenant_id)
+                    return {"operation": operation, "success": True, "data": {"progress": progress, "analytics": analytics, "generated_at": timestamp}}
                 if operation == "get_grant_milestones":
-                    return {"operation": operation, "success": True, "data": {"milestones": [], "generated_at": timestamp}}
+                    from core_platform.data_management.grant_tracking_repository import GrantTrackingRepository
+                    from core_platform.data_management.database_init import get_db_session
+                    from dataclasses import asdict as _asdict
+                    repo = GrantTrackingRepository(get_db_session())
+                    # Return milestone definitions only
+                    milestones = {k.value: _asdict(v) for k, v in repo.MILESTONE_DEFINITIONS.items()}
+                    return {"operation": operation, "success": True, "data": {"milestones": milestones, "generated_at": timestamp}}
                 if operation == "get_onboarding_performance":
-                    return {"operation": operation, "success": True, "data": {"performance": {}, "period": payload.get("period", "30d")}}
+                    # Basic performance computed from taxpayer table (counts last 30d)
+                    period = payload.get("period", "30d")
+                    async for session in get_async_session():
+                        total = (await session.execute(select(Taxpayer))).scalars().all()
+                        perf = {
+                            "total_taxpayers": len(total),
+                            "period": period,
+                        }
+                        return {"operation": operation, "success": True, "data": {"performance": perf, "period": period}}
                 if operation == "get_grant_overview":
                     return {"operation": operation, "success": True, "data": {"overview": {}, "generated_at": timestamp}}
                 if operation == "get_current_grant_status":
@@ -1153,7 +1652,8 @@ class APPServiceRegistry:
                 http_client = firs_service.get("http_client")
                 resource_cache = firs_service.get("resource_cache")
                 auth_handler = firs_service.get("auth_handler")
-                certificate_store: Optional[CertificateStore] = firs_service.get("certificate_store")
+                # Avoid runtime import dependency on SI modules for type annotation
+                certificate_store: Optional[Any] = firs_service.get("certificate_store")
 
                 async def _fetch_transmissions(tin: Optional[str] = None) -> Dict[str, Any]:
                     if not http_client:
@@ -1619,23 +2119,72 @@ class APPServiceRegistry:
     async def _process_si_invoices_for_firs(self, invoice_ids, si_user_id, submission_options):
         """Process invoices received from SI for FIRS submission"""
         try:
-            # This would fetch invoice data from SI and submit to FIRS
-            logger.info(f"Processing {len(invoice_ids)} invoices for FIRS submission")
-            
-            # Generate submission ID
-            from datetime import datetime
-            submission_id = f"FIRS-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{len(invoice_ids)}"
-            
-            # Mock processing - in real implementation:
-            # 1. Fetch invoice data from SI database
-            # 2. Validate FIRS compliance
-            # 3. Submit to FIRS API
-            # 4. Track submission status
-            
+            # First, coordinate through HYBRID layer
+            from core_platform.messaging.message_router import ServiceRole as _SR
+            hybrid_payload = {
+                "invoice_ids": invoice_ids,
+                "si_user_id": si_user_id,
+                "submission_options": submission_options or {},
+            }
+
+            async def _call_hybrid_once() -> Dict[str, Any]:
+                return await self.message_router.route_message(
+                    service_role=_SR.HYBRID,
+                    operation="coordinate_si_invoices_for_firs",
+                    payload=hybrid_payload,
+                )
+
+            hybrid_resp = await _call_hybrid_once()
+            if not (isinstance(hybrid_resp, dict) and hybrid_resp.get("success")):
+                # Basic one-shot retry; then bubble error
+                hybrid_resp = await _call_hybrid_once()
+                if not (isinstance(hybrid_resp, dict) and hybrid_resp.get("success")):
+                    return {"error": "hybrid_coordination_failed", "details": hybrid_resp, "success": False}
+
+            # Resolve invoice payloads via SI (Odoo RPC) and transform to FIRS
+            erp_type = str((submission_options or {}).get("erp_type", "odoo")).lower()
+            if erp_type != "odoo":
+                return {"success": False, "error": f"unsupported_erp_type:{erp_type}"}
+
+            si_fetch = await self.message_router.route_message(
+                service_role=_SR.SYSTEM_INTEGRATOR,
+                operation="fetch_odoo_invoices_for_firs",
+                payload={
+                    "invoice_ids": invoice_ids,
+                    "odoo_config": (submission_options or {}).get("odoo_config") or {},
+                    "transform": True,
+                    "target_format": (submission_options or {}).get("target_format", "UBL_BIS_3.0"),
+                },
+            )
+            if not (isinstance(si_fetch, dict) and si_fetch.get("success")):
+                return {"success": False, "error": "si_invoice_fetch_failed", "details": si_fetch}
+            invoices = (si_fetch.get("data") or {}).get("invoices") or []
+            # Unwrap to raw FIRS invoice payload if transformer wrapped output
+            normalized_invoices = [
+                (inv.get("firs_invoice") if isinstance(inv, dict) and "firs_invoice" in inv else inv)
+                for inv in invoices
+            ]
+            if not invoices:
+                return {"success": False, "error": "no_invoices_resolved"}
+
+            # Submit to APP transmission service (DB persistence + FIRS submission)
+            submit_resp = await self.message_router.route_message(
+                service_role=_SR.ACCESS_POINT_PROVIDER,
+                operation="submit_invoice_batch",
+                payload={
+                    "invoices": normalized_invoices,
+                    "organization_id": (submission_options or {}).get("organization_id"),
+                    "api_version": "v1",
+                },
+            )
+
+            # Surface combined result
             return {
-                "submission_id": submission_id,
-                "status": "submitted",
-                "submitted_at": datetime.utcnow().isoformat()
+                "success": bool(submit_resp.get("success")) if isinstance(submit_resp, dict) else False,
+                "data": {
+                    "hybrid_ack": hybrid_resp.get("data") if isinstance(hybrid_resp, dict) else None,
+                    "transmission": submit_resp,
+                },
             }
             
         except Exception as e:
@@ -1645,22 +2194,70 @@ class APPServiceRegistry:
     async def _process_si_batch_for_firs(self, batch_id, si_user_id, batch_options):
         """Process invoice batch received from SI for FIRS submission"""
         try:
-            logger.info(f"Processing batch {batch_id} for FIRS submission")
-            
-            # Generate batch submission ID
-            from datetime import datetime
-            batch_submission_id = f"FIRS-BATCH-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
-            
-            # Mock batch processing - in real implementation:
-            # 1. Fetch batch data from SI
-            # 2. Validate batch compliance
-            # 3. Submit batch to FIRS
-            # 4. Track batch status
-            
+            # Coordinate via HYBRID layer first
+            from core_platform.messaging.message_router import ServiceRole as _SR
+            hybrid_payload = {
+                "batch_id": batch_id,
+                "si_user_id": si_user_id,
+                "batch_options": batch_options or {},
+            }
+
+            async def _call_hybrid_once() -> Dict[str, Any]:
+                return await self.message_router.route_message(
+                    service_role=_SR.HYBRID,
+                    operation="coordinate_si_batch_for_firs",
+                    payload=hybrid_payload,
+                )
+
+            hybrid_resp = await _call_hybrid_once()
+            if not (isinstance(hybrid_resp, dict) and hybrid_resp.get("success")):
+                hybrid_resp = await _call_hybrid_once()
+                if not (isinstance(hybrid_resp, dict) and hybrid_resp.get("success")):
+                    return {"error": "hybrid_coordination_failed", "details": hybrid_resp, "success": False}
+
+            # Resolve invoices for the batch via SI (Odoo RPC)
+            erp_type = str((batch_options or {}).get("erp_type", "odoo")).lower()
+            if erp_type != "odoo":
+                return {"success": False, "error": f"unsupported_erp_type:{erp_type}"}
+
+            si_fetch = await self.message_router.route_message(
+                service_role=_SR.SYSTEM_INTEGRATOR,
+                operation="fetch_odoo_invoice_batch_for_firs",
+                payload={
+                    "batch_id": batch_id,
+                    "batch_size": int((batch_options or {}).get("batch_size", 50)),
+                    "odoo_config": (batch_options or {}).get("odoo_config") or {},
+                    "transform": True,
+                    "target_format": (batch_options or {}).get("target_format", "UBL_BIS_3.0"),
+                },
+            )
+            if not (isinstance(si_fetch, dict) and si_fetch.get("success")):
+                return {"success": False, "error": "si_batch_fetch_failed", "details": si_fetch}
+            invoices = (si_fetch.get("data") or {}).get("invoices") or []
+            normalized_invoices = [
+                (inv.get("firs_invoice") if isinstance(inv, dict) and "firs_invoice" in inv else inv)
+                for inv in invoices
+            ]
+            if not invoices:
+                return {"success": False, "error": "no_invoices_resolved_for_batch"}
+
+            # Submit resolved invoices as a batch via APP transmission
+            submit_resp = await self.message_router.route_message(
+                service_role=_SR.ACCESS_POINT_PROVIDER,
+                operation="submit_invoice_batch",
+                payload={
+                    "invoices": normalized_invoices,
+                    "organization_id": (batch_options or {}).get("organization_id"),
+                    "api_version": "v1",
+                },
+            )
+
             return {
-                "batch_submission_id": batch_submission_id,
-                "status": "submitted",
-                "submitted_at": datetime.utcnow().isoformat()
+                "success": bool(submit_resp.get("success")) if isinstance(submit_resp, dict) else False,
+                "data": {
+                    "hybrid_ack": hybrid_resp.get("data") if isinstance(hybrid_resp, dict) else None,
+                    "transmission": submit_resp,
+                },
             }
             
         except Exception as e:

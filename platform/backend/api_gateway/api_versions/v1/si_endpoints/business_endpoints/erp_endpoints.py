@@ -279,6 +279,24 @@ class ERPEndpointsV1:
             response_model=V1ResponseModel
         )
 
+        # Test fetch paths (Odoo → FIRS transform) for pre‑submission validation
+        self.router.add_api_route(
+            "/odoo/test-fetch-invoices",
+            self.test_fetch_invoices,
+            methods=["POST"],
+            summary="Test-fetch specific Odoo invoices",
+            description="Fetch and transform specific Odoo invoices via SI to FIRS-compliant payloads",
+            response_model=V1ResponseModel
+        )
+        self.router.add_api_route(
+            "/odoo/test-fetch-batch",
+            self.test_fetch_invoice_batch,
+            methods=["POST"],
+            summary="Test-fetch Odoo invoice batch",
+            description="Fetch and transform a batch of Odoo invoices via SI to FIRS-compliant payloads",
+            response_model=V1ResponseModel
+        )
+
     async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
         """Ensure System Integrator role access for v1 SI endpoints."""
         context = await self.role_detector.detect_role_context(request)
@@ -480,6 +498,62 @@ class ERPEndpointsV1:
     async def bulk_sync_erp_data(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Bulk sync ERP data - placeholder"""
         return self._create_v1_response({"sync_id": "bulk_sync_123"}, "bulk_erp_data_sync_initiated")
+
+    # Test-fetch helpers (routes above)
+    async def test_fetch_invoices(self, request: Request):
+        try:
+            context = await self._require_si_role(request)
+            body = await request.json()
+            invoice_ids = body.get("invoice_ids") or []
+            if not isinstance(invoice_ids, list) or not invoice_ids:
+                raise HTTPException(status_code=400, detail="invoice_ids must be a non-empty list")
+            payload = {
+                "invoice_ids": invoice_ids,
+                "odoo_config": body.get("odoo_config") or {},
+                "transform": bool(body.get("transform", True)),
+                "target_format": body.get("target_format", "UBL_BIS_3.0"),
+            }
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="fetch_odoo_invoices_for_firs",
+                payload=payload,
+            )
+            # Attach summary
+            data = result.get("data") if isinstance(result, dict) else {}
+            if isinstance(data, dict):
+                data["fetched_count"] = len(data.get("invoices") or [])
+            return self._create_v1_response(result, "odoo_invoices_fetched_for_firs")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error test-fetching invoices: {e}")
+            raise HTTPException(status_code=502, detail="Failed to test-fetch invoices")
+
+    async def test_fetch_invoice_batch(self, request: Request):
+        try:
+            context = await self._require_si_role(request)
+            body = await request.json()
+            payload = {
+                "batch_size": int(body.get("batch_size", 50)),
+                "include_attachments": bool(body.get("include_attachments", False)),
+                "odoo_config": body.get("odoo_config") or {},
+                "transform": bool(body.get("transform", True)),
+                "target_format": body.get("target_format", "UBL_BIS_3.0"),
+            }
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="fetch_odoo_invoice_batch_for_firs",
+                payload=payload,
+            )
+            data = result.get("data") if isinstance(result, dict) else {}
+            if isinstance(data, dict):
+                data["fetched_count"] = len(data.get("invoices") or [])
+            return self._create_v1_response(result, "odoo_invoice_batch_fetched_for_firs")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error test-fetching invoice batch: {e}")
+            raise HTTPException(status_code=502, detail="Failed to test-fetch invoice batch")
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""

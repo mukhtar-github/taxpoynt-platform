@@ -33,7 +33,7 @@ def test_all_si_routes_have_registered_handlers():
 
     # Initialize services (registers operations with metadata)
     import asyncio
-    asyncio.get_event_loop().run_until_complete(si_reg.initialize_services())
+    asyncio.run(si_reg.initialize_services())
 
     # Build gateway and validate mapping
     gateway = MainGatewayRouter(
@@ -75,7 +75,7 @@ def test_strict_mode_raises_on_unknown_op(monkeypatch):
     async def cb(op: str, payload: dict):
         return {"operation": op, "success": True}
 
-    asyncio.get_event_loop().run_until_complete(
+    asyncio.run(
         router.register_service(
             service_name="dummy_si",
             service_role=ServiceRole.SYSTEM_INTEGRATOR,
@@ -85,6 +85,6 @@ def test_strict_mode_raises_on_unknown_op(monkeypatch):
     )
 
     with pytest.raises(RuntimeError):
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             router.route_message(ServiceRole.SYSTEM_INTEGRATOR, "totally_unknown_op", {})
         )

@@ -59,6 +59,7 @@ from .workflow_orchestration.e2e_workflow_engine import E2EWorkflowEngine
 
 # Correlation Management - new service for SI-APP correlation
 from .correlation_management.si_app_correlation_service import SIAPPCorrelationService
+from .transmission_coordination import TransmissionCoordinationService
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ class HybridServiceRegistry:
             await self._register_access_control_services()
             await self._register_workflow_services()
             await self._register_correlation_services()
+            await self._register_transmission_coordination_services()
             
             self.is_initialized = True
             logger.info(f"Hybrid services initialized successfully. Registered {len(self.service_endpoints)} services.")
@@ -526,7 +528,52 @@ class HybridServiceRegistry:
             
         except Exception as e:
             logger.error(f"Failed to register correlation services: {str(e)}")
-    
+
+    async def _register_transmission_coordination_services(self):
+        """Register SI→APP transmission coordination service."""
+        try:
+            coordination_service = TransmissionCoordinationService()
+            svc = {
+                "service": coordination_service,
+                "operations": [
+                    "coordinate_si_invoices_for_firs",
+                    "coordinate_si_batch_for_firs",
+                ],
+            }
+
+            self.services["transmission_coordination"] = svc
+
+            endpoint_id = await self.message_router.register_service(
+                service_name="transmission_coordination",
+                service_role=ServiceRole.HYBRID,
+                callback=self._create_transmission_coordination_callback(svc),
+                priority=5,
+                tags=["coordination", "si", "app", "firs"],
+                metadata={
+                    "service_type": "transmission_coordination",
+                    "operations": svc["operations"],
+                },
+            )
+            self.service_endpoints["transmission_coordination"] = endpoint_id
+            logger.info(f"Transmission coordination service registered: {endpoint_id}")
+        except Exception as e:
+            logger.error(f"Failed to register transmission coordination services: {str(e)}")
+
+    def _create_transmission_coordination_callback(self, svc):
+        async def callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                service: TransmissionCoordinationService = svc.get("service")
+                if operation == "coordinate_si_invoices_for_firs":
+                    res = await service.coordinate_invoices(payload)
+                    return {"operation": operation, **res}
+                if operation == "coordinate_si_batch_for_firs":
+                    res = await service.coordinate_batch(payload)
+                    return {"operation": operation, **res}
+                return {"operation": operation, "success": False, "error": "unsupported_operation"}
+            except Exception as e:
+                return {"operation": operation, "success": False, "error": str(e)}
+        return callback
+
     # Service callback creators
     def _create_analytics_callback(self, analytics_service):
         """Create callback for analytics operations"""

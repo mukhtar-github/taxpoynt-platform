@@ -279,6 +279,73 @@ class PrometheusIntegration:
             description="Tenant cache hit/miss stats",
             labels=["metric"]
         ))
+        # Outbound AP delivery/queue metrics
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_current_queue_size",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="Current size of ap_outbound queue",
+            labels=["queue"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_dead_letter_count",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="Current size of dead_letter queue (AP outbound)",
+            labels=["queue"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_delivery_success_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Total successful outbound AP deliveries",
+            labels=["status_code"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_delivery_failure_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Total failed outbound AP deliveries",
+            labels=["error_type", "status_code"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_oldest_message_age_seconds",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="Age in seconds of the oldest queued/scheduled outbound message",
+            labels=[]
+        ))
+        # Outbound POST attempts and latency
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_delivery_attempts_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Total outbound POST attempts to AP endpoints",
+            labels=[]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_delivery_duration_seconds",
+            metric_type=PrometheusMetricsType.HISTOGRAM,
+            description="Duration of outbound POST requests",
+            labels=["status_code"],
+            buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0]
+        ))
+        # Resolve attempts and duration
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_resolve_attempts_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Total attempts to resolve AP participant identifiers",
+            labels=["outcome"]
+        ))
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_resolve_duration_seconds",
+            metric_type=PrometheusMetricsType.HISTOGRAM,
+            description="Duration of resolve calls for AP participants",
+            labels=["outcome"],
+            buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
+        ))
+        # Delivery body size distribution
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_ap_outbound_delivery_body_bytes",
+            metric_type=PrometheusMetricsType.HISTOGRAM,
+            description="Size of outbound delivery bodies (bytes)",
+            labels=[],
+            buckets=[512, 1024, 2048, 4096, 8192, 16384, 65536, 262144, 1048576]
+        ))
     
     def register_metric(self, metric_definition: PrometheusMetric):
         """Register a new Prometheus metric"""

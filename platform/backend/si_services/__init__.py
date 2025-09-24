@@ -438,7 +438,10 @@ class SIServiceRegistry:
                         "extract_erp_data",
                         "sync_erp_data",
                         "process_erp_invoices",
-                        "validate_erp_mapping"
+                        "validate_erp_mapping",
+                        # Bridge operations used by APP to fetch/transform invoices
+                        "fetch_odoo_invoices_for_firs",
+                        "fetch_odoo_invoice_batch_for_firs",
                     ],
                     "supported_erp": ["odoo", "sap", "oracle", "dynamics"]
                 }
@@ -877,6 +880,75 @@ class SIServiceRegistry:
         """Create callback for ERP operations"""
         async def erp_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                # New: Fetch Odoo invoices and transform to FIRS format for APP submissions
+                if operation == "fetch_odoo_invoices_for_firs":
+                    try:
+                        from external_integrations.business_systems.erp.odoo.connector import OdooConnector
+                    except Exception as _imp_err:
+                        return {"operation": operation, "success": False, "error": f"odoo_connector_unavailable: {_imp_err}"}
+
+                    odoo_cfg = payload.get("odoo_config") or {}
+                    invoice_ids = payload.get("invoice_ids") or []
+                    target_format = payload.get("target_format", "UBL_BIS_3.0")
+                    transform = bool(payload.get("transform", True))
+                    if not isinstance(invoice_ids, list):
+                        invoice_ids = [invoice_ids]
+
+                    try:
+                        connector = OdooConnector(odoo_cfg)
+                    except Exception as ce:
+                        return {"operation": operation, "success": False, "error": f"connector_init_failed: {ce}"}
+
+                    invoices = []
+                    errors = []
+                    for inv_id in invoice_ids:
+                        try:
+                            raw = connector.get_invoice_by_id(int(inv_id) if str(inv_id).isdigit() else inv_id)
+                            if transform:
+                                transformed = await connector.transform_to_firs_format(raw, target_format=target_format)
+                                # Shape shim: return just the payload expected by APP signing
+                                out = transformed.get("firs_invoice") if isinstance(transformed, dict) else transformed
+                                invoices.append(out)
+                            else:
+                                invoices.append(raw)
+                        except Exception as e:
+                            errors.append({"invoice_id": inv_id, "error": str(e)})
+                    return {
+                        "operation": operation,
+                        "success": len(invoices) > 0,
+                        "data": {"invoices": invoices, "errors": errors}
+                    }
+
+                if operation == "fetch_odoo_invoice_batch_for_firs":
+                    try:
+                        from external_integrations.business_systems.erp.odoo.connector import OdooConnector
+                    except Exception as _imp_err:
+                        return {"operation": operation, "success": False, "error": f"odoo_connector_unavailable: {_imp_err}"}
+
+                    odoo_cfg = payload.get("odoo_config") or {}
+                    batch_size = int(payload.get("batch_size", 50))
+                    include_attachments = bool(payload.get("include_attachments", False))
+                    transform = bool(payload.get("transform", True))
+                    target_format = payload.get("target_format", "UBL_BIS_3.0")
+                    try:
+                        connector = OdooConnector(odoo_cfg)
+                    except Exception as ce:
+                        return {"operation": operation, "success": False, "error": f"connector_init_failed: {ce}"}
+
+                    try:
+                        raw_list = connector.get_invoices(limit=batch_size, include_attachments=include_attachments)
+                        invoices = []
+                        for raw in raw_list or []:
+                            if transform:
+                                transformed = await connector.transform_to_firs_format(raw, target_format=target_format)
+                                out = transformed.get("firs_invoice") if isinstance(transformed, dict) else transformed
+                                invoices.append(out)
+                            else:
+                                invoices.append(raw)
+                        return {"operation": operation, "success": len(invoices) > 0, "data": {"invoices": invoices}}
+                    except Exception as e:
+                        return {"operation": operation, "success": False, "error": str(e)}
+
                 if operation == "test_erp_connection":
                     # Use the test_odoo_connection function
                     result = erp_service["connection_tester"](payload.get("connection_params"))
