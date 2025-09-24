@@ -798,11 +798,16 @@ class MessageQueue:
                 persistence_file = self.config.persistence_path / f"{self.queue_name}.json"
                 
                 # Prepare data for persistence
+                metrics_data = asdict(self.metrics)
+                last_updated = metrics_data.get('last_updated')
+                if isinstance(last_updated, datetime):
+                    metrics_data['last_updated'] = last_updated.isoformat()
+
                 persistence_data = {
                     'queue_name': self.queue_name,
                     'timestamp': datetime.now(timezone.utc).isoformat(),
                     'messages': [msg.to_dict() for msg in self.message_registry.values()],
-                    'metrics': asdict(self.metrics)
+                    'metrics': metrics_data
                 }
                 
                 # Write to file
@@ -841,6 +846,20 @@ class MessageQueue:
                         await self.messages.put(message)
             
             self.logger.info(f"Loaded {len(persistence_data.get('messages', []))} persisted messages")
+
+            metrics_data = persistence_data.get('metrics')
+            if isinstance(metrics_data, dict):
+                metrics_copy = metrics_data.copy()
+                last_updated = metrics_copy.get('last_updated')
+                if isinstance(last_updated, str):
+                    try:
+                        metrics_copy['last_updated'] = datetime.fromisoformat(last_updated)
+                    except ValueError:
+                        metrics_copy['last_updated'] = datetime.now(timezone.utc)
+                try:
+                    self.metrics = QueueMetrics(**metrics_copy)
+                except Exception:
+                    pass
             
         except Exception as e:
             self.logger.error(f"Error loading persisted messages: {str(e)}")

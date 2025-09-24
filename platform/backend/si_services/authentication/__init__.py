@@ -67,6 +67,9 @@ from .certificate_auth import (
     create_certificate_auth_provider
 )
 
+# Backward compatibility alias for legacy imports
+CertificateAuth = CertificateAuthProvider
+
 # FIRS Authentication
 from .firs_auth_service import (
     FIRSAuthService,
@@ -141,6 +144,7 @@ __all__ = [
     'CertificateFormat',
     'CertificateStatus',
     'create_certificate_auth_provider',
+    'CertificateAuth',
     
     # FIRS Authentication
     'FIRSAuthService',

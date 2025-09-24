@@ -244,12 +244,27 @@ class PrometheusIntegration:
         ))
         
         # Health Check Metrics (Phase 3)
+        health_labels = ["service_role", "service_name", "check_id", "check_type", "priority"]
         self.register_metric(PrometheusMetric(
             name="taxpoynt_health_check_status",
             metric_type=PrometheusMetricsType.GAUGE,
             description="Health check status (1=healthy, 0=unhealthy)",
-            labels=["service_name", "check_name"]
+            labels=health_labels
         ))
+        metric_labels = ["service_role", "service_name", "check_id"]
+        for metric_name, description in [
+            ("taxpoynt_health_check_duration_ms", "Health check duration in milliseconds"),
+            ("taxpoynt_health_check_response_time_ms", "Health check response time in milliseconds"),
+            ("taxpoynt_health_check_connection_time_ms", "Health check connection time in milliseconds"),
+            ("taxpoynt_health_check_active_connections", "Active connections reported by the health check"),
+            ("taxpoynt_health_check_memory_usage_percent", "Memory usage percentage reported by the health check"),
+        ]:
+            self.register_metric(PrometheusMetric(
+                name=metric_name,
+                metric_type=PrometheusMetricsType.GAUGE,
+                description=description,
+                labels=metric_labels
+            ))
         
         # Scaling Metrics (Phase 3)
         self.register_metric(PrometheusMetric(
@@ -532,15 +547,24 @@ class PrometheusIntegration:
             
             # Add standard labels
             labels = {
-                "service_role": service_role,
-                "service_name": service_name,
-                **tags
+                "service_role": str(getattr(service_role, "value", service_role)),
+                "service_name": str(service_name),
+                **{k: str(v) for k, v in (tags or {}).items() if v is not None}
             }
-            
+
             # Map to appropriate Prometheus metric
             prometheus_name = f"taxpoynt_{metric_name}"
-            
+
             # Record the metric
+            if prometheus_name not in self.prometheus_metrics:
+                label_names = sorted(labels.keys())
+                self.register_metric(PrometheusMetric(
+                    name=prometheus_name,
+                    metric_type=PrometheusMetricsType.GAUGE,
+                    description=f"Auto-registered metric for {metric_name}",
+                    labels=label_names
+                ))
+
             self.record_metric(prometheus_name, value, labels)
             
         except Exception as e:
