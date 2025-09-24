@@ -395,6 +395,7 @@ class ValidationManagementEndpointsV1:
     async def validate_invoice_batch(self, request: Request):
         """Validate invoice batch"""
         try:
+            context = await self._require_app_role(request)
             # Handle both JSON and file upload
             if request.headers.get("content-type", "").startswith("multipart/form-data"):
                 # File upload handling would go here
@@ -455,13 +456,16 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error getting batch validation status {batch_id} in v1: {e}")
             return v1_error_response(e, action="get_batch_validation_status")
     
-    async def validate_uploaded_file(self, 
-                                   file: UploadFile = File(...),
-                                   validate_schema: bool = True,
-                                   validate_business_rules: bool = True,
-                                   context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_uploaded_file(
+        self,
+        request: Request,
+        file: UploadFile = File(...),
+        validate_schema: bool = True,
+        validate_business_rules: bool = True,
+    ):
         """Validate uploaded file"""
         try:
+            context = await self._require_app_role(request)
             # Process uploaded file
             content = await file.read()
             
@@ -469,11 +473,13 @@ class ValidationManagementEndpointsV1:
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="validate_uploaded_file",
                 payload={
-                    "file_name": file.filename,
-                    "file_size": len(content),
-                    "content_type": file.content_type,
-                    "validate_schema": validate_schema,
-                    "validate_business_rules": validate_business_rules,
+                    "file_content": content,
+                    "options": {
+                        "validate_schema": validate_schema,
+                        "validate_business_rules": validate_business_rules,
+                        "file_name": file.filename,
+                        "content_type": file.content_type,
+                    },
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
@@ -611,7 +617,6 @@ class ValidationManagementEndpointsV1:
     async def generate_quality_report(self, request: Request):
         """Generate quality report"""
         try:
-            context = await self._require_app_role(request)
             context = await self._require_app_role(request)
             body = await request.json()
             

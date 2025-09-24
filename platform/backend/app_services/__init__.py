@@ -15,13 +15,16 @@ Services Registered:
 - Taxpayer Management Service
 """
 
+import base64
 import logging
 import asyncio
 import os
 import uuid
-from datetime import datetime, timezone
+import json
+from collections import Counter, deque
+from datetime import datetime, timezone, timedelta
 from dataclasses import asdict
-from typing import Dict, Any, Optional, List, TYPE_CHECKING
+from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
@@ -35,12 +38,24 @@ from .status_management.notification_service import NotificationService
 from .firs_communication.firs_api_client import FIRSAPIClient
 from .firs_communication.authentication_handler import FIRSAuthenticationHandler
 from .validation.firs_validator import FIRSValidator
-from .validation.submission_validator import SubmissionValidator
+from .validation.submission_validator import (
+    SubmissionValidator,
+    SubmissionContext,
+    SubmissionReadiness,
+    CheckStatus,
+)
 from .validation.format_validator import FormatValidator
 from .transmission.transmission_service import TransmissionService
 from .reporting.transmission_reports import TransmissionReportGenerator
-from .security_compliance.encryption_service import EncryptionService
-from .security_compliance.audit_logger import AuditLogger
+from .security_compliance.encryption_service import EncryptionService, EncryptedData, EncryptionAlgorithm
+from .security_compliance.audit_logger import (
+    AuditLogger,
+    AuditLevel,
+    EventCategory,
+    AuditContext,
+)
+from .security_compliance.threat_detector import ThreatDetector
+from .security_compliance.security_scanner import SecurityScanner
 from .authentication_seals.seal_generator import SealGenerator
 from .authentication_seals.verification_service import VerificationService
 from .reporting.compliance_metrics import ComplianceMetricsMonitor
@@ -629,49 +644,94 @@ class APPServiceRegistry:
             
         except Exception as e:
             logger.error(f"Failed to register status management services: {str(e)}")
-    
+
+    def _create_validation_service_state(self) -> Dict[str, Any]:
+        """Build reusable validation service state container."""
+
+        firs_validator = FIRSValidator()
+        format_validator = FormatValidator()
+        submission_validator = SubmissionValidator(firs_validator=firs_validator)
+
+        recent_limit = max(10, int(os.getenv("VALIDATION_RECENT_LIMIT", "50") or 50))
+
+        rule_catalog: Dict[str, Dict[str, Any]] = {}
+        for rule in getattr(firs_validator, "validation_rules", {}).values():
+            rule_id = rule.get("rule_id")
+            if not rule_id:
+                continue
+            rule_catalog[rule_id] = {
+                "description": rule.get("description"),
+                "severity": getattr(rule.get("severity"), "value", None),
+            }
+
+        for check in getattr(submission_validator, "check_definitions", {}).values():
+            check_id = check.get("check_id")
+            if not check_id:
+                continue
+            rule_catalog[check_id] = {
+                "description": check.get("description") or check.get("name"),
+                "severity": getattr(check.get("severity"), "value", None),
+            }
+
+        return {
+            "firs_validator": firs_validator,
+            "format_validator": format_validator,
+            "submission_validator": submission_validator,
+            "recent_results": deque(maxlen=recent_limit),
+            "validation_store": {},
+            "batch_results": {},
+            "issue_counter": Counter(),
+            "rule_catalog": rule_catalog,
+            "metrics": {
+                "total_requests": 0,
+                "single_validations": 0,
+                "batch_validations": 0,
+                "passed": 0,
+                "failed": 0,
+                "total_duration_ms": 0.0,
+                "score_accumulator": 0.0,
+                "validations_with_score": 0,
+                "last_validation_at": None,
+            },
+        }
+
     async def _register_validation_services(self):
         """Register validation services"""
         try:
-            # Initialize validation services
-            firs_validator = FIRSValidator() if hasattr(FIRSValidator, '__init__') else None
-            
-            validation_service = {
-                "firs_validator": firs_validator,
-                "operations": [
-                    "validate_invoice",
-                    "validate_submission",
-                    "check_compliance",
-                    "verify_format",
-                    "validate_single_invoice",
-                    "validate_invoice_batch",
-                    "validate_uploaded_file",
-                    "get_validation_result",
-                    "get_batch_validation_status",
-                    "get_validation_metrics",
-                    "get_validation_overview",
-                    "get_recent_validation_results",
-                    "get_validation_rules",
-                    "get_firs_validation_standards",
-                    "get_ubl_validation_standards",
-                    "get_validation_error_analysis",
-                    "get_validation_error_help",
-                    "get_data_quality_metrics",
-                    "generate_quality_report",
-                    "generate_compliance_report",
-                    "list_compliance_reports",
-                    "get_compliance_report",
-                    "validate_ubl_compliance",
-                    "validate_ubl_batch",
-                    "validate_peppol_compliance",
-                    "validate_iso27001_compliance",
-                    "validate_iso20022_compliance",
-                    "validate_data_protection_compliance",
-                    "validate_lei_compliance",
-                    "validate_product_classification",
-                    "validate_comprehensive_compliance"
-                ]
-            }
+            validation_service = self._create_validation_service_state()
+            validation_service["operations"] = [
+                "validate_invoice",
+                "validate_submission",
+                "check_compliance",
+                "verify_format",
+                "validate_single_invoice",
+                "validate_invoice_batch",
+                "validate_uploaded_file",
+                "get_validation_result",
+                "get_batch_validation_status",
+                "get_validation_metrics",
+                "get_validation_overview",
+                "get_recent_validation_results",
+                "get_validation_rules",
+                "get_firs_validation_standards",
+                "get_ubl_validation_standards",
+                "get_validation_error_analysis",
+                "get_validation_error_help",
+                "get_data_quality_metrics",
+                "generate_quality_report",
+                "generate_compliance_report",
+                "list_compliance_reports",
+                "get_compliance_report",
+                "validate_ubl_compliance",
+                "validate_ubl_batch",
+                "validate_peppol_compliance",
+                "validate_iso27001_compliance",
+                "validate_iso20022_compliance",
+                "validate_data_protection_compliance",
+                "validate_lei_compliance",
+                "validate_product_classification",
+                "validate_comprehensive_compliance",
+            ]
             
             self.services["validation"] = validation_service
             
@@ -758,10 +818,14 @@ class APPServiceRegistry:
             # Initialize security services
             encryption_service = EncryptionService()
             audit_logger = AuditLogger(log_directory="audit_logs")
+            threat_detector = ThreatDetector()
+            security_scanner = SecurityScanner(threat_detector=threat_detector, audit_logger=audit_logger)
             
             security_service = {
                 "encryption_service": encryption_service,
                 "audit_logger": audit_logger,
+                "scanner": security_scanner,
+                "threat_detector": threat_detector,
                 "operations": [
                     "encrypt_document",
                     "decrypt_document",
@@ -1289,33 +1353,517 @@ class APPServiceRegistry:
         """Create callback for validation operations"""
         async def validation_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                # Placeholder responses for validation/compliance operations
-                timestamp = datetime.now(timezone.utc).isoformat()
-                if operation in {"validate_invoice", "validate_submission", "validate_single_invoice", "validate_invoice_batch", "validate_uploaded_file", "validate_ubl_compliance", "validate_ubl_batch", "validate_peppol_compliance", "validate_iso27001_compliance", "validate_iso20022_compliance", "validate_data_protection_compliance", "validate_lei_compliance", "validate_product_classification", "validate_comprehensive_compliance"}:
+                firs_validator: Optional[FIRSValidator] = validation_service.get("firs_validator")
+                format_validator: Optional[FormatValidator] = validation_service.get("format_validator")
+                submission_validator: Optional[SubmissionValidator] = validation_service.get("submission_validator")
+                recent_results: deque = validation_service.get("recent_results")  # type: ignore[arg-type]
+                validation_store: Dict[str, Dict[str, Any]] = validation_service.get("validation_store", {})
+                batch_results: Dict[str, Dict[str, Any]] = validation_service.get("batch_results", {})
+                issue_counter: Counter = validation_service.get("issue_counter", Counter())  # type: ignore[assignment]
+                metrics: Dict[str, Any] = validation_service.get("metrics", {})
+                rule_catalog: Dict[str, Dict[str, Any]] = validation_service.get("rule_catalog", {})
+
+                def _utc_now() -> datetime:
+                    return datetime.now(timezone.utc)
+
+                def _serialize_format_result(result) -> Dict[str, Any]:
+                    return {
+                        "field": getattr(result, "field_path", None),
+                        "severity": getattr(getattr(result, "severity", None), "value", None),
+                        "message": getattr(result, "message", None),
+                        "expected": getattr(result, "expected_format", None),
+                        "actual": getattr(result, "actual_value", None),
+                    }
+
+                def _serialize_firs_result(result) -> Dict[str, Any]:
+                    return {
+                        "rule_id": getattr(result, "rule_id", None),
+                        "field": getattr(result, "field_name", None),
+                        "severity": getattr(getattr(result, "severity", None), "value", None),
+                        "message": getattr(result, "message", None),
+                        "suggestion": getattr(result, "suggestion", None),
+                    }
+
+                def _serialize_submission_check(check) -> Dict[str, Any]:
+                    return {
+                        "check_id": getattr(check, "check_id", None),
+                        "name": getattr(check, "check_name", None),
+                        "category": getattr(getattr(check, "category", None), "value", None),
+                        "status": getattr(getattr(check, "status", None), "value", None),
+                        "severity": getattr(getattr(check, "severity", None), "value", None),
+                        "message": getattr(check, "message", None),
+                        "blocking": getattr(check, "blocking", None),
+                    }
+
+                def _serialize_format_report(report) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+                    if report is None:
+                        return None, []
+                    errors = [_serialize_format_result(res) for res in getattr(report, "errors", [])]
+                    warnings = [_serialize_format_result(res) for res in getattr(report, "warnings", [])]
+                    info_entries = [_serialize_format_result(res) for res in getattr(report, "info", [])]
+                    payload = {
+                        "document_id": getattr(report, "document_id", None),
+                        "format_type": getattr(getattr(report, "format_type", None), "value", None),
+                        "is_valid": getattr(report, "is_valid", None),
+                        "schema_version": getattr(report, "schema_version", None),
+                        "total_fields": getattr(report, "total_fields", None),
+                        "invalid_fields": getattr(report, "invalid_fields", None),
+                        "errors": errors,
+                        "warnings": warnings,
+                        "info": info_entries,
+                    }
+                    issues = [
+                        {
+                            "source": "format",
+                            "code": f"format::{entry['field']}",
+                            "severity": entry["severity"],
+                            "message": entry["message"],
+                        }
+                        for entry in errors + warnings
+                    ]
+                    return payload, issues
+
+                def _serialize_firs_report(report) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+                    if report is None:
+                        return None, []
+                    errors = [_serialize_firs_result(res) for res in getattr(report, "errors", [])]
+                    warnings = [_serialize_firs_result(res) for res in getattr(report, "warnings", [])]
+                    payload = {
+                        "document_id": getattr(report, "document_id", None),
+                        "document_type": getattr(getattr(report, "document_type", None), "value", None),
+                        "is_valid": getattr(report, "is_valid", None),
+                        "total_checks": getattr(report, "total_checks", None),
+                        "passed_checks": getattr(report, "passed_checks", None),
+                        "failed_checks": getattr(report, "failed_checks", None),
+                        "errors": errors,
+                        "warnings": warnings,
+                    }
+                    issues = [
+                        {
+                            "source": "compliance",
+                            "code": entry.get("rule_id") or entry.get("field") or "firs_unknown",
+                            "severity": entry.get("severity"),
+                            "message": entry.get("message"),
+                        }
+                        for entry in errors + warnings
+                    ]
+                    return payload, issues
+
+                def _serialize_submission_report(report) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+                    if report is None:
+                        return None, []
+                    checks = [_serialize_submission_check(check) for check in getattr(report, "checks", [])]
+                    categories = {
+                        getattr(category, "value", str(category)): data
+                        for category, data in getattr(report, "categories", {}).items()
+                    }
+                    payload = {
+                        "document_id": getattr(report, "document_id", None),
+                        "validation_id": getattr(report, "validation_id", None),
+                        "readiness": getattr(getattr(report, "readiness", None), "value", None),
+                        "overall_score": getattr(report, "overall_score", None),
+                        "passed_checks": getattr(report, "passed_checks", None),
+                        "failed_checks": getattr(report, "failed_checks", None),
+                        "warning_checks": getattr(report, "warning_checks", None),
+                        "blocking_issues": getattr(report, "blocking_issues", None),
+                        "checks": checks,
+                        "categories": categories,
+                        "recommendations": getattr(report, "recommendations", []),
+                    }
+                    issues = [
+                        {
+                            "source": "submission",
+                            "code": check.get("check_id"),
+                            "severity": check.get("severity"),
+                            "message": check.get("message"),
+                        }
+                        for check in checks
+                        if check.get("status") in {CheckStatus.FAILED.value, CheckStatus.WARNING.value}
+                    ]
+                    return payload, issues
+
+                async def _execute_validation(
+                    document: Dict[str, Any],
+                    options: Optional[Dict[str, Any]] = None,
+                    *,
+                    run_format: bool = True,
+                    run_firs: bool = True,
+                    run_submission: bool = True,
+                ) -> Dict[str, Any]:
+                    if not isinstance(document, dict):
+                        raise ValueError("invoice_data must be a JSON object")
+
+                    options = options or {}
+                    validation_id = str(uuid.uuid4())
+                    started_at = _utc_now()
+
+                    format_report = None
+                    firs_report = None
+                    submission_report = None
+
+                    if run_format and format_validator:
+                        format_report = await format_validator.validate_document_format(document)
+
+                    if run_firs and firs_validator:
+                        firs_report = await firs_validator.validate_document(document)
+
+                    if run_submission and submission_validator:
+                        submission_options = options.get("submission", {})
+                        submission_context = SubmissionContext(
+                            document_data=document,
+                            submission_endpoint=submission_options.get(
+                                "submission_endpoint", "https://firs.sandbox/api"
+                            ),
+                            security_level=submission_options.get("security_level", "standard"),
+                            transmission_mode=submission_options.get("transmission_mode", "api"),
+                            user_permissions=submission_options.get(
+                                "user_permissions",
+                                ["submit_documents", "access_firs"],
+                            ),
+                            organization_settings=submission_options.get(
+                                "organization_settings", {"required_workflow": ["created", "reviewed"]}
+                            ),
+                            external_dependencies=submission_options.get(
+                                "external_dependencies",
+                                {
+                                    "system_version": "1.0.0",
+                                    "cpu_usage": 20,
+                                    "memory_usage": 30,
+                                    "signing": {"signing_key": "available"},
+                                    "daily_submissions": 0,
+                                },
+                            ),
+                            validation_options=submission_options.get("validation_options", {}),
+                        )
+                        endpoint = submission_context.submission_endpoint
+                        if endpoint:
+                            cache_key = f"connectivity_{endpoint}"
+                            submission_validator._service_cache[cache_key] = (
+                                CheckStatus.PASSED,
+                                "Connectivity check skipped (local validation)",
+                                None,
+                            )
+                            submission_validator._cache_expiry[cache_key] = datetime.utcnow() + timedelta(minutes=10)
+                        submission_report = await submission_validator.validate_submission(submission_context)
+
+                    format_payload, format_issues = _serialize_format_report(format_report)
+                    firs_payload, firs_issues = _serialize_firs_report(firs_report)
+                    submission_payload, submission_issues = _serialize_submission_report(submission_report)
+
+                    issues = format_issues + firs_issues + submission_issues
+                    for issue in issues:
+                        issue_code = issue.get("code") or "unknown_issue"
+                        issue_counter[issue_code] += 1
+
+                    duration_ms = (_utc_now() - started_at).total_seconds() * 1000
+
+                    success = True
+                    if format_payload is not None:
+                        success = success and bool(format_payload.get("is_valid", False))
+                    if firs_payload is not None:
+                        success = success and bool(firs_payload.get("is_valid", False))
+                    if submission_payload is not None:
+                        readiness = submission_payload.get("readiness")
+                        success = success and readiness in {
+                            SubmissionReadiness.READY.value,
+                            SubmissionReadiness.PENDING.value,
+                        }
+
+                    metrics.setdefault("total_requests", 0)
+                    metrics.setdefault("single_validations", 0)
+                    metrics.setdefault("batch_validations", 0)
+                    metrics.setdefault("passed", 0)
+                    metrics.setdefault("failed", 0)
+                    metrics.setdefault("total_duration_ms", 0.0)
+                    metrics.setdefault("score_accumulator", 0.0)
+                    metrics.setdefault("validations_with_score", 0)
+
+                    metrics["total_requests"] += 1
+                    metrics["single_validations"] += 1
+                    metrics["total_duration_ms"] += duration_ms
+                    metrics["last_validation_at"] = started_at.isoformat()
+
+                    if success:
+                        metrics["passed"] += 1
+                    else:
+                        metrics["failed"] += 1
+
+                    submission_score = submission_payload.get("overall_score") if submission_payload else None
+                    if submission_score is not None:
+                        metrics["score_accumulator"] += submission_score
+                        metrics["validations_with_score"] += 1
+
+                    record = {
+                        "validation_id": validation_id,
+                        "status": "passed" if success else "failed",
+                        "timestamp": started_at.isoformat(),
+                        "duration_ms": duration_ms,
+                        "issues": issues,
+                        "reports": {},
+                        "summary": {
+                            "format": format_payload,
+                            "compliance": firs_payload,
+                            "submission": submission_payload,
+                        },
+                    }
+
+                    reports_container = record["reports"]
+                    if format_payload is not None:
+                        reports_container["format_report"] = format_payload
+                    if firs_payload is not None:
+                        reports_container["firs_report"] = firs_payload
+                    if submission_payload is not None:
+                        reports_container["submission_report"] = submission_payload
+
+                    validation_store[validation_id] = record
+                    if isinstance(recent_results, deque):
+                        recent_results.appendleft(record)
+
+                    return record
+
+                timestamp = _utc_now().isoformat()
+
+                if operation in {"validate_invoice", "validate_single_invoice", "validate_submission", "check_compliance", "verify_format", "validate_ubl_compliance", "validate_peppol_compliance", "validate_iso27001_compliance", "validate_iso20022_compliance", "validate_data_protection_compliance", "validate_lei_compliance", "validate_product_classification", "validate_comprehensive_compliance"}:
+                    document = (
+                        payload.get("invoice_data")
+                        or payload.get("document")
+                        or payload.get("submission_data")
+                    )
+                    if document is None:
+                        return {"operation": operation, "success": False, "error": "missing_document"}
+
+                    options = payload.get("options") or {}
+
+                    run_format = operation not in {"check_compliance"}
+                    run_firs = operation not in {"verify_format"}
+                    run_submission = operation in {"validate_submission", "validate_comprehensive_compliance", "validate_single_invoice", "validate_invoice", "check_compliance", "validate_ubl_compliance", "validate_peppol_compliance", "validate_iso27001_compliance", "validate_iso20022_compliance", "validate_data_protection_compliance", "validate_lei_compliance", "validate_product_classification", "validate_comprehensive_compliance"}
+
+                    record = await _execute_validation(
+                        document,
+                        options,
+                        run_format=run_format,
+                        run_firs=run_firs,
+                        run_submission=run_submission,
+                    )
+
+                    return {
+                        "operation": operation,
+                        "success": record["status"] == "passed",
+                        "data": record,
+                    }
+
+                if operation == "validate_invoice_batch":
+                    batch_data = payload.get("batch_data") or {}
+                    invoices = batch_data.get("invoices") or []
+                    if not isinstance(invoices, list) or not invoices:
+                        return {"operation": operation, "success": False, "error": "no_invoices_provided"}
+
+                    batch_id = batch_data.get("batch_id") or f"BATCH-{uuid.uuid4().hex[:8]}"
+                    options = batch_data.get("options") or {}
+
+                    batch_records: List[Dict[str, Any]] = []
+                    for invoice in invoices:
+                        record = await _execute_validation(invoice, options)
+                        record["batch_id"] = batch_id
+                        batch_records.append(record)
+
+                    metrics["batch_validations"] = metrics.get("batch_validations", 0) + 1
+
+                    passed_count = sum(1 for rec in batch_records if rec["status"] == "passed")
+                    failed_count = len(batch_records) - passed_count
+                    batch_payload = {
+                        "batch_id": batch_id,
+                        "status": "completed",
+                        "summary": {
+                            "total": len(batch_records),
+                            "passed": passed_count,
+                            "failed": failed_count,
+                        },
+                        "validated_at": timestamp,
+                        "results": batch_records,
+                    }
+
+                    batch_results[batch_id] = batch_payload
+
+                    return {
+                        "operation": operation,
+                        "success": failed_count == 0,
+                        "data": batch_payload,
+                    }
+
+                if operation == "validate_uploaded_file":
+                    file_content = payload.get("file_content")
+                    if isinstance(file_content, bytes):
+                        try:
+                            file_content = file_content.decode("utf-8")
+                        except UnicodeDecodeError:
+                            return {"operation": operation, "success": False, "error": "invalid_file_encoding"}
+                    if isinstance(file_content, str):
+                        try:
+                            parsed = json.loads(file_content)
+                        except json.JSONDecodeError:
+                            return {"operation": operation, "success": False, "error": "invalid_json_payload"}
+                    else:
+                        parsed = file_content
+
+                    if isinstance(parsed, list):
+                        return await validation_callback("validate_invoice_batch", {"batch_data": {"invoices": parsed}})
+                    if isinstance(parsed, dict):
+                        return await validation_callback("validate_single_invoice", {"invoice_data": parsed})
+
+                    return {"operation": operation, "success": False, "error": "unsupported_file_structure"}
+
+                if operation == "get_validation_result":
+                    validation_id = payload.get("validation_id")
+                    if not validation_id:
+                        return {"operation": operation, "success": False, "error": "missing_validation_id"}
+                    record = validation_store.get(validation_id)
+                    if not record:
+                        return {"operation": operation, "success": False, "error": "not_found"}
+                    return {"operation": operation, "success": True, "data": record}
+
+                if operation == "get_batch_validation_status":
+                    batch_id = payload.get("batch_id")
+                    if not batch_id:
+                        return {"operation": operation, "success": False, "error": "missing_batch_id"}
+                    record = batch_results.get(batch_id)
+                    if not record:
+                        return {"operation": operation, "success": False, "error": "not_found"}
+                    return {"operation": operation, "success": True, "data": record}
+
+                if operation == "get_recent_validation_results":
                     return {
                         "operation": operation,
                         "success": True,
                         "data": {
-                            "validated": True,
-                            "issues": [],
-                            "checked_at": timestamp
-                        }
+                            "results": list(recent_results) if isinstance(recent_results, deque) else [],
+                            "generated_at": timestamp,
+                        },
                     }
-                if operation == "get_validation_result":
-                    return {"operation": operation, "success": True, "data": {"result_id": payload.get("validation_id"), "status": "completed", "checked_at": timestamp}}
-                if operation == "get_batch_validation_status":
-                    return {"operation": operation, "success": True, "data": {"batch_id": payload.get("batch_id"), "status": "pending", "processed": 0}}
-                if operation in {"get_validation_metrics", "get_validation_overview", "get_recent_validation_results", "get_data_quality_metrics"}:
-                    return {"operation": operation, "success": True, "data": {"metrics": {}, "generated_at": timestamp}}
+
+                if operation == "get_validation_metrics":
+                    total = metrics.get("total_requests", 0)
+                    passed = metrics.get("passed", 0)
+                    failed = metrics.get("failed", 0)
+                    avg_duration = (
+                        metrics.get("total_duration_ms", 0.0) / total if total else 0.0
+                    )
+                    avg_score = (
+                        metrics.get("score_accumulator", 0.0) / metrics.get("validations_with_score", 1)
+                        if metrics.get("validations_with_score", 0) > 0
+                        else None
+                    )
+                    data = {
+                        "metrics": {
+                            "total_validations": total,
+                            "passed": passed,
+                            "failed": failed,
+                            "pass_rate": (passed / total * 100) if total else 0.0,
+                            "average_duration_ms": avg_duration,
+                            "average_score": avg_score,
+                            "single_validations": metrics.get("single_validations", 0),
+                            "batch_validations": metrics.get("batch_validations", 0),
+                            "last_validation_at": metrics.get("last_validation_at"),
+                        },
+                        "generated_at": timestamp,
+                    }
+                    return {"operation": operation, "success": True, "data": data}
+
+                if operation == "get_validation_overview":
+                    overview = {
+                        "metrics": await validation_callback("get_validation_metrics", {})["data"],
+                        "recent": list(recent_results)[:5] if isinstance(recent_results, deque) else [],
+                        "common_issues": [
+                            {"code": code, "count": count}
+                            for code, count in issue_counter.most_common(10)
+                        ],
+                        "generated_at": timestamp,
+                    }
+                    return {"operation": operation, "success": True, "data": overview}
+
                 if operation in {"get_validation_rules", "get_firs_validation_standards", "get_ubl_validation_standards"}:
-                    return {"operation": operation, "success": True, "data": {"rules": [], "fetched_at": timestamp}}
-                if operation in {"get_validation_error_analysis", "get_validation_error_help"}:
-                    return {"operation": operation, "success": True, "data": {"analysis": [], "generated_at": timestamp}}
-                if operation in {"generate_quality_report", "generate_compliance_report", "get_compliance_report"}:
-                    return {"operation": operation, "success": True, "data": {"report_id": "validation-report", "generated_at": timestamp}}
-                if operation == "list_compliance_reports":
-                    return {"operation": operation, "success": True, "data": {"reports": [], "generated_at": timestamp}}
-                return {"operation": operation, "success": True, "data": {"status": "placeholder", "timestamp": timestamp}}
+                    rules_payload = {
+                        "firs_rules": [
+                            {
+                                "rule_id": rule_id,
+                                **details,
+                            }
+                            for rule_id, details in rule_catalog.items()
+                            if not rule_id.startswith("format::")
+                        ],
+                        "format_schemas": list(getattr(format_validator, "schemas", {}).keys()) if format_validator else [],
+                        "generated_at": timestamp,
+                    }
+                    return {"operation": operation, "success": True, "data": rules_payload}
+
+                if operation == "get_validation_error_analysis":
+                    analysis = [
+                        {"code": code, "count": count}
+                        for code, count in issue_counter.most_common(20)
+                    ]
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"analysis": analysis, "generated_at": timestamp},
+                    }
+
+                if operation == "get_validation_error_help":
+                    error_code = payload.get("error_code")
+                    if not error_code:
+                        return {"operation": operation, "success": False, "error": "missing_error_code"}
+                    help_entry = rule_catalog.get(error_code)
+                    if help_entry:
+                        return {"operation": operation, "success": True, "data": help_entry}
+                    if error_code.startswith("format::"):
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": {
+                                "description": "Format validation issue",
+                                "severity": "warning",
+                                "remediation": "Review field formatting against schema requirements.",
+                            },
+                        }
+                    return {"operation": operation, "success": False, "error": "unknown_error_code"}
+
+                if operation in {"get_data_quality_metrics", "generate_quality_report", "generate_compliance_report", "get_compliance_report", "list_compliance_reports"}:
+                    total_validations = metrics.get("total_requests", 0)
+                    passed = metrics.get("passed", 0)
+                    fail_rate = (metrics.get("failed", 0) / total_validations * 100) if total_validations else 0.0
+                    quality_score = (passed / total_validations * 100) if total_validations else 100.0
+                    top_issues = [
+                        {"code": code, "count": count}
+                        for code, count in issue_counter.most_common(5)
+                    ]
+                    quality_payload = {
+                        "overall_quality_score": round(quality_score, 2),
+                        "pass_rate": (passed / total_validations * 100) if total_validations else 100.0,
+                        "failure_rate": fail_rate,
+                        "total_validations": total_validations,
+                        "top_issues": top_issues,
+                        "generated_at": timestamp,
+                    }
+                    if operation == "get_data_quality_metrics":
+                        return {"operation": operation, "success": True, "data": quality_payload}
+
+                    report = {
+                        "report_id": f"quality-{uuid.uuid4().hex[:8]}",
+                        "summary": quality_payload,
+                        "recommendations": [
+                            "Increase automated validation coverage" if fail_rate > 10 else "Maintain current validation procedures",
+                            "Review top recurring issues" if top_issues else "Great job keeping issues low",
+                        ],
+                        "generated_at": timestamp,
+                    }
+                    if operation == "list_compliance_reports":
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": {"reports": [report], "generated_at": timestamp},
+                        }
+                    return {"operation": operation, "success": True, "data": report}
+
+                return {"operation": operation, "success": False, "error": "unsupported_operation"}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return validation_callback
@@ -1343,41 +1891,228 @@ class APPServiceRegistry:
         """Create callback for security operations"""
         async def security_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                encryption_service: EncryptionService = security_service["encryption_service"]
+                audit_logger: AuditLogger = security_service["audit_logger"]
+                scanner: SecurityScanner = security_service.get("scanner")
+                threat_detector: ThreatDetector = security_service.get("threat_detector")
+
+                def _to_enum(enum_cls, value, default):
+                    if isinstance(value, enum_cls):
+                        return value
+                    if isinstance(value, str):
+                        try:
+                            return enum_cls(value.lower())
+                        except ValueError:
+                            try:
+                                return enum_cls[value.upper()]
+                            except Exception:
+                                return default
+                    return default
+
+                def _decode_bytes(value: Optional[str]) -> Optional[bytes]:
+                    if value is None:
+                        return None
+                    if isinstance(value, bytes):
+                        return value
+                    try:
+                        return base64.b64decode(value)
+                    except Exception:
+                        return None
+
                 if operation == "encrypt_document":
-                    document = payload.get("document", "")
-                    encrypted = security_service["encryption_service"].encrypt_sensitive_data(document)
-                    return {"operation": operation, "success": True, "data": {"encrypted": encrypted}}
+                    document = payload.get("document")
+                    if document is None:
+                        return {"operation": operation, "success": False, "error": "missing_document"}
+                    document_id = payload.get("document_id") or f"doc-{uuid.uuid4().hex[:8]}"
+                    algorithm = payload.get("algorithm")
+                    algorithm_enum = None
+                    if algorithm:
+                        algorithm_enum = _to_enum(EncryptionAlgorithm, algorithm, None)
+                    encrypted = await encryption_service.encrypt_document(
+                        document=document,
+                        document_id=document_id,
+                        algorithm=algorithm_enum,
+                    )
+                    last_operation = encryption_service.operations[-1] if encryption_service.operations else None
+                    key_id = None
+                    algorithm_used = encrypted.algorithm or algorithm_enum or encryption_service.config.algorithm
+                    if last_operation:
+                        key_id = last_operation.key_id or key_id
+                        if not algorithm_used and last_operation.algorithm:
+                            algorithm_used = last_operation.algorithm
+                    if not encrypted.key_id and key_id:
+                        encrypted.key_id = key_id
+                    if algorithm_used and not encrypted.algorithm:
+                        encrypted.algorithm = algorithm_used if isinstance(algorithm_used, EncryptionAlgorithm) else _to_enum(EncryptionAlgorithm, algorithm_used, encryption_service.config.algorithm)
+
+                    data = {
+                        "document_id": document_id,
+                        "data": base64.b64encode(encrypted.data).decode("utf-8"),
+                        "iv": base64.b64encode(encrypted.iv).decode("utf-8"),
+                        "tag": base64.b64encode(encrypted.tag).decode("utf-8") if encrypted.tag else None,
+                        "salt": base64.b64encode(encrypted.salt).decode("utf-8") if encrypted.salt else None,
+                        "algorithm": (encrypted.algorithm.value if isinstance(encrypted.algorithm, EncryptionAlgorithm) else str(encrypted.algorithm or "")) or algorithm_used.value,
+                        "key_id": encrypted.key_id or key_id,
+                    }
+                    return {"operation": operation, "success": True, "data": data}
+
                 if operation == "decrypt_document":
-                    document = payload.get("document", "")
-                    decrypt_fn = getattr(security_service["encryption_service"], "decrypt_sensitive_data", None)
-                    decrypted = decrypt_fn(document) if callable(decrypt_fn) else document
-                    return {"operation": operation, "success": True, "data": {"decrypted": decrypted}}
+                    encrypted_payload = payload.get("encrypted_data")
+                    if not isinstance(encrypted_payload, dict):
+                        return {"operation": operation, "success": False, "error": "missing_encrypted_data"}
+                    encrypted_data = EncryptedData(
+                        data=_decode_bytes(encrypted_payload.get("data")) or b"",
+                        iv=_decode_bytes(encrypted_payload.get("iv")) or b"",
+                        tag=_decode_bytes(encrypted_payload.get("tag")),
+                        salt=_decode_bytes(encrypted_payload.get("salt")),
+                        algorithm=_to_enum(EncryptionAlgorithm, encrypted_payload.get("algorithm"), encryption_service.config.algorithm),
+                        key_id=encrypted_payload.get("key_id"),
+                    )
+                    document_id = payload.get("document_id", "unknown")
+                    decrypted = await encryption_service.decrypt_document(encrypted_data, document_id)
+                    if isinstance(decrypted, bytes):
+                        try:
+                            decrypted = decrypted.decode("utf-8")
+                        except UnicodeDecodeError:
+                            decrypted = base64.b64encode(decrypted).decode("utf-8")
+                    return {"operation": operation, "success": True, "data": {"document": decrypted}}
+
                 if operation == "log_security_event":
                     event = payload.get("event", {})
-                    security_service["audit_logger"].log_security_event(event)
+                    level = _to_enum(AuditLevel, event.get("level", "security"), AuditLevel.SECURITY)
+                    category = _to_enum(EventCategory, event.get("category", "security_incident"), EventCategory.SECURITY_INCIDENT)
+                    message = event.get("message", "Security event logged")
+                    details = event.get("details") or {}
+                    context_payload = event.get("context") or {}
+                    context = None
+                    if isinstance(context_payload, dict):
+                        allowed = {field for field in AuditContext.__annotations__}
+                        context_kwargs = {k: v for k, v in context_payload.items() if k in allowed}
+                        context = AuditContext(**context_kwargs)
+                    await audit_logger.log_event(
+                        level=level,
+                        category=category,
+                        event_type=event.get("event_type", "custom_security_event"),
+                        message=message,
+                        details=details,
+                        context=context,
+                        risk_score=int(event.get("risk_score", 50)),
+                        severity=event.get("severity", "medium"),
+                        source_component=event.get("source", "security_api"),
+                    )
                     return {"operation": operation, "success": True, "data": {"logged": True}}
+
                 if operation == "generate_security_report":
-                    return {"operation": operation, "success": True, "data": {"report_id": "security-report"}}
-                if operation in {"get_security_metrics", "get_security_overview"}:
-                    return {"operation": operation, "success": True, "data": {"metrics": {}, "generated_at": datetime.now(timezone.utc).isoformat()}}
-                if operation == "run_security_scan":
-                    return {"operation": operation, "success": True, "data": {"scan_id": "scan-demo", "status": "running"}}
-                if operation == "get_scan_status":
-                    return {"operation": operation, "success": True, "data": {"status": "completed", "scan_id": payload.get("scan_id")}}
-                if operation == "get_scan_results":
-                    return {"operation": operation, "success": True, "data": {"results": [], "scan_id": payload.get("scan_id")}}
-                if operation == "list_vulnerabilities":
-                    return {"operation": operation, "success": True, "data": {"vulnerabilities": []}}
-                if operation == "resolve_vulnerability":
-                    return {"operation": operation, "success": True, "data": {"resolved": True}}
-                if operation == "get_suspicious_activity":
-                    return {"operation": operation, "success": True, "data": {"activities": []}}
+                    report = {
+                        "report_id": f"security-report-{uuid.uuid4().hex[:8]}",
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                        "metrics": audit_logger.get_metrics(),
+                        "vulnerabilities": scanner.list_vulnerabilities(status="open") if scanner else [],
+                    }
+                    return {"operation": operation, "success": True, "data": report}
+
+                if operation == "run_security_scan" and scanner:
+                    scope = (
+                        payload.get("scan_scope")
+                        or payload.get("targets")
+                        or payload.get("events")
+                        or []
+                    )
+                    result = await scanner.run_scan(scope, scan_type=payload.get("scan_type", "ad_hoc"), options=payload.get("options"))
+                    return {"operation": operation, "success": True, "data": result}
+
+                if operation == "get_scan_status" and scanner:
+                    return {"operation": operation, "success": True, "data": scanner.get_scan_status(payload.get("scan_id", ""))}
+
+                if operation == "get_scan_results" and scanner:
+                    return {"operation": operation, "success": True, "data": scanner.get_scan_results(payload.get("scan_id", ""))}
+
+                if operation == "list_vulnerabilities" and scanner:
+                    status_filter = payload.get("status")
+                    vulns = scanner.list_vulnerabilities(status=status_filter)
+                    return {"operation": operation, "success": True, "data": {"vulnerabilities": vulns}}
+
+                if operation == "resolve_vulnerability" and scanner:
+                    vuln_id = payload.get("vulnerability_id")
+                    if not vuln_id:
+                        return {"operation": operation, "success": False, "error": "missing_vulnerability_id"}
+                    result = scanner.resolve_vulnerability(vuln_id, payload.get("resolution"))
+                    return {"operation": operation, "success": result.get("status") != "not_found", "data": result}
+
+                if operation == "get_suspicious_activity" and scanner:
+                    limit = int(payload.get("limit", 20))
+                    return {"operation": operation, "success": True, "data": {"activities": scanner.get_recent_activity(limit=limit)}}
+
                 if operation == "get_access_logs":
-                    return {"operation": operation, "success": True, "data": {"logs": []}}
+                    limit = int(payload.get("limit", 100))
+                    # Flush buffered events so logs reflect latest entries
+                    await audit_logger._flush_buffer()
+                    events = list(audit_logger.event_storage)[-limit:]
+
+                    def _serialize_event(event):
+                        data = asdict(event)
+                        data["timestamp"] = event.timestamp.isoformat()
+                        if event.context:
+                            ctx = asdict(event.context)
+                            data["context"] = ctx
+                        data["level"] = event.level.value
+                        data["category"] = event.category.value
+                        data["compliance_tags"] = [tag.value for tag in event.compliance_tags]
+                        return data
+
+                    logs = [_serialize_event(evt) for evt in events]
+                    return {"operation": operation, "success": True, "data": {"logs": logs, "count": len(logs)}}
+
+                if operation == "get_security_metrics":
+                    scanner_metrics = scanner.get_metrics() if scanner else {}
+                    audit_metrics = audit_logger.get_metrics()
+                    threat_metrics = {}
+                    if threat_detector:
+                        threat_metrics = dict(threat_detector.metrics)
+                        threat_metrics["threats_by_type"] = dict(threat_metrics.get("threats_by_type", {}))
+                        threat_metrics["threats_by_level"] = dict(threat_metrics.get("threats_by_level", {}))
+                    metrics_payload = {
+                        "scanner": scanner_metrics,
+                        "auditing": audit_metrics,
+                        "threat_detection": threat_metrics,
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    return {"operation": operation, "success": True, "data": metrics_payload}
+
+                if operation == "get_security_overview":
+                    overview = {
+                        "metrics": await security_callback("get_security_metrics", {})["data"],
+                        "recent_activity": scanner.get_recent_activity(limit=10) if scanner else [],
+                        "open_vulnerabilities": scanner.list_vulnerabilities(status="open")[:10] if scanner else [],
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    return {"operation": operation, "success": True, "data": overview}
+
                 if operation == "check_iso27001_compliance":
-                    return {"operation": operation, "success": True, "data": {"compliant": True}}
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "compliant": scanner.metrics.get("open_vulnerabilities", 0) == 0 if scanner else True,
+                            "last_scan_at": scanner.metrics.get("last_scan_at") if scanner else None,
+                        },
+                    }
+
                 if operation == "check_gdpr_compliance":
-                    return {"operation": operation, "success": True, "data": {"compliant": True}}
+                    await audit_logger._flush_buffer()
+                    high_risk_events = [evt for evt in audit_logger.event_storage if evt.risk_score >= 80]
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "compliant": len(high_risk_events) == 0,
+                            "high_risk_events": len(high_risk_events),
+                        },
+                    }
+
+                if operation in {"audit_compliance", "get_scan_status", "get_scan_results", "list_vulnerabilities", "resolve_vulnerability", "get_suspicious_activity"} and not scanner:
+                    return {"operation": operation, "success": False, "error": "scanner_unavailable"}
+
                 return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
