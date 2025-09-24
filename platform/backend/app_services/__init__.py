@@ -18,6 +18,7 @@ Services Registered:
 import logging
 import asyncio
 import os
+import uuid
 from datetime import datetime, timezone
 from dataclasses import asdict
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
@@ -1456,8 +1457,49 @@ class APPServiceRegistry:
             try:
                 from core_platform.data_management.db_async import get_async_session
                 from core_platform.data_management.models.business_systems import Taxpayer, TaxpayerStatus
+                from core_platform.data_management.grant_tracking_repository import (
+                    GrantTrackingRepository,
+                    TaxpayerSize,
+                )
+                from core_platform.data_management.database_init import get_database
                 from sqlalchemy import select
                 timestamp = datetime.now(timezone.utc).isoformat()
+
+                grant_repo: Optional[GrantTrackingRepository] = None
+
+                def _get_grant_repo() -> GrantTrackingRepository:
+                    nonlocal grant_repo
+                    if grant_repo is None:
+                        db = get_database()
+                        if not db:
+                            raise RuntimeError("Database not initialized for grant tracking")
+                        grant_repo = GrantTrackingRepository(db_layer=db)
+                    return grant_repo
+
+                def _resolve_tenant_id(source: Dict[str, Any], fallback: Optional[str] = None) -> Optional[str]:
+                    for key in ("tenant_id", "organization_id", "app_id"):
+                        value = source.get(key)
+                        if value:
+                            return value
+                    return fallback
+
+                def _infer_taxpayer_size(data: Dict[str, Any]) -> str:
+                    size_candidates = [
+                        data.get("taxpayer_size"),
+                        data.get("size"),
+                        data.get("business_size"),
+                        (data.get("metadata") or {}).get("taxpayer_size") if isinstance(data.get("metadata"), dict) else None,
+                    ]
+                    for candidate in size_candidates:
+                        if isinstance(candidate, str) and candidate.strip():
+                            return candidate.strip().lower()
+                    turnover = data.get("annual_turnover") or data.get("turnover")
+                    if isinstance(turnover, (int, float)):
+                        return TaxpayerSize.LARGE.value if turnover >= 500_000_000 else TaxpayerSize.SME.value
+                    employee_count = data.get("employee_count")
+                    if isinstance(employee_count, int):
+                        return TaxpayerSize.LARGE.value if employee_count >= 250 else TaxpayerSize.SME.value
+                    return TaxpayerSize.SME.value
 
                 async def _serialize_taxpayer(t: Taxpayer) -> Dict[str, Any]:
                     return {
@@ -1481,14 +1523,23 @@ class APPServiceRegistry:
 
                 if operation == "create_taxpayer":
                     data = payload.get("taxpayer_data") or {}
-                    org_id = data.get("organization_id") or payload.get("organization_id")
+                    org_id = (
+                        data.get("organization_id")
+                        or payload.get("organization_id")
+                        or _resolve_tenant_id(payload)
+                    )
                     tin = data.get("tax_id") or data.get("tin")
                     name = data.get("name") or data.get("business_name")
                     if not org_id or not tin or not name:
-                        return {"operation": operation, "success": False, "error": "missing_required_fields: organization_id,tax_id/name"}
+                        return {
+                            "operation": operation,
+                            "success": False,
+                            "error": "missing_required_fields: organization_id,tax_id/name",
+                        }
                     async for session in get_async_session():
-                        # Check duplicate by TIN
-                        exists = (await session.execute(select(Taxpayer).where(Taxpayer.tin == tin))).scalars().first()
+                        exists = (
+                            await session.execute(select(Taxpayer).where(Taxpayer.tin == tin))
+                        ).scalars().first()
                         if exists:
                             return {"operation": operation, "success": False, "error": "taxpayer_already_exists"}
                         tp = Taxpayer(
@@ -1509,17 +1560,91 @@ class APPServiceRegistry:
                         session.add(tp)
                         await session.commit()
                         await session.refresh(tp)
-                        return {"operation": operation, "success": True, "data": {"taxpayer": await _serialize_taxpayer(tp), "created_at": timestamp}}
+
+                        tenant_identifier = org_id or str(getattr(tp, "organization_id", ""))
+                        try:
+                            if tenant_identifier:
+                                repo = _get_grant_repo()
+                                await repo.register_taxpayer(
+                                    tenant_id=tenant_identifier,
+                                    organization_id=tenant_identifier,
+                                    taxpayer_tin=tp.tin,
+                                    taxpayer_name=tp.business_name,
+                                    taxpayer_size=_infer_taxpayer_size(data),
+                                    sector=data.get("sector"),
+                                )
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.warning(
+                                "Failed to register taxpayer %s for grant tracking: %s",
+                                tp.tin,
+                                exc,
+                            )
+
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": {
+                                "taxpayer": await _serialize_taxpayer(tp),
+                                "created_at": timestamp,
+                            },
+                        }
 
                 if operation == "list_taxpayers":
                     page = int(payload.get("page", 1))
                     limit = int(payload.get("limit", 50))
                     offset = max(page - 1, 0) * limit
+                    filters = payload.get("filters") or {}
+                    tenant_identifier = _resolve_tenant_id(payload)
+
                     async for session in get_async_session():
-                        q = select(Taxpayer).offset(offset).limit(limit)
-                        rows = (await session.execute(q)).scalars().all()
+                        query = select(Taxpayer)
+                        tenant_uuid = None
+                        if tenant_identifier:
+                            try:
+                                tenant_uuid = uuid.UUID(str(tenant_identifier))
+                            except (ValueError, TypeError):
+                                logger.debug("Unable to coerce tenant identifier %s to UUID", tenant_identifier)
+                        if tenant_uuid:
+                            query = query.where(Taxpayer.organization_id == tenant_uuid)
+                        status_filter = filters.get("status")
+                        if status_filter:
+                            try:
+                                status_enum = TaxpayerStatus(status_filter)
+                                query = query.where(Taxpayer.registration_status == status_enum)
+                            except ValueError:
+                                logger.debug("Ignoring invalid taxpayer status filter: %s", status_filter)
+
+                        rows = (
+                            await session.execute(query.offset(offset).limit(limit))
+                        ).scalars().all()
                         items = [await _serialize_taxpayer(r) for r in rows]
-                        return {"operation": operation, "success": True, "data": {"taxpayers": items, "page": page, "limit": limit}}
+
+                        grant_summary = None
+                        analytics = None
+                        target_tenant = tenant_identifier or (items[0]["organization_id"] if items else None)
+                        if target_tenant:
+                            try:
+                                repo = _get_grant_repo()
+                                grant_summary = await repo.get_grant_summary(target_tenant)
+                                analytics = await repo.get_taxpayer_analytics(target_tenant)
+                            except Exception as exc:  # pragma: no cover - defensive
+                                logger.warning("Failed to load grant metrics: %s", exc)
+
+                        response_payload: Dict[str, Any] = {
+                            "taxpayers": items,
+                            "page": page,
+                            "limit": limit,
+                        }
+                        if grant_summary:
+                            response_payload["grant_summary"] = grant_summary
+                        if analytics:
+                            response_payload["analytics"] = analytics
+
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": response_payload,
+                        }
 
                 if operation == "get_taxpayer":
                     taxpayer_id = payload.get("taxpayer_id")
@@ -1527,7 +1652,24 @@ class APPServiceRegistry:
                         row = (await session.execute(select(Taxpayer).where(Taxpayer.id == taxpayer_id))).scalars().first()
                         if not row:
                             return {"operation": operation, "success": False, "error": "not_found"}
-                        return {"operation": operation, "success": True, "data": {"taxpayer": await _serialize_taxpayer(row)}}
+                        tenant_identifier = str(getattr(row, "organization_id", ""))
+                        grant_details = None
+                        if tenant_identifier:
+                            try:
+                                grant_details = await _get_grant_repo().get_taxpayer_onboarding_status(
+                                    tenant_identifier,
+                                    str(getattr(row, "id", "")),
+                                )
+                            except Exception as exc:  # pragma: no cover - defensive
+                                logger.warning(
+                                    "Failed to fetch grant details for taxpayer %s: %s",
+                                    taxpayer_id,
+                                    exc,
+                                )
+                        payload_data: Dict[str, Any] = {"taxpayer": await _serialize_taxpayer(row)}
+                        if grant_details:
+                            payload_data["grant_tracking"] = grant_details
+                        return {"operation": operation, "success": True, "data": payload_data}
 
                 if operation == "update_taxpayer":
                     taxpayer_id = payload.get("taxpayer_id")
@@ -1536,6 +1678,15 @@ class APPServiceRegistry:
                         row = (await session.execute(select(Taxpayer).where(Taxpayer.id == taxpayer_id))).scalars().first()
                         if not row:
                             return {"operation": operation, "success": False, "error": "not_found"}
+                        grant_updates: Dict[str, Any] = {}
+                        if "sector" in updates:
+                            grant_updates["sector"] = updates["sector"]
+                        if "taxpayer_size" in updates:
+                            grant_updates["taxpayer_size"] = updates["taxpayer_size"]
+                        if "validation_completed" in updates:
+                            grant_updates["validation_completed"] = updates["validation_completed"]
+                        if "grant_tracking" in updates and isinstance(updates["grant_tracking"], dict):
+                            grant_updates.setdefault("grant_tracking", {}).update(updates["grant_tracking"])
                         # Apply simple updates
                         for src_key, model_key in [
                             ("business_name", "business_name"),
@@ -1554,8 +1705,16 @@ class APPServiceRegistry:
                             meta = getattr(row, "taxpayer_metadata", {}) or {}
                             meta.update(updates["metadata"])
                             row.taxpayer_metadata = meta
+                            grant_meta_update = updates["metadata"].get("grant_tracking")
+                            if isinstance(grant_meta_update, dict):
+                                grant_updates.setdefault("grant_tracking", {}).update(grant_meta_update)
                         await session.commit()
                         await session.refresh(row)
+                        try:
+                            repo = _get_grant_repo()
+                            await repo.update_taxpayer_profile(row.id, grant_updates)
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.warning("Failed to update grant metadata for taxpayer %s: %s", taxpayer_id, exc)
                         return {"operation": operation, "success": True, "data": {"taxpayer": await _serialize_taxpayer(row)}}
 
                 if operation == "delete_taxpayer":
@@ -1569,72 +1728,261 @@ class APPServiceRegistry:
                         meta["deleted"] = True
                         row.taxpayer_metadata = meta
                         await session.commit()
+                        try:
+                            await _get_grant_repo().deactivate_taxpayer(row.id)
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.warning("Failed to deactivate taxpayer %s in grant tracker: %s", taxpayer_id, exc)
                         return {"operation": operation, "success": True, "data": {"deleted": True}}
                 if operation == "bulk_onboard_taxpayers":
-                    return {"operation": operation, "success": True, "data": {"processed": len(payload.get("taxpayers", []))}}
+                    taxpayers_payload = payload.get("taxpayers") or []
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"processed": len(taxpayers_payload)},
+                    }
+
                 if operation == "get_taxpayer_overview":
-                    return {"operation": operation, "success": True, "data": {"overview": {}, "generated_at": timestamp}}
-                if operation == "get_taxpayer_statistics":
-                    return {"operation": operation, "success": True, "data": {"statistics": {}, "period": payload.get("period", "30d")}}
-                if operation == "get_taxpayer_onboarding_status":
-                    return {"operation": operation, "success": True, "data": {"taxpayer_id": payload.get("taxpayer_id"), "status": "in_progress"}}
-                if operation == "get_taxpayer_compliance_status":
-                    return {"operation": operation, "success": True, "data": {"status": "compliant", "checked_at": timestamp}}
-                if operation == "update_taxpayer_compliance_status":
-                    return {"operation": operation, "success": True, "data": {"updated": True}}
-                if operation == "list_non_compliant_taxpayers":
-                    return {"operation": operation, "success": True, "data": {"taxpayers": [], "generated_at": timestamp}}
-                if operation == "generate_grant_tracking_report":
-                    # Use grant tracking repository for progress + analytics
-                    from core_platform.data_management.grant_tracking_repository import GrantTrackingRepository
-                    from core_platform.data_management.database_init import get_db_session
-                    repo = GrantTrackingRepository(get_db_session())
-                    tenant_id = payload.get("organization_id") or payload.get("tenant_id")
-                    if not tenant_id:
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
                         return {"operation": operation, "success": False, "error": "missing_tenant_id"}
-                    progress = await repo.get_milestone_progress(tenant_id)
-                    analytics = await repo.get_taxpayer_analytics(tenant_id)
-                    return {"operation": operation, "success": True, "data": {"progress": progress, "analytics": analytics, "generated_at": timestamp}}
-                if operation == "get_grant_milestones":
-                    from core_platform.data_management.grant_tracking_repository import GrantTrackingRepository
-                    from core_platform.data_management.database_init import get_db_session
-                    from dataclasses import asdict as _asdict
-                    repo = GrantTrackingRepository(get_db_session())
-                    # Return milestone definitions only
-                    milestones = {k.value: _asdict(v) for k, v in repo.MILESTONE_DEFINITIONS.items()}
-                    return {"operation": operation, "success": True, "data": {"milestones": milestones, "generated_at": timestamp}}
-                if operation == "get_onboarding_performance":
-                    # Basic performance computed from taxpayer table (counts last 30d)
-                    period = payload.get("period", "30d")
+                    summary = await _get_grant_repo().get_grant_summary(tenant_identifier)
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"overview": summary, "generated_at": summary.get("generated_at", timestamp)},
+                    }
+
+                if operation == "get_taxpayer_statistics":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    stats_result = await _get_grant_repo().get_taxpayer_statistics(
+                        tenant_identifier,
+                        payload.get("period", "30d"),
+                    )
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"statistics": stats_result, "period": stats_result.get("period")},
+                    }
+
+                if operation == "get_taxpayer_onboarding_status":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    taxpayer_id = payload.get("taxpayer_id")
+                    if not tenant_identifier or not taxpayer_id:
+                        return {"operation": operation, "success": False, "error": "missing_parameters"}
+                    status_payload = await _get_grant_repo().get_taxpayer_onboarding_status(
+                        tenant_identifier,
+                        taxpayer_id,
+                    )
+                    if not status_payload:
+                        return {"operation": operation, "success": False, "error": "not_found"}
+                    return {"operation": operation, "success": True, "data": status_payload}
+
+                if operation == "get_taxpayer_compliance_status":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    taxpayer_id = payload.get("taxpayer_id")
+                    if not tenant_identifier or not taxpayer_id:
+                        return {"operation": operation, "success": False, "error": "missing_parameters"}
+                    status_payload = await _get_grant_repo().get_taxpayer_onboarding_status(
+                        tenant_identifier,
+                        taxpayer_id,
+                    )
+                    compliance_state = (status_payload or {}).get("metadata", {}).get("compliance_state", "unknown")
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"status": compliance_state, "checked_at": timestamp},
+                    }
+
+                if operation == "update_taxpayer_compliance_status":
+                    taxpayer_id = payload.get("taxpayer_id")
+                    new_status = payload.get("status") or payload.get("compliance_state")
+                    if not taxpayer_id or not new_status:
+                        return {"operation": operation, "success": False, "error": "missing_parameters"}
+
                     async for session in get_async_session():
-                        total = (await session.execute(select(Taxpayer))).scalars().all()
-                        perf = {
-                            "total_taxpayers": len(total),
-                            "period": period,
+                        row = (
+                            await session.execute(select(Taxpayer).where(Taxpayer.id == taxpayer_id))
+                        ).scalars().first()
+                        if not row:
+                            return {"operation": operation, "success": False, "error": "not_found"}
+                        metadata = dict(getattr(row, "taxpayer_metadata", {}) or {})
+                        grant_meta = dict(metadata.get("grant_tracking") or {})
+                        grant_meta["compliance_state"] = new_status
+                        grant_meta["compliance_updated_at"] = timestamp
+                        metadata["grant_tracking"] = grant_meta
+                        row.taxpayer_metadata = metadata
+                        await session.commit()
+                        await session.refresh(row)
+                        try:
+                            await _get_grant_repo().update_taxpayer_compliance_status(row.id, new_status)
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.warning("Grant compliance update failed for %s: %s", taxpayer_id, exc)
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": {"updated": True, "status": new_status},
                         }
-                        return {"operation": operation, "success": True, "data": {"performance": perf, "period": period}}
+
+                if operation == "list_non_compliant_taxpayers":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    records = await _get_grant_repo().list_non_compliant_taxpayers(tenant_identifier)
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"taxpayers": records, "generated_at": timestamp},
+                    }
+
+                if operation == "generate_grant_tracking_report":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    report = await _get_grant_repo().generate_grant_report(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": report}
+
+                if operation == "get_grant_milestones":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    progress: Dict[str, Any] = {}
+                    if tenant_identifier:
+                        try:
+                            progress = await _get_grant_repo().get_milestone_progress(tenant_identifier)
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.warning("Failed to compute milestone progress: %s", exc)
+                    milestones = {
+                        milestone.value: {
+                            "definition": {
+                                "taxpayer_threshold": definition.taxpayer_threshold,
+                                **definition.requirements,
+                                "description": definition.description,
+                                "grant_amount": definition.grant_amount,
+                            },
+                            "progress": progress.get(milestone.value),
+                        }
+                        for milestone, definition in GrantTrackingRepository.MILESTONE_DEFINITIONS.items()
+                    }
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"milestones": milestones, "generated_at": timestamp},
+                    }
+
+                if operation == "get_onboarding_performance":
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    analytics = await _get_grant_repo().get_taxpayer_analytics(tenant_identifier)
+                    performance = {
+                        "total_taxpayers": analytics.get("total_taxpayers", 0),
+                        "active_taxpayers": analytics.get("active_taxpayers", 0),
+                        "large_taxpayers": analytics.get("large_taxpayers", 0),
+                        "sme_taxpayers": analytics.get("sme_taxpayers", 0),
+                        "transmission_rate": analytics.get("transmission_rate", 0.0),
+                    }
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"performance": performance, "period": payload.get("period", "30d")},
+                    }
+
                 if operation == "get_grant_overview":
-                    return {"operation": operation, "success": True, "data": {"overview": {}, "generated_at": timestamp}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    summary = await _get_grant_repo().get_grant_summary(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": summary}
+
                 if operation == "get_current_grant_status":
-                    return {"operation": operation, "success": True, "data": {"status": "on_track", "checked_at": timestamp}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    status_payload = await _get_grant_repo().get_current_grant_status(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": status_payload}
+
                 if operation == "list_grant_milestones":
-                    return {"operation": operation, "success": True, "data": {"milestones": []}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    progress: Dict[str, Any] = {}
+                    if tenant_identifier:
+                        try:
+                            progress = await _get_grant_repo().get_milestone_progress(tenant_identifier)
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.warning("Failed to compute milestone list progress: %s", exc)
+                    milestone_list = [
+                        {
+                            "milestone": milestone.value,
+                            "description": definition.description,
+                            "grant_amount": definition.grant_amount,
+                            "progress": progress.get(milestone.value),
+                        }
+                        for milestone, definition in GrantTrackingRepository.MILESTONE_DEFINITIONS.items()
+                    ]
+                    return {"operation": operation, "success": True, "data": {"milestones": milestone_list}}
+
                 if operation == "get_milestone_details":
-                    return {"operation": operation, "success": True, "data": {"milestone_id": payload.get("milestone_id"), "status": "in_progress"}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    milestone_id = payload.get("milestone_id")
+                    if not tenant_identifier or not milestone_id:
+                        return {"operation": operation, "success": False, "error": "missing_parameters"}
+                    details = await _get_grant_repo().get_milestone_details(tenant_identifier, milestone_id)
+                    if not details:
+                        return {"operation": operation, "success": False, "error": "not_found"}
+                    return {"operation": operation, "success": True, "data": details}
+
                 if operation == "get_milestone_progress":
-                    return {"operation": operation, "success": True, "data": {"milestone_id": payload.get("milestone_id"), "progress": 0}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    progress = await _get_grant_repo().get_milestone_progress(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": progress}
+
                 if operation == "get_upcoming_milestones":
-                    return {"operation": operation, "success": True, "data": {"milestones": [], "days_ahead": payload.get("days_ahead", 30)}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    upcoming = await _get_grant_repo().get_upcoming_milestones(tenant_identifier)
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {"milestones": upcoming, "days_ahead": payload.get("days_ahead", 30)},
+                    }
+
                 if operation == "get_performance_metrics":
-                    return {"operation": operation, "success": True, "data": {"metrics": {}, "generated_at": timestamp}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    metrics = await _get_grant_repo().get_performance_metrics(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": {"metrics": metrics, "generated_at": metrics.get("generated_at", timestamp)}}
+
                 if operation == "get_performance_trends":
-                    return {"operation": operation, "success": True, "data": {"trends": [], "generated_at": timestamp}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    trends = await _get_grant_repo().get_performance_trends(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": {"trends": trends, "generated_at": timestamp}}
+
                 if operation == "generate_grant_report":
-                    return {"operation": operation, "success": True, "data": {"report_id": "grant-report", "generated_at": timestamp}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    report = await _get_grant_repo().generate_grant_report(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": report}
+
                 if operation == "list_grant_reports":
-                    return {"operation": operation, "success": True, "data": {"reports": []}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    reports = await _get_grant_repo().list_grant_reports(tenant_identifier)
+                    return {"operation": operation, "success": True, "data": {"reports": reports}}
+
                 if operation == "get_grant_report":
-                    return {"operation": operation, "success": True, "data": {"report_id": payload.get("report_id"), "status": "completed"}}
+                    tenant_identifier = _resolve_tenant_id(payload)
+                    report_id = payload.get("report_id", "grant-report-current")
+                    if not tenant_identifier:
+                        return {"operation": operation, "success": False, "error": "missing_tenant_id"}
+                    report = await _get_grant_repo().get_grant_report(tenant_identifier, report_id)
+                    return {"operation": operation, "success": True, "data": report}
                 return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}

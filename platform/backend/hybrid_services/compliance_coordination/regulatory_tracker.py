@@ -12,7 +12,7 @@ from enum import Enum
 import uuid
 import hashlib
 
-from core_platform.data_management.database_init import get_db_session
+from core_platform.data_management.database_init import get_db_session, get_database
 from core_platform.models.regulatory import RegulatoryChange, RegulatorySubscription, RegulatoryNotification
 from core_platform.cache import CacheService
 from core_platform.events import EventBus
@@ -300,7 +300,10 @@ class RegulatoryTracker:
         self.event_bus = EventBus()
         self.metrics_collector = MetricsCollector()
         self.notification_service = NotificationService()
-        self.grant_tracking_repository = GrantTrackingRepository()
+        db_layer = get_database()
+        if not db_layer:
+            raise RuntimeError("Database not initialized for regulatory grant tracking")
+        self.grant_tracking_repository = GrantTrackingRepository(db_layer)
         self.kpi_calculator = KPICalculator()
         self.logger = logging.getLogger(__name__)
         

@@ -14,7 +14,7 @@ import numpy as np
 from sqlalchemy import and_, or_, func, distinct
 from sqlalchemy.orm import Session
 
-from core_platform.data_management.database_init import get_db_session
+from core_platform.data_management.database_init import get_db_session, get_database
 from core_platform.data_management.models.business_systems import Taxpayer
 from core_platform.events import EventBus
 from core_platform.notifications import NotificationService
@@ -179,7 +179,10 @@ class TaxpayerAnalyticsService:
         self.event_bus = EventBus()
         self.metrics_collector = MetricsCollector()
         self.notification_service = NotificationService()
-        self.grant_tracking_repo = GrantTrackingRepository(get_db_session(), self.cache_service)
+        db_layer = get_database()
+        if not db_layer:
+            raise RuntimeError("Database not initialized for grant analytics")
+        self.grant_tracking_repo = GrantTrackingRepository(db_layer, self.cache_service)
         self.kpi_calculator = KPICalculator()
         self.logger = logging.getLogger(__name__)
         
