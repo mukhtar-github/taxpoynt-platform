@@ -38,7 +38,7 @@ from .auth_database import get_auth_database
 logger = logging.getLogger(__name__)
 
 # Authentication configuration
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 security = HTTPBearer()
 
 # JWT settings are managed centrally by core_platform.security.jwt_manager
