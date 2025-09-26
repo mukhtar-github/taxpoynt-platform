@@ -27,10 +27,14 @@ from core_platform.data_management.models.firs_submission import (
 )
 from core_platform.data_management.repositories import (
     firs_submission_repo_async as firs_repo,
+    invoice_repo_async as invoice_repo,
 )
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.messaging.queue_manager import get_queue_manager
 from core_platform.messaging.queue_manager import QueueConfiguration, QueueType, QueueStrategy
+
+
+InvoiceRecord = invoice_repo.InvoiceRecord
 
 
 class TransmissionService:
@@ -203,6 +207,102 @@ class TransmissionService:
             return SubmissionStatus.SUBMITTED
         return SubmissionStatus.PROCESSING
 
+    def _normalize_invoice_payload(self, data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not isinstance(data, dict):
+            return None
+        if "invoice_data" in data and isinstance(data["invoice_data"], dict):
+            return self._normalize_invoice_payload(data["invoice_data"])
+        if "firs_invoice" in data and isinstance(data["firs_invoice"], dict):
+            return self._normalize_invoice_payload(data["firs_invoice"])
+        return data
+
+    def _looks_like_invoice_payload(self, data: Any) -> bool:
+        normalized = self._normalize_invoice_payload(data)
+        if not isinstance(normalized, dict):
+            return False
+        indicators = {
+            "items",
+            "lineItems",
+            "totalAmount",
+            "total_amount",
+            "subtotal",
+            "customer",
+            "customer_info",
+        }
+        return any(key in normalized for key in indicators)
+
+    def _combine_invoice_payload(
+        self,
+        existing: Optional[Dict[str, Any]],
+        record: Optional[InvoiceRecord],
+    ) -> Optional[Dict[str, Any]]:
+        merged: Dict[str, Any] = {}
+        if record and isinstance(record.invoice_data, dict):
+            merged.update(record.invoice_data)
+        if isinstance(existing, dict):
+            merged.update(existing)
+        return merged or None
+
+    async def _fetch_invoice_record(
+        self,
+        *,
+        organization_id: Optional[str],
+        invoice_number: Optional[str],
+        submission_id: Optional[str],
+        irn: Optional[str],
+        correlation_id: Optional[str],
+        si_invoice_id: Optional[str],
+    ) -> Optional[InvoiceRecord]:
+        async with self._session_scope() as session:
+            return await invoice_repo.get_invoice_record(
+                session,
+                organization_id=organization_id,
+                invoice_number=invoice_number,
+                submission_id=submission_id,
+                irn=irn,
+                correlation_id=correlation_id,
+                si_invoice_id=si_invoice_id,
+            )
+
+    def _select_invoice_number(
+        self,
+        primary: Optional[str],
+        fallback: Optional[str],
+        record: Optional[InvoiceRecord],
+        invoice_payload: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        if primary:
+            return primary
+        if fallback:
+            return fallback
+        if record and record.invoice_number:
+            return record.invoice_number
+        normalized = self._normalize_invoice_payload(invoice_payload or {})
+        if isinstance(normalized, dict):
+            for key in ("invoiceNumber", "invoice_number", "id", "invoiceId"):
+                value = normalized.get(key)
+                if value:
+                    return str(value)
+        return None
+
+    def _select_irn(
+        self,
+        irn: Optional[str],
+        record: Optional[InvoiceRecord],
+        invoice_payload: Optional[Dict[str, Any]] = None,
+        firs_response: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        if irn:
+            return irn
+        if record and record.irn:
+            return record.irn
+        for source in (invoice_payload, firs_response):
+            if isinstance(source, dict):
+                candidate = source.get("irn") or source.get("IRN")
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip()
+        return None
+
     def _serialize_submission(self, submission: FIRSSubmission) -> Dict[str, Any]:
         return {
             "id": str(submission.id),
@@ -339,7 +439,14 @@ class TransmissionService:
             )
             target.firs_status_code = response_data.get("statusCode") or response_data.get("status_code")
             target.firs_message = response_data.get("message") or firs_response.get("error")
-            target.irn = response_data.get("irn") or target.irn
+            irn_value = self._select_irn(
+                target.irn,
+                None,
+                invoice_payload=invoice_data,
+                firs_response=response_data if isinstance(response_data, dict) else {},
+            )
+            if irn_value:
+                target.irn = irn_value
             now = datetime.now(timezone.utc)
             target.submitted_at = target.submitted_at or now
             if status_enum == SubmissionStatus.ACCEPTED:
@@ -516,17 +623,70 @@ class TransmissionService:
         if not isinstance(invoices, list):
             invoices = [invoices] if invoices else []
 
-        firs_payload = {"invoices": invoices}
+        organization_id = self._resolve_org_id(payload) or self._resolve_org_id(batch_submission or {})
+
+        resolved_invoices: List[Dict[str, Any]] = []
+        references: List[Dict[str, Any]] = []
+
+        for entry in invoices:
+            if self._looks_like_invoice_payload(entry):
+                normalized = self._normalize_invoice_payload(entry) or {}
+                resolved_invoices.append(dict(normalized))
+            else:
+                ref_dict: Dict[str, Any]
+                if isinstance(entry, dict):
+                    ref_dict = dict(entry)
+                elif isinstance(entry, str):
+                    ref_dict = {"invoice_number": entry}
+                else:
+                    ref_dict = {}
+                references.append(ref_dict)
+
+        if references:
+            async with self._session_scope() as session:
+                for ref in references:
+                    invoice_number = self._select_invoice_number(
+                        ref.get("invoice_number")
+                        or ref.get("invoiceNumber")
+                        or ref.get("invoice_id")
+                        or ref.get("invoiceId"),
+                        None,
+                        None,
+                        ref,
+                    )
+                    record = await invoice_repo.get_invoice_record(
+                        session,
+                        organization_id=organization_id,
+                        invoice_number=invoice_number,
+                        submission_id=ref.get("submission_id") or ref.get("transmission_id"),
+                        irn=ref.get("irn"),
+                        correlation_id=ref.get("correlation_id"),
+                        si_invoice_id=ref.get("si_invoice_id"),
+                    )
+                    if not record or not record.invoice_data:
+                        identifier = invoice_number or ref.get("submission_id") or ref.get("irn") or "invoice_reference_missing"
+                        raise ValueError(f"invoice_payload_unavailable:{identifier}")
+                    invoice_payload = dict(record.invoice_data)
+                    if record.irn and "irn" not in invoice_payload:
+                        invoice_payload.setdefault("irn", record.irn)
+                    resolved_invoices.append(invoice_payload)
+
+        if not resolved_invoices:
+            raise ValueError("invoice_payload_unavailable")
+
+        firs_payload: Dict[str, Any] = {
+            "invoices": resolved_invoices,
+            "organization_id": organization_id,
+        }
         if isinstance(batch_submission, dict):
             firs_payload["metadata"] = batch_submission
 
         firs_response = await self._call_firs("submit_invoice_batch_to_firs", firs_payload)
 
-        organization_id = self._resolve_org_id(payload) or self._resolve_org_id(batch_submission or {})
         persisted_ids: List[str] = []
         async with self._session_scope() as session:
             with tenant_context(organization_id) if organization_id else nullcontext():
-                for invoice in invoices or []:
+                for invoice in resolved_invoices:
                     submission = await self._persist_submission(
                         session,
                         organization_id,
@@ -536,10 +696,10 @@ class TransmissionService:
                     )
                     if submission:
                         persisted_ids.append(str(submission.id))
-        # Optional: schedule store-and-forward delivery if delivery info provided
+
         try:
             delivery = payload.get("delivery") or {}
-            await self._enqueue_outbound_delivery(organization_id, invoices, delivery)
+            await self._enqueue_outbound_delivery(organization_id, resolved_invoices, delivery)
         except Exception:
             self.logger.debug("Outbound delivery enqueue skipped")
 
@@ -558,31 +718,13 @@ class TransmissionService:
         }
 
     async def _handle_submit_single_batch(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        firs_response = await self._call_firs("submit_invoice_batch_to_firs", payload)
-        organization_id = self._resolve_org_id(payload)
-        submission = None
-        async with self._session_scope() as session:
-            with tenant_context(organization_id) if organization_id else nullcontext():
-                submission = await self._persist_submission(
-                    session,
-                    organization_id,
-                    payload.get("submission_config"),
-                    firs_response,
-                    status_hint="submitted",
-                )
-        # Optional: schedule store-and-forward delivery
-        try:
-            delivery = payload.get("delivery") or {}
-            await self._enqueue_outbound_delivery(organization_id, payload.get("invoices") or [], delivery)
-        except Exception:
-            self.logger.debug("Outbound delivery enqueue skipped")
-
-        return {
-            "batch_id": payload.get("batch_id"),
-            "submitted_at": self._now_iso(),
-            "firs_response": firs_response,
-            "submission": self._serialize_submission(submission) if submission else None,
-        }
+        normalized_payload = dict(payload)
+        submission_config = normalized_payload.get("submission_config") or {}
+        if "batch_submission_data" not in normalized_payload:
+            normalized_payload["batch_submission_data"] = submission_config
+        if "invoices" not in normalized_payload and isinstance(submission_config, dict):
+            normalized_payload["invoices"] = submission_config.get("invoices") or submission_config.get("items")
+        return await self._handle_submit_invoice_batches(normalized_payload)
 
     async def _handle_generate_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         generation_data = payload.get("generation_data", {})
@@ -609,39 +751,72 @@ class TransmissionService:
         }
 
     async def _handle_submit_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        submission_data = payload.get("submission_data")
-        invoice_data = payload.get("invoice_data")
+        raw_submission = payload.get("submission_data")
+        submission_data = raw_submission if isinstance(raw_submission, dict) else {}
 
-        if isinstance(submission_data, dict):
-            invoice_data = (
-                invoice_data
-                or submission_data.get("invoice_data")
-                or submission_data
-            )
-
-        if not isinstance(invoice_data, dict):
-            invoice_data = {}
-
-        firs_response = await self._call_firs(
-            "submit_invoice_to_firs",
-            {"invoice_data": invoice_data},
+        invoice_payload = self._normalize_invoice_payload(payload.get("invoice_data"))
+        organization_id = self._resolve_org_id(payload) or self._resolve_org_id(submission_data)
+        invoice_number_primary = self._resolve_invoice_number(payload)
+        invoice_number_fallback = self._resolve_invoice_number(submission_data)
+        submission_identifier = (
+            payload.get("submission_id")
+            or payload.get("transmission_id")
+            or submission_data.get("submission_id")
         )
+        irn_candidate = payload.get("irn") or submission_data.get("irn")
 
-        organization_id = self._resolve_org_id(payload) or self._resolve_org_id(submission_data or {})
+        record = None
+        if not self._looks_like_invoice_payload(invoice_payload):
+            record = await self._fetch_invoice_record(
+                organization_id=organization_id,
+                invoice_number=invoice_number_primary or invoice_number_fallback,
+                submission_id=submission_identifier,
+                irn=irn_candidate,
+                correlation_id=payload.get("correlation_id") or submission_data.get("correlation_id"),
+                si_invoice_id=payload.get("si_invoice_id") or submission_data.get("si_invoice_id"),
+            )
+            invoice_payload = self._combine_invoice_payload(invoice_payload, record)
+
+        if not invoice_payload:
+            raise ValueError("invoice_payload_unavailable")
+
+        invoice_number = self._select_invoice_number(
+            invoice_number_primary,
+            invoice_number_fallback,
+            record,
+            invoice_payload,
+        )
+        irn_value = self._select_irn(irn_candidate, record, invoice_payload=invoice_payload)
+        if irn_value and "irn" not in invoice_payload:
+            invoice_payload = dict(invoice_payload)
+            invoice_payload.setdefault("irn", irn_value)
+
+        invoice_payload = dict(invoice_payload)
+
+        firs_payload = {
+            "invoice_data": invoice_payload,
+            "invoice_number": invoice_number,
+            "organization_id": organization_id,
+        }
+        if irn_value:
+            firs_payload["irn"] = irn_value
+
+        firs_response = await self._call_firs("submit_invoice_to_firs", firs_payload)
+
         submission = None
         async with self._session_scope() as session:
             with tenant_context(organization_id) if organization_id else nullcontext():
                 submission = await self._persist_submission(
                     session,
                     organization_id,
-                    invoice_data,
+                    invoice_payload,
                     firs_response,
                     status_hint="submitted",
                 )
-        # Optional: schedule store-and-forward delivery
+
         try:
-            delivery = payload.get("delivery") or {}
-            await self._enqueue_outbound_delivery(organization_id, [invoice_data], delivery)
+            delivery = payload.get("delivery") or submission_data.get("delivery") or {}
+            await self._enqueue_outbound_delivery(organization_id, [invoice_payload], delivery)
         except Exception:
             self.logger.debug("Outbound delivery enqueue skipped")
 
@@ -849,32 +1024,54 @@ class TransmissionService:
         }
 
     async def _handle_resubmit_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        resubmission_data = payload.get("resubmission_data")
+        raw_resubmission = payload.get("resubmission_data")
+        resubmission_data = raw_resubmission if isinstance(raw_resubmission, dict) else {}
+
         submission_id = (
             payload.get("submission_id")
             or payload.get("transmission_id")
             or payload.get("invoice_id")
-            or self._resolve_invoice_number(resubmission_data)
+            or resubmission_data.get("submission_id")
         )
+        invoice_number = self._resolve_invoice_number(resubmission_data, fallback=self._resolve_invoice_number(payload))
+        organization_id = self._resolve_org_id(payload) or self._resolve_org_id(resubmission_data)
 
-        invoice_data = None
-        if isinstance(resubmission_data, dict):
-            invoice_data = resubmission_data.get("invoice_data") or resubmission_data
+        invoice_payload = self._normalize_invoice_payload(resubmission_data.get("invoice_data"))
+        irn_value = payload.get("irn") or resubmission_data.get("irn")
 
-        if not isinstance(invoice_data, dict):
-            invoice_data = {}
+        record = None
+        if not self._looks_like_invoice_payload(invoice_payload) or not irn_value:
+            record = await self._fetch_invoice_record(
+                organization_id=organization_id,
+                invoice_number=invoice_number,
+                submission_id=submission_id,
+                irn=irn_value,
+                correlation_id=payload.get("correlation_id") or resubmission_data.get("correlation_id"),
+                si_invoice_id=payload.get("si_invoice_id") or resubmission_data.get("si_invoice_id"),
+            )
+            invoice_payload = self._combine_invoice_payload(invoice_payload, record)
+            irn_value = self._select_irn(irn_value, record, invoice_payload=invoice_payload)
 
-        firs_response = await self._call_firs(
-            "transmit_firs_invoice",
-            {"invoice_data": invoice_data, "submission_id": submission_id},
-        )
+        if not irn_value:
+            raise ValueError("irn_required_for_resubmission")
+
+        invoice_payload = dict(invoice_payload) if isinstance(invoice_payload, dict) else {}
+
+        firs_payload = {
+            "irn": irn_value,
+            "invoice_data": invoice_payload,
+            "organization_id": organization_id,
+            "options": resubmission_data.get("options") if isinstance(resubmission_data, dict) else None,
+        }
+
+        firs_response = await self._call_firs("transmit_firs_invoice", firs_payload)
 
         updated = await self._update_submission_status(
             submission_id,
-            self._resolve_org_id(payload) or self._resolve_org_id(resubmission_data or {}),
+            organization_id,
             SubmissionStatus.PROCESSING,
             firs_response.get("error"),
-            invoice_number=self._resolve_invoice_number(resubmission_data, fallback=submission_id),
+            invoice_number=invoice_number or submission_id,
         )
         return {
             "submission_id": submission_id,
