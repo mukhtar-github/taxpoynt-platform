@@ -22,11 +22,16 @@ Architecture:
 - Provides database persistence for APP onboarding state
 """
 
+import asyncio
+import json
 import logging
+import os
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
-import json
+
+from core_platform.services.analytics_service import OnboardingAnalyticsService
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +73,16 @@ class APPOnboardingService:
             ]
         }
         
-        # In-memory storage for now (replace with database in production)
+        # Persistent storage configuration
+        default_store = os.getenv("APP_ONBOARDING_STATE_STORE", os.path.join("queue_data", "app_onboarding_states.json"))
+        self._store_path = Path(default_store)
+        self._store_lock = asyncio.Lock()
+        self._states_loaded = False
         self._onboarding_states: Dict[str, APPOnboardingState] = {}
-        
+
+        # Analytics integration
+        self.analytics_service = OnboardingAnalyticsService()
+
         logger.info(f"{self.service_name} v{self.version} initialized")
         
     async def handle_operation(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -93,6 +105,8 @@ class APPOnboardingService:
             
             if not user_id:
                 raise ValueError("User ID is required for APP onboarding operations")
+
+            await self._ensure_store_loaded()
             
             # Route to appropriate handler
             if operation == "get_onboarding_state":
@@ -122,11 +136,10 @@ class APPOnboardingService:
         """Get current onboarding state for APP user"""
         try:
             state = await self._get_onboarding_state(user_id)
-            
             return {
                 "operation": "get_onboarding_state",
                 "success": True,
-                "data": asdict(state) if state else None,
+                "data": self._state_with_progress(state) if state else None,
                 "user_id": user_id
             }
             
@@ -152,11 +165,11 @@ class APPOnboardingService:
                 completed_steps=completed_steps,
                 metadata=metadata
             )
-            
+
             return {
                 "operation": "update_onboarding_state",
                 "success": True,
-                "data": asdict(state),
+                "data": self._state_with_progress(state),
                 "user_id": user_id
             }
             
@@ -174,11 +187,11 @@ class APPOnboardingService:
                 raise ValueError("Step name is required")
             
             state = await self._complete_step(user_id, step_name, metadata)
-            
+
             return {
                 "operation": "complete_onboarding_step",
                 "success": True,
-                "data": asdict(state),
+                "data": self._state_with_progress(state),
                 "step_completed": step_name,
                 "user_id": user_id
             }
@@ -197,7 +210,7 @@ class APPOnboardingService:
             return {
                 "operation": "complete_onboarding",
                 "success": True,
-                "data": asdict(state),
+                "data": self._state_with_progress(state),
                 "user_id": user_id,
                 "completed_at": state.updated_at
             }
@@ -242,7 +255,7 @@ class APPOnboardingService:
         """Get business verification status for APP user"""
         try:
             status = await self._get_business_verification_status(user_id)
-            
+
             return {
                 "operation": "get_business_verification_status",
                 "success": True,
@@ -271,12 +284,99 @@ class APPOnboardingService:
             raise
 
     # Core APP onboarding state management methods
+
+    async def _ensure_store_loaded(self) -> None:
+        if self._states_loaded:
+            return
+        async with self._store_lock:
+            if self._states_loaded:
+                return
+            try:
+                self._store_path.parent.mkdir(parents=True, exist_ok=True)
+                if self._store_path.exists():
+                    content = await asyncio.to_thread(self._store_path.read_text)
+                    if content.strip():
+                        raw = json.loads(content)
+                        self._onboarding_states = {
+                            user: APPOnboardingState(**state_dict)
+                            for user, state_dict in raw.items()
+                        }
+            except Exception as exc:
+                logger.warning("Failed to load APP onboarding state store: %s", exc)
+                self._onboarding_states = {}
+            finally:
+                self._states_loaded = True
+
+    async def _persist_states(self) -> None:
+        async with self._store_lock:
+            try:
+                payload = {
+                    user: asdict(state)
+                    for user, state in self._onboarding_states.items()
+                }
+                self._store_path.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(
+                    self._store_path.write_text,
+                    json.dumps(payload, indent=2, sort_keys=True),
+                )
+            except Exception as exc:
+                logger.warning("Failed to persist APP onboarding state store: %s", exc)
+
+    def _state_with_progress(self, state: APPOnboardingState) -> Dict[str, Any]:
+        data = asdict(state)
+        data["progress"] = self._calculate_progress(state)
+        return data
+
+    def _calculate_progress(self, state: APPOnboardingState) -> Dict[str, Any]:
+        expected_steps = state.metadata.get("expected_steps", [])
+        total = len(expected_steps)
+        completed = len(state.completed_steps)
+        remaining = [step for step in expected_steps if step not in state.completed_steps]
+        completion_rate = (completed / total * 100) if total else 0
+        return {
+            "completed": completed,
+            "total": total,
+            "completion_rate": round(completion_rate, 1),
+            "remaining_steps": remaining,
+            "current_step": state.current_step,
+            "is_complete": state.is_complete,
+        }
+
+    async def _record_event(
+        self,
+        *,
+        user_id: str,
+        step_id: str,
+        event_type: str,
+        metadata: Dict[str, Any],
+    ) -> None:
+        try:
+            event = {
+                "eventType": event_type,
+                "stepId": step_id,
+                "userId": user_id,
+                "userRole": "access_point_provider",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "sessionId": f"app-onboarding-{user_id}",
+                "metadata": metadata,
+            }
+            await self.analytics_service.handle_operation(
+                "process_onboarding_events",
+                {
+                    "events": [event],
+                    "batch_timestamp": event["timestamp"],
+                },
+            )
+        except Exception as exc:
+            logger.debug("Failed to record onboarding analytics event: %s", exc)
+
     async def _get_onboarding_state(self, user_id: str) -> Optional[APPOnboardingState]:
         """Get APP onboarding state from storage"""
         try:
+            await self._ensure_store_loaded()
             # For now, use in-memory storage (replace with database query)
             state = self._onboarding_states.get(user_id)
-            
+
             if not state:
                 # Initialize new APP onboarding state if none exists
                 state = await self._initialize_onboarding_state(user_id)
@@ -311,6 +411,13 @@ class APPOnboardingService:
         
         # Store in memory (replace with database insert)
         self._onboarding_states[user_id] = state
+        await self._persist_states()
+        await self._record_event(
+            user_id=user_id,
+            step_id="service_introduction",
+            event_type="initialize_onboarding",
+            metadata={"service_package": service_package},
+        )
         
         logger.info(f"Initialized new APP onboarding state for user {user_id}")
         return state
@@ -341,6 +448,16 @@ class APPOnboardingService:
         
         # Store updated state (replace with database update)
         self._onboarding_states[user_id] = state
+        await self._persist_states()
+        await self._record_event(
+            user_id=user_id,
+            step_id=current_step,
+            event_type="update_state",
+            metadata={
+                "completed_steps": list(state.completed_steps),
+                "metadata": metadata or {},
+            },
+        )
         
         return state
 
@@ -374,6 +491,15 @@ class APPOnboardingService:
         
         # Store updated state
         self._onboarding_states[user_id] = state
+        await self._persist_states()
+        await self._record_event(
+            user_id=user_id,
+            step_id=step_name,
+            event_type="complete_step",
+            metadata={
+                "step_metadata": metadata or {},
+            },
+        )
         
         return state
 
@@ -392,6 +518,13 @@ class APPOnboardingService:
         
         # Store updated state
         self._onboarding_states[user_id] = state
+        await self._persist_states()
+        await self._record_event(
+            user_id=user_id,
+            step_id="onboarding_complete",
+            event_type="complete_onboarding",
+            metadata=completion_metadata or {},
+        )
         
         logger.info(f"APP onboarding completed for user {user_id}")
         return state
@@ -402,6 +535,13 @@ class APPOnboardingService:
             del self._onboarding_states[user_id]
         
         logger.info(f"APP onboarding state reset for user {user_id}")
+        await self._persist_states()
+        await self._record_event(
+            user_id=user_id,
+            step_id="reset",
+            event_type="reset_onboarding",
+            metadata={},
+        )
 
     async def _get_onboarding_analytics(self, user_id: str) -> Dict[str, Any]:
         """Get APP onboarding analytics and insights"""
