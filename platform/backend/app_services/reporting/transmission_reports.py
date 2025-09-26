@@ -14,6 +14,16 @@ import csv
 import io
 import base64
 from collections import defaultdict, Counter
+from uuid import UUID
+
+from sqlalchemy import desc, func, select
+from sqlalchemy.sql import and_, or_
+
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models.firs_submission import (
+    FIRSSubmission,
+    SubmissionStatus,
+)
 
 try:
     import matplotlib.pyplot as plt  # type: ignore
@@ -133,8 +143,25 @@ class TransmissionDataProvider:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # In production, this would connect to actual database
-        self._mock_data = self._generate_mock_data()
+        self._mock_data: Optional[List[TransmissionRecord]] = None
+        self._status_map = {
+            SubmissionStatus.PENDING: TransmissionStatus.PENDING,
+            SubmissionStatus.PROCESSING: TransmissionStatus.PENDING,
+            SubmissionStatus.SUBMITTED: TransmissionStatus.SUBMITTED,
+            SubmissionStatus.ACCEPTED: TransmissionStatus.APPROVED,
+            SubmissionStatus.REJECTED: TransmissionStatus.REJECTED,
+            SubmissionStatus.FAILED: TransmissionStatus.FAILED,
+            SubmissionStatus.CANCELLED: TransmissionStatus.CANCELLED,
+        }
+        self._status_filters = {
+            TransmissionStatus.PENDING: {SubmissionStatus.PENDING, SubmissionStatus.PROCESSING},
+            TransmissionStatus.SUBMITTED: {SubmissionStatus.SUBMITTED},
+            TransmissionStatus.ACKNOWLEDGED: {SubmissionStatus.SUBMITTED, SubmissionStatus.ACCEPTED},
+            TransmissionStatus.APPROVED: {SubmissionStatus.ACCEPTED},
+            TransmissionStatus.REJECTED: {SubmissionStatus.REJECTED},
+            TransmissionStatus.FAILED: {SubmissionStatus.FAILED},
+            TransmissionStatus.CANCELLED: {SubmissionStatus.CANCELLED},
+        }
     
     def _generate_mock_data(self) -> List[TransmissionRecord]:
         """Generate mock transmission data for demonstration"""
@@ -193,33 +220,219 @@ class TransmissionDataProvider:
         
         return records
     
-    async def get_transmissions(self, 
-                               start_date: datetime,
-                               end_date: datetime,
-                               filter_criteria: Optional[Dict[str, Any]] = None) -> List[TransmissionRecord]:
+    async def get_transmissions(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        filter_criteria: Optional[Dict[str, Any]] = None,
+        limit: Optional[int] = None,
+    ) -> List[TransmissionRecord]:
         """Get transmission records for date range with optional filters"""
-        # Filter by date range
+
+        filter_criteria = filter_criteria or {}
+
+        try:
+            records = await self._fetch_records_from_db(start_date, end_date, filter_criteria, limit)
+            if records:
+                return records
+        except Exception as exc:  # pragma: no cover - fallback to mock data
+            self.logger.warning("Falling back to mock transmission data: %s", exc)
+
+        if self._mock_data is None:
+            self._mock_data = self._generate_mock_data()
+
         filtered_records = [
             record for record in self._mock_data
             if start_date <= record.submitted_at <= end_date
         ]
-        
-        # Apply additional filters
-        if filter_criteria:
-            for key, value in filter_criteria.items():
-                if key == "status":
-                    filtered_records = [r for r in filtered_records if r.status == value]
-                elif key == "client_id":
-                    filtered_records = [r for r in filtered_records if r.client_id == value]
-                elif key == "organization_id":
-                    filtered_records = [r for r in filtered_records if r.organization_id == value]
-                elif key == "has_errors":
-                    if value:
-                        filtered_records = [r for r in filtered_records if r.error_code is not None]
-                    else:
-                        filtered_records = [r for r in filtered_records if r.error_code is None]
-        
+
+        filtered_records = self._apply_filters(filtered_records, filter_criteria)
+
+        if limit is not None:
+            return filtered_records[:limit]
         return filtered_records
+
+    async def _fetch_records_from_db(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        filter_criteria: Dict[str, Any],
+        limit: Optional[int],
+    ) -> List[TransmissionRecord]:
+        """Load transmission records from the database."""
+
+        timestamp_field = func.coalesce(FIRSSubmission.submitted_at, FIRSSubmission.created_at)
+        stmt = (
+            select(FIRSSubmission)
+            .where(timestamp_field >= start_date, timestamp_field <= end_date)
+            .order_by(desc(timestamp_field))
+        )
+
+        status_filter = filter_criteria.get("status")
+        if status_filter:
+            stmt = stmt.where(FIRSSubmission.status.in_(self._coerce_status_filter(status_filter)))
+
+        org_id = filter_criteria.get("organization_id") or filter_criteria.get("tenant_id")
+        org_uuid = self._parse_uuid(org_id)
+        if org_uuid:
+            stmt = stmt.where(FIRSSubmission.organization_id == org_uuid)
+
+        client_id = filter_criteria.get("client_id")
+        if client_id:
+            stmt = stmt.where(
+                and_(
+                    FIRSSubmission.customer_tin.isnot(None),
+                    func.lower(FIRSSubmission.customer_tin) == str(client_id).lower(),
+                )
+            )
+
+        has_errors = filter_criteria.get("has_errors")
+        if has_errors is True:
+            stmt = stmt.where(
+                or_(
+                    FIRSSubmission.firs_status_code.isnot(None),
+                    FIRSSubmission.error_details.isnot(None),
+                )
+            )
+        elif has_errors is False:
+            stmt = stmt.where(
+                and_(
+                    FIRSSubmission.firs_status_code.is_(None),
+                    FIRSSubmission.error_details.is_(None),
+                )
+            )
+
+        if limit is not None:
+            stmt = stmt.limit(int(max(1, limit)))
+
+        async for session in get_async_session():
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [self._map_submission_to_record(row) for row in rows]
+
+        return []
+
+    def _apply_filters(
+        self,
+        records: List[TransmissionRecord],
+        filter_criteria: Dict[str, Any],
+    ) -> List[TransmissionRecord]:
+        """Apply in-memory filters (used for mock fallback)."""
+
+        filtered = records
+        status_filter = filter_criteria.get("status")
+        if status_filter:
+            statuses = self._coerce_status_filter(status_filter)
+            filtered = [r for r in filtered if self._map_to_submission_status(r.status) in statuses]
+
+        client_id = filter_criteria.get("client_id")
+        if client_id:
+            filtered = [r for r in filtered if r.client_id == client_id]
+
+        org_id = filter_criteria.get("organization_id")
+        if org_id:
+            filtered = [r for r in filtered if r.organization_id == str(org_id)]
+
+        if "has_errors" in filter_criteria:
+            if filter_criteria["has_errors"]:
+                filtered = [r for r in filtered if r.error_code]
+            else:
+                filtered = [r for r in filtered if not r.error_code]
+
+        return filtered
+
+    def _map_submission_to_record(self, submission: FIRSSubmission) -> TransmissionRecord:
+        """Convert database submission record into reporting record."""
+
+        status = self._status_map.get(submission.status, TransmissionStatus.PENDING)
+        submitted_at = submission.submitted_at or submission.created_at or datetime.now(timezone.utc)
+        completion_timestamp = submission.accepted_at or submission.rejected_at
+        acknowledged_at = submission.accepted_at or submission.submitted_at
+
+        processing_time = None
+        if submitted_at and completion_timestamp:
+            processing_time = max(
+                0.0,
+                (completion_timestamp - submitted_at).total_seconds(),
+            )
+
+        error_code = submission.firs_status_code
+        error_message = submission.firs_message
+        if not error_message and submission.error_details:
+            if isinstance(submission.error_details, dict):
+                error_message = submission.error_details.get("message") or submission.error_details.get("detail")
+
+        payload_size = 0
+        try:
+            payload_size = len(json.dumps(submission.invoice_data or {}))
+        except Exception:  # pragma: no cover - defensive fallback
+            payload_size = 0
+
+        client_identifier = (
+            submission.customer_tin
+            or submission.customer_name
+            or str(submission.organization_id)
+        )
+
+        return TransmissionRecord(
+            transmission_id=str(submission.id),
+            invoice_number=submission.invoice_number,
+            irn=submission.irn,
+            client_id=str(client_identifier),
+            organization_id=str(submission.organization_id),
+            status=status,
+            submitted_at=submitted_at,
+            acknowledged_at=acknowledged_at,
+            completed_at=completion_timestamp,
+            processing_time_seconds=processing_time,
+            retry_count=submission.retry_count or 0,
+            error_code=error_code,
+            error_message=error_message,
+            firs_response=submission.firs_response,
+            payload_size_bytes=payload_size,
+        )
+
+    def _parse_uuid(self, value: Any) -> Optional[UUID]:
+        if not value:
+            return None
+        try:
+            return UUID(str(value))
+        except Exception:
+            return None
+
+    def _coerce_status_filter(self, raw_status: Any) -> List[SubmissionStatus]:
+        """Normalize status filter into submission statuses."""
+
+        statuses: List[SubmissionStatus] = []
+
+        items = raw_status
+        if not isinstance(items, (list, tuple, set)):
+            items = [items]
+
+        for entry in items:
+            if isinstance(entry, TransmissionStatus):
+                statuses.extend(self._status_filters.get(entry, []))
+                continue
+            try:
+                statuses.append(SubmissionStatus(entry))
+                continue
+            except Exception:
+                pass
+            normalized = str(entry).strip().lower()
+            for ts, submission_group in self._status_filters.items():
+                if ts.value == normalized:
+                    statuses.extend(submission_group)
+                    break
+
+        if not statuses:
+            return list(self._status_map.keys())
+        return list({status for status in statuses})
+
+    def _map_to_submission_status(self, status: TransmissionStatus) -> SubmissionStatus:
+        for submission_status, mapped in self._status_map.items():
+            if mapped == status:
+                return submission_status
+        return SubmissionStatus.PENDING
 
 
 class TransmissionReportGenerator:
@@ -263,7 +476,8 @@ class TransmissionReportGenerator:
             records = await self.data_provider.get_transmissions(
                 start_date=config.start_date,
                 end_date=config.end_date,
-                filter_criteria=config.filter_criteria
+                filter_criteria=config.filter_criteria,
+                limit=config.limit,
             )
             
             # Apply sorting and limiting

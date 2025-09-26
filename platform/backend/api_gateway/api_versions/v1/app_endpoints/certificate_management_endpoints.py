@@ -195,11 +195,13 @@ class CertificateManagementEndpointsV1:
         """Get certificate overview"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_certificate_overview",
                 payload={
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -216,13 +218,16 @@ class CertificateManagementEndpointsV1:
         """List certificates"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_certificates",
                 payload={
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "filters": {
-                        "status": status
+                        "status": status,
+                        "organization_id": org_id,
                     },
                     "api_version": "v1"
                 }
@@ -238,6 +243,7 @@ class CertificateManagementEndpointsV1:
         try:
             context = await self._require_app_role(request)
             body = await request.json()
+            org_id = str(context.organization_id) if context.organization_id else None
             
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
@@ -245,6 +251,7 @@ class CertificateManagementEndpointsV1:
                 payload={
                     "certificate_data": body,
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -258,12 +265,14 @@ class CertificateManagementEndpointsV1:
         """Get certificate details"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_certificate",
                 payload={
                     "certificate_id": certificate_id,
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -278,6 +287,7 @@ class CertificateManagementEndpointsV1:
         try:
             context = await self._require_app_role(request)
             body = await request.json()
+            org_id = str(context.organization_id) if context.organization_id else None
             
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
@@ -286,6 +296,7 @@ class CertificateManagementEndpointsV1:
                     "certificate_id": certificate_id,
                     "updates": body,
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -299,12 +310,14 @@ class CertificateManagementEndpointsV1:
         """Delete certificate (revoke)"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="delete_certificate",
                 payload={
                     "certificate_id": certificate_id,
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -319,12 +332,14 @@ class CertificateManagementEndpointsV1:
         """Renew certificate"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="renew_certificate",
                 payload={
                     "certificate_id": certificate_id,
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -338,12 +353,14 @@ class CertificateManagementEndpointsV1:
         """Get renewal status"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_renewal_status",
                 payload={
                     "certificate_id": certificate_id,
                     "app_id": context.user_id,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )
@@ -359,12 +376,14 @@ class CertificateManagementEndpointsV1:
         """List expiring certificates"""
         try:
             context = await self._require_app_role(request)
+            org_id = str(context.organization_id) if context.organization_id else None
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_expiring_certificates",
                 payload={
                     "app_id": context.user_id,
                     "days_ahead": days_ahead,
+                    "organization_id": org_id,
                     "api_version": "v1"
                 }
             )

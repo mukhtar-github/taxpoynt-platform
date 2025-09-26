@@ -5,11 +5,14 @@ Access Point Provider endpoints for generating custom compliance and transmissio
 Handles report creation, formatting, and delivery for regulatory and business purposes.
 """
 import logging
+import inspect
+import asyncio
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from datetime import datetime
 import io
+import base64
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -18,6 +21,8 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from app_services import get_app_service_registry, APPServiceRegistry
+from app_services import ReportingServiceManager  # for fallback instantiation
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +61,8 @@ class ReportGenerationEndpointsV1:
             tags=["Report Generation V1"],
             dependencies=[Depends(self._require_app_role)]
         )
-        
+        self._fallback_reporting_callback = None
+
         # Define report generation capabilities
         self.report_capabilities = {
             "compliance_reports": {
@@ -90,7 +96,21 @@ class ReportGenerationEndpointsV1:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for APP v1 endpoint")
         context.metadata["api_version"] = "v1"
         context.metadata["endpoint_group"] = "app"
+        try:
+            context.primary_role = context.platform_role or PlatformRole.ACCESS_POINT_PROVIDER
+        except AttributeError:
+            # Older contexts without primary_role property
+            context.platform_role = context.platform_role or PlatformRole.ACCESS_POINT_PROVIDER
         return context
+
+    def _make_json_safe(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, (list, tuple, set)):
+            return [self._make_json_safe(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): self._make_json_safe(val) for key, val in value.items()}
+        return value
     
     def _setup_routes(self):
         """Setup report generation routes"""
@@ -243,24 +263,122 @@ class ReportGenerationEndpointsV1:
             description="Delete scheduled report",
             response_model=V1ResponseModel
         )
-    
+
+    async def _route_reporting_operation(
+        self,
+        context: HTTPRoutingContext,
+        operation: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Route reporting operations with graceful fallback when Redis router is active."""
+
+        router = self.message_router
+        route_fn = getattr(router, "route_message", None)
+        if route_fn:
+            try:
+                signature = inspect.signature(route_fn)
+                if "service_role" in signature.parameters:
+                    return await route_fn(
+                        service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                        operation=operation,
+                        payload=payload,
+                        tenant_id=context.organization_id,
+                        correlation_id=context.correlation_id,
+                        source_service="api_gateway",
+                    )
+            except TypeError as exc:
+                # Redis router uses a different signature; fall back below
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+            except Exception:
+                raise
+
+        # Fallback path: reuse reporting callback from APP service registry
+        registry = get_app_service_registry()
+        reporting_service = None
+
+        if registry:
+            reporting_service = registry.services.get("reporting")
+            if reporting_service and self._fallback_reporting_callback is None:
+                self._fallback_reporting_callback = registry._create_reporting_callback(reporting_service)
+
+        if self._fallback_reporting_callback is None:
+            # Build a lightweight reporting service on the fly
+            manager = ReportingServiceManager()
+            await manager.initialize_services()
+
+            reporting_service = {
+                "manager": manager,
+                "transmission_reporter": manager.transmission_reporter,
+                "compliance_monitor": manager.compliance_monitor,
+                "performance_analyzer": manager.performance_analyzer,
+                "regulatory_dashboard": manager.regulatory_dashboard,
+                "operations": [
+                    "generate_transmission_report",
+                    "monitor_compliance",
+                    "analyze_performance",
+                    "create_dashboard",
+                    "generate_custom_report",
+                    "generate_security_report",
+                    "generate_financial_report",
+                    "generate_compliance_report",
+                    "list_generated_reports",
+                    "list_scheduled_reports",
+                    "schedule_report",
+                    "update_scheduled_report",
+                    "delete_scheduled_report",
+                    "get_report_templates",
+                    "get_report_template",
+                    "get_report_details",
+                    "get_report_status",
+                    "download_report",
+                    "preview_report",
+                    "get_dashboard_metrics",
+                    "get_dashboard_overview",
+                    "get_pending_invoices",
+                    "get_status_summary",
+                    "get_transmission_batches",
+                    "quick_validate_invoices",
+                    "quick_submit_invoices",
+                    "validate_firs_batch",
+                    "submit_firs_batch",
+                ],
+                "report_history": {},
+                "report_index": {},
+                "schedules": {},
+                "schedule_index": {},
+                "lock": asyncio.Lock(),
+            }
+
+            temp_registry = APPServiceRegistry(self.message_router)
+            self._fallback_reporting_callback = temp_registry._create_reporting_callback(reporting_service)
+
+        if self._fallback_reporting_callback is None:
+            raise HTTPException(status_code=500, detail="Reporting services unavailable")
+
+        callback = self._fallback_reporting_callback
+        result = await callback(operation, payload)
+        if not isinstance(result, dict):
+            raise HTTPException(status_code=500, detail="Reporting fallback produced invalid response")
+        return self._make_json_safe(result)
+
     # Report Generation Endpoints
     async def generate_custom_report(self, request: Request):
         """Generate custom report with specified parameters"""
         try:
             context = await self._require_app_role(request)
             body = await request.json()
-            
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="generate_custom_report",
-                payload={
+
+            result = await self._route_reporting_operation(
+                context,
+                "generate_custom_report",
+                {
                     "report_config": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
-            
+
             # Add demo data if service not available
             if not result:
                 result = {
@@ -284,13 +402,13 @@ class ReportGenerationEndpointsV1:
         """Get available report templates"""
         try:
             context = await self._require_app_role(request)
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_report_templates",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "get_report_templates",
+                {
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Add demo data if service not available
@@ -328,14 +446,14 @@ class ReportGenerationEndpointsV1:
         """Get specific report template configuration"""
         try:
             context = await self._require_app_role(request)
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_report_template",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "get_report_template",
+                {
                     "template_id": template_id,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "report_template_retrieved")
@@ -350,14 +468,14 @@ class ReportGenerationEndpointsV1:
             context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="generate_compliance_report",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "generate_compliance_report",
+                {
                     "compliance_config": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "compliance_report_generated")
@@ -371,14 +489,14 @@ class ReportGenerationEndpointsV1:
             context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="generate_transmission_report",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "generate_transmission_report",
+                {
                     "transmission_config": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "transmission_report_generated")
@@ -391,14 +509,14 @@ class ReportGenerationEndpointsV1:
         try:
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="generate_security_report",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "generate_security_report",
+                {
                     "security_config": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "security_report_generated")
@@ -406,19 +524,20 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error generating security report in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to generate security report")
     
-    async def generate_financial_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def generate_financial_report(self, request: Request):
         """Generate financial transaction report"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="generate_financial_report",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "generate_financial_report",
+                {
                     "financial_config": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "financial_report_generated")
@@ -427,23 +546,24 @@ class ReportGenerationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to generate financial report")
     
     # Report Management Endpoints
-    async def list_generated_reports(self, 
+    async def list_generated_reports(self,
+                                   request: Request,
                                    status: Optional[str] = Query(None, description="Filter by report status"),
                                    type: Optional[str] = Query(None, description="Filter by report type"),
-                                   limit: Optional[int] = Query(50, description="Number of reports to return"),
-                                   context: HTTPRoutingContext = Depends(lambda: None)):
+                                   limit: Optional[int] = Query(50, description="Number of reports to return")):
         """List all generated reports"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="list_generated_reports",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "list_generated_reports",
+                {
                     "status": status,
                     "type": type,
                     "limit": limit,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "generated_reports_listed")
@@ -451,17 +571,18 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error listing generated reports in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list generated reports")
     
-    async def get_report_details(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_report_details(self, report_id: str, request: Request):
         """Get detailed information about specific report"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_report_details",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "get_report_details",
+                {
                     "report_id": report_id,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "report_details_retrieved")
@@ -469,17 +590,18 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error getting report details {report_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get report details")
     
-    async def get_report_status(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_report_status(self, report_id: str, request: Request):
         """Get current status of report generation"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_report_status",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "get_report_status",
+                {
                     "report_id": report_id,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "report_status_retrieved")
@@ -488,31 +610,39 @@ class ReportGenerationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get report status")
     
     # Report Download Endpoints
-    async def download_report(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def download_report(self, report_id: str, request: Request):
         """Download generated report file"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="download_report",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "download_report",
+                {
                     "report_id": report_id,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Generate demo content if service not available
             if not result:
-                content = f"Report {report_id}\nGenerated: {datetime.now().isoformat()}\nStatus: Completed\n".encode()
+                content_bytes = f"Report {report_id}\nGenerated: {datetime.now().isoformat()}\nStatus: Completed\n".encode()
                 media_type = "application/pdf"
                 filename = f"report-{report_id}.pdf"
             else:
-                content = result.get("content", "").encode()
+                raw_content = result.get("content", "")
+                if result.get("is_base64"):
+                    try:
+                        content_bytes = base64.b64decode(raw_content)
+                    except Exception:
+                        content_bytes = raw_content.encode()
+                else:
+                    content_bytes = raw_content.encode()
                 media_type = result.get("media_type", "application/pdf")
                 filename = result.get("filename", f"report-{report_id}.pdf")
-            
+
             return StreamingResponse(
-                io.BytesIO(content),
+                io.BytesIO(content_bytes),
                 media_type=media_type,
                 headers={"Content-Disposition": f"attachment; filename={filename}"}
             )
@@ -520,17 +650,18 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error downloading report {report_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to download report")
     
-    async def preview_report(self, report_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def preview_report(self, report_id: str, request: Request):
         """Get preview of report contents"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="preview_report",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "preview_report",
+                {
                     "report_id": report_id,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "report_preview_retrieved")
@@ -539,19 +670,20 @@ class ReportGenerationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to preview report")
     
     # Report Scheduling Endpoints
-    async def schedule_report(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def schedule_report(self, request: Request):
         """Schedule automatic report generation"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="schedule_report",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "schedule_report",
+                {
                     "schedule_config": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "report_scheduled")
@@ -559,16 +691,17 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error scheduling report in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to schedule report")
     
-    async def list_scheduled_reports(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def list_scheduled_reports(self, request: Request):
         """List all scheduled reports"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="list_scheduled_reports",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "list_scheduled_reports",
+                {
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "scheduled_reports_listed")
@@ -576,20 +709,21 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error listing scheduled reports in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to list scheduled reports")
     
-    async def update_scheduled_report(self, schedule_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def update_scheduled_report(self, schedule_id: str, request: Request):
         """Update scheduled report configuration"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="update_scheduled_report",
-                payload={
+            result = await self._route_reporting_operation(
+                context,
+                "update_scheduled_report",
+                {
                     "schedule_id": schedule_id,
                     "updates": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "scheduled_report_updated")
@@ -597,17 +731,18 @@ class ReportGenerationEndpointsV1:
             logger.error(f"Error updating scheduled report {schedule_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to update scheduled report")
     
-    async def delete_scheduled_report(self, schedule_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def delete_scheduled_report(self, schedule_id: str, request: Request):
         """Delete scheduled report"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="delete_scheduled_report",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_reporting_operation(
+                context,
+                "delete_scheduled_report",
+                {
                     "schedule_id": schedule_id,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "scheduled_report_deleted")
@@ -617,7 +752,8 @@ class ReportGenerationEndpointsV1:
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""
-        return build_v1_response(data, action)
+        safe_data = self._make_json_safe(data)
+        return build_v1_response(safe_data, action)
 
 
 def create_report_generation_router(role_detector: HTTPRoleDetector,

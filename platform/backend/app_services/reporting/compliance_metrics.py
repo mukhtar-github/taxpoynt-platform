@@ -13,6 +13,8 @@ from enum import Enum
 import statistics
 from collections import defaultdict, Counter
 
+from .transmission_reports import TransmissionDataProvider, TransmissionStatus
+
 
 class ComplianceStatus(str, Enum):
     """Compliance status levels"""
@@ -135,6 +137,7 @@ class ComplianceDataProvider:
         self._mock_transmission_data = self._generate_mock_transmission_data()
         self._mock_certificate_data = self._generate_mock_certificate_data()
         self._mock_audit_data = self._generate_mock_audit_data()
+        self._transmission_provider = TransmissionDataProvider()
     
     def _generate_mock_transmission_data(self) -> Dict[str, Any]:
         """Generate mock transmission data"""
@@ -198,7 +201,69 @@ class ComplianceDataProvider:
     
     async def get_transmission_metrics(self, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Get transmission-related compliance metrics"""
-        return self._mock_transmission_data
+        try:
+            records = await self._transmission_provider.get_transmissions(start_date, end_date)
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            self.logger.warning("Transmission metric lookup failed, using mock data: %s", exc)
+            records = []
+
+        if not records:
+            return self._mock_transmission_data
+
+        total = len(records)
+        successful = len(
+            [r for r in records if r.status in {TransmissionStatus.APPROVED, TransmissionStatus.SUBMITTED}]
+        )
+        failed = len(
+            [r for r in records if r.status in {TransmissionStatus.REJECTED, TransmissionStatus.FAILED}]
+        )
+        processing_times = [r.processing_time_seconds for r in records if r.processing_time_seconds]
+        average_response_time = (
+            round(sum(processing_times) / len(processing_times), 2)
+            if processing_times
+            else 0.0
+        )
+
+        signature_failures = sum(
+            1 for r in records if r.error_code and "signature" in r.error_code.lower()
+        )
+        timestamp_violations = sum(
+            1 for r in records if r.error_code and "timestamp" in r.error_code.lower()
+        )
+        retry_attempts = sum(r.retry_count for r in records)
+
+        transmission_by_hour = Counter(
+            (r.submitted_at or start_date).strftime("%H") for r in records
+        )
+        last_24h_cutoff = end_date - timedelta(hours=24)
+        last_24h_transmissions = len(
+            [r for r in records if (r.submitted_at or end_date) >= last_24h_cutoff]
+        )
+        peak_transmission_time = (
+            f"{transmission_by_hour.most_common(1)[0][0]}:00"
+            if transmission_by_hour
+            else "00:00"
+        )
+
+        compliance_failures = Counter(
+            (r.error_code or "unknown_error").lower()
+            for r in records
+            if r.error_code
+        )
+
+        return {
+            'total_transmissions': total,
+            'successful_transmissions': successful,
+            'failed_transmissions': failed,
+            'average_response_time': average_response_time,
+            'signature_validation_failures': signature_failures,
+            'timestamp_violations': timestamp_violations,
+            'retry_attempts': retry_attempts,
+            'transmission_by_hour': dict(transmission_by_hour),
+            'last_24h_transmissions': last_24h_transmissions,
+            'peak_transmission_time': peak_transmission_time,
+            'compliance_failures_by_type': dict(compliance_failures) or {'none': 0},
+        }
     
     async def get_certificate_metrics(self) -> Dict[str, Any]:
         """Get certificate-related compliance metrics"""

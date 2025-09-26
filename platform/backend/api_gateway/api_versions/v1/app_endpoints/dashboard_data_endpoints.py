@@ -5,6 +5,8 @@ Access Point Provider endpoints for dashboard data, metrics, and general APP ope
 Handles dashboard statistics, pending invoices, and general APP data.
 """
 import logging
+import inspect
+import asyncio
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
@@ -17,6 +19,8 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from app_services import get_app_service_registry, APPServiceRegistry
+from app_services import ReportingServiceManager
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +56,8 @@ class DashboardDataEndpointsV1:
             tags=["Dashboard Data V1"],  # No prefix to handle root level endpoints
             dependencies=[Depends(self._require_app_role)]
         )
-        
+        self._fallback_reporting_callback = None
+
         # Define dashboard capabilities
         self.dashboard_capabilities = {
             "invoice_management": {
@@ -83,6 +88,77 @@ class DashboardDataEndpointsV1:
         context.metadata["api_version"] = "v1"
         context.metadata["endpoint_group"] = "app"
         return context
+
+    def _make_json_safe(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, (list, tuple, set)):
+            return [self._make_json_safe(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): self._make_json_safe(val) for key, val in value.items()}
+        return value
+
+    async def _route_dashboard_operation(
+        self,
+        context: HTTPRoutingContext,
+        operation: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        router = self.message_router
+        route_fn = getattr(router, "route_message", None)
+        if route_fn:
+            try:
+                signature = inspect.signature(route_fn)
+                if "service_role" in signature.parameters:
+                    return await route_fn(
+                        service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                        operation=operation,
+                        payload=payload,
+                        tenant_id=context.organization_id,
+                        correlation_id=context.correlation_id,
+                        source_service="api_gateway",
+                    )
+            except TypeError as exc:
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+            except Exception:
+                raise
+
+        registry = get_app_service_registry()
+        reporting_service = None
+
+        if registry:
+            reporting_service = registry.services.get("reporting")
+            if reporting_service and self._fallback_reporting_callback is None:
+                self._fallback_reporting_callback = registry._create_reporting_callback(reporting_service)
+
+        if self._fallback_reporting_callback is None:
+            manager = ReportingServiceManager()
+            await manager.initialize_services()
+            reporting_service = {
+                "manager": manager,
+                "transmission_reporter": manager.transmission_reporter,
+                "compliance_monitor": manager.compliance_monitor,
+                "performance_analyzer": manager.performance_analyzer,
+                "regulatory_dashboard": manager.regulatory_dashboard,
+                "operations": [],
+                "report_history": {},
+                "report_index": {},
+                "schedules": {},
+                "schedule_index": {},
+                "lock": asyncio.Lock(),
+            }
+            temp_registry = APPServiceRegistry(self.message_router)
+            self._fallback_reporting_callback = temp_registry._create_reporting_callback(reporting_service)
+
+        if self._fallback_reporting_callback is None:
+            raise HTTPException(status_code=500, detail="Dashboard services unavailable")
+
+        callback = self._fallback_reporting_callback
+        result = await callback(operation, payload)
+        if not isinstance(result, dict):
+            raise HTTPException(status_code=500, detail="Dashboard fallback produced invalid response")
+        return self._make_json_safe(result)
     
     def _setup_routes(self):
         """Setup dashboard data routes"""
@@ -174,21 +250,22 @@ class DashboardDataEndpointsV1:
         )
     
     # Invoice Management Endpoints
-    async def get_pending_invoices(self, 
+    async def get_pending_invoices(self,
+                                 request: Request,
                                  limit: Optional[int] = Query(50, description="Number of invoices to return"),
-                                 status: Optional[str] = Query(None, description="Filter by status"),
-                                 context: HTTPRoutingContext = Depends(lambda: None)):
+                                 status: Optional[str] = Query(None, description="Filter by status")):
         """Get pending invoices"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_pending_invoices",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_dashboard_operation(
+                context,
+                "get_pending_invoices",
+                {
                     "limit": limit,
                     "status": status,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Add demo data if service not available
@@ -223,19 +300,20 @@ class DashboardDataEndpointsV1:
             logger.error(f"Error getting pending invoices in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get pending invoices")
     
-    async def get_transmission_batches(self, 
-                                     status: Optional[str] = Query(None, description="Filter by status"),
-                                     context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_transmission_batches(self,
+                                     request: Request,
+                                     status: Optional[str] = Query(None, description="Filter by status")):
         """Get transmission batches for dashboard"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_transmission_batches",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_dashboard_operation(
+                context,
+                "get_transmission_batches",
+                {
                     "status": status,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Add demo data if service not available
@@ -269,19 +347,20 @@ class DashboardDataEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get transmission batches")
     
     # FIRS Operations Endpoints
-    async def validate_firs_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def validate_firs_batch(self, request: Request):
         """Validate invoice batch for FIRS compliance"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="validate_firs_batch",
-                payload={
+            result = await self._route_dashboard_operation(
+                context,
+                "validate_firs_batch",
+                {
                     "batch_data": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Add demo data if service not available
@@ -300,19 +379,20 @@ class DashboardDataEndpointsV1:
             logger.error(f"Error validating FIRS batch in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to validate FIRS batch")
     
-    async def submit_firs_batch(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def submit_firs_batch(self, request: Request):
         """Submit validated batch to FIRS"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="submit_firs_batch",
-                payload={
+            result = await self._route_dashboard_operation(
+                context,
+                "submit_firs_batch",
+                {
                     "batch_data": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Add demo data if service not available
@@ -331,16 +411,17 @@ class DashboardDataEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to submit FIRS batch")
     
     # Dashboard Metrics Endpoints
-    async def get_dashboard_metrics(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_dashboard_metrics(self, request: Request):
         """Get comprehensive dashboard metrics"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_dashboard_metrics",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_dashboard_operation(
+                context,
+                "get_dashboard_metrics",
+                {
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             # Add demo data if service not available
@@ -378,16 +459,17 @@ class DashboardDataEndpointsV1:
             logger.error(f"Error getting dashboard metrics in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get dashboard metrics")
     
-    async def get_dashboard_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_dashboard_overview(self, request: Request):
         """Get dashboard overview and summary data"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_dashboard_overview",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_dashboard_operation(
+                context,
+                "get_dashboard_overview",
+                {
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "dashboard_overview_retrieved")
@@ -396,16 +478,17 @@ class DashboardDataEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get dashboard overview")
     
     # Status and Health Endpoints
-    async def get_status_summary(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_status_summary(self, request: Request):
         """Get overall APP status summary"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_status_summary",
-                payload={
+            context = await self._require_app_role(request)
+            result = await self._route_dashboard_operation(
+                context,
+                "get_status_summary",
+                {
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "status_summary_retrieved")
@@ -414,19 +497,20 @@ class DashboardDataEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get status summary")
     
     # Quick Operations Endpoints
-    async def quick_validate_invoices(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def quick_validate_invoices(self, request: Request):
         """Quick validation of invoice data"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="quick_validate_invoices",
-                payload={
+            result = await self._route_dashboard_operation(
+                context,
+                "quick_validate_invoices",
+                {
                     "validation_data": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "quick_validation_completed")
@@ -434,19 +518,20 @@ class DashboardDataEndpointsV1:
             logger.error(f"Error in quick validate invoices in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to quick validate invoices")
     
-    async def quick_submit_invoices(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def quick_submit_invoices(self, request: Request):
         """Quick submission of validated invoices"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="quick_submit_invoices",
-                payload={
+            result = await self._route_dashboard_operation(
+                context,
+                "quick_submit_invoices",
+                {
                     "submission_data": body,
                     "app_id": context.user_id,
                     "api_version": "v1"
-                }
+                },
             )
             
             return self._create_v1_response(result, "quick_submission_completed")
@@ -456,7 +541,8 @@ class DashboardDataEndpointsV1:
     
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format using V1ResponseModel"""
-        return build_v1_response(data, action)
+        safe_data = self._make_json_safe(data)
+        return build_v1_response(safe_data, action)
 
 
 def create_dashboard_data_router(role_detector: HTTPRoleDetector,

@@ -129,10 +129,28 @@ class HTTPRoutingContext:
     request_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
     is_authenticated: bool = False  # Add missing authentication flag
-    
+    _primary_role: Optional[PlatformRole] = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self._primary_role is None and self.platform_role is not None:
+            self._primary_role = self.platform_role
+        elif self._primary_role is not None and self.platform_role is None:
+            self.platform_role = self._primary_role
+
     def has_role(self, role: PlatformRole) -> bool:
         """Check if context has the specified platform role"""
         return self.platform_role == role
+
+    @property
+    def primary_role(self) -> Optional[PlatformRole]:
+        """Alias for legacy callers expecting primary_role attribute."""
+        return self._primary_role or self.platform_role
+
+    @primary_role.setter
+    def primary_role(self, value: Optional[PlatformRole]) -> None:
+        self._primary_role = value
+        if value is not None:
+            self.platform_role = value
 
 
 @dataclass

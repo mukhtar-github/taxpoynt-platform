@@ -524,10 +524,17 @@ class APPServicesRouter:
     async def list_certificates(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """List APP certificates"""
         try:
+            filters = dict(request.query_params)
+            org_id = str(context.organization_id) if context.organization_id else None
+            filters.setdefault("organization_id", org_id)
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="list_certificates",
-                payload={"app_id": context.user_id, "filters": request.query_params}
+                payload={
+                    "app_id": context.user_id,
+                    "organization_id": org_id,
+                    "filters": filters,
+                }
             )
             return JSONResponse(content=result)
         except Exception as e:
@@ -540,7 +547,12 @@ class APPServicesRouter:
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="get_certificate",
-                payload={"cert_id": cert_id, "app_id": context.user_id}
+                payload={
+                    "cert_id": cert_id,
+                    "certificate_id": cert_id,
+                    "app_id": context.user_id,
+                    "organization_id": str(context.organization_id) if context.organization_id else None,
+                }
             )
             return JSONResponse(content=result)
         except Exception as e:

@@ -5,7 +5,7 @@ Access Point Provider endpoints for real-time tracking of invoice transmission s
 Handles status monitoring, real-time updates, and transmission progress tracking.
 """
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable, Awaitable
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
 from datetime import datetime
@@ -26,6 +26,13 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
     get_submission_metrics,
     list_submissions_filtered,
     get_submission_by_id,
+    get_tracking_overview_data,
+    list_transmission_statuses_data,
+    list_recent_status_changes_data,
+    list_tracking_alerts,
+    acknowledge_tracking_alert,
+    list_firs_responses_data,
+    get_firs_response_detail,
 )
 from api_gateway.utils.pagination import normalize_pagination
 from core_platform.data_management.models.firs_submission import FIRSSubmission
@@ -164,7 +171,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get tracking overview",
             description="Get tracking overview and dashboard data",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         # Transmission Status Tracking
@@ -174,7 +182,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get transmission statuses",
             description="Get current status of all transmissions",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -183,7 +192,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get transmission tracking",
             description="Get detailed tracking information for specific transmission",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -192,7 +202,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get transmission progress",
             description="Get real-time progress of transmission",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         # Real-time Updates
@@ -202,7 +213,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get live updates",
             description="Get real-time updates for active transmissions",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -211,7 +223,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get recent status changes",
             description="Get recent status changes across all transmissions",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         # FIRS Response Tracking
@@ -221,7 +234,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get FIRS responses",
             description="Get FIRS acknowledgments and responses",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -230,7 +244,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get FIRS response details",
             description="Get detailed FIRS response for specific transmission",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         # Performance Analytics
@@ -240,7 +255,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get performance metrics",
             description="Get transmission performance metrics and analytics",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -249,7 +265,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get performance trends",
             description="Get transmission performance trends over time",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         # Alerts and Notifications
@@ -259,7 +276,8 @@ class TrackingManagementEndpointsV1:
             methods=["GET"],
             summary="Get active alerts",
             description="Get current active alerts and issues",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
         
         self.router.add_api_route(
@@ -268,7 +286,8 @@ class TrackingManagementEndpointsV1:
             methods=["POST"],
             summary="Acknowledge alert",
             description="Acknowledge and resolve alert",
-            response_model=V1ResponseModel
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self.tenant_scope)]
         )
 
     def _to_submission_dict(self, s: FIRSSubmission) -> Dict[str, Any]:
@@ -285,13 +304,54 @@ class TrackingManagementEndpointsV1:
             "submitted_at": getattr(s, "submitted_at", None).isoformat() if getattr(s, "submitted_at", None) else None,
         }
 
-    async def get_recent_submissions(self,
-                                    limit: int = Query(10, ge=1, le=100),
-                                    offset: int = Query(0, ge=0),
-                                    db: AsyncSession = Depends(get_async_session)):
+    async def _route_status_operation(
+        self,
+        context: HTTPRoutingContext,
+        operation: str,
+        payload: Dict[str, Any],
+        *,
+        db: Optional[AsyncSession] = None,
+        fallback: Optional[Callable[[AsyncSession], Awaitable[Dict[str, Any]]]] = None,
+    ) -> Dict[str, Any]:
+        router = self.message_router
+        if router and hasattr(router, "route_message"):
+            try:
+                result = await router.route_message(
+                    service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                    operation=operation,
+                    payload=payload,
+                )
+                if isinstance(result, dict) and result:
+                    return result
+            except Exception as exc:
+                logger.warning(
+                    "Tracking operation %s falling back to repository: %s",
+                    operation,
+                    exc,
+                )
+        if fallback:
+            if db is not None:
+                return await fallback(db)
+            async for session in get_async_session():
+                return await fallback(session)
+        return {"operation": operation, "success": False, "error": "tracking_service_unavailable"}
+
+    async def get_recent_submissions(
+        self,
+        request: Request,
+        limit: int = Query(10, ge=1, le=100),
+        offset: int = Query(0, ge=0),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         try:
+            context = await self._require_app_role(request)
             self.metric_recent_submissions_total.inc()
-            rows = await list_recent_submissions(db, limit=limit, offset=offset)
+            rows = await list_recent_submissions(
+                db,
+                limit=limit,
+                offset=offset,
+                organization_id=context.organization_id,
+            )
             payload = {
                 "items": [self._to_submission_dict(r) for r in rows],
                 "count": len(rows),
@@ -304,6 +364,7 @@ class TrackingManagementEndpointsV1:
 
     async def get_submissions(
         self,
+        request: Request,
         status: Optional[str] = Query(None, description="Filter by submission status"),
         start_date: Optional[str] = Query(None, description="Start date (ISO)")
         ,
@@ -314,13 +375,14 @@ class TrackingManagementEndpointsV1:
     ):
         """List submissions with filters (async, tenant scoped via dependency)."""
         try:
+            context = await self._require_app_role(request)
             rows = await list_submissions_filtered(
                 db,
+                organization_id=context.organization_id,
                 status=status,
                 start_date=start_date,
                 end_date=end_date,
                 limit=limit,
-                offset=offset,
             )
             payload = {
                 "items": [self._to_submission_dict(r) for r in rows],
@@ -335,11 +397,17 @@ class TrackingManagementEndpointsV1:
     async def get_submission(
         self,
         submission_id: str,
+        request: Request,
         db: AsyncSession = Depends(get_async_session),
     ):
         """Get a single submission (async, tenant scoped via dependency)."""
         try:
-            row = await get_submission_by_id(db, submission_id=submission_id)
+            context = await self._require_app_role(request)
+            row = await get_submission_by_id(
+                db,
+                submission_id=submission_id,
+                organization_id=context.organization_id,
+            )
             if not row:
                 return v1_error_response(EntityNotFoundError("Submission not found"), action="get_submission")
             return self._create_v1_response(self._to_submission_dict(row), "submission_retrieved")
@@ -368,9 +436,14 @@ class TrackingManagementEndpointsV1:
         )
     
     # Tracking Metrics Endpoints
-    async def get_tracking_metrics(self, db: AsyncSession = Depends(get_async_session)):
+    async def get_tracking_metrics(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get comprehensive tracking metrics (async, tenant-scoped)."""
         try:
+            await self._require_app_role(request)
             metrics = await get_submission_metrics(db)
             metrics["capabilities"] = self.tracking_capabilities
             return self._create_v1_response(metrics, "tracking_metrics_retrieved")
@@ -378,71 +451,74 @@ class TrackingManagementEndpointsV1:
             logger.error(f"Error getting tracking metrics in v1: {e}")
             return v1_error_response(e, action="get_tracking_metrics")
     
-    async def get_tracking_overview(self, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_tracking_overview(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get tracking overview"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_tracking_overview",
-                payload={
+            context = await self._require_app_role(request)
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                overview = await get_tracking_overview_data(
+                    session,
+                    organization_id=context.organization_id,
+                )
+                return {"operation": "get_tracking_overview", "success": True, "data": overview}
+
+            result = await self._route_status_operation(
+                context,
+                "get_tracking_overview",
+                {
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
+
             return self._create_v1_response(result, "tracking_overview_retrieved")
         except Exception as e:
             logger.error(f"Error getting tracking overview in v1: {e}")
             return v1_error_response(e, action="get_tracking_overview")
     
     # Transmission Status Tracking
-    async def get_transmission_statuses(self, 
-                                      status: Optional[str] = Query(None, description="Filter by status"),
-                                      limit: Optional[int] = Query(50, description="Number of transmissions to return"),
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_transmission_statuses(
+        self,
+        request: Request,
+        status: Optional[str] = Query(None, description="Filter by status"),
+        limit: Optional[int] = Query(50, description="Number of transmissions to return"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get current status of all transmissions"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_transmission_statuses",
-                payload={
+            context = await self._require_app_role(request)
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                data = await list_transmission_statuses_data(
+                    session,
+                    organization_id=context.organization_id,
+                    status=status,
+                    limit=limit or 50,
+                )
+                return {"operation": "get_transmission_statuses", "success": True, "data": data}
+
+            result = await self._route_status_operation(
+                context,
+                "get_transmission_statuses",
+                {
                     "status": status,
                     "limit": limit,
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
-            # Add demo data if service not available
-            if not result:
-                result = [
-                    {
-                        "id": "TX-2024-001",
-                        "batchId": "BATCH-2024-015",
-                        "submittedAt": "2024-01-15 14:30:00",
-                        "status": "accepted",
-                        "invoiceCount": 156,
-                        "processedCount": 156,
-                        "acceptedCount": 156,
-                        "rejectedCount": 0,
-                        "firsResponse": {
-                            "acknowledgeId": "ACK-FIRS-2024-001",
-                            "responseDate": "2024-01-15 14:32:15",
-                            "message": "All invoices processed successfully"
-                        }
-                    },
-                    {
-                        "id": "TX-2024-002",
-                        "batchId": "BATCH-2024-014",
-                        "submittedAt": "2024-01-15 13:45:00",
-                        "status": "processing",
-                        "invoiceCount": 89,
-                        "processedCount": 67,
-                        "acceptedCount": 67,
-                        "rejectedCount": 0
-                    }
-                ]
-            
+
             return self._create_v1_response(result, "transmission_statuses_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission statuses in v1: {e}")
@@ -505,63 +581,121 @@ class TrackingManagementEndpointsV1:
             logger.error(f"Error getting live updates in v1: {e}")
             return v1_error_response(e, action="get_live_updates")
     
-    async def get_recent_status_changes(self, 
-                                      hours: Optional[int] = Query(24, description="Hours of status changes to retrieve"),
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_recent_status_changes(
+        self,
+        request: Request,
+        hours: Optional[int] = Query(24, description="Hours of status changes to retrieve"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get recent status changes across all transmissions"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_recent_status_changes",
-                payload={
+            context = await self._require_app_role(request)
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                data = await list_recent_status_changes_data(
+                    session,
+                    organization_id=context.organization_id,
+                    hours=hours or 24,
+                )
+                return {"operation": "get_recent_status_changes", "success": True, "data": data}
+
+            result = await self._route_status_operation(
+                context,
+                "get_recent_status_changes",
+                {
                     "hours": hours,
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
+
             return self._create_v1_response(result, "recent_status_changes_retrieved")
         except Exception as e:
             logger.error(f"Error getting recent status changes in v1: {e}")
             return v1_error_response(e, action="get_recent_status_changes")
     
     # FIRS Response Tracking
-    async def get_firs_responses(self, 
-                               status: Optional[str] = Query(None, description="Filter by response status"),
-                               limit: Optional[int] = Query(50, description="Number of responses to return"),
-                               context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_responses(
+        self,
+        request: Request,
+        status: Optional[str] = Query(None, description="Filter by response status"),
+        limit: Optional[int] = Query(50, description="Number of responses to return"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get FIRS acknowledgments and responses"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_firs_responses",
-                payload={
+            context = await self._require_app_role(request)
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                data = await list_firs_responses_data(
+                    session,
+                    organization_id=context.organization_id,
+                    status=status,
+                    limit=limit or 50,
+                )
+                return {"operation": "get_firs_responses", "success": True, "data": data}
+
+            result = await self._route_status_operation(
+                context,
+                "get_firs_responses",
+                {
                     "status": status,
                     "limit": limit,
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
+
             return self._create_v1_response(result, "firs_responses_retrieved")
         except Exception as e:
             logger.error(f"Error getting FIRS responses in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS responses")
     
-    async def get_firs_response_details(self, transmission_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_firs_response_details(
+        self,
+        transmission_id: str,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get detailed FIRS response for specific transmission"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_firs_response_details",
-                payload={
+            context = await self._require_app_role(request)
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                detail = await get_firs_response_detail(
+                    session,
+                    organization_id=context.organization_id,
+                    transmission_id=transmission_id,
+                )
+                if not detail:
+                    return {"operation": "get_firs_response_details", "success": False, "error": "response_not_found"}
+                return {"operation": "get_firs_response_details", "success": True, "data": detail}
+
+            result = await self._route_status_operation(
+                context,
+                "get_firs_response_details",
+                {
                     "transmission_id": transmission_id,
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
+
+            if result.get("success") is False:
+                raise HTTPException(status_code=404, detail="FIRS response not found")
+
             return self._create_v1_response(result, "firs_response_details_retrieved")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error getting FIRS response details {transmission_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS response details")
@@ -608,43 +742,91 @@ class TrackingManagementEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get performance trends")
     
     # Alerts and Notifications
-    async def get_active_alerts(self, 
-                              severity: Optional[str] = Query(None, description="Filter by alert severity"),
-                              context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_active_alerts(
+        self,
+        request: Request,
+        severity: Optional[str] = Query(None, description="Filter by alert severity"),
+        include_acknowledged: bool = Query(
+            True,
+            description="Include acknowledged alerts (set to false for active-only)",
+        ),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get current active alerts"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_active_alerts",
-                payload={
+            context = await self._require_app_role(request)
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                alerts = await list_tracking_alerts(
+                    session,
+                    organization_id=context.organization_id,
+                    include_acknowledged=include_acknowledged,
+                )
+                if severity:
+                    alerts = [a for a in alerts if a.get("severity") == severity]
+                return {"operation": "get_active_alerts", "success": True, "data": {"alerts": alerts, "count": len(alerts)}}
+
+            result = await self._route_status_operation(
+                context,
+                "get_active_alerts",
+                {
                     "severity": severity,
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                    "include_acknowledged": include_acknowledged,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
+
             return self._create_v1_response(result, "active_alerts_retrieved")
         except Exception as e:
             logger.error(f"Error getting active alerts in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get active alerts")
     
-    async def acknowledge_alert(self, alert_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
+    async def acknowledge_alert(
+        self,
+        alert_id: str,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Acknowledge and resolve alert"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json()
-            
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="acknowledge_alert",
-                payload={
+
+            async def fallback(session: AsyncSession) -> Dict[str, Any]:
+                result = await acknowledge_tracking_alert(
+                    session,
+                    alert_id=alert_id,
+                    acknowledged_by=body.get("acknowledged_by") or context.user_id or "system",
+                    organization_id=context.organization_id,
+                )
+                if not result:
+                    return {"operation": "acknowledge_alert", "success": False, "error": "alert_not_found"}
+                return {"operation": "acknowledge_alert", "success": True, "data": result}
+
+            result = await self._route_status_operation(
+                context,
+                "acknowledge_alert",
+                {
                     "alert_id": alert_id,
                     "acknowledgment_data": body,
                     "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+                    "api_version": "v1",
+                    "organization_id": context.organization_id,
+                },
+                db=db,
+                fallback=fallback,
             )
-            
+
+            if result.get("success") is False:
+                raise HTTPException(status_code=404, detail="Alert not found")
+
             return self._create_v1_response(result, "alert_acknowledged")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error acknowledging alert {alert_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to acknowledge alert")
