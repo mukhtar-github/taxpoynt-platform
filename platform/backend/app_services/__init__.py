@@ -3851,6 +3851,133 @@ class APPServiceRegistry:
                         summary["status_counts"][status] = summary["status_counts"].get(status, 0) + 1
                     return summary
 
+                def _extract_timestamp_value(record: Dict[str, Any]) -> Optional[Any]:
+                    for key in (
+                        "timestamp",
+                        "submitted_at",
+                        "submittedAt",
+                        "created_at",
+                        "createdAt",
+                        "updated_at",
+                        "updatedAt",
+                    ):
+                        if key in record and record[key] is not None:
+                            return record[key]
+                    return None
+
+                def _coerce_datetime(value: Any) -> Optional[datetime]:
+                    if value is None:
+                        return None
+                    if isinstance(value, datetime):
+                        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+                    if isinstance(value, (int, float)):
+                        return datetime.fromtimestamp(float(value), tz=timezone.utc)
+                    if isinstance(value, str):
+                        cleaned = value.strip()
+                        if not cleaned:
+                            return None
+                        if cleaned.endswith("Z"):
+                            cleaned = cleaned.replace("Z", "+00:00")
+                        try:
+                            parsed = datetime.fromisoformat(cleaned)
+                        except ValueError:
+                            try:
+                                parsed = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+                            except ValueError:
+                                try:
+                                    parsed = datetime.strptime(value, "%Y-%m-%d")
+                                except ValueError:
+                                    return None
+                        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+                    return None
+
+                def _to_iso(dt: Optional[datetime]) -> Optional[str]:
+                    if not dt:
+                        return None
+                    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+                def _format_transmission(record: Dict[str, Any]) -> Dict[str, Any]:
+                    status_raw = str(record.get("status", "unknown")).lower()
+                    submission_id = (
+                        record.get("submission_id")
+                        or record.get("submissionId")
+                        or record.get("id")
+                        or record.get("irn")
+                    )
+                    timestamp_value = _coerce_datetime(_extract_timestamp_value(record))
+                    last_updated = _coerce_datetime(
+                        record.get("updated_at")
+                        or record.get("updatedAt")
+                        or record.get("last_updated")
+                    )
+                    firs_status_code = (
+                        record.get("status_code")
+                        or record.get("statusCode")
+                        or record.get("code")
+                    )
+                    firs_message = (
+                        record.get("message")
+                        or record.get("status_message")
+                        or record.get("detail")
+                    )
+                    return {
+                        "submissionId": submission_id,
+                        "irn": record.get("irn"),
+                        "status": status_raw,
+                        "statusDisplay": status_raw.replace("_", " ").title(),
+                        "firsStatusCode": firs_status_code,
+                        "firsMessage": firs_message,
+                        "submittedAt": _to_iso(timestamp_value),
+                        "lastUpdatedAt": _to_iso(last_updated or timestamp_value),
+                        "payload": record,
+                    }
+
+                def _parse_date_filter(value: Optional[str]) -> Optional[datetime]:
+                    if not value:
+                        return None
+                    try:
+                        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                    except ValueError:
+                        try:
+                            parsed = datetime.strptime(value, "%Y-%m-%d")
+                        except ValueError:
+                            return None
+                    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+                def _filter_transmissions(
+                    records: List[Dict[str, Any]],
+                    *,
+                    status_filter: Optional[str],
+                    start_at: Optional[datetime],
+                    end_at: Optional[datetime],
+                ) -> List[Dict[str, Any]]:
+                    filtered: List[Dict[str, Any]] = []
+                    for rec in records:
+                        if status_filter and rec["status"] != status_filter:
+                            continue
+                        submission_ts = _coerce_datetime(rec.get("submittedAt"))
+                        if not submission_ts:
+                            submission_ts = _coerce_datetime(rec.get("lastUpdatedAt"))
+                        if start_at and submission_ts and submission_ts < start_at:
+                            continue
+                        if end_at and submission_ts and submission_ts > end_at:
+                            continue
+                        filtered.append(rec)
+                    return filtered
+
+                def _aggregate_by_day(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                    bucket: Dict[str, int] = {}
+                    for rec in records:
+                        ts = _coerce_datetime(rec.get("submittedAt") or rec.get("lastUpdatedAt"))
+                        if not ts:
+                            continue
+                        day = ts.date().isoformat()
+                        bucket[day] = bucket.get(day, 0) + 1
+                    return [
+                        {"date": day, "count": bucket[day]}
+                        for day in sorted(bucket.keys())
+                    ]
+
                 if operation == "receive_invoices_from_si":
                     # Handle receiving invoices from SI for FIRS submission
                     invoice_ids = payload.get("invoice_ids", [])
@@ -3941,7 +4068,18 @@ class APPServiceRegistry:
                     if not resource_cache:
                         return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
                     resources = await resource_cache.get_resources()
-                    return {"operation": operation, "success": True, "data": {"resources": resources}}
+                    normalized = resources or {}
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "resources": normalized,
+                            "metadata": {
+                                "retrieved_at": _utc_now(),
+                                "resource_keys": sorted(normalized.keys()) if isinstance(normalized, dict) else [],
+                            },
+                        },
+                    }
 
                 elif operation == "refresh_firs_resources":
                     if not resource_cache:
@@ -3982,7 +4120,26 @@ class APPServiceRegistry:
                     if not irn:
                         return {"operation": operation, "success": False, "error": "missing_irn"}
                     resp = await http_client.update_invoice(irn, update_data)
-                    return {"operation": operation, "success": resp.get("success", False), "data": resp}
+                    if not resp.get("success"):
+                        return {
+                            "operation": operation,
+                            "success": False,
+                            "error": resp.get("error") or resp.get("data"),
+                            "data": {
+                                "status_code": resp.get("status_code"),
+                                "firs_response": resp.get("data"),
+                            },
+                        }
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "irn": irn,
+                            "status_code": resp.get("status_code"),
+                            "updated_at": _utc_now(),
+                            "firs_response": resp.get("data"),
+                        },
+                    }
 
                 elif operation in ("submit_invoice_batch_to_firs", "submit_invoice_batch"):
                     # Batch submit: sign -> transmit for each invoice
@@ -4173,18 +4330,50 @@ class APPServiceRegistry:
                     }
 
                 elif operation == "list_firs_submissions":
+                    filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+                    pagination = payload.get("pagination") if isinstance(payload.get("pagination"), dict) else {}
+                    status_filter = (filters.get("status") or "").strip().lower() or None
+                    start_at = _parse_date_filter(filters.get("start_date"))
+                    end_at = _parse_date_filter(filters.get("end_date"))
+                    try:
+                        limit = max(1, int(pagination.get("limit", payload.get("limit", 50))))
+                    except (TypeError, ValueError):
+                        limit = 50
+                    try:
+                        offset = max(0, int(pagination.get("offset", payload.get("offset", 0))))
+                    except (TypeError, ValueError):
+                        offset = 0
+
                     resp = await _fetch_transmissions(payload.get("tin") or payload.get("taxpayer_tin"))
                     if resp.get("success"):
-                        records = _normalize_transmissions(resp.get("data"))
-                        return {
-                            "operation": operation,
-                            "success": True,
-                            "data": {
-                                "submissions": records,
-                                "summary": _summarize_transmissions(records)
-                            }
+                        raw_records = _normalize_transmissions(resp.get("data"))
+                        formatted = [_format_transmission(record) for record in raw_records]
+                        filtered = _filter_transmissions(
+                            formatted,
+                            status_filter=status_filter,
+                            start_at=start_at,
+                            end_at=end_at,
+                        )
+                        total = len(filtered)
+                        paged = filtered[offset : offset + limit]
+                        summary_counts = Counter(item["status"] for item in filtered)
+                        payload_data = {
+                            "items": paged,
+                            "count": total,
+                            "summary": {
+                                "total": total,
+                                "statusCounts": dict(summary_counts),
+                            },
+                            "pagination": {"limit": limit, "offset": offset},
+                            "generated_at": _utc_now(),
                         }
-                    return {"operation": operation, "success": False, "error": resp.get("error", "transmission_lookup_failed"), "data": resp.get("data")}
+                        return {"operation": operation, "success": True, "data": payload_data}
+                    return {
+                        "operation": operation,
+                        "success": False,
+                        "error": resp.get("error", "transmission_lookup_failed"),
+                        "data": resp.get("data"),
+                    }
 
                 elif operation == "list_firs_certificates":
                     if not certificate_store:
@@ -4257,13 +4446,34 @@ class APPServiceRegistry:
                     return {"operation": operation, "success": False, "error": resp.get("error", "transmission_lookup_failed")}
 
                 elif operation == "generate_firs_report":
-                    resp = await _fetch_transmissions(payload.get("tin"))
+                    filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+                    status_filter = (filters.get("status") or "").strip().lower() or None
+                    start_at = _parse_date_filter(filters.get("start_date"))
+                    end_at = _parse_date_filter(filters.get("end_date"))
+                    resp = await _fetch_transmissions(payload.get("tin") or payload.get("taxpayer_tin"))
                     if resp.get("success"):
-                        records = _normalize_transmissions(resp.get("data"))
-                        summary = _summarize_transmissions(records)
-                        summary["generated_at"] = _utc_now()
-                        return {"operation": operation, "success": True, "data": summary}
-                    return {"operation": operation, "success": False, "error": resp.get("error", "report_generation_failed")}
+                        raw_records = _normalize_transmissions(resp.get("data"))
+                        formatted = [_format_transmission(record) for record in raw_records]
+                        filtered = _filter_transmissions(
+                            formatted,
+                            status_filter=status_filter,
+                            start_at=start_at,
+                            end_at=end_at,
+                        )
+                        summary_counts = Counter(item["status"] for item in filtered)
+                        report = {
+                            "generated_at": _utc_now(),
+                            "total": len(filtered),
+                            "statusBreakdown": dict(summary_counts),
+                            "dailyCounts": _aggregate_by_day(filtered),
+                            "recent": filtered[:10],
+                        }
+                        return {"operation": operation, "success": True, "data": report}
+                    return {
+                        "operation": operation,
+                        "success": False,
+                        "error": resp.get("error", "report_generation_failed"),
+                    }
 
                 elif operation == "get_firs_reporting_dashboard":
                     resp = await _fetch_transmissions()
