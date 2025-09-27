@@ -29,8 +29,9 @@
 - **Certificate Management**
     - Digital certificate storage and retrieval
     - ECDSA (Elliptic Curve Digital Signature Algorithm) implementation
-    - XAdES compliance for XML invoices
-    - PAdES compliance for PDF invoices
+    - XAdES compliance for XML invoices (applied before FIRS submission)
+    - PAdES compliance for PDF invoices (applied before FIRS submission)
+    - Separation of SI-applied signatures from FIRS-issued cryptographic stamps
 
 ### **4. FIRS Communication**
 
@@ -38,8 +39,8 @@
     - OAuth 2.0 authentication implementation
     - Secure API endpoints for APP communication
     - Request/Response logging
-    - IRN/CSID receipt and storage
-    - QR code integration into the final invoice
+    - IRN/CSID/QR receipt from FIRS and persistence in platform repositories
+    - QR code integration into the final invoice using FIRS-supplied payloads
 
 ### **5. Basic Data Management**
 

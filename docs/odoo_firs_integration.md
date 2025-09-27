@@ -11,7 +11,7 @@ The TaxPoynt eInvoice system implements an ERP-first integration strategy, with 
 1. Prioritizes data integrity between your ERP and e-invoicing submissions
 2. Minimizes manual data entry and reconciliation work
 3. Enables automatic status updates between systems
-4. Ensures consistent IRN generation across all platforms
+4. Ensures consistent persistence of FIRS-issued IRNs, CSIDs, and QR payloads across all platforms
 
 ## Key Components
 
@@ -30,16 +30,14 @@ All required invoice fields are handled, including:
 - Tax information
 - Monetary totals
 
-### 2. IRN Generation Integration
+### 2. IRN Submission & Persistence
 
-The IRN (Invoice Reference Number) generation system has been enhanced to:
+IRNs are no longer generated locally. Instead, the integration:
 
-* Extract invoice numbers directly from Odoo
-* Incorporate the FIRS-assigned Service ID (e.g., 94ND90NR)
-* Apply the current date in YYYYMMDD format
-* Assemble the components in the required format: `InvoiceNumber-ServiceID-YYYYMMDD`
-
-For example: `INV001-94ND90NR-20250525`
+* Submits the transformed invoice to FIRS using the APP submission flow
+* Captures the FIRS-issued IRN, CSID, QR payload, and stamp metadata on success
+* Persists those identifiers in `firs_submissions` and correlation tables for downstream use
+* Maintains compatibility with legacy invoices by storing any pre-existing IRN as the fallback key
 
 ### 3. UUID4 Business Identification
 
@@ -89,7 +87,7 @@ This API establishes a connection with your Odoo instance, authenticates, and re
 
 **Endpoint:** `POST /api/v1/odoo/submit`
 
-This API retrieves an invoice from Odoo, converts it to the FIRS UBL format, generates a valid IRN, and submits it to FIRS.
+This API retrieves an invoice from Odoo, converts it to the FIRS UBL format, submits it to FIRS, and stores the returned identifiers.
 
 **Request:**
 ```json
@@ -107,6 +105,8 @@ This API retrieves an invoice from Odoo, converts it to the FIRS UBL format, gen
   "code": 200,
   "data": {
     "irn": "INV/2025/0001-94ND90NR-20250525",
+    "csid": "CSID-XYZ",
+    "qr_payload": {"data": "..."},
     "submission_id": "5f3e9b1d-8c4e-4b0a-9f5d-8e7a3b1d4c2e",
     "status": "accepted",
     "odoo_status_update": "success"
@@ -125,7 +125,7 @@ The `FIRSOdooConnect.tsx` component provides a user interface for:
 - Connecting to your Odoo instance
 - Selecting invoices to submit
 - Converting Odoo invoices to FIRS format
-- Submitting to FIRS with proper IRN generation
+- Submitting to FIRS and surfacing returned IRN/CSID/QR metadata back to Odoo
 - Viewing conversion and submission results
 
 ### 2. OdooIntegrationMetricsCard Component
@@ -150,10 +150,10 @@ The `OdooIntegrationForm.tsx` component allows configuration of your Odoo connec
 
 The TaxPoynt eInvoice platform includes testing tools to ensure proper integration:
 
-1. **IRN Generation Testing**:
-   - Validate IRN format compliance
-   - Test with various invoice numbers
-   - Ensure proper service ID incorporation
+1. **FIRS Submission Testing**:
+   - Validate transformed payloads before submission
+   - Confirm that FIRS returns IRN/CSID/QR identifiers
+   - Ensure identifiers are persisted in the database and synced back to Odoo
 
 2. **Odoo Connection Testing**:
    - Verify connection to your Odoo instance
@@ -162,8 +162,8 @@ The TaxPoynt eInvoice platform includes testing tools to ensure proper integrati
 
 3. **End-to-End Submission Testing**:
    - Convert Odoo invoices to FIRS format
-   - Submit to FIRS sandbox environment
-   - Validate responses and IRN generation
+   - Submit to the FIRS sandbox environment
+   - Validate responses and confirm persisted identifiers in both TaxPoynt and Odoo
 
 ## Next Steps
 

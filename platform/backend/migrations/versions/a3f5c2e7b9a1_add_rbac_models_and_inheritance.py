@@ -21,7 +21,7 @@ def upgrade() -> None:
     # rbac_roles
     op.create_table(
         'rbac_roles',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False, index=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('role_id', sa.String(length=100), nullable=False),
@@ -35,7 +35,7 @@ def upgrade() -> None:
     # rbac_permissions
     op.create_table(
         'rbac_permissions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False, index=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('name', sa.String(length=150), nullable=False),
@@ -48,11 +48,11 @@ def upgrade() -> None:
     # rbac_role_permissions
     op.create_table(
         'rbac_role_permissions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False, index=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('role_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_roles.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('permission_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_permissions.id', ondelete='CASCADE'), nullable=False, index=True),
+        sa.Column('role_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_roles.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('permission_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_permissions.id', ondelete='CASCADE'), nullable=False),
         sa.UniqueConstraint('role_id', 'permission_id', name='uq_role_permission'),
     )
     op.create_index('ix_rbac_role_permissions_id', 'rbac_role_permissions', ['id'])
@@ -62,11 +62,11 @@ def upgrade() -> None:
     # rbac_permission_hierarchy
     op.create_table(
         'rbac_permission_hierarchy',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False, index=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('parent_permission_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_permissions.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('child_permission_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_permissions.id', ondelete='CASCADE'), nullable=False, index=True),
+        sa.Column('parent_permission_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_permissions.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('child_permission_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_permissions.id', ondelete='CASCADE'), nullable=False),
         sa.UniqueConstraint('parent_permission_id', 'child_permission_id', name='uq_permission_hierarchy'),
     )
     op.create_index('ix_rbac_permission_hierarchy_id', 'rbac_permission_hierarchy', ['id'])
@@ -76,11 +76,11 @@ def upgrade() -> None:
     # rbac_role_inheritance
     op.create_table(
         'rbac_role_inheritance',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False, index=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('parent_role_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_roles.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('child_role_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_roles.id', ondelete='CASCADE'), nullable=False, index=True),
+        sa.Column('parent_role_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_roles.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('child_role_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('rbac_roles.id', ondelete='CASCADE'), nullable=False),
         sa.UniqueConstraint('parent_role_id', 'child_role_id', name='uq_role_inheritance'),
     )
     op.create_index('ix_rbac_role_inheritance_id', 'rbac_role_inheritance', ['id'])
@@ -111,4 +111,3 @@ def downgrade() -> None:
     op.drop_index('ix_rbac_roles_role_id', table_name='rbac_roles')
     op.drop_index('ix_rbac_roles_id', table_name='rbac_roles')
     op.drop_table('rbac_roles')
-

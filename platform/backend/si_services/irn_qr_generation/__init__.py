@@ -13,12 +13,8 @@ from .duplicate_detector import DuplicateDetector
 from .irn_validator import IRNValidator
 from .bulk_processor import BulkProcessor
 
-# Services (refactored to use granular components)
-from .bulk_irn_service import BulkIRNService
+# Services
 from .irn_generation_service import IRNGenerationService
-
-# Legacy service (original monolithic version)
-from .irn_generation_service_legacy import IRNGenerationService as IRNGenerationServiceLegacy
 
 __all__ = [
     # New granular components
@@ -30,9 +26,5 @@ __all__ = [
     "BulkProcessor",
     
     # Refactored services
-    "BulkIRNService",
     "IRNGenerationService",
-    
-    # Legacy (original monolithic)
-    "IRNGenerationServiceLegacy"
 ]

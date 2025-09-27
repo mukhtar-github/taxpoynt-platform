@@ -7,8 +7,12 @@ Maintains backward compatibility while leveraging the new architecture.
 
 import logging
 import asyncio
+import uuid
 from datetime import datetime, timedelta
 from typing import Tuple, Dict, Any, Optional, List, Union, Set
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 # Import granular components
@@ -18,7 +22,20 @@ from .sequence_manager import SequenceManager
 from .duplicate_detector import DuplicateDetector
 from .irn_validator import IRNValidator, ValidationLevel
 
-from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
+from core_platform.utils.firs_response import (
+    extract_firs_identifiers,
+    map_firs_status_to_submission,
+    merge_identifiers_into_payload,
+)
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models.firs_submission import (
+    FIRSSubmission,
+    SubmissionStatus,
+)
+from core_platform.data_management.models.si_app_correlation import (
+    CorrelationStatus,
+    SIAPPCorrelation,
+)
 
 # Import authentication services for FIRS integration
 from si_services.authentication import (
@@ -329,73 +346,130 @@ class IRNGenerationService:
                 'attempted_at': datetime.now().isoformat()
             }
     
-    async def submit_irn_to_firs(
+    async def request_irn_from_firs(
         self,
-        irn_value: str,
+        irn_value: Optional[str],
         invoice_data: Dict[str, Any],
-        environment: str = "sandbox"
+        environment: str = "sandbox",
+        *,
+        organization_id: Optional[Union[str, uuid.UUID]] = None,
+        db_session: Optional[AsyncSession] = None,
     ) -> Dict[str, Any]:
-        """
-        Submit IRN to FIRS for validation and registration
-        
-        Args:
-            irn_value: Generated IRN
-            invoice_data: Original invoice data
-            environment: FIRS environment
-            
-        Returns:
-            Submission result from FIRS
-        """
+        """Submit an invoice payload to FIRS and persist returned identifiers."""
+
+        managed_session = False
+        session: Optional[AsyncSession] = db_session
+
         try:
-            # First authenticate if not already authenticated
+            if session is None:
+                async for candidate in get_async_session():
+                    session = candidate
+                    managed_session = True
+                    break
+
+            # Authenticate with FIRS before transmission
             auth_result = await self.authenticate_with_firs(environment)
-            if not auth_result['success']:
+            if not auth_result["success"]:
                 return {
-                    'success': False,
-                    'error': f"Authentication failed: {auth_result.get('error')}",
-                    'irn': irn_value
+                    "success": False,
+                    "error": f"Authentication failed: {auth_result.get('error')}",
+                    "irn": irn_value,
                 }
-            
-            # Submit IRN using authenticated session
+
             submission_result = await self.firs_auth_service.submit_irn(
                 irn_value=irn_value,
                 invoice_data=invoice_data,
-                auth_data=auth_result['auth_data'],
-                environment=environment
+                auth_data=auth_result["auth_data"],
+                environment=environment,
             )
-            
-            if submission_result.success:
-                logger.info(f"Successfully submitted IRN {irn_value} to FIRS {environment}")
-                identifiers = extract_firs_identifiers(submission_result.response_data)
-                normalized_response = merge_identifiers_into_payload(submission_result.response_data or {}, identifiers)
+
+            if not submission_result.success:
+                logger.error("FIRS IRN submission failed: %s", submission_result.error_message)
                 return {
-                    'success': True,
-                    'irn': identifiers.get('irn') or irn_value,
-                    'firs_response': normalized_response,
-                    'identifiers': identifiers,
-                    'submitted_at': datetime.now().isoformat(),
-                    'environment': environment
+                    "success": False,
+                    "irn": irn_value,
+                    "error": submission_result.error_message,
+                    "firs_error_code": submission_result.error_code,
+                    "submitted_at": datetime.now().isoformat(),
+                    "environment": environment,
                 }
-            else:
-                logger.error(f"FIRS IRN submission failed: {submission_result.error_message}")
-                return {
-                    'success': False,
-                    'irn': irn_value,
-                    'error': submission_result.error_message,
-                    'firs_error_code': submission_result.error_code,
-                    'submitted_at': datetime.now().isoformat(),
-                    'environment': environment
-                }
-                
-        except Exception as e:
-            logger.error(f"Error submitting IRN {irn_value} to FIRS: {e}")
+
+            logger.info("Successfully submitted invoice to FIRS %s", environment)
+
+            identifiers = extract_firs_identifiers(submission_result.response_data)
+            normalized_response = merge_identifiers_into_payload(
+                submission_result.response_data or {}, identifiers
+            )
+
+            persisted_irn = identifiers.get("irn") or irn_value
+
+            if session:
+                try:
+                    await self._persist_firs_submission(
+                        session,
+                        original_irn=irn_value,
+                        resolved_irn=persisted_irn,
+                        organization_id=organization_id,
+                        invoice_data=invoice_data,
+                        identifiers=identifiers,
+                        response_payload=normalized_response,
+                    )
+                    if managed_session:
+                        await session.commit()
+                    else:
+                        await session.flush()
+                except Exception as persistence_error:
+                    if managed_session and session:
+                        await session.rollback()
+                    logger.error(
+                        "Failed to persist FIRS identifiers for invoice %s: %s",
+                        persisted_irn,
+                        persistence_error,
+                        exc_info=True,
+                    )
+
             return {
-                'success': False,
-                'irn': irn_value,
-                'error': str(e),
-                'submitted_at': datetime.now().isoformat(),
-                'environment': environment
+                "success": True,
+                "irn": persisted_irn,
+                "firs_response": normalized_response,
+                "identifiers": identifiers,
+                "submitted_at": datetime.now().isoformat(),
+                "environment": environment,
             }
+
+        except Exception as exc:
+            if managed_session and session:
+                await session.rollback()
+            logger.error("Error submitting invoice to FIRS: %s", exc, exc_info=True)
+            return {
+                "success": False,
+                "irn": irn_value,
+                "error": str(exc),
+                "submitted_at": datetime.now().isoformat(),
+                "environment": environment,
+            }
+
+    async def submit_irn_to_firs(
+        self,
+        irn_value: Optional[str],
+        invoice_data: Dict[str, Any],
+        environment: str = "sandbox",
+        *,
+        organization_id: Optional[Union[str, uuid.UUID]] = None,
+        db_session: Optional[AsyncSession] = None,
+    ) -> Dict[str, Any]:
+        """Backward-compatible wrapper for legacy call sites."""
+
+        logger.debug(
+            "submit_irn_to_firs is deprecated; use request_irn_from_firs instead."
+        )
+        return await self.request_irn_from_firs(
+            irn_value=irn_value,
+            invoice_data=invoice_data,
+            environment=environment,
+            organization_id=organization_id,
+            db_session=db_session,
+        )
     
     async def validate_irn_with_firs(
         self,
@@ -458,6 +532,264 @@ class IRNGenerationService:
                 'validated_at': datetime.now().isoformat(),
                 'environment': environment
             }
+
+    async def _persist_firs_submission(
+        self,
+        session: AsyncSession,
+        *,
+        original_irn: Optional[str],
+        resolved_irn: Optional[str],
+        organization_id: Optional[Union[str, uuid.UUID]],
+        invoice_data: Dict[str, Any],
+        identifiers: Dict[str, Any],
+        response_payload: Dict[str, Any],
+    ) -> None:
+        """Persist FIRS identifiers onto the submission + correlation records."""
+
+        org_uuid = self._resolve_organization_id(organization_id, invoice_data)
+        invoice_number = self._resolve_invoice_number(invoice_data)
+        submission_id = self._extract_submission_id(invoice_data)
+
+        submission = await self._resolve_submission(
+            session,
+            submission_id=submission_id,
+            organization_id=org_uuid,
+            invoice_number=invoice_number,
+            irn=original_irn,
+        )
+
+        if not submission:
+            logger.warning(
+                "Unable to locate FIRS submission for invoice_number=%s irn=%s",
+                invoice_number,
+                original_irn,
+            )
+            return
+
+        status_text = identifiers.get("status") or response_payload.get("status")
+        mapped_status = map_firs_status_to_submission(status_text)
+
+        try:
+            status_enum = SubmissionStatus(mapped_status)
+        except ValueError:
+            status_enum = SubmissionStatus.SUBMITTED
+
+        previous_irn = submission.irn
+
+        submission.update_status(
+            status_enum,
+            status_text or mapped_status,
+            response_payload,
+        )
+
+        if resolved_irn:
+            submission.irn = resolved_irn
+
+        if invoice_data and isinstance(invoice_data, dict):
+            merged_invoice = dict(invoice_data)
+            if resolved_irn:
+                merged_invoice.setdefault("irn", resolved_irn)
+            submission.invoice_data = merged_invoice
+        elif resolved_irn:
+            submission.invoice_data = {"irn": resolved_irn}
+
+        await session.flush()
+
+        await self._update_correlation(
+            session,
+            previous_irn=previous_irn or original_irn,
+            resolved_irn=resolved_irn,
+            organization_id=org_uuid,
+            status_label=mapped_status,
+            response_payload=response_payload,
+            identifiers=identifiers,
+            invoice_number=invoice_number,
+        )
+
+    async def _resolve_submission(
+        self,
+        session: AsyncSession,
+        *,
+        submission_id: Optional[Union[str, uuid.UUID]],
+        organization_id: Optional[uuid.UUID],
+        invoice_number: Optional[str],
+        irn: Optional[str],
+    ) -> Optional[FIRSSubmission]:
+        if submission_id:
+            stmt = select(FIRSSubmission).where(FIRSSubmission.id == submission_id)
+            if organization_id:
+                stmt = stmt.where(FIRSSubmission.organization_id == organization_id)
+            result = await session.execute(stmt)
+            submission = result.scalars().first()
+            if submission:
+                return submission
+
+        if irn:
+            stmt = select(FIRSSubmission).where(FIRSSubmission.irn == irn)
+            if organization_id:
+                stmt = stmt.where(FIRSSubmission.organization_id == organization_id)
+            result = await session.execute(stmt)
+            submission = result.scalars().first()
+            if submission:
+                return submission
+
+        if invoice_number:
+            stmt = select(FIRSSubmission).where(FIRSSubmission.invoice_number == invoice_number)
+            if organization_id:
+                stmt = stmt.where(FIRSSubmission.organization_id == organization_id)
+            result = await session.execute(stmt)
+            submission = result.scalars().first()
+            if submission:
+                return submission
+
+        return None
+
+    async def _update_correlation(
+        self,
+        session: AsyncSession,
+        *,
+        previous_irn: Optional[str],
+        resolved_irn: Optional[str],
+        organization_id: Optional[uuid.UUID],
+        status_label: str,
+        response_payload: Dict[str, Any],
+        identifiers: Dict[str, Any],
+        invoice_number: Optional[str],
+    ) -> None:
+        candidates: List[str] = []
+        if resolved_irn:
+            candidates.append(resolved_irn)
+        if previous_irn and previous_irn not in candidates:
+            candidates.append(previous_irn)
+
+        correlation: Optional[SIAPPCorrelation] = None
+        for candidate in candidates:
+            stmt = select(SIAPPCorrelation).where(SIAPPCorrelation.irn == candidate)
+            if organization_id:
+                stmt = stmt.where(SIAPPCorrelation.organization_id == organization_id)
+            result = await session.execute(stmt.limit(1))
+            correlation = result.scalars().first()
+            if correlation:
+                break
+
+        if not correlation:
+            return
+
+        if resolved_irn and correlation.irn != resolved_irn:
+            correlation.irn = resolved_irn
+
+        if invoice_number and correlation.invoice_number != invoice_number:
+            correlation.invoice_number = invoice_number
+
+        firs_response_id = (
+            identifiers.get("response_id")
+            or response_payload.get("submissionId")
+            or response_payload.get("submission_id")
+        )
+
+        status_for_correlation = status_label or CorrelationStatus.APP_SUBMITTED.value
+        correlation.set_firs_response(
+            firs_response_id or resolved_irn or previous_irn,
+            status_for_correlation,
+            response_payload,
+        )
+
+        if identifiers:
+            metadata = correlation.submission_metadata or {}
+            metadata["identifiers"] = identifiers
+            correlation.submission_metadata = metadata
+
+        await session.flush()
+
+    def _resolve_organization_id(
+        self,
+        organization_id: Optional[Union[str, uuid.UUID]],
+        invoice_data: Dict[str, Any],
+    ) -> Optional[uuid.UUID]:
+        candidates: List[Optional[Union[str, uuid.UUID]]] = [organization_id]
+
+        if isinstance(invoice_data, dict):
+            candidates.append(invoice_data.get("organization_id"))
+            candidates.append(invoice_data.get("organizationId"))
+            candidates.append(invoice_data.get("tenant_id"))
+            candidates.append(invoice_data.get("tenantId"))
+            metadata = invoice_data.get("metadata")
+            if isinstance(metadata, dict):
+                candidates.append(metadata.get("organization_id"))
+                candidates.append(metadata.get("organizationId"))
+
+        for candidate in candidates:
+            parsed = self._try_parse_uuid(candidate)
+            if parsed:
+                return parsed
+
+        return None
+
+    def _resolve_invoice_number(self, invoice_data: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(invoice_data, dict):
+            return None
+
+        keys = [
+            "invoice_number",
+            "invoiceNumber",
+            "invoice_id",
+            "invoiceId",
+            "irn",
+        ]
+
+        for key in keys:
+            value = invoice_data.get(key)
+            if value:
+                return str(value)
+
+        metadata = invoice_data.get("metadata")
+        if isinstance(metadata, dict):
+            for key in keys:
+                value = metadata.get(key)
+                if value:
+                    return str(value)
+
+        return None
+
+    def _extract_submission_id(self, invoice_data: Dict[str, Any]) -> Optional[uuid.UUID]:
+        if not isinstance(invoice_data, dict):
+            return None
+
+        candidates = [
+            invoice_data.get("submission_id"),
+            invoice_data.get("submissionId"),
+            invoice_data.get("firs_submission_id"),
+            invoice_data.get("firsSubmissionId"),
+        ]
+
+        metadata = invoice_data.get("metadata")
+        if isinstance(metadata, dict):
+            candidates.extend(
+                [
+                    metadata.get("submission_id"),
+                    metadata.get("submissionId"),
+                    metadata.get("firs_submission_id"),
+                ]
+            )
+
+        for candidate in candidates:
+            parsed = self._try_parse_uuid(candidate)
+            if parsed:
+                return parsed
+
+        return None
+
+    def _try_parse_uuid(
+        self, value: Optional[Union[str, uuid.UUID]]
+    ) -> Optional[uuid.UUID]:
+        if not value:
+            return None
+        if isinstance(value, uuid.UUID):
+            return value
+        try:
+            return uuid.UUID(str(value))
+        except Exception:
+            return None
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get service statistics"""

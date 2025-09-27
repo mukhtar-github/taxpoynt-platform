@@ -9,8 +9,65 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import Text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects import sqlite
+
+# Enumerated types reused across upgrades to avoid duplicate CREATE TYPE statements.
+invoice_type_enum = sa.Enum(
+    'standard_invoice',
+    'credit_note',
+    'debit_note',
+    'simplified_invoice',
+    'receipt',
+    name='invoicetype',
+)
+
+validation_status_enum = sa.Enum(
+    'pending',
+    'valid',
+    'invalid',
+    'warning',
+    name='validationstatus',
+)
+
+submission_status_enum = sa.Enum(
+    'pending',
+    'processing',
+    'submitted',
+    'accepted',
+    'rejected',
+    'failed',
+    'cancelled',
+    name='submissionstatus',
+)
+
+auth_method_enum = sa.Enum(
+    'oauth2',
+    'api_key',
+    'username_password',
+    'jwt',
+    'webhook',
+    name='authmethod',
+)
+
+business_type_enum = sa.Enum(
+    'SOLE_PROPRIETORSHIP',
+    'PARTNERSHIP',
+    'LIMITED_COMPANY',
+    'PUBLIC_COMPANY',
+    'NON_PROFIT',
+    'COOPERATIVE',
+    name='businesstype',
+)
+
+organization_status_enum = sa.Enum(
+    'ACTIVE',
+    'INACTIVE',
+    'SUSPENDED',
+    'PENDING_VERIFICATION',
+    name='organizationstatus',
+)
 
 # revision identifiers, used by Alembic.
 revision: str = '920b8e791d92'
@@ -431,9 +488,15 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.add_column('firs_submissions', sa.Column('invoice_number', sa.String(length=100), nullable=False))
-    op.add_column('firs_submissions', sa.Column('invoice_type', sa.Enum('STANDARD_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'SIMPLIFIED_INVOICE', 'RECEIPT', name='invoicetype'), nullable=False))
+    bind = op.get_bind()
+    invoice_type_enum.create(bind, checkfirst=True)
+    validation_status_enum.create(bind, checkfirst=True)
+    auth_method_enum.create(bind, checkfirst=True)
+
+    # Add enriched FIRS submission fields leveraging the new enum types.
+    op.add_column('firs_submissions', sa.Column('invoice_type', invoice_type_enum, nullable=False))
     op.add_column('firs_submissions', sa.Column('irn', sa.String(length=255), nullable=True))
-    op.add_column('firs_submissions', sa.Column('validation_status', sa.Enum('PENDING', 'VALID', 'INVALID', 'WARNING', name='validationstatus'), nullable=False))
+    op.add_column('firs_submissions', sa.Column('validation_status', validation_status_enum, nullable=False))
     op.add_column('firs_submissions', sa.Column('invoice_data', sa.JSON(), nullable=False))
     op.add_column('firs_submissions', sa.Column('original_data', sa.JSON(), nullable=True))
     op.add_column('firs_submissions', sa.Column('subtotal', sa.Numeric(precision=15, scale=2), nullable=True))
@@ -462,14 +525,21 @@ def upgrade() -> None:
                existing_type=sa.VARCHAR(length=36),
                type_=sa.UUID(),
                existing_nullable=False)
+    # Ensure the submission status enum includes the expanded set of values.
+    op.execute("ALTER TYPE submissionstatus ADD VALUE IF NOT EXISTS 'processing';")
+    op.execute("ALTER TYPE submissionstatus ADD VALUE IF NOT EXISTS 'failed';")
     op.alter_column('firs_submissions', 'status',
-               existing_type=sa.VARCHAR(length=9),
-               type_=sa.Enum('PENDING', 'PROCESSING', 'SUBMITTED', 'ACCEPTED', 'REJECTED', 'FAILED', 'CANCELLED', name='submissionstatus'),
+               existing_type=submission_status_enum,
+               type_=submission_status_enum,
                existing_nullable=False)
-    op.alter_column('firs_submissions', 'error_details',
-               existing_type=sa.TEXT(),
-               type_=sa.JSON(),
-               existing_nullable=True)
+    op.alter_column(
+        'firs_submissions',
+        'error_details',
+        existing_type=sa.TEXT(),
+        type_=sa.JSON(),
+        existing_nullable=True,
+        postgresql_using="NULLIF(error_details, '')::json"
+    )
     op.alter_column('firs_submissions', 'created_at',
                existing_type=sa.DATETIME(),
                nullable=False)
@@ -510,7 +580,7 @@ def upgrade() -> None:
     op.drop_column('integration_credentials', 'encrypted_data')
     op.drop_column('integration_credentials', 'credential_type')
     op.add_column('integrations', sa.Column('description', sa.Text(), nullable=True))
-    op.add_column('integrations', sa.Column('auth_method', sa.Enum('OAUTH2', 'API_KEY', 'USERNAME_PASSWORD', 'JWT', 'WEBHOOK', name='authmethod'), nullable=False))
+    op.add_column('integrations', sa.Column('auth_method', auth_method_enum, nullable=False))
     op.add_column('integrations', sa.Column('endpoint_url', sa.String(length=500), nullable=True))
     op.add_column('integrations', sa.Column('configuration', sa.JSON(), nullable=True))
     op.add_column('integrations', sa.Column('sync_settings', sa.JSON(), nullable=True))
@@ -576,7 +646,10 @@ def upgrade() -> None:
     op.create_foreign_key(None, 'organization_users', 'users', ['invited_by_user_id'], ['id'])
     op.drop_column('organization_users', 'joined_at')
     op.add_column('organizations', sa.Column('business_name', sa.String(length=255), nullable=True))
-    op.add_column('organizations', sa.Column('business_type', sa.Enum('SOLE_PROPRIETORSHIP', 'PARTNERSHIP', 'LIMITED_COMPANY', 'PUBLIC_COMPANY', 'NON_PROFIT', 'COOPERATIVE', name='businesstype'), nullable=True))
+    bind = op.get_bind()
+    business_type_enum.create(bind, checkfirst=True)
+    organization_status_enum.create(bind, checkfirst=True)
+    op.add_column('organizations', sa.Column('business_type', business_type_enum, nullable=True))
     op.add_column('organizations', sa.Column('tin', sa.String(length=50), nullable=True))
     op.add_column('organizations', sa.Column('rc_number', sa.String(length=50), nullable=True))
     op.add_column('organizations', sa.Column('vat_number', sa.String(length=50), nullable=True))
@@ -588,7 +661,7 @@ def upgrade() -> None:
     op.add_column('organizations', sa.Column('lga', sa.String(length=100), nullable=True))
     op.add_column('organizations', sa.Column('postal_code', sa.String(length=20), nullable=True))
     op.add_column('organizations', sa.Column('country', sa.String(length=50), nullable=False))
-    op.add_column('organizations', sa.Column('status', sa.Enum('ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING_VERIFICATION', name='organizationstatus'), nullable=False))
+    op.add_column('organizations', sa.Column('status', organization_status_enum, nullable=False))
     op.add_column('organizations', sa.Column('is_verified', sa.Boolean(), nullable=False))
     op.add_column('organizations', sa.Column('verification_documents', sa.JSON(), nullable=True))
     op.add_column('organizations', sa.Column('firs_service_id', sa.String(length=50), nullable=True))
@@ -797,6 +870,8 @@ def downgrade() -> None:
     op.drop_column('organizations', 'tin')
     op.drop_column('organizations', 'business_type')
     op.drop_column('organizations', 'business_name')
+    organization_status_enum.drop(op.get_bind(), checkfirst=True)
+    business_type_enum.drop(op.get_bind(), checkfirst=True)
     op.add_column('organization_users', sa.Column('joined_at', sa.DATETIME(), nullable=True))
     op.drop_constraint(None, 'organization_users', type_='foreignkey')
     op.drop_index(op.f('ix_organization_users_id'), table_name='organization_users')
@@ -850,6 +925,7 @@ def downgrade() -> None:
                existing_type=sa.UUID(),
                type_=sa.VARCHAR(length=36),
                existing_nullable=False)
+    auth_method_enum.drop(op.get_bind(), checkfirst=True)
     op.drop_column('integrations', 'created_by_user_id')
     op.drop_column('integrations', 'sync_frequency')
     op.drop_column('integrations', 'total_records_synced')
@@ -942,6 +1018,8 @@ def downgrade() -> None:
     op.drop_column('firs_submissions', 'irn')
     op.drop_column('firs_submissions', 'invoice_type')
     op.drop_column('firs_submissions', 'invoice_number')
+    validation_status_enum.drop(op.get_bind(), checkfirst=True)
+    invoice_type_enum.drop(op.get_bind(), checkfirst=True)
     op.drop_table('pos_transaction_logs')
     op.drop_table('erp_sync_logs')
     op.drop_table('crm_sync_logs')

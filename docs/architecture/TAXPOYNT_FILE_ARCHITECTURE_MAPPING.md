@@ -19,7 +19,6 @@ This document provides a complete mapping of all executable files in the TaxPoyn
 
 | Current File Path | Architecture Mapping | Description |
 |------------------|---------------------|-------------|
-| `/backend/app/services/firs_si/bulk_irn_service.py` | si_services/irn_management | Bulk IRN generation and processing |
 | `/backend/app/services/firs_si/certificate_service.py` | si_services/certificate_management | Digital certificate lifecycle management |
 | `/backend/app/services/firs_si/certificate_request_service.py` | si_services/certificate_management | Certificate request processing |
 | `/backend/app/services/firs_si/digital_certificate_service.py` | si_services/certificate_management | Digital certificate operations |
@@ -40,7 +39,7 @@ This document provides a complete mapping of all executable files in the TaxPoyn
 | `/backend/app/services/firs_si/integration_status_service.py` | si_services/monitoring | Integration status monitoring |
 | `/backend/app/services/firs_si/schema_compliance_service.py` | si_services/validation | Schema conformity validation |
 | `/backend/app/services/firs_si/si_authentication_service.py` | si_services/authentication | SI authentication services |
-| `/backend/app/services/firs_si/irn_generation_service.py` | si_services/irn_management | IRN generation and QR code creation |
+| `/backend/app/services/firs_si/irn_generation_service.py` | si_services/irn_management | Handles remote IRN requests to FIRS and QR metadata persistence |
 
 ---
 

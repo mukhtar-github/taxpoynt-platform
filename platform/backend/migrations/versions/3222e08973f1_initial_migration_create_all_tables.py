@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -22,7 +23,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     # Create users table
     op.create_table('users',
-        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('email', sa.String(length=255), nullable=False),
         sa.Column('hashed_password', sa.String(length=255), nullable=False),
         sa.Column('first_name', sa.String(length=100), nullable=False),
@@ -40,7 +41,7 @@ def upgrade() -> None:
 
     # Create organizations table
     op.create_table('organizations',
-        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('tax_id', sa.String(length=50), nullable=True),
         sa.Column('registration_number', sa.String(length=100), nullable=True),
@@ -56,8 +57,8 @@ def upgrade() -> None:
 
     # Create user_service_access table  
     op.create_table('user_service_access',
-        sa.Column('id', sa.String(length=36), nullable=False),
-        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('service_type', sa.Enum('firs_integration', 'invoice_generation', 'compliance_monitoring', name='servicetype'), nullable=False),
         sa.Column('access_level', sa.Enum('read', 'write', 'admin', name='accesslevel'), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=True, default=True),
@@ -71,9 +72,9 @@ def upgrade() -> None:
 
     # Create organization_users table
     op.create_table('organization_users',
-        sa.Column('id', sa.String(length=36), nullable=False),
-        sa.Column('organization_id', sa.String(length=36), nullable=False),
-        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('role', sa.Enum('owner', 'admin', 'member', 'viewer', name='organizationrole'), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=True, default=True),
         sa.Column('joined_at', sa.DateTime(), nullable=True),
@@ -87,8 +88,8 @@ def upgrade() -> None:
 
     # Create integrations table
     op.create_table('integrations',
-        sa.Column('id', sa.String(length=36), nullable=False),
-        sa.Column('organization_id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('integration_type', sa.Enum('erp', 'crm', 'pos', 'accounting', 'other', name='integrationtype'), nullable=False),
         sa.Column('provider', sa.String(length=100), nullable=False),
@@ -103,8 +104,8 @@ def upgrade() -> None:
 
     # Create integration_credentials table
     op.create_table('integration_credentials',
-        sa.Column('id', sa.String(length=36), nullable=False),
-        sa.Column('integration_id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('integration_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('credential_type', sa.Enum('api_key', 'oauth_token', 'username_password', 'certificate', name='credentialtype'), nullable=False),
         sa.Column('encrypted_data', sa.Text(), nullable=False),
         sa.Column('expires_at', sa.DateTime(), nullable=True),
@@ -117,11 +118,11 @@ def upgrade() -> None:
 
     # Create firs_submissions table
     op.create_table('firs_submissions',
-        sa.Column('id', sa.String(length=36), nullable=False),
-        sa.Column('organization_id', sa.String(length=36), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('invoice_id', sa.String(length=100), nullable=False),
         sa.Column('submission_type', sa.Enum('invoice', 'credit_note', 'debit_note', name='submissiontype'), nullable=False),
-        sa.Column('status', sa.Enum('pending', 'submitted', 'accepted', 'rejected', 'cancelled', name='submissionstatus'), nullable=False, default='pending'),
+        sa.Column('status', sa.Enum('pending', 'processing', 'submitted', 'accepted', 'rejected', 'failed', 'cancelled', name='submissionstatus'), nullable=False, default='pending'),
         sa.Column('firs_reference', sa.String(length=100), nullable=True),
         sa.Column('submission_data', sa.JSON(), nullable=True),
         sa.Column('response_data', sa.JSON(), nullable=True),

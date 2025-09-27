@@ -53,6 +53,10 @@ class FIRSSubmission(BaseModel):
     invoice_number = Column(String(100), nullable=False, index=True)
     invoice_type = Column(Enum(InvoiceType), default=InvoiceType.STANDARD_INVOICE, nullable=False)
     irn = Column(String(255), nullable=True, unique=True, index=True)  # Invoice Reference Number from FIRS
+    csid = Column(String(255), nullable=True, index=True)  # Cryptographic Stamp Identifier from FIRS
+    csid_hash = Column(String(512), nullable=True)
+    qr_payload = Column(JSON, nullable=True)  # QR payload returned by FIRS
+    firs_stamp_metadata = Column(JSON, nullable=True)  # Additional stamp metadata from FIRS
     
     # Submission details
     status = Column(Enum(SubmissionStatus), default=SubmissionStatus.PENDING, nullable=False)
@@ -78,6 +82,7 @@ class FIRSSubmission(BaseModel):
     firs_submission_id = Column(String(100), nullable=True, index=True)  # FIRS internal ID
     firs_status_code = Column(String(20), nullable=True)
     firs_message = Column(Text, nullable=True)
+    firs_received_at = Column(DateTime(timezone=True), nullable=True)
     
     # Timestamps
     submitted_at = Column(DateTime(timezone=True), nullable=True)
@@ -160,6 +165,19 @@ class FIRSSubmission(BaseModel):
             self.firs_status_code = firs_data.get('statusCode')
             if 'irn' in firs_data:
                 self.irn = firs_data['irn']
+            if 'csid' in firs_data:
+                self.csid = firs_data['csid']
+            if 'csidHash' in firs_data:
+                self.csid_hash = firs_data['csidHash']
+            if 'qr' in firs_data:
+                self.qr_payload = firs_data['qr']
+            elif 'qr_code' in firs_data:
+                self.qr_payload = firs_data['qr_code']
+            if 'stampMetadata' in firs_data:
+                self.firs_stamp_metadata = firs_data['stampMetadata']
+            elif 'cryptographic_stamp' in firs_data:
+                self.firs_stamp_metadata = firs_data['cryptographic_stamp']
+            self.firs_received_at = datetime.utcnow()
         
         # Update timestamps
         now = datetime.utcnow()

@@ -9,9 +9,11 @@ Let me expand on this important point:
 
 3. **Validation Before Submission**: Our validate_invoice method in the FIRS service acts as a pre-submission check to ensure that transformed invoices meet all FIRS requirements before attempting to sign them.
 
-4. **Consistent Invoice Reference Numbers**: The IRN system we've implemented ensures that invoices across all ERP sources maintain consistent and unique identification, which is crucial for the FIRS reconciliation process.
+4. **Consistent Invoice Reference Numbers**: IRNs are now issued by FIRS during submission rather than being generated locally. Our repositories persist the returned IRN / CSID / QR payload so every ERP source reads from the same canonical record, which keeps reconciliation predictable and auditable.
 
-5. **Centralized FIRS Integration**: By centralizing the FIRS API communication through our service, we can ensure that regardless of the source ERP system, all e-invoices follow the same validation, signing, and submission process.
+5. **Centralized FIRS Integration**: By centralizing the FIRS API communication through our service, we ensure that regardless of the source ERP system, all e-invoices follow the same validation, pre-submission signing (XAdES/PAdES), submission, and persistence flow.
+
+6. **Digital Signature Compliance**: Digital signatures are applied before FIRS submission (per the MoSCoW requirements), while FIRS-supplied IRN and cryptographic stamps are stored after submission. Keeping these responsibilities separate preserves non-repudiation without shadowing FIRS artefacts.
 
 This approach gives us several advantages:
 - Reduces compliance risk across different ERP integrations

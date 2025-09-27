@@ -27,10 +27,13 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import asdict
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 
+from sqlalchemy import select
+
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
 from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.repositories import invoice_repo_async as invoice_repo
 from core_platform.data_management.repositories.firs_submission_repo_async import (
     get_tracking_overview_data,
     list_transmission_statuses_data,
@@ -39,7 +42,10 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
     acknowledge_tracking_alert,
     list_firs_responses_data,
     get_firs_response_detail,
+    get_submission_by_id,
 )
+from core_platform.data_management.models.firs_submission import FIRSSubmission
+from core_platform.data_management.models.si_app_correlation import SIAPPCorrelation
 
 from .status_management.app_configuration import AppConfigurationStore
 
@@ -3853,6 +3859,124 @@ class APPServiceRegistry:
 
             return environment, resolved
 
+        def _extract_irn(source: Optional[Dict[str, Any]]) -> Optional[str]:
+            if not isinstance(source, dict):
+                return None
+            for key in ("irn", "IRN"):
+                value = source.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+            return None
+
+        def _resolve_org_id(source: Optional[Dict[str, Any]]) -> Optional[str]:
+            if not isinstance(source, dict):
+                return None
+            for key in ("organization_id", "organizationId", "org_id", "tenant_id", "tenantId", "app_id", "appId"):
+                value = source.get(key)
+                if value:
+                    return str(value)
+            context = source.get("context") if isinstance(source.get("context"), dict) else None
+            if context:
+                resolved = _resolve_org_id(context)
+                if resolved:
+                    return resolved
+            return None
+
+        def _resolve_invoice_number(*sources: Optional[Dict[str, Any]]) -> Optional[str]:
+            for source in sources:
+                if not isinstance(source, dict):
+                    continue
+                for key in ("invoice_number", "invoiceNumber", "invoice_id", "invoiceId", "document_id", "documentId"):
+                    value = source.get(key)
+                    if value:
+                        return str(value)
+            return None
+
+        def _to_uuid(value: Optional[Any]) -> Optional[uuid.UUID]:
+            if not value:
+                return None
+            if isinstance(value, uuid.UUID):
+                return value
+            try:
+                return uuid.UUID(str(value))
+            except Exception:
+                return None
+
+        async def _resolve_irn_from_storage(request_payload: Dict[str, Any]) -> Optional[str]:
+            candidates = []
+            invoice_data = request_payload.get("invoice_data") if isinstance(request_payload.get("invoice_data"), dict) else {}
+            submission_data = request_payload.get("submission_data") if isinstance(request_payload.get("submission_data"), dict) else {}
+            metadata = request_payload.get("metadata") if isinstance(request_payload.get("metadata"), dict) else {}
+
+            for source in (request_payload, invoice_data, submission_data, metadata):
+                direct = _extract_irn(source)
+                if direct:
+                    return direct
+                candidates.append(source)
+
+            organization_id = None
+            for source in candidates:
+                resolved = _resolve_org_id(source)
+                if resolved:
+                    organization_id = resolved
+                    break
+
+            submission_id = request_payload.get("submission_id") or request_payload.get("submissionId")
+            submission_id = submission_id or request_payload.get("transmission_id") or request_payload.get("transmissionId")
+            invoice_number = _resolve_invoice_number(request_payload, invoice_data, submission_data, metadata)
+            correlation_id = request_payload.get("correlation_id") or request_payload.get("correlationId")
+            if not correlation_id and isinstance(submission_data, dict):
+                correlation_id = submission_data.get("correlation_id") or submission_data.get("correlationId")
+            si_invoice_id = request_payload.get("si_invoice_id") or request_payload.get("siInvoiceId")
+            if not si_invoice_id and isinstance(submission_data, dict):
+                si_invoice_id = submission_data.get("si_invoice_id") or submission_data.get("siInvoiceId")
+
+            async for session in get_async_session():
+                org_uuid = _to_uuid(organization_id)
+
+                if submission_id:
+                    submission_uuid = _to_uuid(submission_id)
+                    if submission_uuid:
+                        submission = await get_submission_by_id(
+                            session,
+                            submission_id=submission_uuid,
+                            organization_id=org_uuid,
+                        )
+                        if submission and submission.irn:
+                            return submission.irn
+
+                record = await invoice_repo.get_invoice_record(
+                    session,
+                    organization_id=organization_id,
+                    invoice_number=invoice_number,
+                    submission_id=submission_id,
+                    irn=None,
+                    correlation_id=correlation_id,
+                    si_invoice_id=si_invoice_id,
+                )
+                if record and record.irn:
+                    return record.irn
+
+                if correlation_id:
+                    stmt = select(SIAPPCorrelation).where(SIAPPCorrelation.correlation_id == str(correlation_id))
+                    if org_uuid:
+                        stmt = stmt.where(SIAPPCorrelation.organization_id == org_uuid)
+                    correlation_row = (await session.execute(stmt.limit(1))).scalars().first()
+                    if correlation_row and correlation_row.irn:
+                        return correlation_row.irn
+
+                if invoice_number:
+                    stmt = select(FIRSSubmission).where(FIRSSubmission.invoice_number == str(invoice_number))
+                    if org_uuid:
+                        stmt = stmt.where(FIRSSubmission.organization_id == org_uuid)
+                    submission_row = (await session.execute(stmt.order_by(FIRSSubmission.created_at.desc()).limit(1))).scalars().first()
+                    if submission_row and submission_row.irn:
+                        return submission_row.irn
+
+                break
+
+            return None
+
         async def _run_header_auth_check(auth_payload: Dict[str, Any]) -> Dict[str, Any]:
             environment, creds = _resolve_firs_credentials(auth_payload)
 
@@ -4100,18 +4224,81 @@ class APPServiceRegistry:
                     # Submit flow using header-based endpoints: sign -> transmit
                     if not http_client:
                         return {"operation": operation, "success": False, "error": "http_client_unavailable"}
-                    invoice_data = payload.get("invoice_data", {})
-                    irn = invoice_data.get("irn") or payload.get("irn")
+
+                    invoice_data = payload.get("invoice_data")
+                    invoice_data = dict(invoice_data) if isinstance(invoice_data, dict) else {}
+
                     sign_resp = await http_client.sign_invoice(invoice_data)
                     if not sign_resp.get("success"):
                         return {"operation": operation, "success": False, "data": {"sign": sign_resp}}
-                    if not irn and isinstance(sign_resp.get("data"), dict):
-                        irn = sign_resp["data"].get("irn") or irn
+
+                    sign_identifiers = sign_resp.get("identifiers") or extract_firs_identifiers(sign_resp.get("data"))
+                    if sign_identifiers:
+                        sign_resp["identifiers"] = sign_identifiers
+
+                    irn = invoice_data.get("irn") or payload.get("irn")
+                    if not irn and sign_identifiers:
+                        irn = sign_identifiers.get("irn")
+                    if not irn:
+                        lookup_payload = dict(payload)
+                        lookup_payload.setdefault("invoice_data", invoice_data)
+                        irn = await _resolve_irn_from_storage(lookup_payload)
                     if not irn:
                         return {"operation": operation, "success": False, "error": "missing_irn_for_transmit"}
-                    tx_resp = await http_client.transmit(irn)
+
+                    try:
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_app_submitting",
+                            payload={"irn": irn, "metadata": {"source": "app_service", "operation": "submit_to_firs"}},
+                        )
+                    except Exception:
+                        logger.debug("Correlation update_app_submitting skipped")
+
+                    tx_resp = await http_client.transmit(irn, payload.get("options"))
+                    tx_identifiers = tx_resp.get("identifiers") or extract_firs_identifiers(tx_resp.get("data"))
+                    if tx_identifiers:
+                        tx_resp["identifiers"] = tx_identifiers
+
+                    final_irn = tx_identifiers.get("irn") if tx_identifiers else irn
+                    if final_irn and "irn" not in invoice_data:
+                        invoice_data["irn"] = final_irn
+
+                    try:
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_app_submitted",
+                            payload={"irn": final_irn or irn, "metadata": {"source": "app_service", "operation": "submit_to_firs"}},
+                        )
+                    except Exception:
+                        logger.debug("Correlation update_app_submitted skipped")
+
+                    try:
+                        data = tx_resp.get("data") if isinstance(tx_resp, dict) else None
+                        base_payload = data if isinstance(data, dict) else (tx_resp if isinstance(tx_resp, dict) else {})
+                        normalized_payload = merge_identifiers_into_payload(base_payload, tx_identifiers or {})
+                        firs_status = (tx_resp.get("status") if isinstance(tx_resp, dict) else None) or (base_payload.get("status") if isinstance(base_payload, dict) else None) or "submitted"
+                        firs_response_id = (data.get("submission_id") if isinstance(data, dict) else None) or (data.get("id") if isinstance(data, dict) else None)
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_firs_response",
+                            payload={
+                                "irn": final_irn or irn,
+                                "firs_response_id": str(firs_response_id) if firs_response_id else None,
+                                "firs_status": str(firs_status),
+                                "response_data": normalized_payload,
+                                "identifiers": tx_identifiers,
+                            },
+                        )
+                    except Exception:
+                        logger.debug("Correlation update_firs_response skipped")
+
                     success = sign_resp.get("success", False) and tx_resp.get("success", False)
-                    return {"operation": operation, "success": success, "data": {"sign": sign_resp, "transmit": tx_resp}}
+                    return {
+                        "operation": operation,
+                        "success": success,
+                        "data": {"sign": sign_resp, "transmit": tx_resp, "irn": final_irn or irn},
+                    }
 
                 elif operation == "validate_invoice_for_firs":
                     # Validate invoice via thin HTTP client
@@ -4263,9 +4450,11 @@ class APPServiceRegistry:
                 elif operation == "transmit_firs_invoice":
                     if not http_client:
                         return {"operation": operation, "success": False, "error": "http_client_unavailable"}
-                    irn = payload.get("irn")
+                    irn = await _resolve_irn_from_storage(payload)
                     if not irn:
                         return {"operation": operation, "success": False, "error": "missing_irn"}
+                    payload = dict(payload)
+                    payload["irn"] = irn
                     # Update SI-APP correlation: APP submitting
                     try:
                         await self.message_router.route_message(
@@ -4313,7 +4502,7 @@ class APPServiceRegistry:
                 elif operation == "confirm_firs_receipt":
                     if not http_client:
                         return {"operation": operation, "success": False, "error": "http_client_unavailable"}
-                    irn = payload.get("irn")
+                    irn = await _resolve_irn_from_storage(payload)
                     if not irn:
                         return {"operation": operation, "success": False, "error": "missing_irn"}
                     resp = await http_client.confirm_receipt(irn, payload.get("options"))

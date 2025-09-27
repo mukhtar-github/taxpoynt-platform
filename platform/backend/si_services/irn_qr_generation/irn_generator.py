@@ -10,8 +10,14 @@ import hashlib
 import hmac
 import base64
 import secrets
+import warnings
+import logging
 from datetime import datetime
 from typing import Tuple, Dict, Any, Optional
+
+from core_platform.config.feature_flags import is_firs_remote_irn_enabled
+
+logger = logging.getLogger(__name__)
 
 
 class IRNGenerator:
@@ -20,6 +26,7 @@ class IRNGenerator:
     def __init__(self, secret_key: Optional[str] = None):
         self.secret_key = secret_key or secrets.token_hex(32)
         self.irn_prefix = "IRN"
+        self._remote_irn_warning_emitted = False
     
     def generate_irn(self, invoice_data: Dict[str, Any]) -> Tuple[str, str, str]:
         """
@@ -31,6 +38,17 @@ class IRNGenerator:
         Returns:
             Tuple containing (irn_value, verification_code, hash_value)
         """
+        if is_firs_remote_irn_enabled():
+            if not self._remote_irn_warning_emitted:
+                warning_msg = (
+                    "FIRS_REMOTE_IRN enabled; IRNGenerator.generate_irn is bypassed. "
+                    "Legacy IRN generation should be disabled in remote mode."
+                )
+                warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
+                logger.warning(warning_msg)
+                self._remote_irn_warning_emitted = True
+            raise RuntimeError("FIRS remote IRN mode enabled; local IRN generation is unavailable.")
+
         # Create deterministic hash from invoice data
         invoice_hash = self._create_invoice_hash(invoice_data)
         
@@ -49,6 +67,15 @@ class IRNGenerator:
     
     def generate_simple_irn(self, invoice_id: str) -> str:
         """Generate simple IRN for basic use cases"""
+        if is_firs_remote_irn_enabled():
+            if not self._remote_irn_warning_emitted:
+                warning_msg = (
+                    "FIRS_REMOTE_IRN enabled; IRNGenerator.generate_simple_irn is bypassed."
+                )
+                warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
+                logger.warning(warning_msg)
+                self._remote_irn_warning_emitted = True
+            raise RuntimeError("FIRS remote IRN mode enabled; simple IRN generation is unavailable.")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         invoice_hash = hashlib.md5(invoice_id.encode()).hexdigest()[:8].upper()
         return f"{self.irn_prefix}{timestamp}{invoice_hash}"

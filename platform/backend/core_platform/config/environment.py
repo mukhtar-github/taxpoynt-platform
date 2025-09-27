@@ -12,6 +12,14 @@ from typing import Dict, Any, Optional
 from enum import Enum
 import logging
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    """Parse boolean feature flags from environment variables."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -128,33 +136,42 @@ class EnvironmentConfig:
             
     def get_feature_flags(self) -> Dict[str, bool]:
         """Get feature flags for the current environment."""
+        base_flags = {
+            "ENABLE_REAL_TIME_MONITORING": False,
+            "ENABLE_ODOO_DIRECT_CONNECT": False,
+            "ENABLE_ADVANCED_ANALYTICS": False,
+            "ENABLE_DEBUG_TOOLBAR": False,
+            "ENABLE_SQL_LOGGING": False,
+            "DISABLE_RATE_LIMITING": False,
+            "FIRS_REMOTE_IRN": False,
+        }
+
         if self.environment == Environment.DEVELOPMENT:
-            return {
+            base_flags.update({
                 "ENABLE_REAL_TIME_MONITORING": True,
                 "ENABLE_ODOO_DIRECT_CONNECT": True,
                 "ENABLE_ADVANCED_ANALYTICS": True,
                 "ENABLE_DEBUG_TOOLBAR": True,
                 "ENABLE_SQL_LOGGING": True,
                 "DISABLE_RATE_LIMITING": True,
-            }
+                "FIRS_REMOTE_IRN": _env_flag("FIRS_REMOTE_IRN", default=False),
+            })
         elif self.environment == Environment.STAGING:
-            return {
+            base_flags.update({
                 "ENABLE_REAL_TIME_MONITORING": True,
-                "ENABLE_ODOO_DIRECT_CONNECT": False,
                 "ENABLE_ADVANCED_ANALYTICS": True,
                 "ENABLE_DEBUG_TOOLBAR": True,
-                "ENABLE_SQL_LOGGING": False,
-                "DISABLE_RATE_LIMITING": False,
-            }
+                "FIRS_REMOTE_IRN": _env_flag("FIRS_REMOTE_IRN", default=False),
+            })
         else:  # PRODUCTION
-            return {
-                "ENABLE_REAL_TIME_MONITORING": os.getenv("NEXT_PUBLIC_ENABLE_REAL_TIME_MONITORING", "false").lower() == "true",
-                "ENABLE_ODOO_DIRECT_CONNECT": os.getenv("NEXT_PUBLIC_ENABLE_ODOO_DIRECT_CONNECT", "false").lower() == "true",
-                "ENABLE_ADVANCED_ANALYTICS": os.getenv("NEXT_PUBLIC_ENABLE_ADVANCED_ANALYTICS", "false").lower() == "true",
-                "ENABLE_DEBUG_TOOLBAR": False,
-                "ENABLE_SQL_LOGGING": False,
-                "DISABLE_RATE_LIMITING": False,
-            }
+            base_flags.update({
+                "ENABLE_REAL_TIME_MONITORING": _env_flag("NEXT_PUBLIC_ENABLE_REAL_TIME_MONITORING", default=False),
+                "ENABLE_ODOO_DIRECT_CONNECT": _env_flag("NEXT_PUBLIC_ENABLE_ODOO_DIRECT_CONNECT", default=False),
+                "ENABLE_ADVANCED_ANALYTICS": _env_flag("NEXT_PUBLIC_ENABLE_ADVANCED_ANALYTICS", default=False),
+                "FIRS_REMOTE_IRN": _env_flag("FIRS_REMOTE_IRN", default=False),
+            })
+
+        return base_flags
     
     def get_database_config(self) -> Dict[str, Any]:
         """Get complete database configuration for the current environment."""

@@ -15,6 +15,8 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from core_platform.config.feature_flags import is_firs_remote_irn_enabled
+
 # Import integrated services
 from si_services.authentication import (
     AuthenticationManager,
@@ -180,21 +182,34 @@ class AuthenticationIntegrationDemo:
                     'timestamp': datetime.now().isoformat()
                 })
                 
-                # Step 4: Generate IRN
-                logger.info("Step 4: Generating IRN...")
-                
-                irn, qr_code, verification_code = self.irn_service.generate_irn(invoice_data)
-                
-                workflow_result['steps'].append({
-                    'step': 'irn_generation',
-                    'success': bool(irn),
-                    'irn': irn,
-                    'timestamp': datetime.now().isoformat()
-                })
-                
-                if not irn:
-                    workflow_result['error'] = 'IRN generation failed'
-                    return workflow_result
+                irn = None
+                qr_code = None
+                verification_code = None
+
+                remote_mode = is_firs_remote_irn_enabled()
+
+                if not remote_mode:
+                    # Step 4: Generate IRN locally (legacy path)
+                    logger.info("Step 4: Generating IRN locally...")
+                    irn, qr_code, verification_code = self.irn_service.generate_irn(invoice_data)
+                    workflow_result['steps'].append({
+                        'step': 'irn_generation',
+                        'success': bool(irn),
+                        'mode': 'local',
+                        'irn': irn,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    if not irn:
+                        workflow_result['error'] = 'IRN generation failed'
+                        return workflow_result
+                else:
+                    logger.info("Step 4: Remote IRN mode enabled; deferring to FIRS submission response")
+                    workflow_result['steps'].append({
+                        'step': 'irn_generation',
+                        'success': True,
+                        'mode': 'remote',
+                        'timestamp': datetime.now().isoformat()
+                    })
                 
                 # Step 5: Authenticate with FIRS
                 logger.info("Step 5: Authenticating with FIRS...")
@@ -217,20 +232,27 @@ class AuthenticationIntegrationDemo:
                 # Step 6: Submit IRN to FIRS
                 logger.info("Step 6: Submitting IRN to FIRS...")
                 
-                submission_result = await self.irn_service.submit_irn_to_firs(
+                submission_result = await self.irn_service.request_irn_from_firs(
                     irn_value=irn,
                     invoice_data=invoice_data,
                     environment='sandbox'
                 )
                 
+                identifiers = submission_result.get('identifiers') or {}
+                final_irn = identifiers.get('irn') or submission_result.get('irn') or irn
+                if final_irn:
+                    irn = final_irn
+                if remote_mode and not qr_code:
+                    qr_code = identifiers.get('qr_payload')
+
                 workflow_result['steps'].append({
                     'step': 'firs_submission',
                     'success': submission_result['success'],
                     'irn': irn,
                     'timestamp': datetime.now().isoformat()
                 })
-                
-                if submission_result['success']:
+
+                if submission_result['success'] and irn:
                     workflow_result['success'] = True
                     workflow_result['final_result'] = {
                         'irn': irn,
@@ -239,7 +261,7 @@ class AuthenticationIntegrationDemo:
                         'firs_response': submission_result.get('firs_response')
                     }
                 else:
-                    workflow_result['error'] = f"FIRS submission failed: {submission_result.get('error')}"
+                    workflow_result['error'] = submission_result.get('error') or 'FIRS submission failed'
             
             workflow_result['completed_at'] = datetime.now().isoformat()
             return workflow_result

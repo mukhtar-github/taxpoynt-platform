@@ -5,8 +5,8 @@ This package provides comprehensive FIRS API communication services for the
 APP (Access Point Provider) role in the TaxPoynt e-invoicing platform.
 
 Key Components:
-- FIRSAPIClient: Official FIRS API client with OAuth 2.0 and TLS 1.3
-- FIRSAuthenticationHandler: Specialized OAuth 2.0 authentication for FIRS
+- FIRSAPIClient: Official FIRS API client using header-based auth and TLS 1.3
+- FIRSAuthenticationHandler: Specialized OAuth 2.0 authentication for legacy flows
 - FIRSRequestBuilder: Type-safe request building with validation
 - FIRSResponseParser: Comprehensive response parsing and interpretation
 - FIRSConnectionPool: Advanced connection pooling with load balancing
@@ -18,7 +18,7 @@ All components are designed to be independent and work with core_platform
 foundation services when available.
 
 Security Features:
-- OAuth 2.0 client credentials flow
+- Header-based authentication (x-api-key/x-api-secret/x-certificate)
 - TLS 1.3 encrypted communication
 - Request signing and validation
 - Rate limiting and quota management

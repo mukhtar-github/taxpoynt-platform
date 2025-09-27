@@ -42,8 +42,8 @@ This document provides a comprehensive migration plan for restructuring the TaxP
    - transmission_key_service.py
 
 4. **IRN & Invoice Services**
-   - irn_service.py
-   - bulk_irn_service.py
+   - irn_service.py (migrated to remote IRN submission)
+   - bulk_irn_service.py *(retired – replaced by request_irn_from_firs persistence flow)*
    - invoice_service.py
    - invoice_validation_service.py
    - invoice_service_code_validator.py
@@ -114,7 +114,7 @@ This document provides a comprehensive migration plan for restructuring the TaxP
 
 **Primary Services:**
 - irn_service.py - Core IRN generation and validation
-- bulk_irn_service.py - Batch IRN processing
+- bulk_irn_service.py - Batch IRN processing *(retired; use request_irn_from_firs persistence pipeline)*
 - integration_service.py - ERP integration management
 - integration_credential_connector.py - Integration authentication
 - integration_monitor.py - Integration health monitoring
@@ -331,7 +331,7 @@ firs_hybrid → (no dependencies)
 1. certificate_service.py - Certificate management
 2. certificate_request_service.py - Certificate requests
 3. irn_service.py - IRN generation
-4. bulk_irn_service.py - Bulk IRN processing
+4. bulk_irn_service.py - Bulk IRN processing *(retired; replaced by remote IRN submission workflow)*
 5. validation_rule_service.py - Validation rules
 6. ubl_validator.py - UBL validation
 7. integration_service.py - Integration management

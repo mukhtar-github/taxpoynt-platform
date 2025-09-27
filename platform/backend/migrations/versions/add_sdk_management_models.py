@@ -16,18 +16,68 @@ branch_labels = None
 depends_on = None
 
 
+SDK_LANGUAGES = (
+    'python',
+    'javascript',
+    'java',
+    'csharp',
+    'php',
+    'go',
+    'ruby',
+    'swift',
+    'kotlin',
+    'rust',
+)
+
+SDK_STATUSES = (
+    'draft',
+    'beta',
+    'stable',
+    'deprecated',
+    'archived',
+)
+
+FEEDBACK_TYPES = (
+    'general',
+    'bug_report',
+    'feature_request',
+    'documentation',
+    'performance',
+    'integration',
+)
+
+TEST_STATUSES = (
+    'pending',
+    'running',
+    'success',
+    'failed',
+    'timeout',
+)
+
+sdk_language_enum = postgresql.ENUM(*SDK_LANGUAGES, name='sdklanguage', create_type=False)
+sdk_status_enum = postgresql.ENUM(*SDK_STATUSES, name='sdkstatus', create_type=False)
+feedback_type_enum = postgresql.ENUM(*FEEDBACK_TYPES, name='feedbacktype', create_type=False)
+test_status_enum = postgresql.ENUM(*TEST_STATUSES, name='teststatus', create_type=False)
+
+sdk_language_enum_type = postgresql.ENUM(*SDK_LANGUAGES, name='sdklanguage')
+sdk_status_enum_type = postgresql.ENUM(*SDK_STATUSES, name='sdkstatus')
+feedback_type_enum_type = postgresql.ENUM(*FEEDBACK_TYPES, name='feedbacktype')
+test_status_enum_type = postgresql.ENUM(*TEST_STATUSES, name='teststatus')
+
+
 def upgrade():
     # Create enums
-    op.execute("CREATE TYPE sdklanguage AS ENUM ('python', 'javascript', 'java', 'csharp', 'php', 'go', 'ruby', 'swift', 'kotlin', 'rust')")
-    op.execute("CREATE TYPE sdkstatus AS ENUM ('draft', 'beta', 'stable', 'deprecated', 'archived')")
-    op.execute("CREATE TYPE feedbacktype AS ENUM ('general', 'bug_report', 'feature_request', 'documentation', 'performance', 'integration')")
-    op.execute("CREATE TYPE teststatus AS ENUM ('pending', 'running', 'success', 'failed', 'timeout')")
+    bind = op.get_bind()
+    sdk_language_enum_type.create(bind, checkfirst=True)
+    sdk_status_enum_type.create(bind, checkfirst=True)
+    feedback_type_enum_type.create(bind, checkfirst=True)
+    test_status_enum_type.create(bind, checkfirst=True)
     
     # Create sdks table
     op.create_table('sdks',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('name', sa.String(length=100), nullable=False),
-        sa.Column('language', postgresql.ENUM('python', 'javascript', 'java', 'csharp', 'php', 'go', 'ruby', 'swift', 'kotlin', 'rust', name='sdklanguage'), nullable=False),
+        sa.Column('language', sdk_language_enum, nullable=False),
         sa.Column('version', sa.String(length=20), nullable=False),
         sa.Column('description', sa.Text(), nullable=False),
         sa.Column('features', postgresql.JSON(astext_type=sa.Text()), nullable=False),
@@ -36,7 +86,7 @@ def upgrade():
         sa.Column('examples', postgresql.JSON(astext_type=sa.Text()), nullable=False),
         sa.Column('download_count', sa.Integer(), nullable=True),
         sa.Column('rating', sa.Numeric(precision=3, scale=2), nullable=True),
-        sa.Column('status', postgresql.ENUM('draft', 'beta', 'stable', 'deprecated', 'archived', name='sdkstatus'), nullable=True),
+        sa.Column('status', sdk_status_enum, nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.Column('metadata', postgresql.JSON(astext_type=sa.Text()), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -151,7 +201,7 @@ def upgrade():
         sa.Column('scenario_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('status', postgresql.ENUM('pending', 'running', 'success', 'failed', 'timeout', name='teststatus'), nullable=False),
+        sa.Column('status', test_status_enum, nullable=False),
         sa.Column('response_time', sa.Integer(), nullable=False),
         sa.Column('status_code', sa.Integer(), nullable=True),
         sa.Column('response_body', postgresql.JSON(astext_type=sa.Text()), nullable=True),
@@ -199,7 +249,7 @@ def upgrade():
         sa.Column('sdk_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('feedback_type', postgresql.ENUM('general', 'bug_report', 'feature_request', 'documentation', 'performance', 'integration', name='feedbacktype'), nullable=False),
+        sa.Column('feedback_type', feedback_type_enum, nullable=False),
         sa.Column('rating', sa.Integer(), nullable=False),
         sa.Column('comments', sa.Text(), nullable=True),
         sa.Column('is_public', sa.Boolean(), nullable=True),
@@ -301,7 +351,8 @@ def downgrade():
     op.drop_table('sdks')
     
     # Drop enums
-    op.execute("DROP TYPE teststatus")
-    op.execute("DROP TYPE feedbacktype")
-    op.execute("DROP TYPE sdkstatus")
-    op.execute("DROP TYPE sdklanguage")
+    bind = op.get_bind()
+    test_status_enum_type.drop(bind, checkfirst=True)
+    feedback_type_enum_type.drop(bind, checkfirst=True)
+    sdk_status_enum_type.drop(bind, checkfirst=True)
+    sdk_language_enum_type.drop(bind, checkfirst=True)

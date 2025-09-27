@@ -23,6 +23,7 @@ import asyncio
 from typing import Dict, Any, Optional
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
+from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
 # Import SI services
 from .banking_integration.banking_service import SIBankingService
@@ -672,6 +673,8 @@ class SIServiceRegistry:
                 metadata={
                     "service_type": "irn_generation",
                     "operations": [
+                        "request_irn_from_firs",
+                        "submit_irn_to_firs",
                         "generate_irn",
                         "generate_qr_code",
                         "validate_irn",
@@ -1060,11 +1063,146 @@ class SIServiceRegistry:
     
     def _create_irn_callback(self, irn_service):
         """Create callback for IRN operations"""
+
+        generation_service = irn_service.get("generation_service")
+        irn_generator = irn_service.get("irn_generator")
+        qr_generator = irn_service.get("qr_generator")
+
         async def irn_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                remote_mode = is_firs_remote_irn_enabled()
+
+                if operation in {"request_irn_from_firs", "submit_irn_to_firs"}:
+                    if not generation_service:
+                        return {"operation": operation, "success": False, "error": "irn_service_unavailable"}
+
+                    invoice_data = payload.get("invoice_data") or {}
+                    irn_value = payload.get("irn")
+                    organization_id = payload.get("organization_id") or payload.get("tenant_id") or payload.get("tenantId")
+                    environment = payload.get("environment", "sandbox")
+
+                    result = await generation_service.request_irn_from_firs(
+                        irn_value=irn_value,
+                        invoice_data=invoice_data,
+                        environment=environment,
+                        organization_id=organization_id,
+                    )
+                    return {
+                        "operation": operation,
+                        "success": result.get("success", False),
+                        "data": result,
+                    }
+
+                if operation == "generate_irn":
+                    if remote_mode:
+                        return {
+                            "operation": operation,
+                            "success": False,
+                            "error": "remote_irn_enabled",
+                        }
+                    if not irn_generator:
+                        return {"operation": operation, "success": False, "error": "irn_generator_unavailable"}
+
+                    invoice_data = payload.get("invoice_data") or {}
+                    irn_value, verification_code, hash_value = irn_generator.generate_irn(invoice_data)
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "irn": irn_value,
+                            "verification_code": verification_code,
+                            "hash": hash_value,
+                        },
+                    }
+
+                if operation == "generate_qr_code":
+                    if not qr_generator:
+                        return {"operation": operation, "success": False, "error": "qr_generator_unavailable"}
+
+                    irn_value = payload.get("irn") or payload.get("IRN")
+                    if not irn_value:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+
+                    verification_code = (
+                        payload.get("verification_code")
+                        or payload.get("verificationCode")
+                        or ""
+                    )
+                    invoice_data = payload.get("invoice_data") or {}
+                    format_type = payload.get("format_type", "json")
+
+                    qr_payload = qr_generator.generate_qr_code(
+                        irn_value=irn_value,
+                        verification_code=verification_code,
+                        invoice_data=invoice_data,
+                        format_type=format_type,
+                    )
+
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": qr_payload,
+                    }
+
+                if operation == "validate_irn":
+                    if not generation_service:
+                        return {"operation": operation, "success": False, "error": "irn_service_unavailable"}
+
+                    irn_value = payload.get("irn")
+                    if not irn_value:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+
+                    verification_code = payload.get("verification_code") or payload.get("verificationCode")
+                    validation_level_value = payload.get("validation_level") or payload.get("validationLevel")
+
+                    if validation_level_value:
+                        from si_services.irn_qr_generation.irn_validator import ValidationLevel as _ValidationLevel
+
+                        try:
+                            validation_level = (
+                                validation_level_value
+                                if isinstance(validation_level_value, _ValidationLevel)
+                                else _ValidationLevel[str(validation_level_value).upper()]
+                            )
+                        except Exception:
+                            validation_level = _ValidationLevel.STANDARD
+                    else:
+                        from si_services.irn_qr_generation.irn_validator import ValidationLevel as _ValidationLevel
+
+                        validation_level = _ValidationLevel.STANDARD
+
+                    validation = generation_service.validate_irn(
+                        irn_value=str(irn_value),
+                        verification_code=verification_code,
+                        validation_level=validation_level,
+                    )
+
+                    return {
+                        "operation": operation,
+                        "success": validation.get("is_valid", False),
+                        "data": validation,
+                    }
+
+                if operation == "bulk_generate_irn":
+                    return {
+                        "operation": operation,
+                        "success": False,
+                        "error": "bulk_irn_generation_deprecated",
+                    }
+
+                if operation == "get_irn_status":
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "remote_irn_enabled": remote_mode,
+                        },
+                    }
+
+                return {"operation": operation, "success": False, "error": "unsupported_operation"}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
+
         return irn_callback
     
     def _create_extraction_callback(self, extraction_service):

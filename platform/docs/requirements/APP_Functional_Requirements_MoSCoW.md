@@ -19,7 +19,7 @@
 - **MBS Platform Communication**
     - Secure transmission to FIRS's MBS solution
     - Real-time API integration
-    - IRN and CSID receipt handling within 2-4 hours
+    - Persist FIRS-issued IRN, CSID, and QR payloads within 2-4 hours
     - Status polling mechanism
     - Error response handling
 
@@ -38,7 +38,8 @@
     - API-based invoice reception
     - Format detection (XML, JSON)
     - BIS Billing 3.0 UBL schema validation
-    - Digital signature verification
+    - Digital signature application (XAdES/PAdES) before submission and verification on receipt
+    - Preservation of FIRS cryptographic stamp as a post-submission artefact
     - Duplicate detection
 
 ### **5. QR Code Management**

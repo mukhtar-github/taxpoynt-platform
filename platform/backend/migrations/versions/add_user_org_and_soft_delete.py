@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -22,7 +23,7 @@ def upgrade() -> None:
     """Add organization_id and soft delete fields."""
     
     # Add organization_id to users table
-    op.add_column('users', sa.Column('organization_id', sa.String(length=36), nullable=True))
+    op.add_column('users', sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=True))
     
     # Add foreign key constraint for organization_id
     op.create_foreign_key(

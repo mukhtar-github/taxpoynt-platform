@@ -177,9 +177,21 @@ class BulkProcessor:
                     "duplicate_irn": existing_irn
                 }
             
-            # Generate IRN
-            irn_value, verification_code, hash_value = self.irn_generator.generate_irn(invoice_data)
-            
+            # Generate IRN (legacy path – disabled when remote IRN is enabled)
+            try:
+                irn_value, verification_code, hash_value = self.irn_generator.generate_irn(invoice_data)
+            except RuntimeError as exc:
+                return {
+                    "success": False,
+                    "error": str(exc),
+                }
+
+            if not irn_value:
+                return {
+                    "success": False,
+                    "error": "irn_generation_unavailable",
+                }
+
             # Validate generated IRN
             validation_result = self.irn_validator.validate_irn(
                 irn_value=irn_value,

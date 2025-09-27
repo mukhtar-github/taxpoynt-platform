@@ -81,6 +81,8 @@ class FIRSConfig:
     certificate: str = ""
     client_id: str = ""  # retained for backwards compatibility with OAuth flows
     client_secret: str = ""  # retained for backwards compatibility with OAuth flows
+    certificates: List[str] = field(default_factory=list)
+    certificate_rotation_interval_seconds: int = 0
     
     # Connection settings
     base_url: str = ""
@@ -108,6 +110,20 @@ class FIRSConfig:
                 self.base_url = "https://sandbox-api.firs.gov.ng"
             else:
                 self.base_url = "https://api.firs.gov.ng"
+
+        # Normalise certificate pool
+        cert_pool: List[str] = []
+        if self.certificate:
+            cert_pool.append(self.certificate)
+        for cert in self.certificates:
+            if cert and cert not in cert_pool:
+                cert_pool.append(cert)
+        self.certificates = cert_pool
+        if self.certificates and not self.certificate:
+            self.certificate = self.certificates[0]
+
+        if self.certificate_rotation_interval_seconds < 0:
+            self.certificate_rotation_interval_seconds = 0
 
 
 @dataclass
@@ -171,6 +187,11 @@ class FIRSAPIClient:
 
         # Client state
         self.session: Optional[aiohttp.ClientSession] = None
+
+        # Certificate rotation state
+        self._certificate_pool: List[str] = self._initialize_certificate_pool()
+        self._current_certificate_index: int = 0
+        self._last_certificate_rotation: Optional[datetime] = None
 
         # Rate limiting
         self.request_timestamps: List[datetime] = []
@@ -293,8 +314,9 @@ class FIRSAPIClient:
             "x-request-id": request_id,
         }
 
-        if self.config.certificate:
-            headers["x-certificate"] = self.config.certificate
+        certificate = self._select_certificate()
+        if certificate:
+            headers["x-certificate"] = certificate
 
         if extra_headers:
             headers.update({k: v for k, v in extra_headers.items() if v is not None})
@@ -427,8 +449,9 @@ class FIRSAPIClient:
                     identifiers=identifiers or None
                 )
 
-                if response.status == 401 and retry_on_auth_failure:
-                    logger.warning("Received 401 from FIRS; retrying once with fresh headers")
+                if response.status in {401, 403} and retry_on_auth_failure:
+                    logger.warning("Received %s from FIRS; rotating certificate and retrying once", response.status)
+                    self.rotate_certificate()
                     return await self.make_request(
                         endpoint=endpoint,
                         method=method,
@@ -483,18 +506,112 @@ class FIRSAPIClient:
             endpoint=FIRSEndpoint.INVOICE_TRANSMIT_SELF_HEALTH,
             method="GET"
         )
-    
+
     async def system_status(self) -> FIRSResponse:
         """Get FIRS system status"""
         return await self.make_request(
             endpoint=FIRSEndpoint.INVOICE_TRANSMIT_PULL,
             method="GET"
         )
-    
+
+    async def validate_invoice(self, payload: Dict[str, Any]) -> FIRSResponse:
+        """Validate invoice payload with FIRS."""
+        return await self.make_request(
+            endpoint=FIRSEndpoint.INVOICE_VALIDATE,
+            method="POST",
+            data=payload,
+        )
+
+    async def submit_invoice(self, payload: Dict[str, Any]) -> FIRSResponse:
+        """Submit invoice for signing/clearance."""
+        return await self.make_request(
+            endpoint=FIRSEndpoint.INVOICE_SIGN,
+            method="POST",
+            data=payload,
+        )
+
+    async def transmit_invoice(self, irn: str, payload: Optional[Dict[str, Any]] = None) -> FIRSResponse:
+        """Transmit a signed invoice to the recipient channel."""
+        endpoint = FIRSEndpoint.INVOICE_TRANSMIT.value.format(irn=irn)
+        return await self.make_request(
+            endpoint=endpoint,
+            method="POST",
+            data=payload or {},
+        )
+
+    async def get_submission_status(self, irn: str) -> FIRSResponse:
+        """Retrieve submission status for an IRN."""
+        endpoint = FIRSEndpoint.INVOICE_TRANSMIT_LOOKUP_IRN.value.format(irn=irn)
+        return await self.make_request(
+            endpoint=endpoint,
+            method="GET",
+        )
+
+    async def confirm_invoice(self, irn: str, payload: Optional[Dict[str, Any]] = None) -> FIRSResponse:
+        """Confirm invoice receipt/acceptance."""
+        endpoint = FIRSEndpoint.INVOICE_CONFIRM.value.format(irn=irn)
+        return await self.make_request(
+            endpoint=endpoint,
+            method="POST",
+            data=payload or {},
+        )
+
+    async def create_party(self, payload: Dict[str, Any]) -> FIRSResponse:
+        """Create or update a party record in FIRS."""
+        return await self.make_request(
+            endpoint=FIRSEndpoint.INVOICE_PARTY,
+            method="POST",
+            data=payload,
+        )
+
+    async def get_party(self, party_id: str) -> FIRSResponse:
+        """Fetch a party record from FIRS."""
+        endpoint = FIRSEndpoint.INVOICE_PARTY_DETAIL.value.format(party_id=party_id)
+        return await self.make_request(
+            endpoint=endpoint,
+            method="GET",
+        )
+
+    async def verify_tin(self, payload: Dict[str, Any]) -> FIRSResponse:
+        """Verify a taxpayer identification number with FIRS utilities."""
+        return await self.make_request(
+            endpoint=FIRSEndpoint.UTILITIES_VERIFY_TIN,
+            method="POST",
+            data=payload,
+        )
+
+    async def get_resources(self, resource: str) -> FIRSResponse:
+        """Fetch resource metadata (currencies, invoice types, etc.)."""
+        endpoint = FIRSEndpoint.INVOICE_RESOURCES.value.format(resource=resource)
+        return await self.make_request(
+            endpoint=endpoint,
+            method="GET",
+        )
+
+    async def get_resources_currencies(self) -> FIRSResponse:
+        return await self.get_resources("currencies")
+
+    async def get_resources_invoice_types(self) -> FIRSResponse:
+        return await self.get_resources("invoice-types")
+
+    async def get_resources_service_codes(self) -> FIRSResponse:
+        return await self.get_resources("services-codes")
+
+    async def get_resources_vat_exemptions(self) -> FIRSResponse:
+        return await self.get_resources("vat-exemptions")
+
+    async def get_invoice(self, business_id: str) -> FIRSResponse:
+        """Retrieve invoices for a business identifier."""
+        endpoint = FIRSEndpoint.INVOICE_SEARCH.value.format(business_id=business_id)
+        return await self.make_request(
+            endpoint=endpoint,
+            method="GET",
+        )
+
     def get_metrics(self) -> FIRSClientMetrics:
         """Get client metrics"""
         return self.metrics
-    
+
     def get_connection_info(self) -> Dict[str, Any]:
         """Get connection information"""
         return {
@@ -503,11 +620,71 @@ class FIRSAPIClient:
             'tls_version': self.config.tls_version,
             'api_key_configured': bool(self.config.api_key),
             'api_secret_configured': bool(self.config.api_secret),
-            'certificate_configured': bool(self.config.certificate),
+            'certificate_configured': bool(self.config.certificate or self._certificate_pool),
             'rate_limited': self.is_rate_limited,
             'rate_limit_reset_time': self.rate_limit_reset_time.isoformat() if self.rate_limit_reset_time else None,
             'session_active': self.session is not None and not self.session.closed
         }
+
+    def rotate_certificate(self) -> Optional[str]:
+        """Force rotation to the next certificate in the pool."""
+        if not self._certificate_pool or len(self._certificate_pool) <= 1:
+            return self._select_certificate()
+        self._current_certificate_index = (self._current_certificate_index + 1) % len(self._certificate_pool)
+        self._last_certificate_rotation = datetime.utcnow()
+        return self._certificate_pool[self._current_certificate_index]
+
+    def update_certificates(self, certificates: List[str]) -> None:
+        """Replace the certificate pool and reset rotation state."""
+        sanitized = [c for c in certificates if c]
+        if self.config.certificate:
+            sanitized.insert(0, self.config.certificate)
+        # Deduplicate while preserving order
+        seen: List[str] = []
+        for cert in sanitized:
+            if cert not in seen:
+                seen.append(cert)
+        self._certificate_pool = seen
+        self.config.certificates = seen
+        if seen and not self.config.certificate:
+            self.config.certificate = seen[0]
+        self._current_certificate_index = 0
+        self._last_certificate_rotation = None
+
+    def get_current_certificate(self) -> Optional[str]:
+        """Return the certificate currently used for headers."""
+        if self._certificate_pool:
+            return self._certificate_pool[self._current_certificate_index]
+        return self.config.certificate if self.config.certificate else None
+
+    def _initialize_certificate_pool(self) -> List[str]:
+        pool: List[str] = []
+        if self.config.certificate:
+            pool.append(self.config.certificate)
+        for cert in self.config.certificates:
+            if cert and cert not in pool:
+                pool.append(cert)
+        return pool
+
+    def _select_certificate(self) -> Optional[str]:
+        """Select the certificate for the current request, applying rotation policy."""
+        if self._certificate_pool:
+            if self._current_certificate_index >= len(self._certificate_pool):
+                self._current_certificate_index = 0
+
+            now = datetime.utcnow()
+            if self._last_certificate_rotation is None:
+                self._last_certificate_rotation = now
+            elif (
+                self.config.certificate_rotation_interval_seconds > 0
+                and len(self._certificate_pool) > 1
+                and (now - self._last_certificate_rotation).total_seconds() >= self.config.certificate_rotation_interval_seconds
+            ):
+                self._current_certificate_index = (self._current_certificate_index + 1) % len(self._certificate_pool)
+                self._last_certificate_rotation = now
+            return self._certificate_pool[self._current_certificate_index]
+
+        return self.config.certificate or None
 
 
 # Factory function for creating FIRS API client
@@ -518,6 +695,8 @@ def create_firs_api_client(
     api_key: str = "",
     api_secret: str = "",
     certificate: str = "",
+    certificates: Optional[List[str]] = None,
+    certificate_rotation_interval_seconds: int = 0,
     config_overrides: Optional[Dict[str, Any]] = None
 ) -> FIRSAPIClient:
     """
@@ -541,7 +720,9 @@ def create_firs_api_client(
         client_secret=client_secret,
         api_key=api_key,
         api_secret=api_secret,
-        certificate=certificate
+        certificate=certificate,
+        certificates=certificates or [],
+        certificate_rotation_interval_seconds=certificate_rotation_interval_seconds,
     )
     
     # Apply configuration overrides
