@@ -83,6 +83,7 @@ class FIRSSubmission(BaseModel):
     firs_status_code = Column(String(20), nullable=True)
     firs_message = Column(Text, nullable=True)
     firs_received_at = Column(DateTime(timezone=True), nullable=True)
+    request_id = Column(String(100), nullable=True, index=True)
     
     # Timestamps
     submitted_at = Column(DateTime(timezone=True), nullable=True)

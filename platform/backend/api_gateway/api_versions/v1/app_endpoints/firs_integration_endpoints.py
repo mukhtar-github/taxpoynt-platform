@@ -5,9 +5,12 @@ Access Point Provider endpoints for direct FIRS system integration.
 Handles communication with FIRS e-invoicing infrastructure.
 """
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Request, HTTPException, Depends, status, Query, Path
+from fastapi import APIRouter, Request, Response, HTTPException, Depends, status, Query, Path
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from email.utils import format_datetime, parsedate_to_datetime
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -84,7 +87,13 @@ class FIRSIntegrationEndpointsV1:
         context.metadata["api_version"] = "v1"
         context.metadata["endpoint_group"] = "app"
         return context
-    
+
+    async def _require_app_admin(self, request: Request) -> HTTPRoutingContext:
+        context = await self._require_app_role(request)
+        if not context.has_role(PlatformRole.PLATFORM_ADMIN):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator privileges required")
+        return context
+
     def _setup_routes(self):
         """Setup FIRS integration routes"""
         
@@ -265,6 +274,17 @@ class FIRSIntegrationEndpointsV1:
             description="Refresh a single cached FIRS resource by key",
             response_model=V1ResponseModel,
             dependencies=[Depends(self._require_app_role)]
+        )
+
+        # Admin-triggered refresh helpers
+        self.router.add_api_route(
+            "/admin/resources/refresh",
+            self.admin_refresh_firs_resources,
+            methods=["POST"],
+            summary="Admin refresh of FIRS resources",
+            description="Force refresh of cached FIRS resources using admin privileges",
+            response_model=V1ResponseModel,
+            dependencies=[Depends(self._require_app_admin)]
         )
         
         # Certificate Management Routes
@@ -673,7 +693,7 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error validating invoice batch for FIRS in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to validate invoice batch for FIRS")
     
-    async def get_firs_validation_rules(self, context: HTTPRoutingContext = Depends(_require_app_role)):
+    async def get_firs_validation_rules(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS validation rules"""
         try:
             result = await self.message_router.route_message(
@@ -684,8 +704,46 @@ class FIRSIntegrationEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            
-            return self._create_v1_response(result, "firs_validation_rules_retrieved")
+            data = result.get("data") or {}
+            metadata = data.get("metadata") or {}
+            etag = metadata.get("etag")
+            last_modified_iso = metadata.get("last_modified")
+            headers: Dict[str, str] = {}
+            last_modified_dt = None
+            if etag:
+                headers["ETag"] = f'"{etag}"'
+            if last_modified_iso:
+                try:
+                    iso_value = last_modified_iso
+                    if iso_value.endswith("Z"):
+                        iso_value = iso_value.replace("Z", "+00:00")
+                    last_modified_dt = datetime.fromisoformat(iso_value)
+                    if last_modified_dt.tzinfo is None:
+                        last_modified_dt = last_modified_dt.replace(tzinfo=timezone.utc)
+                    headers["Last-Modified"] = format_datetime(last_modified_dt, usegmt=True)
+                except Exception:
+                    last_modified_dt = None
+            if_none_match = request.headers.get("if-none-match")
+            if if_none_match and etag and if_none_match.strip('"') == etag:
+                return Response(status_code=304, headers=headers)
+            if_modified_since = request.headers.get("if-modified-since")
+            if if_modified_since and last_modified_dt:
+                try:
+                    since_dt = parsedate_to_datetime(if_modified_since)
+                    if since_dt.tzinfo is None:
+                        since_dt = since_dt.replace(tzinfo=timezone.utc)
+                    if last_modified_dt <= since_dt:
+                        return Response(status_code=304, headers=headers)
+                except Exception:
+                    pass
+            response_model = self._create_v1_response(result, "firs_validation_rules_retrieved")
+            if headers:
+                return JSONResponse(
+                    status_code=200,
+                    content=jsonable_encoder(response_model),
+                    headers=headers
+                )
+            return response_model
         except Exception as e:
             logger.error(f"Error getting FIRS validation rules in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS validation rules")
@@ -704,6 +762,30 @@ class FIRSIntegrationEndpointsV1:
             return self._create_v1_response(result, "firs_resources_refreshed")
         except Exception as e:
             logger.error(f"Error refreshing FIRS resources in v1: {e}")
+            raise HTTPException(status_code=500, detail="Failed to refresh FIRS resources")
+
+    async def admin_refresh_firs_resources(self, context: HTTPRoutingContext = Depends(_require_app_admin)):
+        """Admin-triggered refresh that forces an update of cached FIRS resources."""
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
+                operation="refresh_firs_resources",
+                payload={
+                    "app_id": context.user_id,
+                    "api_version": "v1",
+                    "triggered_by": "admin",
+                    "force_refresh": True,
+                }
+            )
+            enriched_result = dict(result or {})
+            data_section = enriched_result.get("data")
+            if isinstance(data_section, dict):
+                metadata = data_section.setdefault("metadata", {})
+                metadata.setdefault("triggered_by", "admin")
+                metadata.setdefault("manual_refresh", True)
+            return self._create_v1_response(enriched_result, "firs_resources_admin_refreshed")
+        except Exception as e:
+            logger.error(f"Error refreshing FIRS resources via admin route in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to refresh FIRS resources")
 
     async def refresh_firs_resource(self, resource: str, context: HTTPRoutingContext = Depends(_require_app_role)):

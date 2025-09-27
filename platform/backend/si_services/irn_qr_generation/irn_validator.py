@@ -36,9 +36,10 @@ class IRNValidator:
     
     def __init__(self):
         self.irn_patterns = {
-            'standard': r'^IRN\d{14}[A-Z0-9]{8}$',  # IRN + timestamp + unique_id
-            'legacy': r'^IRN\d{12}[A-Z0-9]{6}$',    # Legacy format
-            'custom': r'^[A-Z]{3}\d{14}[A-Z0-9]{8}$'  # Custom prefix
+            'firs': r'^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-[A-Za-z0-9]+-\d{8}$',
+            'standard': r'^IRN\d{14}[A-Z0-9]{8}$',  # Historic format
+            'legacy': r'^IRN\d{12}[A-Z0-9]{6}$',    # Older legacy format
+            'custom': r'^[A-Z]{3}\d{14}[A-Z0-9]{8}$'
         }
         
         self.max_irn_age_days = 365  # Maximum age for IRN validity
@@ -194,7 +195,7 @@ class IRNValidator:
         warnings = []
         
         # Check IRN age
-        if 'timestamp' in irn_info:
+        if 'timestamp' in irn_info and irn_info['timestamp']:
             irn_age = datetime.now() - irn_info['timestamp']
             if irn_age.days > self.max_irn_age_days:
                 warnings.append(f"IRN is {irn_age.days} days old (max recommended: {self.max_irn_age_days})")
@@ -242,11 +243,13 @@ class IRNValidator:
         # FIRS-specific validation rules
         
         # 1. IRN must have verification code for compliance
-        if not verification_code:
+        firs_style = re.match(self.irn_patterns['firs'], irn_value) is not None
+
+        if not verification_code and not firs_style:
             errors.append("Verification code required for FIRS compliance")
         
         # 2. Check timestamp validity
-        if 'timestamp' in irn_info:
+        if 'timestamp' in irn_info and irn_info['timestamp']:
             # IRN shouldn't be from future
             if irn_info['timestamp'] > datetime.now():
                 errors.append("IRN timestamp is in the future")
@@ -255,11 +258,7 @@ class IRNValidator:
             age = datetime.now() - irn_info['timestamp']
             if age.days > 30:
                 warnings.append("IRN is older than 30 days - may need renewal")
-        
-        # 3. Check prefix compliance
-        if not irn_value.startswith('IRN'):
-            warnings.append("Non-standard IRN prefix - FIRS prefers 'IRN' prefix")
-        
+
         return errors, warnings
     
     def _validate_organization_rules(
@@ -300,24 +299,38 @@ class IRNValidator:
             'length': len(irn_value),
             'prefix': '',
             'timestamp': None,
-            'unique_part': ''
+            'unique_part': '',
+            'service_id': None,
+            'document_reference': None,
         }
-        
-        # Extract prefix (first 3 characters typically)
-        if len(irn_value) >= 3:
-            irn_info['prefix'] = irn_value[:3]
-        
-        # Try to extract timestamp for standard format
-        if re.match(self.irn_patterns['standard'], irn_value):
+
+        if not irn_value:
+            return irn_info
+
+        segments = irn_value.split('-')
+        if segments:
+            irn_info['prefix'] = segments[0]
+
+        if re.match(self.irn_patterns['firs'], irn_value):
             try:
-                # IRN + 14 digit timestamp + 8 char unique
-                timestamp_str = irn_value[3:17]  # Skip 'IRN' prefix
+                date_part = segments[-1]
+                irn_info['timestamp'] = datetime.strptime(date_part, '%Y%m%d')
+            except (ValueError, IndexError):
+                irn_info['timestamp'] = None
+            if len(segments) >= 2:
+                irn_info['service_id'] = segments[-2]
+            if len(segments) >= 3:
+                irn_info['document_reference'] = '-'.join(segments[:-2])
+
+        elif re.match(self.irn_patterns['standard'], irn_value):
+            try:
+                timestamp_str = irn_value[3:17]
                 timestamp = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
                 irn_info['timestamp'] = timestamp
                 irn_info['unique_part'] = irn_value[17:]
             except ValueError:
                 pass  # Invalid timestamp format
-        
+
         return irn_info
     
     def get_validation_summary(self, results: Dict[str, ValidationResult]) -> Dict[str, Any]:

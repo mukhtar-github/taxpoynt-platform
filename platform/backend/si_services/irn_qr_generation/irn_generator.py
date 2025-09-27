@@ -1,19 +1,25 @@
 """
 IRN Generator
 
-Handles generation of unique Invoice Reference Numbers (IRNs).
-Extracts core IRN generation logic from the monolithic service.
+Provides a legacy-compatible helper for synthesising Invoice Reference Numbers
+when running in environments that do not call the live FIRS APIs. The local
+fallback now mirrors the FIRS-compliant structure:
+
+    {InvoiceRef}-{ServiceID}-{YYYYMMDD}
+
+The generator is bypassed entirely when `FIRS_REMOTE_IRN` is enabled (normal
+production behaviour) so that IRNs always originate from FIRS.
 """
 
-import uuid
+import base64
 import hashlib
 import hmac
-import base64
+import logging
+import re
 import secrets
 import warnings
-import logging
 from datetime import datetime
-from typing import Tuple, Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
@@ -21,50 +27,40 @@ logger = logging.getLogger(__name__)
 
 
 class IRNGenerator:
-    """Generate unique Invoice Reference Numbers"""
-    
+    """Generate FIRS-style Invoice Reference Numbers when remote IRNs are disabled."""
+
+    _DEFAULT_SERVICE_ID = "SERVICE"
+
     def __init__(self, secret_key: Optional[str] = None):
         self.secret_key = secret_key or secrets.token_hex(32)
-        self.irn_prefix = "IRN"
         self._remote_irn_warning_emitted = False
-    
+
     def generate_irn(self, invoice_data: Dict[str, Any]) -> Tuple[str, str, str]:
-        """
-        Generate a unique Invoice Reference Number (IRN) based on invoice data.
-        
-        Args:
-            invoice_data: Dictionary containing invoice details
-            
-        Returns:
-            Tuple containing (irn_value, verification_code, hash_value)
-        """
+        """Generate a deterministic IRN using the FIRS-compliant structure."""
+
         if is_firs_remote_irn_enabled():
             if not self._remote_irn_warning_emitted:
                 warning_msg = (
                     "FIRS_REMOTE_IRN enabled; IRNGenerator.generate_irn is bypassed. "
-                    "Legacy IRN generation should be disabled in remote mode."
+                    "Live flows should retrieve IRNs from FIRS instead of generating locally."
                 )
                 warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
                 logger.warning(warning_msg)
                 self._remote_irn_warning_emitted = True
             raise RuntimeError("FIRS remote IRN mode enabled; local IRN generation is unavailable.")
 
-        # Create deterministic hash from invoice data
+        invoice_reference = self._resolve_invoice_reference(invoice_data)
+        service_id = self._resolve_service_id(invoice_data)
+        invoice_date = self._resolve_invoice_date(invoice_data)
+
+        irn_value = f"{invoice_reference}-{service_id}-{invoice_date.strftime('%Y%m%d')}"
+
         invoice_hash = self._create_invoice_hash(invoice_data)
-        
-        # Generate unique IRN
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        unique_id = str(uuid.uuid4())[:8].upper()
-        irn_value = f"{self.irn_prefix}{timestamp}{unique_id}"
-        
-        # Generate verification code
         verification_code = self._generate_verification_code(irn_value, invoice_hash)
-        
-        # Create final hash for integrity
         final_hash = self._create_final_hash(irn_value, verification_code)
-        
+
         return irn_value, verification_code, final_hash
-    
+
     def generate_simple_irn(self, invoice_id: str) -> str:
         """Generate simple IRN for basic use cases"""
         if is_firs_remote_irn_enabled():
@@ -76,10 +72,11 @@ class IRNGenerator:
                 logger.warning(warning_msg)
                 self._remote_irn_warning_emitted = True
             raise RuntimeError("FIRS remote IRN mode enabled; simple IRN generation is unavailable.")
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        invoice_hash = hashlib.md5(invoice_id.encode()).hexdigest()[:8].upper()
-        return f"{self.irn_prefix}{timestamp}{invoice_hash}"
-    
+        invoice_reference = self._sanitize_reference(str(invoice_id) or "INV")
+        service_id = self._DEFAULT_SERVICE_ID
+        invoice_date = datetime.utcnow()
+        return f"{invoice_reference}-{service_id}-{invoice_date.strftime('%Y%m%d')}"
+
     def _create_invoice_hash(self, invoice_data: Dict[str, Any]) -> str:
         """Create deterministic hash from invoice data"""
         # Extract key fields for hashing
@@ -95,7 +92,72 @@ class IRNGenerator:
         
         # Generate hash
         return hashlib.sha256(hash_string.encode('utf-8')).hexdigest()
-    
+
+    def _resolve_invoice_reference(self, invoice_data: Dict[str, Any]) -> str:
+        candidates = [
+            'invoice_reference', 'invoiceReference', 'invoice_ref', 'invoiceRef',
+            'invoice_number', 'invoiceNumber', 'document_number', 'documentNumber',
+        ]
+        for key in candidates:
+            value = invoice_data.get(key)
+            if value:
+                sanitized = self._sanitize_reference(str(value))
+                if sanitized:
+                    return sanitized
+        fallback = f"INV{datetime.utcnow().strftime('%Y%m%d')}{secrets.token_hex(2).upper()}"
+        return self._sanitize_reference(fallback)
+
+    def _resolve_service_id(self, invoice_data: Dict[str, Any]) -> str:
+        candidates = [
+            'service_id', 'serviceId', 'firs_service_id', 'firsServiceId',
+            'service_code', 'serviceCode', 'serviceID'
+        ]
+        for key in candidates:
+            value = invoice_data.get(key)
+            if value:
+                sanitized = self._sanitize_service_id(str(value))
+                if sanitized:
+                    return sanitized
+        return self._DEFAULT_SERVICE_ID
+
+    def _resolve_invoice_date(self, invoice_data: Dict[str, Any]) -> datetime:
+        candidates = [
+            'invoice_date', 'invoiceDate', 'issue_date', 'issueDate',
+            'transaction_date', 'transactionDate', 'date'
+        ]
+        for key in candidates:
+            value = invoice_data.get(key)
+            if not value:
+                continue
+            parsed = self._parse_date(value)
+            if parsed:
+                return parsed
+        return datetime.utcnow()
+
+    def _parse_date(self, value: Any) -> Optional[datetime]:
+        if isinstance(value, datetime):
+            return value
+        text = str(value).strip()
+        if not text:
+            return None
+        for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%d-%m-%Y', '%Y%m%d', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f'):
+            try:
+                return datetime.strptime(text, fmt)
+            except ValueError:
+                continue
+        try:
+            return datetime.fromisoformat(text.replace('Z', '+00:00'))
+        except ValueError:
+            return None
+
+    def _sanitize_reference(self, value: str) -> str:
+        cleaned = re.sub(r'[^A-Za-z0-9\-]', '', value.upper())
+        return cleaned[:48] or 'INV'
+
+    def _sanitize_service_id(self, value: str) -> str:
+        cleaned = re.sub(r'[^A-Za-z0-9]', '', value.upper())
+        return cleaned[:16] or self._DEFAULT_SERVICE_ID
+
     def _generate_verification_code(self, irn_value: str, invoice_hash: str) -> str:
         """Generate verification code using HMAC"""
         message = f"{irn_value}:{invoice_hash}"
@@ -117,27 +179,16 @@ class IRNGenerator:
         """Validate IRN format structure"""
         if not irn_value or not isinstance(irn_value, str):
             return False
-        
-        # Check prefix
-        if not irn_value.startswith(self.irn_prefix):
-            return False
-        
-        # Check length (IRN + 14 digit timestamp + 8 char unique ID)
-        expected_length = len(self.irn_prefix) + 14 + 8
-        if len(irn_value) != expected_length:
-            return False
-        
-        return True
-    
+
+        pattern = r'^[A-Z0-9]+(?:-[A-Z0-9]+)*-[A-Z0-9]+-\d{8}$'
+        return re.match(pattern, irn_value.upper()) is not None
+
     def extract_timestamp_from_irn(self, irn_value: str) -> Optional[datetime]:
         """Extract timestamp from IRN"""
         if not self.validate_irn_format(irn_value):
             return None
-        
         try:
-            # Extract timestamp part (after prefix, 14 characters)
-            prefix_len = len(self.irn_prefix)
-            timestamp_str = irn_value[prefix_len:prefix_len + 14]
-            return datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
-        except ValueError:
+            date_part = irn_value.split('-')[-1]
+            return datetime.strptime(date_part, "%Y%m%d")
+        except (ValueError, IndexError):
             return None

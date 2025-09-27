@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | **SI Services** | `si_services/irn_qr_generation/irn_generator.py` | Generates IRN + verification code locally | Retire module; replace with FIRS response handling |
 | | `irn_generation_service.py` | Exposes `generate_irn`, registers duplicates, caches verification code | Remove generation, keep duplicate detection on invoice hash, ingest remote IRN/CSID/QR |
-| | `bulk_processor.py` | Legacy batch helpers | Defer to remote IRN submission; keep only queue orchestration |
+| | `bulk_irn_service.py`, `bulk_processor.py` | Bulk-create IRNs for queued invoices | Convert to bulk submission (no IRN) and persist returned identifiers |
 | | ERP adapters (`erp_integration_service.py`, `odoo_service.py`, `firs_si_erp_integration_service.py`, `firs_integration/comprehensive_invoice_generator.py`) | Call local generator before transmission | Submit without IRN; update to consume FIRS-issued identifiers |
 | | Legacy (`irn_generation_service_legacy.py`, archived scripts) | Legacy reference to generation helpers | Mark deprecated; adjust references/tests |
 | **APP Services** | `app_services/__init__.py` | Message router expects IRN in payloads | Make IRN optional pre-submit, required post-response; route FIRS data |
@@ -89,16 +89,22 @@ Key implications:
 - Update SI submission flow (`submit_irn_to_firs`) to persist FIRS-issued identifiers.
 - Wire captured values into repositories and message payloads.
 
+Implement these fixes:✅
+" 
 ### Phase 3 – Downstream Consumers
 
 - Rework APP `transmission_service`, hybrid correlation callbacks, and queue processors to rely on stored FIRS identifiers.
 - Remove/localise legacy IRN generators; replace tests with fixtures using mocked FIRS responses.
+"
 
+Implement these fixes:✅
+"
 ### Phase 4 – Cleanup & Docs
 
 - Delete deprecated generator modules (after replacements validated).
 - Update documentation (`architecture`, `compliance`, `integration guides`) to describe new flow.
 - Ensure MoSCoW “Digital Signature” requirements reference pre-submission signing (XAdES/PAdES) while IRN/stamp remain post-submission artefacts.
+"
 
 ## Risks & Mitigations
 

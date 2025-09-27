@@ -62,6 +62,7 @@ from .firs_communication.firs_api_client import (
     FIRSEndpoint,
     create_firs_api_client,
 )
+from .firs_communication.firs_payload_mapper import build_firs_invoice
 from .validation.firs_validator import FIRSValidator
 from .validation.submission_validator import (
     SubmissionValidator,
@@ -3830,6 +3831,13 @@ class APPServiceRegistry:
         def _utc_now() -> str:
             return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+        def _format_last_modified(epoch_seconds: float) -> str:
+            try:
+                dt = datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
+            except (TypeError, ValueError, OSError):
+                dt = datetime.now(timezone.utc)
+            return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
         def _resolve_firs_credentials(source: Dict[str, Any]) -> Tuple[FIRSEnvironment, Dict[str, str]]:
             """Resolve FIRS header credentials from request payload and environment."""
 
@@ -4305,7 +4313,8 @@ class APPServiceRegistry:
                     if not http_client:
                         return {"operation": operation, "success": False, "error": "http_client_unavailable"}
                     data = payload.get("validation_data") or payload.get("submission_data") or {}
-                    resp = await http_client.validate_invoice(data)
+                    firs_invoice = build_firs_invoice(data)
+                    resp = await http_client.validate_invoice(firs_invoice)
                     return {"operation": operation, "success": resp.get("success", False), "data": resp}
 
                 elif operation == "validate_invoice_batch_for_firs":
@@ -4318,7 +4327,7 @@ class APPServiceRegistry:
                     if isinstance(batch, dict) and "invoices" in batch:
                         batch = batch["invoices"]
                     for item in (batch or []):
-                        resp = await http_client.validate_invoice(item)
+                        resp = await http_client.validate_invoice(build_firs_invoice(item))
                         overall = overall and resp.get("success", False)
                         results.append(resp)
                     return {"operation": operation, "success": overall, "data": {"results": results}}
@@ -4329,15 +4338,22 @@ class APPServiceRegistry:
                         return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
                     resources = await resource_cache.get_resources()
                     normalized = resources or {}
+                    metadata = {
+                        "retrieved_at": _utc_now(),
+                        "resource_keys": sorted(normalized.keys()) if isinstance(normalized, dict) else [],
+                    }
+                    combined_etag = resource_cache.get_combined_etag()
+                    if combined_etag:
+                        metadata["etag"] = combined_etag
+                    last_modified_ts = resource_cache.get_last_modified()
+                    if last_modified_ts:
+                        metadata["last_modified"] = _format_last_modified(last_modified_ts)
                     return {
                         "operation": operation,
                         "success": True,
                         "data": {
                             "resources": normalized,
-                            "metadata": {
-                                "retrieved_at": _utc_now(),
-                                "resource_keys": sorted(normalized.keys()) if isinstance(normalized, dict) else [],
-                            },
+                            "metadata": metadata,
                         },
                     }
 
@@ -4345,7 +4361,24 @@ class APPServiceRegistry:
                     if not resource_cache:
                         return {"operation": operation, "success": False, "error": "resource_cache_unavailable"}
                     resources = await resource_cache.refresh_all()
-                    return {"operation": operation, "success": True, "data": {"resources": resources}}
+                    metadata = {
+                        "retrieved_at": _utc_now(),
+                        "resource_keys": sorted(resources.keys()) if isinstance(resources, dict) else [],
+                    }
+                    combined_etag = resource_cache.get_combined_etag()
+                    if combined_etag:
+                        metadata["etag"] = combined_etag
+                    last_modified_ts = resource_cache.get_last_modified()
+                    if last_modified_ts:
+                        metadata["last_modified"] = _format_last_modified(last_modified_ts)
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "resources": resources,
+                            "metadata": metadata,
+                        },
+                    }
 
                 elif operation == "refresh_firs_resource":
                     if not resource_cache:
@@ -4354,7 +4387,25 @@ class APPServiceRegistry:
                     if res_key not in ("currencies", "invoice-types", "services-codes", "vat-exemptions"):
                         return {"operation": operation, "success": False, "error": "invalid_resource"}
                     out = await resource_cache.refresh_resource(res_key)
-                    return {"operation": operation, "success": True, "data": out}
+                    metadata = {
+                        "retrieved_at": _utc_now(),
+                        "resource": res_key,
+                    }
+                    etag = resource_cache.get_resource_etag(res_key)
+                    if etag:
+                        metadata["etag"] = etag
+                    last_modified_ts = resource_cache.get_resource_last_modified(res_key)
+                    if last_modified_ts:
+                        metadata["last_modified"] = _format_last_modified(last_modified_ts)
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "resource": res_key,
+                            "value": out.get(res_key),
+                            "metadata": metadata,
+                        },
+                    }
 
                 elif operation == "process_firs_webhook":
                     # Process FIRS webhook events

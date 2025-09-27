@@ -33,6 +33,8 @@ from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.messaging.queue_manager import get_queue_manager
 from core_platform.messaging.queue_manager import QueueConfiguration, QueueType, QueueStrategy
 
+from app_services.firs_communication.firs_payload_mapper import build_firs_invoice
+
 
 InvoiceRecord = invoice_repo.InvoiceRecord
 
@@ -214,6 +216,16 @@ class TransmissionService:
             return self._normalize_invoice_payload(data["invoice_data"])
         if "firs_invoice" in data and isinstance(data["firs_invoice"], dict):
             return self._normalize_invoice_payload(data["firs_invoice"])
+        if "documentMetadata" in data and isinstance(data["documentMetadata"], dict):
+            normalized = dict(data)
+            metadata = normalized["documentMetadata"]
+            invoice_number = metadata.get("invoiceNumber") or metadata.get("invoice_number")
+            if invoice_number:
+                normalized.setdefault("invoiceNumber", invoice_number)
+                normalized.setdefault("invoice_number", invoice_number)
+            if metadata.get("invoiceDate"):
+                normalized.setdefault("invoice_date", metadata.get("invoiceDate"))
+            return normalized
         return data
 
     def _looks_like_invoice_payload(self, data: Any) -> bool:
@@ -381,6 +393,7 @@ class TransmissionService:
         invoice_data: Optional[Dict[str, Any]],
         firs_response: Dict[str, Any],
         status_hint: Optional[str] = None,
+        request_id: Optional[str] = None,
     ) -> Optional[FIRSSubmission]:
         org_uuid = self._ensure_uuid(organization_id)
         if org_uuid is None:
@@ -397,7 +410,12 @@ class TransmissionService:
         total_amount = self._parse_decimal(
             invoice_data.get("totalAmount") or invoice_data.get("total_amount")
         )
-        currency = (invoice_data.get("currency") or "NGN").upper()
+        currency = (
+            invoice_data.get("currency")
+            or invoice_data.get("currency_code")
+            or invoice_data.get("documentMetadata", {}).get("currencyCode")
+            or "NGN"
+        ).upper()
         invoice_type_value = invoice_data.get("invoiceType") or invoice_data.get("invoice_type")
         invoice_type_enum = None
         if invoice_type_value:
@@ -453,6 +471,8 @@ class TransmissionService:
                 target.accepted_at = now
             if status_enum in {SubmissionStatus.REJECTED, SubmissionStatus.FAILED, SubmissionStatus.CANCELLED}:
                 target.rejected_at = now
+            if request_id:
+                target.request_id = request_id
 
         await session.refresh(target)
         return target
@@ -674,6 +694,9 @@ class TransmissionService:
         if not resolved_invoices:
             raise ValueError("invoice_payload_unavailable")
 
+        request_id = payload.get("request_id")
+        resolved_invoices = [build_firs_invoice(inv) for inv in resolved_invoices]
+
         firs_payload: Dict[str, Any] = {
             "invoices": resolved_invoices,
             "organization_id": organization_id,
@@ -693,6 +716,7 @@ class TransmissionService:
                         invoice,
                         firs_response,
                         status_hint="submitted",
+                        request_id=request_id,
                     )
                     if submission:
                         persisted_ids.append(str(submission.id))
@@ -791,7 +815,9 @@ class TransmissionService:
             invoice_payload = dict(invoice_payload)
             invoice_payload.setdefault("irn", irn_value)
 
-        invoice_payload = dict(invoice_payload)
+        request_id = payload.get("request_id")
+        original_invoice = dict(invoice_payload)
+        invoice_payload = build_firs_invoice(original_invoice)
 
         firs_payload = {
             "invoice_data": invoice_payload,
@@ -812,6 +838,7 @@ class TransmissionService:
                     invoice_payload,
                     firs_response,
                     status_hint="submitted",
+                    request_id=request_id,
                 )
 
         try:

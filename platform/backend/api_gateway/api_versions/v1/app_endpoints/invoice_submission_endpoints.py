@@ -6,8 +6,10 @@ Handles invoice generation, submission, and tracking in FIRS systems.
 """
 import logging
 from typing import Dict, Any, List, Optional
+
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query, Path
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -18,6 +20,8 @@ from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
 from api_gateway.utils.error_mapping import v1_error_response
 from api_gateway.utils.pagination import normalize_pagination
+from core_platform.data_management.db_async import get_async_session
+from core_platform.idempotency.store import IdempotencyStore
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +56,6 @@ class InvoiceSubmissionEndpointsV1:
 
         self._setup_routes()
         logger.info("Invoice Submission Endpoints V1 initialized")
-        # Minimal idempotency store (in-memory per process)
-        self._idempotency_store = {}
 
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
         """Local guard to enforce APP role and permissions for v1 routes."""
@@ -213,48 +215,102 @@ class InvoiceSubmissionEndpointsV1:
             return v1_error_response(e, action="generate_invoice_batch")
     
     # Invoice Submission Endpoints
-    async def submit_invoice(self, request: Request):
+    async def submit_invoice(self, request: Request, db: AsyncSession = Depends(get_async_session)):
         """Submit invoice to FIRS"""
         try:
             context = await self._require_app_role(request)
             body = await request.json()
             # Idempotency key handling
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            requester_id = str(context.user_id) if context and context.user_id else None
             if idem_key:
-                if idem_key in self._idempotency_store:
-                    return self._create_v1_response({"status": "duplicate", "idempotency_key": idem_key}, "idempotent_replay")
-                self._idempotency_store[idem_key] = True
-            
+                request_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=requester_id,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=request_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key conflict for submit_invoice")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "invoice_submitted")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="submit_invoice",
                 payload={
                     "submission_data": body,
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": getattr(request.state, "request_id", None)
+                    or request.headers.get("x-request-id"),
                 }
             )
-            
+
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=requester_id,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
+
             return self._create_v1_response(result, "invoice_submitted")
         except Exception as e:
             logger.error(f"Error submitting invoice in v1: {e}")
             return v1_error_response(e, action="submit_invoice")
-    
-    async def submit_invoice_batch(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+
+    async def submit_invoice_batch(
+        self,
+        request: Request,
+        context: HTTPRoutingContext = Depends(_require_app_role),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Submit invoice batch to FIRS"""
         try:
             body = await request.json()
-            
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            requester_id = str(context.user_id) if context and context.user_id else None
+            if idem_key:
+                request_hash = IdempotencyStore.compute_request_hash(body)
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=requester_id,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=request_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key conflict for submit_invoice_batch")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "invoice_batch_submitted")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="submit_invoice_batch",
                 payload={
                     "batch_submission_data": body,
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": getattr(request.state, "request_id", None)
+                    or request.headers.get("x-request-id"),
                 }
             )
-            
+
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=requester_id,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
+
             return self._create_v1_response(result, "invoice_batch_submitted")
         except Exception as e:
             logger.error(f"Error submitting invoice batch in v1: {e}")
