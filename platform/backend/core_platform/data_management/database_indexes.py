@@ -233,7 +233,7 @@ class DatabaseIndexManager:
             {
                 "name": "idx_erp_connections_provider_status", 
                 "table": "erp_connections",
-                "columns": ["erp_provider", "status"],
+                "columns": ["provider", "status"],
                 "purpose": "Provider-specific ERP queries"
             },
             
@@ -263,7 +263,7 @@ class DatabaseIndexManager:
             {
                 "name": "idx_certificates_expiry_status",
                 "table": "certificates",
-                "columns": ["expires_at", "status"],
+                "columns": ["valid_until", "status"],
                 "purpose": "Certificate expiry monitoring"
             },
             
@@ -278,13 +278,13 @@ class DatabaseIndexManager:
             # IRN Generation - FIRS compliance critical
             {
                 "name": "idx_irn_generation_organization_date",
-                "table": "irn_generation",
+                "table": "irn_generations",
                 "columns": ["organization_id", "generated_at"],
                 "purpose": "IRN generation tracking per organization"
             },
             {
                 "name": "idx_irn_generation_irn_number",
-                "table": "irn_generation",
+                "table": "irn_generations",
                 "columns": ["irn_number"],
                 "purpose": "IRN number lookups"
             }
@@ -301,13 +301,13 @@ class DatabaseIndexManager:
             {
                 "name": "idx_taxpayers_organization_status", 
                 "table": "taxpayers",
-                "columns": ["organization_id", "status"],
+                "columns": ["organization_id", "registration_status"],
                 "purpose": "Active taxpayer lookup by organization"
             },
             {
                 "name": "idx_taxpayers_tin_number",
                 "table": "taxpayers", 
-                "columns": ["tin_number"],
+                "columns": ["tin"],
                 "purpose": "TIN number lookups for FIRS integration"
             },
             
@@ -315,7 +315,7 @@ class DatabaseIndexManager:
             {
                 "name": "idx_webhook_events_processed_created",
                 "table": "webhook_events",
-                "columns": ["is_processed", "created_at"],
+                "columns": ["processing_status", "processed_at"],
                 "purpose": "Webhook processing queue"
             },
             {
@@ -337,19 +337,19 @@ class DatabaseIndexManager:
             {
                 "name": "idx_audit_logs_organization_timestamp",
                 "table": "audit_logs", 
-                "columns": ["organization_id", "timestamp"],
+                "columns": ["organization_id", "created_at"],
                 "purpose": "Audit trail by organization and time"
             },
             {
                 "name": "idx_audit_logs_event_type_timestamp",
                 "table": "audit_logs",
-                "columns": ["event_type", "timestamp"],
+                "columns": ["event_type", "created_at"],
                 "purpose": "Audit event filtering"
             },
             {
                 "name": "idx_audit_logs_user_timestamp", 
                 "table": "audit_logs",
-                "columns": ["user_id", "timestamp"],
+                "columns": ["user_id", "created_at"],
                 "purpose": "User activity audit trails"
             },
             
@@ -357,7 +357,7 @@ class DatabaseIndexManager:
             {
                 "name": "idx_compliance_checks_organization_status",
                 "table": "compliance_checks",
-                "columns": ["organization_id", "status"],
+                "columns": ["organization_id", "compliance_status"],
                 "purpose": "Compliance monitoring by organization"
             },
             
@@ -365,7 +365,7 @@ class DatabaseIndexManager:
             {
                 "name": "idx_analytics_reports_organization_date",
                 "table": "analytics_reports",
-                "columns": ["organization_id", "report_date"],
+                "columns": ["organization_id", "generated_at"],
                 "purpose": "Analytics report generation"
             }
         ]
@@ -431,7 +431,7 @@ class DatabaseIndexManager:
             {
                 "name": "idx_audit_comprehensive",
                 "table": "audit_logs",
-                "columns": ["organization_id", "user_id", "event_type", "timestamp"],
+                "columns": ["organization_id", "user_id", "event_type", "created_at"],
                 "purpose": "Comprehensive audit queries"
             }
         ]

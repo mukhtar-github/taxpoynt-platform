@@ -26,6 +26,9 @@ The authentication package provides a layered approach to authentication:
 6. Multi-tenancy: Supports tenant isolation and management
 """
 
+# Core Platform exceptions shared with SI authentication modules
+from core_platform.authentication import AuthenticationError
+
 # Core Authentication Components
 from .auth_manager import (
     AuthenticationManager,
@@ -122,6 +125,7 @@ __all__ = [
     'AuthenticationScope',
     'ServiceType',
     'create_auth_manager',
+    'AuthenticationError',
     
     # ERP Authentication
     'BaseERPAuthProvider',
