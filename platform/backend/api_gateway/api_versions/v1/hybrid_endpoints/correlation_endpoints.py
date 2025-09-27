@@ -33,6 +33,7 @@ class CorrelationUpdateRequest(BaseModel):
     firs_status: Optional[str] = Field(None, description="FIRS status")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
     response_data: Optional[Dict[str, Any]] = Field(None, description="Full response data")
+    identifiers: Optional[Dict[str, Any]] = Field(None, description="Normalized identifiers extracted from FIRS response")
 
 
 class CorrelationResponse(BaseModel):
@@ -341,10 +342,10 @@ def create_correlation_router(
         """Update correlation with FIRS response information."""
         try:
             # Validate required fields for FIRS response
-            if not request.firs_response_id or not request.firs_status:
+            if not request.firs_status:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="FIRS response ID and status are required"
+                    detail="FIRS status is required"
                 )
             
             correlation_service = SIAPPCorrelationService(db)
@@ -353,7 +354,8 @@ def create_correlation_router(
                 irn=irn,
                 firs_response_id=request.firs_response_id,
                 firs_status=request.firs_status,
-                response_data=request.response_data
+                response_data=request.response_data,
+                identifiers=request.identifiers
             )
             
             if not success:
@@ -472,4 +474,3 @@ def create_correlation_router(
             )
 
     return router
-

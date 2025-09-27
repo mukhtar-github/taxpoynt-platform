@@ -18,7 +18,12 @@ from sqlalchemy.orm import selectinload
 
 from core_platform.data_management.models.si_app_correlation import SIAPPCorrelation, CorrelationStatus
 from core_platform.data_management.models.organization import Organization
-from core_platform.data_management.models.firs_submission import FIRSSubmission
+from core_platform.data_management.models.firs_submission import FIRSSubmission, SubmissionStatus
+from core_platform.utils.firs_response import (
+    extract_firs_identifiers,
+    merge_identifiers_into_payload,
+    map_firs_status_to_submission,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -193,9 +198,10 @@ class SIAPPCorrelationService:
     async def update_firs_response(
         self,
         irn: str,
-        firs_response_id: str,
+        firs_response_id: Optional[str],
         firs_status: str,
-        response_data: Optional[Dict] = None
+        response_data: Optional[Dict] = None,
+        identifiers: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
         Update correlation with FIRS response.
@@ -216,6 +222,22 @@ class SIAPPCorrelationService:
                 return False
             
             correlation.set_firs_response(firs_response_id, firs_status, response_data)
+
+            submission = await self._get_firs_submission(irn, correlation)
+            if submission:
+                merged_payload = response_data or {}
+                if identifiers:
+                    merged_payload = merge_identifiers_into_payload(merged_payload, identifiers)
+                else:
+                    normalized = extract_firs_identifiers(merged_payload)
+                    if normalized:
+                        merged_payload = merge_identifiers_into_payload(merged_payload, normalized)
+                        identifiers = normalized
+
+                status_label = map_firs_status_to_submission(firs_status)
+                submission_status = self._map_submission_status(status_label, submission.status)
+                submission.update_status(submission_status, firs_status, merged_payload)
+
             await self.db.commit()
             
             logger.info(f"Updated correlation {correlation.correlation_id} - FIRS response: {firs_status}")
@@ -225,6 +247,50 @@ class SIAPPCorrelationService:
             await self.db.rollback()
             logger.error(f"Failed to update FIRS response for IRN {irn}: {e}")
             return False
+
+    async def _get_firs_submission(
+        self,
+        irn: str,
+        correlation: Optional[SIAPPCorrelation]
+    ) -> Optional[FIRSSubmission]:
+        submission = None
+        if irn:
+            result = await self.db.execute(
+                select(FIRSSubmission).where(FIRSSubmission.irn == irn)
+            )
+            submission = result.scalar_one_or_none()
+
+        if not submission and correlation:
+            result = await self.db.execute(
+                select(FIRSSubmission).where(
+                    and_(
+                        FIRSSubmission.organization_id == correlation.organization_id,
+                        FIRSSubmission.invoice_number == correlation.invoice_number
+                    )
+                )
+            )
+            submission = result.scalar_one_or_none()
+
+        if submission and not submission.irn and irn:
+            submission.irn = irn
+
+        return submission
+
+    def _map_submission_status(
+        self,
+        status_label: str,
+        current_status: SubmissionStatus
+    ) -> SubmissionStatus:
+        normalized = (status_label or "").lower()
+        if normalized in {"accepted", "success", "approved"}:
+            return SubmissionStatus.ACCEPTED
+        if normalized in {"rejected", "failed", "error"}:
+            return SubmissionStatus.REJECTED
+        if normalized in {"processing", "pending", "queued"}:
+            return SubmissionStatus.PROCESSING
+        if normalized in {"submitted", "transmitted"}:
+            return SubmissionStatus.SUBMITTED
+        return current_status
     
     async def get_organization_correlations(
         self,

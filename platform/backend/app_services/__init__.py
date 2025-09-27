@@ -28,6 +28,8 @@ from dataclasses import asdict
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
+from core_platform.config.feature_flags import is_firs_remote_irn_enabled
+from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
 from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.repositories.firs_submission_repo_async import (
     get_tracking_overview_data,
@@ -48,8 +50,12 @@ from .webhook_services.signature_validator import SignatureValidator
 from .status_management.callback_manager import CallbackManager
 from .status_management.status_tracker import StatusTracker
 from .status_management.notification_service import NotificationService
-from .firs_communication.firs_api_client import FIRSAPIClient
-from .firs_communication.authentication_handler import FIRSAuthenticationHandler
+from .firs_communication.firs_api_client import (
+    FIRSAPIClient,
+    FIRSEnvironment,
+    FIRSEndpoint,
+    create_firs_api_client,
+)
 from .validation.firs_validator import FIRSValidator
 from .validation.submission_validator import (
     SubmissionValidator,
@@ -89,6 +95,7 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_CERTIFICATE_LIST_LIMIT = 25
+FIRS_REMOTE_IRN_ENABLED = is_firs_remote_irn_enabled()
 
 
 def _normalize_days_until_expiry(not_after: Optional[str]) -> Optional[int]:
@@ -546,9 +553,6 @@ class APPServiceRegistry:
         try:
             # Initialize FIRS services with real implementations
             firs_api_client = await self._create_firs_api_client()
-            auth_handler = FIRSAuthenticationHandler(
-                environment=os.getenv("FIRS_ENVIRONMENT", "sandbox")
-            )
             # Thin HTTP client + resource cache for current FIRS header-based flows
             try:
                 from .firs_communication.firs_http_client import FIRSHttpClient
@@ -569,12 +573,6 @@ class APPServiceRegistry:
             except Exception:
                 firs_http_client = None
                 resource_cache = None
-
-            try:
-                if hasattr(auth_handler, "start"):
-                    await auth_handler.start()
-            except Exception:
-                logger.debug("FIRS auth handler start failed; continuing with placeholders")
 
             # Lazy import to avoid SI module import at app import time
             try:
@@ -624,11 +622,11 @@ class APPServiceRegistry:
 
             firs_service = {
                 "api_client": firs_api_client,
-                "auth_handler": auth_handler,
                 "http_client": firs_http_client,
                 "resource_cache": resource_cache,
                 "certificate_store": certificate_store,
                 "operations": firs_operations,
+                "remote_irn_enabled": FIRS_REMOTE_IRN_ENABLED,
             }
             
             self.services["firs_communication"] = firs_service
@@ -643,11 +641,16 @@ class APPServiceRegistry:
                 metadata={
                     "service_type": "firs_communication",
                     "operations": firs_operations,
+                    "remote_irn_enabled": FIRS_REMOTE_IRN_ENABLED,
                 }
             )
             
             self.service_endpoints["firs_communication"] = endpoint_id
-            logger.info(f"FIRS communication service registered: {endpoint_id}")
+            logger.info(
+                "FIRS communication service registered: %s (remote_irn=%s)",
+                endpoint_id,
+                FIRS_REMOTE_IRN_ENABLED,
+            )
             
         except Exception as e:
             logger.error(f"Failed to register FIRS services: {str(e)}")
@@ -1526,6 +1529,8 @@ class APPServiceRegistry:
             client_id = os.getenv("FIRS_CLIENT_ID", "your_firs_client_id")
             client_secret = os.getenv("FIRS_CLIENT_SECRET", "your_firs_client_secret")
             api_key = os.getenv("FIRS_API_KEY", "test_api_key")
+            api_secret = os.getenv("FIRS_API_SECRET", "")
+            certificate = os.getenv("FIRS_CERTIFICATE") or os.getenv("FIRS_ENCRYPTION_KEY", "")
 
             # Create FIRS API client using factory function (synchronous factory)
             client = create_firs_api_client(
@@ -1533,6 +1538,8 @@ class APPServiceRegistry:
                 client_id=client_id,
                 client_secret=client_secret,
                 api_key=api_key,
+                api_secret=api_secret,
+                certificate=certificate,
             )
             
             return client
@@ -3817,12 +3824,78 @@ class APPServiceRegistry:
         def _utc_now() -> str:
             return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+        def _resolve_firs_credentials(source: Dict[str, Any]) -> Tuple[FIRSEnvironment, Dict[str, str]]:
+            """Resolve FIRS header credentials from request payload and environment."""
+
+            env_name = str(source.get("environment") or os.getenv("FIRS_ENVIRONMENT", "sandbox")).lower()
+            environment = FIRSEnvironment.PRODUCTION if env_name == "production" else FIRSEnvironment.SANDBOX
+
+            if environment == FIRSEnvironment.PRODUCTION:
+                api_key_env = os.getenv("FIRS_PRODUCTION_API_KEY") or os.getenv("FIRS_API_KEY")
+                api_secret_env = os.getenv("FIRS_PRODUCTION_API_SECRET") or os.getenv("FIRS_API_SECRET")
+                base_url_env = os.getenv("FIRS_PRODUCTION_URL") or os.getenv("FIRS_API_URL") or "https://api.firs.gov.ng"
+            else:
+                api_key_env = os.getenv("FIRS_SANDBOX_API_KEY") or os.getenv("FIRS_API_KEY")
+                api_secret_env = os.getenv("FIRS_SANDBOX_API_SECRET") or os.getenv("FIRS_API_SECRET")
+                base_url_env = os.getenv("FIRS_SANDBOX_URL") or os.getenv("FIRS_API_URL") or "https://sandbox-api.firs.gov.ng"
+
+            resolved = {
+                "api_key": source.get("api_key") or api_key_env or "",
+                "api_secret": source.get("api_secret") or api_secret_env or "",
+                "certificate": source.get("certificate")
+                    or os.getenv("FIRS_CERTIFICATE")
+                    or os.getenv("FIRS_ENCRYPTION_KEY")
+                    or "",
+                "base_url": (source.get("base_url") or base_url_env).rstrip("/")
+                    if (source.get("base_url") or base_url_env)
+                    else "https://sandbox-api.firs.gov.ng",
+            }
+
+            return environment, resolved
+
+        async def _run_header_auth_check(auth_payload: Dict[str, Any]) -> Dict[str, Any]:
+            environment, creds = _resolve_firs_credentials(auth_payload)
+
+            missing = [field for field in ("api_key", "api_secret") if not creds.get(field)]
+            if missing:
+                return {
+                    "success": False,
+                    "error": "missing_credentials",
+                    "details": {"missing": missing},
+                    "environment": environment.value,
+                }
+
+            config_overrides: Dict[str, Any] = {"base_url": creds["base_url"]}
+
+            client = create_firs_api_client(
+                environment=environment,
+                api_key=creds["api_key"],
+                api_secret=creds["api_secret"],
+                certificate=creds.get("certificate", ""),
+                config_overrides=config_overrides,
+            )
+
+            await client.start()
+            try:
+                endpoint = FIRSEndpoint.INVOICE_RESOURCES.value.format(resource="currencies")
+                response = await client.make_request(endpoint, method="GET")
+                return {
+                    "success": response.success,
+                    "status_code": response.status_code,
+                    "environment": environment.value,
+                    "request_id": response.request_id,
+                    "data": response.data,
+                    "error_code": response.error_code,
+                    "error_message": response.error_message,
+                }
+            finally:
+                await client.stop()
+
         async def firs_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 # Utilities
                 http_client = firs_service.get("http_client")
                 resource_cache = firs_service.get("resource_cache")
-                auth_handler = firs_service.get("auth_handler")
                 # Avoid runtime import dependency on SI modules for type annotation
                 certificate_store: Optional[Any] = firs_service.get("certificate_store")
 
@@ -4153,6 +4226,15 @@ class APPServiceRegistry:
                     for item in (batch or []):
                         try:
                             sign_resp = await http_client.sign_invoice(item)
+                            identifiers = sign_resp.get("identifiers") or extract_firs_identifiers(sign_resp.get("data"))
+                            if identifiers:
+                                sign_resp["identifiers"] = identifiers
+                                item.update({
+                                    "irn": identifiers.get("irn", item.get("irn")),
+                                    "csid": identifiers.get("csid") or item.get("csid"),
+                                    "csidHash": identifiers.get("csid_hash") or item.get("csidHash"),
+                                    "qr": identifiers.get("qr_payload") or item.get("qr"),
+                                })
                             if not sign_resp.get("success"):
                                 results.append({"sign": sign_resp, "transmit": None, "success": False})
                                 overall = False
@@ -4160,11 +4242,16 @@ class APPServiceRegistry:
                             irn = item.get("irn")
                             if not irn and isinstance(sign_resp.get("data"), dict):
                                 irn = sign_resp["data"].get("irn")
+                            if not irn and identifiers:
+                                irn = identifiers.get("irn")
                             if not irn:
                                 results.append({"sign": sign_resp, "transmit": {"success": False, "error": "missing_irn"}, "success": False})
                                 overall = False
                                 continue
                             tx_resp = await http_client.transmit(irn)
+                            tx_identifiers = tx_resp.get("identifiers") or extract_firs_identifiers(tx_resp.get("data"))
+                            if tx_identifiers:
+                                tx_resp["identifiers"] = tx_identifiers
                             success = sign_resp.get("success", False) and tx_resp.get("success", False)
                             results.append({"sign": sign_resp, "transmit": tx_resp, "success": success})
                             overall = overall and success
@@ -4189,6 +4276,9 @@ class APPServiceRegistry:
                     except Exception:
                         logger.debug("Correlation update_app_submitting skipped")
                     resp = await http_client.transmit(irn, payload.get("options"))
+                    identifiers = resp.get("identifiers") or extract_firs_identifiers(resp.get("data"))
+                    if identifiers:
+                        resp["identifiers"] = identifiers
                     # Update SI-APP correlation: APP submitted
                     try:
                         await self.message_router.route_message(
@@ -4201,19 +4291,21 @@ class APPServiceRegistry:
                     # Optionally push FIRS response if status/id available
                     try:
                         data = resp.get("data") if isinstance(resp, dict) else None
-                        firs_status = (resp.get("status") if isinstance(resp, dict) else None) or (data.get("status") if isinstance(data, dict) else None) or "submitted"
+                        base_payload = data if isinstance(data, dict) else (resp if isinstance(resp, dict) else {})
+                        normalized_payload = merge_identifiers_into_payload(base_payload, identifiers or {})
+                        firs_status = (resp.get("status") if isinstance(resp, dict) else None) or (base_payload.get("status") if isinstance(base_payload, dict) else None) or "submitted"
                         firs_response_id = (data.get("submission_id") if isinstance(data, dict) else None) or (data.get("id") if isinstance(data, dict) else None)
-                        if firs_response_id:
-                            await self.message_router.route_message(
-                                service_role=ServiceRole.HYBRID,
-                                operation="update_firs_response",
-                                payload={
-                                    "irn": irn,
-                                    "firs_response_id": str(firs_response_id),
-                                    "firs_status": str(firs_status),
-                                    "response_data": data or resp,
-                                },
-                            )
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_firs_response",
+                            payload={
+                                "irn": irn,
+                                "firs_response_id": str(firs_response_id) if firs_response_id else None,
+                                "firs_status": str(firs_status),
+                                "response_data": normalized_payload,
+                                "identifiers": identifiers,
+                            },
+                        )
                     except Exception:
                         logger.debug("Correlation update_firs_response skipped")
                     return {"operation": operation, "success": resp.get("success", False), "data": resp}
@@ -4228,62 +4320,34 @@ class APPServiceRegistry:
                     return {"operation": operation, "success": resp.get("success", False), "data": resp}
 
                 elif operation in ("authenticate_with_firs", "authenticate_firs"):
-                    if not auth_handler:
-                        return {"operation": operation, "success": False, "error": "auth_handler_unavailable"}
-                    client_id = payload.get("client_id") or os.getenv("FIRS_CLIENT_ID")
-                    client_secret = payload.get("client_secret") or os.getenv("FIRS_CLIENT_SECRET")
-                    api_key = payload.get("api_key") or os.getenv("FIRS_API_KEY")
-                    scope = payload.get("scope")
-                    if not all([client_id, client_secret, api_key]):
-                        return {
-                            "operation": operation,
-                            "success": False,
-                            "error": "missing_credentials",
-                            "data": {"details": "FIRS credentials not configured"}
+                    auth_payload = payload.get("auth_data") or payload
+                    auth_result = await _run_header_auth_check(auth_payload or {})
+                    if auth_result.get("success"):
+                        data = {
+                            "environment": auth_result.get("environment"),
+                            "status_code": auth_result.get("status_code"),
+                            "request_id": auth_result.get("request_id"),
+                            "message": "FIRS header authentication verified",
+                            "response": auth_result.get("data"),
                         }
-                    try:
-                        if hasattr(auth_handler, "start"):
-                            await auth_handler.start()
-                        auth_result = await auth_handler.authenticate_client_credentials(
-                            client_id=client_id,
-                            client_secret=client_secret,
-                            api_key=api_key,
-                            scope=scope
-                        )
-                        if auth_result.success:
-                            data = {
-                                "auth_data": auth_result.auth_data,
-                                "expires_at": auth_result.expires_at.isoformat() if auth_result.expires_at else None,
-                                "session_id": auth_result.session_id,
-                                "provider": auth_result.provider
-                            }
-                        else:
-                            data = {
-                                "error": auth_result.error_message,
-                                "error_code": auth_result.error_code,
-                                "provider": auth_result.provider
-                            }
-                        return {"operation": operation, "success": auth_result.success, "data": data}
-                    except Exception as auth_error:
-                        return {"operation": operation, "success": False, "error": str(auth_error)}
+                    else:
+                        data = {
+                            "error": auth_result.get("error") or auth_result.get("error_message"),
+                            "details": auth_result.get("details"),
+                            "status_code": auth_result.get("status_code"),
+                            "response": auth_result.get("data"),
+                        }
+                    return {"operation": operation, "success": auth_result.get("success", False), "data": data}
 
                 elif operation == "refresh_firs_token":
-                    if not auth_handler:
-                        return {"operation": operation, "success": False, "error": "auth_handler_unavailable"}
-                    try:
-                        if hasattr(auth_handler, "start"):
-                            await auth_handler.start()
-                        refresh_result = await auth_handler.refresh_access_token(payload.get("refresh_token"))
-                        return {
-                            "operation": operation,
-                            "success": refresh_result.success,
-                            "data": refresh_result.auth_data if refresh_result.success else {
-                                "error": refresh_result.error_message,
-                                "error_code": refresh_result.error_code
-                            }
-                        }
-                    except Exception as refresh_error:
-                        return {"operation": operation, "success": False, "error": str(refresh_error)}
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "message": "Header-based FIRS authentication does not require token refresh",
+                            "timestamp": _utc_now(),
+                        },
+                    }
 
                 elif operation == "test_firs_connection":
                     if http_client:
@@ -4296,19 +4360,16 @@ class APPServiceRegistry:
                     }
 
                 elif operation == "get_firs_auth_status":
-                    if auth_handler and hasattr(auth_handler, "auth_state"):
-                        state = auth_handler.auth_state
-                        data = {
-                            "is_authenticated": state.is_authenticated,
-                            "last_auth_time": state.last_auth_time.isoformat() if state.last_auth_time else None,
-                            "last_refresh_time": state.last_refresh_time.isoformat() if state.last_refresh_time else None,
-                            "auth_attempts": state.auth_attempts,
-                            "refresh_attempts": state.refresh_attempts,
-                            "active_session_id": state.active_session_id,
-                        }
-                    else:
-                        data = {"is_authenticated": False, "details": "auth_handler_unavailable"}
-                    return {"operation": operation, "success": True, "data": data}
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "provider": "header_based",
+                            "is_authenticated": False,
+                            "details": "FIRS header authentication is stateless; provide credentials per request",
+                            "timestamp": _utc_now(),
+                        },
+                    }
 
                 elif operation == "get_firs_system_info":
                     info = {

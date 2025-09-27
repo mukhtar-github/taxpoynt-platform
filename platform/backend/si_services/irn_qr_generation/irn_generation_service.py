@@ -18,6 +18,8 @@ from .sequence_manager import SequenceManager
 from .duplicate_detector import DuplicateDetector
 from .irn_validator import IRNValidator, ValidationLevel
 
+from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
+
 # Import authentication services for FIRS integration
 from si_services.authentication import (
     FIRSAuthService,
@@ -364,10 +366,13 @@ class IRNGenerationService:
             
             if submission_result.success:
                 logger.info(f"Successfully submitted IRN {irn_value} to FIRS {environment}")
+                identifiers = extract_firs_identifiers(submission_result.response_data)
+                normalized_response = merge_identifiers_into_payload(submission_result.response_data or {}, identifiers)
                 return {
                     'success': True,
-                    'irn': irn_value,
-                    'firs_response': submission_result.response_data,
+                    'irn': identifiers.get('irn') or irn_value,
+                    'firs_response': normalized_response,
+                    'identifiers': identifiers,
                     'submitted_at': datetime.now().isoformat(),
                     'environment': environment
                 }

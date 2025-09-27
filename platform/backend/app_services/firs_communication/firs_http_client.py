@@ -24,6 +24,8 @@ from typing import Any, Dict, Optional
 
 import aiohttp
 
+from core_platform.utils.firs_response import extract_firs_identifiers
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +107,11 @@ class FIRSHttpClient:
 
     # Manage E-Invoice
     async def sign_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        return await self._post("/api/v1/invoice/sign", payload)
+        response = await self._post("/api/v1/invoice/sign", payload)
+        identifiers = extract_firs_identifiers(response.get("data"))
+        if identifiers:
+            response.setdefault("identifiers", identifiers)
+        return response
 
     async def confirm_invoice(self, irn: str) -> Dict[str, Any]:
         return await self._get(f"/api/v1/invoice/confirm/{irn}")
@@ -132,7 +138,11 @@ class FIRSHttpClient:
 
     # Exchange E-Invoice (transmission)
     async def transmit(self, irn: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return await self._post(f"/api/v1/invoice/transmit/{irn}", payload or {})
+        response = await self._post(f"/api/v1/invoice/transmit/{irn}", payload or {})
+        identifiers = extract_firs_identifiers(response.get("data"))
+        if identifiers:
+            response.setdefault("identifiers", identifiers)
+        return response
 
     async def confirm_receipt(self, irn: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return await self._patch(f"/api/v1/invoice/transmit/{irn}", payload or {})

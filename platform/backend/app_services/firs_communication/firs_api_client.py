@@ -2,10 +2,11 @@
 FIRS API Client - Access Point Provider Services
 
 Official FIRS API client for the APP (Access Point Provider) role.
-Handles secure communication with FIRS endpoints using OAuth 2.0 and TLS 1.3.
+Handles secure communication with FIRS endpoints using the header-based
+authentication model required by the live FIRS scheme (x-api-key,
+x-api-secret, x-timestamp, x-request-id, x-certificate).
 
 This client provides:
-- OAuth 2.0 authentication with FIRS
 - TLS 1.3 secure communications
 - Request/response handling
 - Connection pooling and retry logic
@@ -14,24 +15,21 @@ This client provides:
 """
 
 import asyncio
+import json
 import logging
 import ssl
-import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union, Tuple
+import time
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import aiohttp
 import certifi
 from urllib.parse import urljoin
 
-# Import APP authentication services (independent)
-from .authentication_handler import (
-    FIRSAuthenticationHandler,
-    AuthenticationError,
-    AuthenticationResult,
-    OAuthCredentials
-)
+from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
 
 logger = logging.getLogger(__name__)
 
@@ -43,36 +41,46 @@ class FIRSEnvironment(Enum):
 
 
 class FIRSEndpoint(Enum):
-    """FIRS API endpoints"""
-    # Authentication endpoints
-    TOKEN = "/oauth2/token"
-    REFRESH_TOKEN = "/oauth2/refresh"
-    
-    # Invoice endpoints
-    IRN_GENERATE = "/api/v1/irn/generate"
-    IRN_VALIDATE = "/api/v1/irn/validate"
-    IRN_CANCEL = "/api/v1/irn/cancel"
-    
-    # Document endpoints
-    DOCUMENT_SUBMIT = "/api/v1/documents/submit"
-    DOCUMENT_STATUS = "/api/v1/documents/status"
-    
-    # Reporting endpoints
-    REPORTS_SUMMARY = "/api/v1/reports/summary"
-    REPORTS_DETAIL = "/api/v1/reports/detail"
-    
-    # System endpoints
-    HEALTH_CHECK = "/api/v1/health"
-    SYSTEM_STATUS = "/api/v1/system/status"
+    """FIRS API endpoints aligned with the live header-auth scheme"""
+
+    # Invoice validation and management
+    INVOICE_VALIDATE = "/api/v1/invoice/validate"
+    INVOICE_IRN_VALIDATE = "/api/v1/invoice/irn/validate"
+    INVOICE_SIGN = "/api/v1/invoice/sign"
+    INVOICE_CONFIRM = "/api/v1/invoice/confirm/{irn}"
+    INVOICE_DOWNLOAD = "/api/v1/invoice/download/{irn}"
+    INVOICE_SEARCH = "/api/v1/invoice/{business_id}"
+    INVOICE_UPDATE = "/api/v1/invoice/update/{irn}"
+
+    # Party endpoints
+    INVOICE_PARTY = "/api/v1/invoice/party"
+    INVOICE_PARTY_DETAIL = "/api/v1/invoice/party/{party_id}"
+
+    # Resource endpoints
+    INVOICE_RESOURCES = "/api/v1/invoice/resources/{resource}"
+
+    # Transmission endpoints
+    INVOICE_TRANSMIT = "/api/v1/invoice/transmit/{irn}"
+    INVOICE_TRANSMIT_LOOKUP_IRN = "/api/v1/invoice/transmit/lookup/{irn}"
+    INVOICE_TRANSMIT_LOOKUP_TIN = "/api/v1/invoice/transmit/lookup/tin/{party_id}"
+    INVOICE_TRANSMIT_LOOKUP_PARTY = "/api/v1/invoice/transmit/lookup/party/{party_id}"
+    INVOICE_TRANSMIT_SELF_HEALTH = "/api/v1/invoice/transmit/self-health-check"
+    INVOICE_TRANSMIT_PULL = "/api/v1/invoice/transmit/pull"
+
+    # Utility endpoints
+    UTILITIES_VERIFY_TIN = "/api/v1/utilities/verify-tin"
+    UTILITIES_AUTHENTICATE = "/api/v1/utilities/authenticate"
 
 
 @dataclass
 class FIRSConfig:
     """Configuration for FIRS API client"""
     environment: FIRSEnvironment = FIRSEnvironment.SANDBOX
-    client_id: str = ""
-    client_secret: str = ""
     api_key: str = ""
+    api_secret: str = ""
+    certificate: str = ""
+    client_id: str = ""  # retained for backwards compatibility with OAuth flows
+    client_secret: str = ""  # retained for backwards compatibility with OAuth flows
     
     # Connection settings
     base_url: str = ""
@@ -126,6 +134,7 @@ class FIRSResponse:
     success: bool = False
     error_code: Optional[str] = None
     error_message: Optional[str] = None
+    identifiers: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -146,36 +155,31 @@ class FIRSAPIClient:
     """
     Official FIRS API client for Access Point Provider services.
     
-    Provides secure, authenticated communication with FIRS endpoints
-    using OAuth 2.0 and TLS 1.3.
+    Provides secure communication with FIRS endpoints using the required
+    header-based authentication scheme and TLS 1.3.
     """
     
     def __init__(
         self,
         config: FIRSConfig,
-        auth_handler: Optional[FIRSAuthenticationHandler] = None
+        auth_handler: Optional[Any] = None
     ):
         self.config = config
-        
-        # Authentication components (independent)
-        self.auth_handler = auth_handler or FIRSAuthenticationHandler(
-            environment=config.environment.value
-        )
-        
+
+        # Optional legacy authentication handler (kept for backwards compatibility)
+        self.auth_handler = auth_handler
+
         # Client state
         self.session: Optional[aiohttp.ClientSession] = None
-        self.access_token: Optional[str] = None
-        self.token_expires_at: Optional[datetime] = None
-        self.refresh_token: Optional[str] = None
-        
+
         # Rate limiting
         self.request_timestamps: List[datetime] = []
         self.is_rate_limited: bool = False
         self.rate_limit_reset_time: Optional[datetime] = None
-        
+
         # Metrics
         self.metrics = FIRSClientMetrics()
-        
+
         # SSL context for TLS 1.3
         self._ssl_context: Optional[ssl.SSLContext] = None
     
@@ -183,10 +187,14 @@ class FIRSAPIClient:
         """Start the FIRS API client"""
         try:
             logger.info(f"Starting FIRS API client for {self.config.environment.value}")
-            
-            # Initialize authentication handler
-            await self.auth_handler.start()
-            
+
+            # Initialize optional legacy authentication handler, if provided
+            if self.auth_handler and hasattr(self.auth_handler, "start"):
+                try:
+                    await self.auth_handler.start()
+                except Exception:  # pragma: no cover - best-effort legacy support
+                    logger.debug("FIRS legacy auth handler failed to start; continuing with header auth")
+
             # Create SSL context for TLS 1.3
             self._ssl_context = self._create_ssl_context()
             
@@ -212,14 +220,10 @@ class FIRSAPIClient:
                 timeout=timeout,
                 headers={
                     'User-Agent': 'TaxPoynt-APP-Client/1.0',
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Accept': 'application/json'
                 }
             )
-            
-            # Authenticate with FIRS
-            await self._authenticate()
-            
+
             logger.info("FIRS API client started successfully")
             
         except Exception as e:
@@ -234,8 +238,12 @@ class FIRSAPIClient:
             if self.session:
                 await self.session.close()
                 self.session = None
-            
-            await self.auth_handler.stop()
+
+            if self.auth_handler and hasattr(self.auth_handler, "stop"):
+                try:
+                    await self.auth_handler.stop()
+                except Exception:  # pragma: no cover - best-effort legacy support
+                    logger.debug("FIRS legacy auth handler failed to stop cleanly")
             
             logger.info("FIRS API client stopped successfully")
             
@@ -271,84 +279,27 @@ class FIRSAPIClient:
             logger.error(f"Failed to create SSL context: {e}")
             raise
     
-    async def _authenticate(self) -> bool:
-        """Authenticate with FIRS using OAuth 2.0"""
-        try:
-            logger.info("Authenticating with FIRS")
-            
-            # Use independent authentication handler
-            auth_result = await self.auth_handler.authenticate_client_credentials(
-                client_id=self.config.client_id,
-                client_secret=self.config.client_secret,
-                api_key=self.config.api_key
-            )
-            
-            if auth_result.success:
-                self.access_token = auth_result.auth_data.get('access_token')
-                self.refresh_token = auth_result.auth_data.get('refresh_token')
-                self.token_expires_at = auth_result.expires_at
-                
-                self.metrics.authentication_requests += 1
-                
-                logger.info("Successfully authenticated with FIRS")
-                return True
-            else:
-                logger.error(f"FIRS authentication failed: {auth_result.error_message}")
-                return False
-                
-        except AuthenticationError as e:
-            logger.error(f"FIRS authentication error: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected authentication error: {e}")
-            return False
-    
-    async def _refresh_authentication(self) -> bool:
-        """Refresh FIRS authentication token"""
-        try:
-            if not self.refresh_token:
-                logger.warning("No refresh token available, re-authenticating")
-                return await self._authenticate()
-            
-            logger.info("Refreshing FIRS authentication token")
-            
-            refresh_result = await self.auth_handler.refresh_access_token(
-                refresh_token=self.refresh_token
-            )
-            
-            if refresh_result.success:
-                self.access_token = refresh_result.auth_data.get('access_token')
-                self.refresh_token = refresh_result.auth_data.get('refresh_token', self.refresh_token)
-                self.token_expires_at = refresh_result.expires_at
-                
-                logger.info("Successfully refreshed FIRS authentication token")
-                return True
-            else:
-                logger.warning("Token refresh failed, re-authenticating")
-                return await self._authenticate()
-                
-        except Exception as e:
-            logger.error(f"Token refresh error: {e}")
-            return await self._authenticate()
-    
-    async def _ensure_authenticated(self) -> bool:
-        """Ensure client is authenticated"""
-        try:
-            # Check if token exists and is valid
-            if not self.access_token:
-                return await self._authenticate()
-            
-            # Check if token is about to expire
-            if self.token_expires_at:
-                buffer_time = timedelta(seconds=self.config.token_expiry_buffer)
-                if datetime.now() + buffer_time >= self.token_expires_at:
-                    return await self._refresh_authentication()
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Authentication check failed: {e}")
-            return False
+    def _build_headers(self, extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """Construct the required header-based authentication values."""
+
+        timestamp = str(int(time.time()))
+        request_id = f"req_{timestamp}_{uuid.uuid4().hex[:8]}"
+
+        headers = {
+            "accept": "application/json",
+            "x-api-key": self.config.api_key,
+            "x-api-secret": self.config.api_secret,
+            "x-timestamp": timestamp,
+            "x-request-id": request_id,
+        }
+
+        if self.config.certificate:
+            headers["x-certificate"] = self.config.certificate
+
+        if extra_headers:
+            headers.update({k: v for k, v in extra_headers.items() if v is not None})
+
+        return headers
     
     async def _check_rate_limits(self) -> bool:
         """Check if request can be made within rate limits"""
@@ -407,94 +358,101 @@ class FIRSAPIClient:
                 endpoint_path = endpoint.value
             else:
                 endpoint_path = endpoint
-            
+
             url = urljoin(self.config.base_url, endpoint_path)
-            
+
             # Check rate limits
             if not await self._check_rate_limits():
                 raise Exception("Rate limit exceeded")
-            
-            # Ensure authentication
-            if not await self._ensure_authenticated():
-                raise Exception("Authentication failed")
-            
-            # Prepare request
-            request_headers = {
-                'Authorization': f'Bearer {self.access_token}',
-                'X-API-Key': self.config.api_key,
-                'X-Request-ID': f"req_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{id(self) % 10000}",
-                **(headers or {})
-            }
-            
+
+            if not self.session:
+                raise RuntimeError("FIRS API client session is not initialized. Call start() first.")
+
+            request_headers = self._build_headers(headers)
+
+            http_method = method.upper()
+
+            # Only include JSON payload when appropriate
+            json_payload = data if http_method not in {"GET", "DELETE"} else None
+
+            if http_method not in {"GET", "DELETE"} and "Content-Type" not in request_headers:
+                request_headers["Content-Type"] = "application/json"
+
             request_timeout = timeout or self.config.timeout_seconds
-            
+
             # Make request
             start_time = datetime.now()
-            
+
             async with self.session.request(
                 method=method,
                 url=url,
-                json=data,
+                json=json_payload,
                 params=params,
                 headers=request_headers,
                 timeout=aiohttp.ClientTimeout(total=request_timeout)
             ) as response:
-                
+
                 response_time = (datetime.now() - start_time).total_seconds()
-                
+
                 # Update metrics
                 self.metrics.total_requests += 1
-                self.metrics.last_request_time = datetime.now()
-                self.request_timestamps.append(datetime.now())
-                
+                now = datetime.now()
+                self.metrics.last_request_time = now
+                self.request_timestamps.append(now)
+
                 # Update average response time
                 total_time = self.metrics.average_response_time * (self.metrics.total_requests - 1)
                 self.metrics.average_response_time = (total_time + response_time) / self.metrics.total_requests
-                
+
                 # Parse response
                 response_text = await response.text()
-                
+
                 try:
                     response_data = json.loads(response_text) if response_text else {}
                 except json.JSONDecodeError:
                     response_data = {'raw_response': response_text}
-                
-                # Create FIRS response object
+
+                identifiers = extract_firs_identifiers(response_data)
+                if identifiers:
+                    response_data = merge_identifiers_into_payload(response_data or {}, identifiers)
+
                 firs_response = FIRSResponse(
                     status_code=response.status,
                     headers=dict(response.headers),
                     data=response_data,
                     raw_response=response_text,
-                    request_id=request_headers.get('X-Request-ID'),
-                    timestamp=datetime.now(),
-                    success=200 <= response.status < 300
+                    request_id=request_headers.get('x-request-id'),
+                    timestamp=now,
+                    success=200 <= response.status < 300,
+                    identifiers=identifiers or None
                 )
-                
-                # Handle authentication errors
+
                 if response.status == 401 and retry_on_auth_failure:
-                    logger.warning("Authentication error, attempting to refresh token")
-                    if await self._refresh_authentication():
-                        # Retry request with new token
-                        return await self.make_request(
-                            endpoint=endpoint,
-                            method=method,
-                            data=data,
-                            params=params,
-                            headers=headers,
-                            timeout=timeout,
-                            retry_on_auth_failure=False  # Avoid infinite retry
-                        )
-                
-                # Update success metrics
+                    logger.warning("Received 401 from FIRS; retrying once with fresh headers")
+                    return await self.make_request(
+                        endpoint=endpoint,
+                        method=method,
+                        data=data,
+                        params=params,
+                        headers=headers,
+                        timeout=timeout,
+                        retry_on_auth_failure=False
+                    )
+
                 if firs_response.success:
                     self.metrics.successful_requests += 1
                 else:
                     self.metrics.failed_requests += 1
-                    firs_response.error_code = response_data.get('error_code')
-                    firs_response.error_message = response_data.get('error_message', 'Unknown error')
-                
+                    firs_response.error_code = response_data.get('error_code') or response_data.get('code')
+                    firs_response.error_message = (
+                        response_data.get('error_message')
+                        or response_data.get('message')
+                        or response_data.get('error')
+                        or 'Unknown error'
+                    )
+
                 return firs_response
-                
+
         except asyncio.TimeoutError:
             self.metrics.failed_requests += 1
             return FIRSResponse(
@@ -522,14 +480,14 @@ class FIRSAPIClient:
     async def health_check(self) -> FIRSResponse:
         """Check FIRS API health"""
         return await self.make_request(
-            endpoint=FIRSEndpoint.HEALTH_CHECK,
+            endpoint=FIRSEndpoint.INVOICE_TRANSMIT_SELF_HEALTH,
             method="GET"
         )
     
     async def system_status(self) -> FIRSResponse:
         """Get FIRS system status"""
         return await self.make_request(
-            endpoint=FIRSEndpoint.SYSTEM_STATUS,
+            endpoint=FIRSEndpoint.INVOICE_TRANSMIT_PULL,
             method="GET"
         )
     
@@ -543,9 +501,11 @@ class FIRSAPIClient:
             'environment': self.config.environment.value,
             'base_url': self.config.base_url,
             'tls_version': self.config.tls_version,
-            'authenticated': bool(self.access_token),
-            'token_expires_at': self.token_expires_at.isoformat() if self.token_expires_at else None,
+            'api_key_configured': bool(self.config.api_key),
+            'api_secret_configured': bool(self.config.api_secret),
+            'certificate_configured': bool(self.config.certificate),
             'rate_limited': self.is_rate_limited,
+            'rate_limit_reset_time': self.rate_limit_reset_time.isoformat() if self.rate_limit_reset_time else None,
             'session_active': self.session is not None and not self.session.closed
         }
 
@@ -556,6 +516,8 @@ def create_firs_api_client(
     client_id: str = "",
     client_secret: str = "",
     api_key: str = "",
+    api_secret: str = "",
+    certificate: str = "",
     config_overrides: Optional[Dict[str, Any]] = None
 ) -> FIRSAPIClient:
     """
@@ -563,9 +525,11 @@ def create_firs_api_client(
     
     Args:
         environment: FIRS environment
-        client_id: OAuth 2.0 client ID
-        client_secret: OAuth 2.0 client secret
-        api_key: FIRS API key
+        client_id: Legacy OAuth 2.0 client ID (unused for header auth)
+        client_secret: Legacy OAuth 2.0 client secret (unused for header auth)
+        api_key: FIRS API key (x-api-key header)
+        api_secret: FIRS API secret (x-api-secret header)
+        certificate: Base64 encoded certificate (x-certificate header)
         config_overrides: Additional configuration options
         
     Returns:
@@ -575,7 +539,9 @@ def create_firs_api_client(
         environment=environment,
         client_id=client_id,
         client_secret=client_secret,
-        api_key=api_key
+        api_key=api_key,
+        api_secret=api_secret,
+        certificate=certificate
     )
     
     # Apply configuration overrides
@@ -592,6 +558,8 @@ def create_production_firs_client(
     client_id: str,
     client_secret: str,
     api_key: str,
+    api_secret: str = "",
+    certificate: str = "",
     **kwargs
 ) -> FIRSAPIClient:
     """Create production FIRS API client"""
@@ -600,6 +568,8 @@ def create_production_firs_client(
         client_id=client_id,
         client_secret=client_secret,
         api_key=api_key,
+        api_secret=api_secret,
+        certificate=certificate,
         config_overrides=kwargs
     )
 
@@ -609,6 +579,8 @@ def create_sandbox_firs_client(
     client_id: str,
     client_secret: str,
     api_key: str,
+    api_secret: str = "",
+    certificate: str = "",
     **kwargs
 ) -> FIRSAPIClient:
     """Create sandbox FIRS API client"""
@@ -617,5 +589,7 @@ def create_sandbox_firs_client(
         client_id=client_id,
         client_secret=client_secret,
         api_key=api_key,
+        api_secret=api_secret,
+        certificate=certificate,
         config_overrides=kwargs
     )

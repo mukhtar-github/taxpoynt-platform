@@ -11,6 +11,7 @@ SI (System Integrator) role invoice generation.
 import asyncio
 import logging
 import os
+import warnings
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any, Optional, Tuple
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
 # Fixed imports - use relative imports instead of platform.backend
+from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 from core_platform.data_management.models.firs_submission import (
     FIRSSubmission, SubmissionStatus, ValidationStatus
 )
@@ -166,6 +168,7 @@ class ComprehensiveFIRSInvoiceGenerator:
         self.db = db_session
         self.firs_formatter = firs_formatter
         self.correlation_service = SIAPPCorrelationService(db_session)
+        self._remote_irn_warning_emitted = False
         
         # Initialize connectors for all supported systems (graceful handling of missing connectors)
         self.connectors = {
@@ -946,7 +949,9 @@ class ComprehensiveFIRSInvoiceGenerator:
                     selected_transactions, request
                 )
                 invoices.append(invoice_result)
-                irns_generated.append(invoice_result['irn'])
+                captured_irn = invoice_result.get('irn')
+                if captured_irn:
+                    irns_generated.append(captured_irn)
                 total_amount += Decimal(str(invoice_result['total_amount']))
             else:
                 # Generate individual invoices
@@ -956,7 +961,9 @@ class ComprehensiveFIRSInvoiceGenerator:
                             transaction, request
                         )
                         invoices.append(invoice_result)
-                        irns_generated.append(invoice_result['irn'])
+                        captured_irn = invoice_result.get('irn')
+                        if captured_irn:
+                            irns_generated.append(captured_irn)
                         total_amount += Decimal(str(invoice_result['total_amount']))
                     except Exception as e:
                         error_msg = f"Failed to generate invoice for transaction {transaction.id}: {e}"
@@ -1003,7 +1010,6 @@ class ComprehensiveFIRSInvoiceGenerator:
         
         # Create FIRS-compliant invoice data
         invoice_data = {
-            'irn': irn,
             'invoice_number': f"TXP-{transaction.transaction_id}",
             'invoice_date': transaction.date.isoformat(),
             'due_date': (transaction.date + timedelta(days=30)).isoformat(),
@@ -1026,6 +1032,9 @@ class ComprehensiveFIRSInvoiceGenerator:
             }
         }
 
+        if irn:
+            invoice_data['irn'] = irn
+
         # Save to database
         firs_submission = FIRSSubmission(
             organization_id=request.organization_id,
@@ -1046,24 +1055,25 @@ class ComprehensiveFIRSInvoiceGenerator:
         await self.db.commit()
 
         # Create SI-APP correlation for status tracking
-        try:
-            await self.correlation_service.create_correlation(
-                organization_id=request.organization_id,
-                si_invoice_id=invoice_data['invoice_number'],
-                si_transaction_ids=[transaction.id],
-                irn=irn,
-                invoice_number=invoice_data['invoice_number'],
-                total_amount=float(transaction.amount),
-                currency=transaction.currency,
-                customer_name=transaction.customer_name,
-                customer_email=transaction.customer_email,
-                customer_tin=transaction.customer_tin,
-                invoice_data=invoice_data
-            )
-            logger.info(f"Created SI-APP correlation for IRN {irn}")
-        except Exception as e:
-            logger.warning(f"Failed to create SI-APP correlation for IRN {irn}: {e}")
-            # Don't fail the invoice generation if correlation creation fails
+        if irn:
+            try:
+                await self.correlation_service.create_correlation(
+                    organization_id=request.organization_id,
+                    si_invoice_id=invoice_data['invoice_number'],
+                    si_transaction_ids=[transaction.id],
+                    irn=irn,
+                    invoice_number=invoice_data['invoice_number'],
+                    total_amount=float(transaction.amount),
+                    currency=transaction.currency,
+                    customer_name=transaction.customer_name,
+                    customer_email=transaction.customer_email,
+                    customer_tin=transaction.customer_tin,
+                    invoice_data=invoice_data
+                )
+                logger.info(f"Created SI-APP correlation for IRN {irn}")
+            except Exception as e:
+                logger.warning(f"Failed to create SI-APP correlation for IRN {irn}: {e}")
+                # Don't fail the invoice generation if correlation creation fails
 
         return invoice_data
 
@@ -1092,7 +1102,6 @@ class ComprehensiveFIRSInvoiceGenerator:
 
         # Create consolidated invoice data
         invoice_data = {
-            'irn': irn,
             'invoice_number': f"TXP-CONSOLIDATED-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
             'invoice_date': datetime.utcnow().isoformat(),
             'due_date': (datetime.utcnow() + timedelta(days=30)).isoformat(),
@@ -1115,6 +1124,9 @@ class ComprehensiveFIRSInvoiceGenerator:
             }
         }
 
+        if irn:
+            invoice_data['irn'] = irn
+
         # Save to database
         firs_submission = FIRSSubmission(
             organization_id=request.organization_id,
@@ -1135,24 +1147,25 @@ class ComprehensiveFIRSInvoiceGenerator:
         await self.db.commit()
 
         # Create SI-APP correlation for consolidated invoice
-        try:
-            await self.correlation_service.create_correlation(
-                organization_id=request.organization_id,
-                si_invoice_id=invoice_data['invoice_number'],
-                si_transaction_ids=[txn.id for txn in transactions],
-                irn=irn,
-                invoice_number=invoice_data['invoice_number'],
-                total_amount=float(total_amount),
-                currency=primary_transaction.currency,
-                customer_name=invoice_data['customer']['name'],
-                customer_email=invoice_data['customer']['email'],
-                customer_tin=invoice_data['customer']['tin'],
-                invoice_data=invoice_data
-            )
-            logger.info(f"Created SI-APP correlation for consolidated IRN {irn}")
-        except Exception as e:
-            logger.warning(f"Failed to create SI-APP correlation for consolidated IRN {irn}: {e}")
-            # Don't fail the invoice generation if correlation creation fails
+        if irn:
+            try:
+                await self.correlation_service.create_correlation(
+                    organization_id=request.organization_id,
+                    si_invoice_id=invoice_data['invoice_number'],
+                    si_transaction_ids=[txn.id for txn in transactions],
+                    irn=irn,
+                    invoice_number=invoice_data['invoice_number'],
+                    total_amount=float(total_amount),
+                    currency=primary_transaction.currency,
+                    customer_name=invoice_data['customer']['name'],
+                    customer_email=invoice_data['customer']['email'],
+                    customer_tin=invoice_data['customer']['tin'],
+                    invoice_data=invoice_data
+                )
+                logger.info(f"Created SI-APP correlation for consolidated IRN {irn}")
+            except Exception as e:
+                logger.warning(f"Failed to create SI-APP correlation for consolidated IRN {irn}: {e}")
+                # Don't fail the invoice generation if correlation creation fails
 
         return invoice_data
 
@@ -1161,9 +1174,20 @@ class ComprehensiveFIRSInvoiceGenerator:
         transaction: BusinessTransactionData,
         organization_id: UUID,
         is_consolidated: bool = False
-    ) -> str:
+    ) -> Optional[str]:
         """Generate FIRS-compliant Invoice Reference Number (IRN)."""
-        
+
+        if is_firs_remote_irn_enabled():
+            if not self._remote_irn_warning_emitted:
+                warning_msg = (
+                    "FIRS_REMOTE_IRN enabled; skipping local IRN generation in SI invoice builder. "
+                    "FIRS will supply the IRN after submission."
+                )
+                warnings.warn(warning_msg, RuntimeWarning, stacklevel=3)
+                logger.warning(warning_msg)
+                self._remote_irn_warning_emitted = True
+            return None
+
         # Get organization-specific service ID
         from core_platform.data_management.models.organization import Organization
         org_result = await self.db.execute(
