@@ -22,3 +22,4 @@ __author__ = "TaxPoynt Platform Team"
 # 2. Integration Tests - Service-to-service testing  
 # 3. UAT Tests - User acceptance and compliance testing
 # 4. Performance Tests - Load, stress, and scalability testing
+# pytest: filterwarnings = ignore::UserWarning

@@ -40,6 +40,7 @@ from .report_generation_endpoints import create_report_generation_router
 from .dashboard_data_endpoints import create_dashboard_data_router
 from .onboarding_endpoints import create_app_onboarding_router
 from .network_routing_endpoints import create_network_routing_router
+from .webhook_endpoints import create_app_webhook_router
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,14 @@ class APPRouterV1:
             self.message_router,
         )
         self.router.include_router(network_router, dependencies=[Depends(self.tenant_scope)])
+
+        # Webhook Routes (FIRS notifications)
+        webhook_router = create_app_webhook_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router,
+        )
+        self.router.include_router(webhook_router, dependencies=[Depends(self.tenant_scope)])
 
         # Certificate Management Routes
         certificate_router = create_certificate_management_router(

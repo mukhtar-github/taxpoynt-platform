@@ -1,0 +1,69 @@
+{
+  "queue_name": "ap_outbound",
+  "timestamp": "2025-09-27T14:35:43.072089+00:00",
+  "messages": [
+    {
+      "message_id": "78fdbec1-5301-4e8e-9035-a353a1870d59",
+      "queue_name": "ap_outbound",
+      "payload": {
+        "endpoint_url": "http://127.0.0.1:42051/ok",
+        "document": {
+          "id": "inv-ok"
+        }
+      },
+      "priority": 0,
+      "scheduled_time": "2025-09-27T14:32:13.900748+00:00",
+      "created_time": "2025-09-27T14:32:13.900748+00:00",
+      "processing_time": "2025-09-27T14:32:13.901208+00:00",
+      "completion_time": "2025-09-27T14:32:13.929050+00:00",
+      "expiry_time": "2025-09-28T02:32:13.900694+00:00",
+      "retry_count": 0,
+      "max_retries": 1,
+      "status": "completed",
+      "consumer_id": "ap_outbound_worker_0",
+      "correlation_id": null,
+      "tenant_id": null,
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "message_id": "6e962204-b718-414e-b853-2fde84589d95",
+      "queue_name": "ap_outbound",
+      "payload": {
+        "endpoint_url": "http://127.0.0.1:42051/bad",
+        "document": {
+          "id": "inv-4xx"
+        }
+      },
+      "priority": 0,
+      "scheduled_time": "2025-09-27T14:32:13.952351+00:00",
+      "created_time": "2025-09-27T14:32:13.952351+00:00",
+      "processing_time": "2025-09-27T14:32:13.952846+00:00",
+      "completion_time": null,
+      "expiry_time": "2025-09-28T02:32:13.952254+00:00",
+      "retry_count": 0,
+      "max_retries": 1,
+      "status": "processing",
+      "consumer_id": "ap_outbound_worker_1",
+      "correlation_id": null,
+      "tenant_id": null,
+      "tags": [],
+      "metadata": {}
+    }
+  ],
+  "metrics": {
+    "queue_name": "ap_outbound",
+    "total_messages": 2,
+    "queued_messages": 0,
+    "processing_messages": 1,
+    "completed_messages": 1,
+    "failed_messages": 0,
+    "retry_messages": 0,
+    "dead_letter_messages": 0,
+    "expired_messages": 0,
+    "average_processing_time": 0.027842,
+    "peak_queue_size": 2,
+    "current_queue_size": 2,
+    "last_updated": "2025-09-27T14:32:13.890990+00:00"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "queue_name": "app_notifications",
+  "timestamp": "2025-09-27T14:35:43.068369+00:00",
+  "messages": [],
+  "metrics": {
+    "queue_name": "app_notifications",
+    "total_messages": 0,
+    "queued_messages": 0,
+    "processing_messages": 0,
+    "completed_messages": 0,
+    "failed_messages": 0,
+    "retry_messages": 0,
+    "dead_letter_messages": 0,
+    "expired_messages": 0,
+    "average_processing_time": 0.0,
+    "peak_queue_size": 0,
+    "current_queue_size": 0,
+    "last_updated": "2025-09-27T14:32:13.836594+00:00"
+  }
+}
