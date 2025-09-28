@@ -439,7 +439,8 @@ class ComplianceMetricsMonitor:
             'last_check_at': None,
             'average_compliance_score': 0.0,
             'compliance_trend': 'stable',
-            'category_scores': {}
+            'category_scores': {},
+            'last_rule_violation_counts': {}
         }
         
         # Alert thresholds
@@ -483,13 +484,16 @@ class ComplianceMetricsMonitor:
             # Generate recommendations
             recommendations = self._generate_recommendations(violations)
             
+            # Timestamp for this run
+            generated_at = datetime.now(timezone.utc)
+
             # Create summary
-            summary = self._create_compliance_summary(metrics, violations)
+            summary = self._create_compliance_summary(metrics, violations, generated_at)
             
             # Create report
             report = ComplianceReport(
-                report_id=f"COMP_{int(datetime.now(timezone.utc).timestamp())}",
-                generated_at=datetime.now(timezone.utc),
+                report_id=f"COMP_{int(generated_at.timestamp())}",
+                generated_at=generated_at,
                 period_start=start_date,
                 period_end=end_date,
                 overall_status=overall_status,
@@ -501,7 +505,8 @@ class ComplianceMetricsMonitor:
             )
             
             # Update statistics
-            self._update_stats(overall_score, violations)
+            rule_summary = summary.get('violation_summary', {}).get('by_rule', [])
+            self._update_stats(overall_score, violations, generated_at, rule_summary)
             
             self.logger.info(
                 f"Compliance check completed: Score {overall_score:.1f}%, "
@@ -880,7 +885,8 @@ class ComplianceMetricsMonitor:
     
     def _create_compliance_summary(self, 
                                   metrics: List[ComplianceMetric],
-                                  violations: List[ComplianceViolation]) -> Dict[str, Any]:
+                                  violations: List[ComplianceViolation],
+                                  generated_at: datetime) -> Dict[str, Any]:
         """Create compliance summary statistics"""
         # Category breakdown
         category_scores = {}
@@ -895,10 +901,24 @@ class ComplianceMetricsMonitor:
                 }
         
         # Violation summary
+        rule_counts = Counter(v.rule_id for v in violations)
+        rule_breakdown: List[Dict[str, Any]] = []
+        for rule_id, count in rule_counts.items():
+            rule = self.rules.get(rule_id)
+            violation_match = next((v for v in violations if v.rule_id == rule_id), None)
+            rule_breakdown.append({
+                'rule_id': rule_id,
+                'rule_name': rule.name if rule else (violation_match.rule_name if violation_match else rule_id),
+                'severity': (rule.alert_level.value if rule else (violation_match.severity.value if violation_match else AlertLevel.INFO.value)),
+                'violation_count': count
+            })
+        rule_breakdown.sort(key=lambda item: item['violation_count'], reverse=True)
+
         violation_summary = {
             'total_violations': len(violations),
-            'by_severity': Counter(v.severity.value for v in violations),
-            'by_category': Counter(v.category.value for v in violations)
+            'by_severity': dict(Counter(v.severity.value for v in violations)),
+            'by_category': dict(Counter(v.category.value for v in violations)),
+            'by_rule': rule_breakdown
         }
         
         # Trend analysis (mock implementation)
@@ -913,14 +933,25 @@ class ComplianceMetricsMonitor:
             'violation_summary': violation_summary,
             'trend_analysis': trend_data,
             'metric_count': len(metrics),
-            'compliant_metrics': len([m for m in metrics if m.status == ComplianceStatus.COMPLIANT])
+            'compliant_metrics': len([m for m in metrics if m.status == ComplianceStatus.COMPLIANT]),
+            'metadata': {
+                'last_refreshed_at': generated_at.isoformat()
+            }
         }
     
-    def _update_stats(self, compliance_score: float, violations: List[ComplianceViolation]):
+    def _update_stats(self, 
+                      compliance_score: float,
+                      violations: List[ComplianceViolation],
+                      checked_at: datetime,
+                      rule_summary: Optional[List[Dict[str, Any]]] = None):
         """Update monitoring statistics"""
         self.stats['total_checks_performed'] += 1
         self.stats['violations_detected'] += len(violations)
-        self.stats['last_check_at'] = datetime.now(timezone.utc).isoformat()
+        self.stats['last_check_at'] = checked_at.isoformat()
+        if rule_summary is not None:
+            self.stats['last_rule_violation_counts'] = {
+                item['rule_id']: item['violation_count'] for item in rule_summary
+            }
         
         # Update average compliance score
         current_avg = self.stats['average_compliance_score']

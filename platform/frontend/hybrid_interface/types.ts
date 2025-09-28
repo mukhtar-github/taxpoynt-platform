@@ -286,6 +286,26 @@ export interface UnifiedComplianceStatus {
   upcoming_deadlines: ComplianceDeadline[];
   compliance_trends: ComplianceTrend[];
   recommendations: ComplianceRecommendation[];
+  violation_summary?: ComplianceViolationSummary;
+  metadata?: ComplianceStatusMetadata;
+}
+
+export interface ComplianceViolationRuleSummary {
+  rule_id: string;
+  rule_name: string;
+  severity: 'info' | 'warning' | 'critical' | 'emergency' | 'high' | 'medium' | 'low';
+  violation_count: number;
+}
+
+export interface ComplianceViolationSummary {
+  total_violations: number;
+  by_severity: Record<string, number>;
+  by_category: Record<string, number>;
+  by_rule: ComplianceViolationRuleSummary[];
+}
+
+export interface ComplianceStatusMetadata {
+  last_refreshed_at: Date;
 }
 
 export interface ComplianceCategory {

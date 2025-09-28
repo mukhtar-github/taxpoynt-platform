@@ -9,6 +9,7 @@ preserving the route-facing contract.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager, nullcontext
 from datetime import datetime, timezone
@@ -34,6 +35,13 @@ from core_platform.messaging.queue_manager import get_queue_manager
 from core_platform.messaging.queue_manager import QueueConfiguration, QueueType, QueueStrategy
 
 from app_services.firs_communication.firs_payload_mapper import build_firs_invoice
+from app_services.transmission.retry_handler import RetryHandler, RetryPolicy, RetryStrategy
+from app_services.transmission.secure_transmitter import (
+    TransmissionRequest,
+    TransmissionResult,
+    TransmissionStatus,
+    SecurityLevel,
+)
 
 
 InvoiceRecord = invoice_repo.InvoiceRecord
@@ -60,9 +68,71 @@ class TransmissionService:
         "cancelled": SubmissionStatus.CANCELLED,
     }
 
+    class _RouterTransmissionAdapter:
+        """Bridge TransmissionRequest execution through the message router."""
+
+        def __init__(self, service: "TransmissionService") -> None:
+            self._service = service
+            self._logger = logging.getLogger(f"{__name__}.RouterTransmitter")
+
+        async def transmit_document(self, request: TransmissionRequest) -> TransmissionResult:
+            metadata = request.metadata or {}
+            operation = metadata.get("operation") or "submit_invoice_to_firs"
+
+            payload = dict(metadata.get("payload") or {})
+            organization_id = metadata.get("organization_id")
+            invoice_number = metadata.get("invoice_number") or request.document_id
+
+            if "organization_id" not in payload and organization_id:
+                payload["organization_id"] = organization_id
+            if "invoice_number" not in payload and invoice_number:
+                payload["invoice_number"] = invoice_number
+            if "invoice_data" not in payload:
+                payload["invoice_data"] = request.document_data
+
+            response = await self._service._call_firs(operation, payload)
+
+            success = bool(response.get("success")) if isinstance(response, dict) else False
+            data = response.get("data") if isinstance(response, dict) else None
+            error = response.get("error") if isinstance(response, dict) else None
+
+            result = TransmissionResult(
+                request_id=str(uuid.uuid4()),
+                document_id=request.document_id,
+                status=TransmissionStatus.DELIVERED if success else TransmissionStatus.FAILED,
+                transmission_id=(data or {}).get("submission_id") or (data or {}).get("id"),
+                response_data=data if isinstance(data, dict) else None,
+                error_message=None if success else (error or "transmission_failed"),
+                metadata={**metadata, "operation": operation},
+            )
+
+            if result.status == TransmissionStatus.DELIVERED:
+                result.transmitted_at = datetime.now(timezone.utc)
+            else:
+                self._logger.debug(
+                    "Router transmission failed for %s: %s",
+                    request.document_id,
+                    result.error_message,
+                )
+
+            return result
+
     def __init__(self, message_router: MessageRouter) -> None:
         self.message_router = message_router
         self.logger = logging.getLogger(__name__)
+        self._queue_manager = None
+        self._queue_consumers_registered = False
+        self._retry_handler: Optional[RetryHandler] = None
+        self._router_transmitter = self._RouterTransmissionAdapter(self)
+        self._default_retry_policy = RetryPolicy(
+            max_attempts=5,
+            strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
+            base_delay=5.0,
+            max_delay=600.0,
+            backoff_multiplier=2.0,
+            jitter_factor=0.2,
+            timeout=1800.0,
+        )
 
     async def handle(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         handlers = {
@@ -190,6 +260,135 @@ class TransmissionService:
             return Decimal(str(raw))
         except (InvalidOperation, ValueError, TypeError):
             return None
+
+    def _default_destination_endpoint(self) -> str:
+        return os.getenv("FIRS_API_URL", "https://sandbox-api.firs.gov.ng")
+
+    def _clone_retry_policy(self) -> RetryPolicy:
+        return RetryPolicy(
+            max_attempts=self._default_retry_policy.max_attempts,
+            strategy=self._default_retry_policy.strategy,
+            base_delay=self._default_retry_policy.base_delay,
+            max_delay=self._default_retry_policy.max_delay,
+            backoff_multiplier=self._default_retry_policy.backoff_multiplier,
+            jitter_factor=self._default_retry_policy.jitter_factor,
+            timeout=self._default_retry_policy.timeout,
+            retry_on_status=list(self._default_retry_policy.retry_on_status),
+            retry_on_reasons=list(self._default_retry_policy.retry_on_reasons),
+            circuit_breaker_enabled=self._default_retry_policy.circuit_breaker_enabled,
+            circuit_breaker_threshold=self._default_retry_policy.circuit_breaker_threshold,
+            circuit_breaker_timeout=self._default_retry_policy.circuit_breaker_timeout,
+        )
+
+    def _build_retry_policy(self, raw_policy: Optional[Dict[str, Any]]) -> RetryPolicy:
+        if not isinstance(raw_policy, dict):
+            return self._clone_retry_policy()
+
+        policy = self._clone_retry_policy()
+
+        if "max_attempts" in raw_policy:
+            try:
+                policy.max_attempts = max(1, int(raw_policy["max_attempts"]))
+            except (TypeError, ValueError):
+                pass
+
+        if "base_delay" in raw_policy:
+            try:
+                policy.base_delay = float(raw_policy["base_delay"])
+            except (TypeError, ValueError):
+                pass
+
+        if "max_delay" in raw_policy:
+            try:
+                policy.max_delay = float(raw_policy["max_delay"])
+            except (TypeError, ValueError):
+                pass
+
+        if "backoff_multiplier" in raw_policy:
+            try:
+                policy.backoff_multiplier = max(1.0, float(raw_policy["backoff_multiplier"]))
+            except (TypeError, ValueError):
+                pass
+
+        if "jitter_factor" in raw_policy:
+            try:
+                jitter_value = float(raw_policy["jitter_factor"])
+                policy.jitter_factor = max(0.0, min(jitter_value, 1.0))
+            except (TypeError, ValueError):
+                pass
+
+        if "timeout" in raw_policy:
+            try:
+                policy.timeout = max(0.0, float(raw_policy["timeout"]))
+            except (TypeError, ValueError):
+                pass
+
+        if "strategy" in raw_policy and isinstance(raw_policy["strategy"], str):
+            strategy_value = raw_policy["strategy"].strip().lower()
+            for candidate in RetryStrategy:
+                if candidate.value == strategy_value or candidate.name.lower() == strategy_value:
+                    policy.strategy = candidate
+                    break
+
+        return policy
+
+    def _create_transmission_request(
+        self,
+        *,
+        document_id: str,
+        document_data: Dict[str, Any],
+        organization_id: Optional[str],
+        operation: str,
+        priority: int = 1,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> TransmissionRequest:
+        enriched_metadata = {
+            "operation": operation,
+            "organization_id": organization_id,
+            "invoice_number": document_id,
+        }
+        if metadata:
+            enriched_metadata.update(metadata)
+
+        document_type = str(document_data.get("invoiceType") or document_data.get("invoice_type") or "firs_invoice")
+
+        return TransmissionRequest(
+            document_id=str(document_id),
+            document_type=document_type,
+            document_data=document_data,
+            destination_endpoint=self._default_destination_endpoint(),
+            security_level=SecurityLevel.STANDARD,
+            priority=priority,
+            metadata=enriched_metadata,
+        )
+
+    def _serialize_transmission_request(self, request: TransmissionRequest) -> Dict[str, Any]:
+        return {
+            "document_id": request.document_id,
+            "document_type": request.document_type,
+            "document_data": request.document_data,
+            "destination_endpoint": request.destination_endpoint,
+            "security_level": request.security_level.value if isinstance(request.security_level, SecurityLevel) else request.security_level,
+            "priority": request.priority,
+            "metadata": request.metadata,
+        }
+
+    def _deserialize_transmission_request(self, data: Dict[str, Any]) -> TransmissionRequest:
+        level_value = data.get("security_level") or SecurityLevel.STANDARD.value
+        try:
+            security_level = SecurityLevel(level_value)
+        except Exception:
+            security_level = SecurityLevel.STANDARD
+
+        return TransmissionRequest(
+            document_id=str(data.get("document_id")),
+            document_type=str(data.get("document_type") or "firs_invoice"),
+            document_data=data.get("document_data") or {},
+            destination_endpoint=data.get("destination_endpoint") or self._default_destination_endpoint(),
+            security_level=security_level,
+            priority=int(data.get("priority", 1)),
+            metadata=data.get("metadata") or {},
+        )
 
     def _map_status(self, status_value: Any, success_hint: Optional[bool] = None) -> SubmissionStatus:
         if isinstance(status_value, SubmissionStatus):
@@ -385,6 +584,156 @@ class TransmissionService:
             "invoice_type_histogram": invoice_hist,
             "currency_histogram": currency_hist,
         }
+
+    def _extract_retry_config(self, payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not isinstance(payload, dict):
+            return None
+        candidate = (
+            payload.get("retry_config")
+            or payload.get("retryConfig")
+            or payload.get("retryPolicy")
+            or payload.get("retry_options")
+        )
+        return candidate if isinstance(candidate, dict) else None
+
+    async def _ensure_queue_manager(self):
+        if self._queue_manager:
+            return self._queue_manager
+
+        qm = get_queue_manager()
+        try:
+            await qm.initialize()
+        except Exception as exc:
+            self.logger.error("Failed to initialize queue manager: %s", exc)
+            raise
+
+        if not self._queue_consumers_registered:
+            try:
+                await qm.register_consumer(
+                    "firs_submissions_high",
+                    "app_transmission_worker",
+                    self._consume_transmission_message,
+                )
+                await qm.register_consumer(
+                    "firs_submissions_retry",
+                    "app_transmission_retry_worker",
+                    self._consume_transmission_message,
+                )
+                self._queue_consumers_registered = True
+            except Exception as exc:
+                self.logger.error("Failed to register transmission consumers: %s", exc)
+                raise
+
+        self._queue_manager = qm
+        return qm
+
+    async def _ensure_retry_handler(self) -> RetryHandler:
+        if self._retry_handler:
+            return self._retry_handler
+
+        handler = RetryHandler(
+            secure_transmitter=self._router_transmitter,
+            default_retry_policy=self._clone_retry_policy(),
+        )
+        await handler.start()
+        self._retry_handler = handler
+        return handler
+
+    async def _queue_transmission_job(
+        self,
+        *,
+        queue_name: str,
+        submission_id: Optional[str],
+        organization_id: Optional[str],
+        request: TransmissionRequest,
+        retry_config: Optional[Dict[str, Any]] = None,
+        batch_id: Optional[str] = None,
+    ) -> Optional[str]:
+        try:
+            qm = await self._ensure_queue_manager()
+        except Exception:
+            return None
+
+        payload: Dict[str, Any] = {
+            "transmission_request": self._serialize_transmission_request(request),
+            "submission_id": submission_id,
+            "organization_id": organization_id,
+        }
+        if batch_id:
+            payload["batch_id"] = batch_id
+        if retry_config:
+            payload["retry_policy"] = retry_config
+
+        try:
+            return await qm.enqueue_message(queue_name, payload)
+        except Exception as exc:
+            self.logger.error("Failed to enqueue transmission job: %s", exc)
+            return None
+
+    async def _schedule_retry(
+        self,
+        request: TransmissionRequest,
+        result: TransmissionResult,
+        retry_config: Optional[Dict[str, Any]],
+    ) -> Optional[str]:
+        handler = await self._ensure_retry_handler()
+        policy = self._build_retry_policy(retry_config or request.metadata.get("retry_config"))
+        retry_id = await handler.handle_failed_transmission(
+            transmission_request=request,
+            transmission_result=result,
+            retry_policy=policy,
+        )
+        return retry_id or None
+
+    async def _persist_transmission_outcome(
+        self,
+        *,
+        request: TransmissionRequest,
+        result: TransmissionResult,
+        submission_id: Optional[str],
+        organization_id: Optional[str],
+    ) -> Optional[FIRSSubmission]:
+        firs_response: Dict[str, Any] = {
+            "success": result.status == TransmissionStatus.DELIVERED,
+            "data": result.response_data or {},
+        }
+        if result.error_message:
+            firs_response["error"] = result.error_message
+
+        status_hint = "accepted" if firs_response["success"] else "failed"
+
+        persisted: Optional[FIRSSubmission] = None
+        async with self._session_scope() as session:
+            tenant_id = None
+            org_uuid = self._ensure_uuid(organization_id)
+            if org_uuid is not None:
+                tenant_id = str(org_uuid)
+            elif isinstance(organization_id, str):
+                tenant_id = organization_id
+
+            with tenant_context(tenant_id) if tenant_id else nullcontext():
+                persisted = await self._persist_submission(
+                    session,
+                    organization_id,
+                    request.document_data,
+                    firs_response,
+                    status_hint=status_hint,
+                    request_id=request.metadata.get("request_id"),
+                )
+
+        if submission_id and organization_id:
+            try:
+                await self._update_submission_status(
+                    submission_id,
+                    organization_id,
+                    SubmissionStatus.ACCEPTED if firs_response["success"] else SubmissionStatus.FAILED,
+                    message=result.error_message,
+                    invoice_number=request.metadata.get("invoice_number"),
+                )
+            except Exception as exc:
+                self.logger.debug("Unable to update submission status for %s: %s", submission_id, exc)
+
+        return persisted
 
     async def _persist_submission(
         self,
@@ -727,6 +1076,44 @@ class TransmissionService:
         except Exception:
             self.logger.debug("Outbound delivery enqueue skipped")
 
+        submission_batch_id = (
+            payload.get("batch_id")
+            or payload.get("batchId")
+            or (batch_submission or {}).get("batch_id")
+            or (batch_submission or {}).get("batchId")
+        )
+
+        if not firs_response.get("success"):
+            retry_config = self._extract_retry_config(payload) or self._extract_retry_config(batch_submission)
+            for index, invoice in enumerate(resolved_invoices):
+                submission_ref = persisted_ids[index] if index < len(persisted_ids) else None
+                document_id = (
+                    invoice.get("invoiceNumber")
+                    or invoice.get("invoice_number")
+                    or submission_ref
+                    or self._make_identifier("INV")
+                )
+                request = self._create_transmission_request(
+                    document_id=document_id,
+                    document_data=invoice,
+                    organization_id=organization_id,
+                    operation="submit_invoice_to_firs",
+                    metadata={
+                        "submission_id": submission_ref,
+                        "batch_id": submission_batch_id,
+                        "request_id": request_id,
+                        "retry_config": retry_config,
+                    },
+                )
+                await self._queue_transmission_job(
+                    queue_name="firs_submissions_high",
+                    submission_id=submission_ref,
+                    organization_id=organization_id,
+                    request=request,
+                    retry_config=retry_config,
+                    batch_id=submission_batch_id,
+                )
+
         return {
             "submitted_at": self._now_iso(),
             "firs_response": firs_response,
@@ -846,6 +1233,42 @@ class TransmissionService:
             await self._enqueue_outbound_delivery(organization_id, [invoice_payload], delivery)
         except Exception:
             self.logger.debug("Outbound delivery enqueue skipped")
+
+        if not firs_response.get("success"):
+            retry_config = self._extract_retry_config(payload) or self._extract_retry_config(submission_data)
+            submission_ref = str(submission.id) if submission else (
+                submission_identifier if isinstance(submission_identifier, str) else None
+            )
+            document_id = (
+                invoice_number
+                or invoice_number_primary
+                or invoice_number_fallback
+                or submission_ref
+                or self._make_identifier("INV")
+            )
+            request = self._create_transmission_request(
+                document_id=document_id,
+                document_data=invoice_payload,
+                organization_id=organization_id,
+                operation="submit_invoice_to_firs",
+                metadata={
+                    "submission_id": submission_ref,
+                    "request_id": request_id,
+                    "retry_config": retry_config,
+                    "payload": {
+                        "irn": irn_value,
+                        "invoice_number": invoice_number,
+                        "organization_id": organization_id,
+                    },
+                },
+            )
+            await self._queue_transmission_job(
+                queue_name="firs_submissions_high",
+                submission_id=submission_ref,
+                organization_id=organization_id,
+                request=request,
+                retry_config=retry_config,
+            )
 
         return {
             "submission_id": str(submission.id) if submission else self._make_identifier("SUB"),
@@ -1114,27 +1537,121 @@ class TransmissionService:
             or payload.get("invoice_id")
         )
         invoice_number = self._resolve_invoice_number(payload, fallback=submission_id)
+        organization_id = self._resolve_org_id(payload)
+        retry_config = self._extract_retry_config(payload)
+
+        submission_record: Optional[FIRSSubmission] = None
+        invoice_payload: Optional[Dict[str, Any]] = None
+
+        async with self._session_scope() as session:
+            org_uuid = self._ensure_uuid(organization_id)
+            tenant_id = str(org_uuid) if org_uuid else (
+                organization_id if isinstance(organization_id, str) else None
+            )
+            with tenant_context(tenant_id) if tenant_id else nullcontext():
+                sub_uuid = self._ensure_uuid(submission_id)
+                if sub_uuid is not None:
+                    submission_record = await firs_repo.get_submission_by_id(
+                        session,
+                        submission_id=sub_uuid,
+                        organization_id=org_uuid,
+                    )
+                if submission_record is None and invoice_number:
+                    submission_record = await self._get_submission_by_invoice(
+                        session,
+                        invoice_number=invoice_number,
+                        organization_id=org_uuid,
+                    )
+
+        if submission_record and isinstance(submission_record.invoice_data, dict):
+            invoice_payload = dict(submission_record.invoice_data)
+
+        if invoice_payload is None:
+            record = await self._fetch_invoice_record(
+                organization_id=organization_id,
+                invoice_number=invoice_number,
+                submission_id=submission_id,
+                irn=getattr(submission_record, "irn", None),
+                correlation_id=payload.get("correlation_id"),
+                si_invoice_id=payload.get("si_invoice_id"),
+            )
+            if record and isinstance(record.invoice_data, dict):
+                invoice_payload = dict(record.invoice_data)
+
+        if invoice_payload is None:
+            raise ValueError("invoice_payload_unavailable_for_retry")
+
+        prepared_invoice = build_firs_invoice(dict(invoice_payload))
+        irn_value = payload.get("irn") or (submission_record.irn if submission_record else None)
+        submission_ref = str(submission_record.id) if submission_record else (submission_id if submission_id else None)
+        operation = "transmit_firs_invoice" if irn_value else "submit_invoice_to_firs"
+
+        metadata_payload: Dict[str, Any] = {
+            k: v for k, v in {
+                "irn": irn_value,
+                "invoice_number": invoice_number,
+                "organization_id": organization_id,
+            }.items() if v
+        }
+
+        request = self._create_transmission_request(
+            document_id=invoice_number or submission_ref or self._make_identifier("INV"),
+            document_data=prepared_invoice,
+            organization_id=organization_id,
+            operation=operation,
+            metadata={
+                "submission_id": submission_ref,
+                "request_id": payload.get("request_id"),
+                "retry_config": retry_config,
+                "payload": metadata_payload if metadata_payload else None,
+            },
+        )
+
+        job_id = await self._queue_transmission_job(
+            queue_name="firs_submissions_retry",
+            submission_id=submission_ref,
+            organization_id=organization_id,
+            request=request,
+            retry_config=retry_config,
+        )
+
+        failure_result = TransmissionResult(
+            request_id=str(uuid.uuid4()),
+            document_id=request.document_id,
+            status=TransmissionStatus.FAILED,
+            transmission_id=submission_ref,
+            response_data=submission_record.firs_response if submission_record and isinstance(submission_record.firs_response, dict) else None,
+            error_message=submission_record.firs_message if submission_record and submission_record.firs_message else None,
+        )
+
+        retry_id = await self._schedule_retry(request, failure_result, retry_config)
 
         firs_response = None
-        if submission_id or invoice_number:
-            firs_response = await self._call_firs(
-                "update_firs_submission_status",
-                {
-                    "submission_id": submission_id,
-                    "invoice_number": invoice_number,
-                    "status": "processing",
-                },
-            )
+        if submission_ref or invoice_number:
+            try:
+                firs_response = await self._call_firs(
+                    "update_firs_submission_status",
+                    {
+                        "submission_id": submission_ref,
+                        "invoice_number": invoice_number,
+                        "status": "processing",
+                    },
+                )
+            except Exception as exc:
+                self.logger.debug("FIRS status sync failed for %s: %s", submission_ref or invoice_number, exc)
 
         updated = await self._update_submission_status(
-            submission_id,
-            self._resolve_org_id(payload),
+            submission_ref,
+            organization_id,
             SubmissionStatus.PROCESSING,
             invoice_number=invoice_number,
         )
+
         return {
-            "submission_id": submission_id,
+            "submission_id": submission_ref,
             "retry": True,
+            "queue_message_id": job_id,
+            "retry_id": retry_id,
             "submission": self._serialize_submission(updated) if updated else None,
             "firs_response": firs_response,
         }
@@ -1257,15 +1774,147 @@ class TransmissionService:
         return {"statistics": metrics, "generated_at": self._now_iso()}
 
     async def _handle_queue_transmission(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        operation_name = payload.get("operation") or payload.get("action") or "transmit_batch"
+        organization_id = self._resolve_org_id(payload)
+        retry_config = self._extract_retry_config(payload)
+        batch_id = payload.get("batch_id") or payload.get("batchId")
+
+        source_invoices: List[Any] = []
+        candidate_lists = [
+            payload.get("invoices"),
+            payload.get("documents"),
+            payload.get("items"),
+            payload.get("invoice_batch"),
+        ]
+        for candidate in candidate_lists:
+            if candidate:
+                source_invoices = candidate
+                break
+
+        if not source_invoices:
+            single_invoice = (
+                payload.get("invoice_data")
+                or payload.get("document")
+                or payload.get("invoice")
+            )
+            if single_invoice:
+                source_invoices = [single_invoice]
+
+        if isinstance(source_invoices, dict):
+            source_invoices = (
+                source_invoices.get("items")
+                or source_invoices.get("invoices")
+                or source_invoices.get("documents")
+                or []
+            )
+
+        normalized_invoices: List[Dict[str, Any]] = []
+        for raw in source_invoices or []:
+            normalized = self._normalize_invoice_payload(raw)
+            if normalized:
+                normalized_invoices.append(dict(normalized))
+
+        if not normalized_invoices:
+            raise ValueError("invoice_payload_unavailable_for_queueing")
+
+        job_results: List[Dict[str, Any]] = []
+        for entry in normalized_invoices:
+            prepared_invoice = build_firs_invoice(dict(entry))
+            document_id = (
+                self._resolve_invoice_number(entry)
+                or entry.get("invoiceNumber")
+                or entry.get("invoice_number")
+                or self._make_identifier("INV")
+            )
+            request = self._create_transmission_request(
+                document_id=document_id,
+                document_data=prepared_invoice,
+                organization_id=organization_id,
+                operation="submit_invoice_to_firs",
+                metadata={
+                    "batch_id": batch_id,
+                    "retry_config": retry_config,
+                    "payload": {
+                        "batch_id": batch_id,
+                        "organization_id": organization_id,
+                    },
+                },
+            )
+            job_id = await self._queue_transmission_job(
+                queue_name="firs_submissions_high",
+                submission_id=None,
+                organization_id=organization_id,
+                request=request,
+                retry_config=retry_config,
+                batch_id=batch_id,
+            )
+            job_results.append(
+                {
+                    "document_id": document_id,
+                    "queue_message_id": job_id,
+                }
+            )
+
         return {
-            "queued_operation": payload.get("operation") or payload.get("action"),
+            "queued_operation": operation_name,
             "queued_at": self._now_iso(),
             "status": "queued",
+            "jobs": job_results,
+            "batch_id": batch_id,
+            "count": len(job_results),
         }
 
     # ------------------------------------------------------------------
     # Messaging helpers
     # ------------------------------------------------------------------
+
+    async def _consume_transmission_message(self, message) -> Any:
+        payload = getattr(message, "payload", {}) or {}
+        request_data = payload.get("transmission_request")
+        if not isinstance(request_data, dict):
+            self.logger.debug("Transmission message missing request payload")
+            return False
+
+        request = self._deserialize_transmission_request(request_data)
+        submission_id = payload.get("submission_id") or request.metadata.get("submission_id")
+        organization_id = payload.get("organization_id") or request.metadata.get("organization_id")
+        retry_config = payload.get("retry_policy")
+
+        if submission_id and "submission_id" not in request.metadata:
+            request.metadata["submission_id"] = submission_id
+        if organization_id and "organization_id" not in request.metadata:
+            request.metadata["organization_id"] = organization_id
+
+        batch_id = payload.get("batch_id")
+        if batch_id:
+            request.metadata.setdefault("batch_id", batch_id)
+
+        result = await self._router_transmitter.transmit_document(request)
+
+        await self._persist_transmission_outcome(
+            request=request,
+            result=result,
+            submission_id=submission_id,
+            organization_id=organization_id,
+        )
+
+        if result.status == TransmissionStatus.DELIVERED:
+            return {
+                "status": "delivered",
+                "document_id": request.document_id,
+                "queue": message.queue_name,
+            }
+
+        retry_id = await self._schedule_retry(request, result, retry_config)
+        if retry_id:
+            return {
+                "status": "scheduled_retry",
+                "retry_id": retry_id,
+                "document_id": request.document_id,
+                "queue": message.queue_name,
+            }
+
+        return False
 
     async def _call_firs(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:

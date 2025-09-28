@@ -65,6 +65,7 @@ import type {
   ComplianceViolation,
   ComplianceDeadline,
   ComplianceRequirement,
+  ComplianceViolationRuleSummary,
   DashboardComponentProps
 } from '../../types';
 
@@ -132,6 +133,12 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
+  const violationSummary = complianceStatus?.violation_summary;
+  const totalViolations = violationSummary?.total_violations ?? complianceStatus?.recent_violations.length ?? 0;
+  const lastUpdatedLabel = complianceStatus?.metadata?.last_refreshed_at
+    ? new Date(complianceStatus.metadata.last_refreshed_at).toLocaleString()
+    : null;
+
   useEffect(() => {
     loadComplianceData();
 
@@ -164,6 +171,7 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
 
   // Mock API functions
   const fetchUnifiedComplianceStatus = async (): Promise<UnifiedComplianceStatus> => {
+    const generatedAt = new Date();
     return {
       overall_score: 91.4,
       compliance_categories: [
@@ -325,7 +333,23 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
           ],
           deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
         }
-      ]
+      ],
+      violation_summary: {
+        total_violations: 1,
+        by_severity: { warning: 1 },
+        by_category: { signature_compliance: 1 },
+        by_rule: [
+          {
+            rule_id: 'ISO_20022_FORMAT',
+            rule_name: 'ISO 20022 Message Validation',
+            severity: 'warning',
+            violation_count: 1
+          }
+        ]
+      },
+      metadata: {
+        last_refreshed_at: generatedAt
+      }
     };
   };
 
@@ -452,6 +476,9 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
       case 'high': return '#fa8c16';
       case 'medium': return '#faad14';
       case 'low': return '#52c41a';
+      case 'warning': return '#faad14';
+      case 'emergency': return '#d4380d';
+      case 'info': return '#1890ff';
       default: return '#666';
     }
   };
@@ -460,6 +487,34 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
     return FIRS_MANDATED_STANDARDS.find(standard => standard.code === code) || 
            { code, name: code, description: 'Standard compliance', icon: <FileTextOutlined />, color: '#666' };
   };
+
+  const ruleColumns = [
+    {
+      title: 'Rule',
+      dataIndex: 'rule_name',
+      key: 'rule',
+      render: (_: string, record: ComplianceViolationRuleSummary) => (
+        <div>
+          <strong>{record.rule_name || record.rule_id}</strong>
+          <br />
+          <small style={{ color: '#666' }}>{record.rule_id}</small>
+        </div>
+      )
+    },
+    {
+      title: 'Severity',
+      dataIndex: 'severity',
+      key: 'severity',
+      render: (severity: string) => (
+        <Badge color={getSeverityColor(severity)} text={severity.replace('_', ' ').toUpperCase()} />
+      )
+    },
+    {
+      title: 'Failures',
+      dataIndex: 'violation_count',
+      key: 'violation_count'
+    }
+  ];
 
   // Table columns for violations
   const violationColumns = [
@@ -608,6 +663,11 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
             <p style={{ margin: '4px 0 0 0', color: '#666' }}>
               FIRS-mandated APP service provider compliance monitoring
             </p>
+            {lastUpdatedLabel && (
+              <p style={{ margin: '4px 0 0 0', color: '#999', fontSize: '12px' }}>
+                Last updated {lastUpdatedLabel}
+              </p>
+            )}
           </Col>
           <Col>
             <Space>
@@ -668,9 +728,9 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
                 <Col xs={12} sm={6}>
                   <Statistic
                     title="Platform Issues"
-                    value={complianceStatus.recent_violations.length}
+                    value={totalViolations}
                     prefix={<ExclamationCircleOutlined />}
-                    valueStyle={{ color: complianceStatus.recent_violations.length > 0 ? '#ff4d4f' : '#52c41a' }}
+                    valueStyle={{ color: totalViolations > 0 ? '#ff4d4f' : '#52c41a' }}
                   />
                 </Col>
                 <Col xs={12} sm={6}>
@@ -793,11 +853,26 @@ export const PlatformComplianceDashboard: React.FC<UnifiedComplianceOverviewProp
               tab={
                 <span>
                   <ExclamationCircleOutlined />
-                  Violations ({complianceStatus.recent_violations.length})
+                  Violations ({totalViolations})
                 </span>
               }
               key="violations"
             >
+              {violationSummary?.by_rule?.length ? (
+                <Card
+                  size="small"
+                  title="Validation Failures by Rule"
+                  style={{ marginBottom: 16 }}
+                >
+                  <Table
+                    columns={ruleColumns}
+                    dataSource={violationSummary.by_rule}
+                    rowKey="rule_id"
+                    pagination={false}
+                    size="small"
+                  />
+                </Card>
+              ) : null}
               <Table
                 columns={violationColumns}
                 dataSource={complianceStatus.recent_violations}

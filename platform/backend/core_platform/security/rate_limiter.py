@@ -6,9 +6,10 @@ Protects against DDoS attacks, API abuse, and ensures fair usage.
 """
 
 import time
+import math
 import redis
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from enum import Enum
 from dataclasses import dataclass
 from fastapi import Request, HTTPException, status
@@ -18,6 +19,51 @@ import json
 import asyncio
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_role_key(role_value: str) -> Optional[str]:
+    """Normalize various role strings to coordinator rate-limit keys."""
+    if not role_value:
+        return None
+
+    value = role_value.lower()
+    if "system_integrator" in value or value.startswith("si"):
+        return "system_integrator"
+    if "access_point_provider" in value or value.startswith("app"):
+        return "access_point_provider"
+    if "platform_admin" in value or "administrator" in value or "admin" in value:
+        return "administrator"
+    if "hybrid" in value:
+        return "hybrid"
+    if "tenant_admin" in value:
+        return "tenant_admin"
+    if "user" == value:
+        return "user"
+    return value
+
+
+def _infer_role_key_from_request(request: Request) -> Optional[str]:
+    """Best-effort derivation of role key from routing context or path."""
+    ctx = getattr(request.state, "routing_context", None)
+    if ctx and getattr(ctx, "primary_role", None):
+        try:
+            role_value = getattr(ctx.primary_role, "value", str(ctx.primary_role))
+        except Exception:  # pragma: no cover - defensive fallback
+            role_value = str(ctx.primary_role)
+        normalized = _normalize_role_key(role_value)
+        if normalized:
+            return normalized
+
+    path = str(request.url.path)
+    if "/si/" in path:
+        return "system_integrator"
+    if "/app/" in path:
+        return "access_point_provider"
+    if "/hybrid/" in path:
+        return "hybrid"
+    if "/admin/" in path:
+        return "administrator"
+    return None
 
 
 class RateLimitType(str, Enum):
@@ -47,13 +93,16 @@ class RateLimitRule:
     window_seconds: int
     endpoint_pattern: str = "*"
     priority: int = 0
-    user_roles: list = None
+    user_roles: Optional[List[str]] = None
     ip_whitelist: list = None
     burst_allowance: int = 0  # Additional requests allowed in burst
     
     def __post_init__(self):
         if self.user_roles is None:
             self.user_roles = []
+        else:
+            # Normalize role identifiers to lowercase for matching
+            self.user_roles = [role.lower() for role in self.user_roles]
         if self.ip_whitelist is None:
             self.ip_whitelist = []
 
@@ -214,18 +263,20 @@ class ProductionRateLimiter:
             user_id = self._get_user_id(request)
             api_key = self._get_api_key(request)
             endpoint = str(request.url.path)
+            role_key = _infer_role_key_from_request(request)
             
             # Check IP whitelist
             if self._is_ip_whitelisted(client_ip):
                 return True, {"status": "whitelisted", "ip": client_ip}
             
             # Find applicable rules
-            applicable_rules = self._find_applicable_rules(endpoint, user_id)
+            applicable_rules = self._find_applicable_rules(endpoint, user_id, role_key)
             
             rate_limit_info = {
                 "ip": client_ip,
                 "user_id": user_id,
                 "endpoint": endpoint,
+                "role": role_key,
                 "rules_checked": len(applicable_rules),
                 "limits": {}
             }
@@ -337,7 +388,7 @@ class ProductionRateLimiter:
             # Fail open for individual rule errors
             return True, {"error": str(e)}
     
-    def _find_applicable_rules(self, endpoint: str, user_id: Optional[str]) -> list:
+    def _find_applicable_rules(self, endpoint: str, user_id: Optional[str], role_key: Optional[str]) -> list:
         """Find rate limiting rules applicable to the request"""
         applicable_rules = []
         
@@ -345,10 +396,8 @@ class ProductionRateLimiter:
             # Check endpoint pattern
             if self._pattern_matches(rule.endpoint_pattern, endpoint):
                 # Check user role restrictions if any
-                if rule.user_roles:
-                    # This would require user role lookup - simplified for now
-                    # In production, you'd fetch user roles from database
-                    pass
+                if rule.user_roles and role_key not in rule.user_roles:
+                    continue
                 
                 applicable_rules.append(rule)
         
@@ -525,39 +574,48 @@ async def rate_limit_middleware(request: Request, call_next):
             # Detect API version from request path/headers
             version = vc.detect_version_from_request(request)
             routing = vc.get_routing_config(version)
-            # Derive role from routing_context if available
-            role_key = None
-            ctx = getattr(request.state, 'routing_context', None)
-            if ctx and getattr(ctx, 'primary_role', None):
-                role_val = str(getattr(ctx, 'primary_role')).lower()
-                if 'system_integrator' in role_val or 'si' in role_val:
-                    role_key = 'system_integrator'
-                elif 'access_point_provider' in role_val or 'app' in role_val:
-                    role_key = 'access_point_provider'
-                elif 'admin' in role_val:
-                    role_key = 'administrator'
-            # Fallback: infer from path prefix
-            if role_key is None:
-                path = str(request.url.path)
-                if '/si/' in path:
-                    role_key = 'system_integrator'
-                elif '/app/' in path:
-                    role_key = 'access_point_provider'
+            role_key = _infer_role_key_from_request(request)
             # Apply dynamic rule if mapping present
             if role_key and role_key in routing.rate_limits:
                 per_hour = routing.rate_limits[role_key]
-                per_minute = max(1, int(per_hour / 60))
-                rule_name = f"dynamic_{version}_{role_key}_per_user"
-                # Create/update a high-priority rule for this version+role scope
-                rate_limiter.add_rule(RateLimitRule(
-                    name=rule_name,
-                    limit_type=RateLimitType.PER_USER,
-                    max_requests=per_minute,
-                    window=RateLimitWindow.MINUTE,
-                    window_seconds=60,
-                    endpoint_pattern=f"/api/{version}/*",
-                    priority=120,  # higher than defaults
-                ))
+                per_minute = max(1, math.ceil(per_hour / 60))
+
+                # Clean up legacy dynamic rule naming to avoid broad matches
+                legacy_name = f"dynamic_{version}_{role_key}_per_user"
+                if legacy_name in rate_limiter.rules:
+                    rate_limiter.remove_rule(legacy_name)
+
+                dynamic_rules = [
+                    (
+                        f"dynamic_{version}_{role_key}_per_minute",
+                        per_minute,
+                        RateLimitWindow.MINUTE,
+                        60,
+                        120
+                    ),
+                    (
+                        f"dynamic_{version}_{role_key}_per_hour",
+                        per_hour,
+                        RateLimitWindow.HOUR,
+                        3600,
+                        115
+                    )
+                ]
+
+                for rule_name, limit, window_enum, window_seconds, priority in dynamic_rules:
+                    existing_rule = rate_limiter.rules.get(rule_name)
+                    if existing_rule and existing_rule.max_requests == limit and existing_rule.window_seconds == window_seconds:
+                        continue
+                    rate_limiter.add_rule(RateLimitRule(
+                        name=rule_name,
+                        limit_type=RateLimitType.PER_USER,
+                        max_requests=limit,
+                        window=window_enum,
+                        window_seconds=window_seconds,
+                        endpoint_pattern=f"/api/{version}/*",
+                        priority=priority,
+                        user_roles=[role_key]
+                    ))
     except Exception as _e:
         # Fail open on adapter issues
         pass

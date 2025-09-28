@@ -56,7 +56,10 @@ class FIRSWebhookEndpoints:
         """
         self.message_router = message_router
         self.router = APIRouter(prefix="/webhooks/firs", tags=["FIRS Webhooks"])
-        self.webhook_secret = os.getenv("FIRS_WEBHOOK_SECRET", "yRLXTUtWIU2OlMyKOBAWEVmjIop1xJe5ULPJLYoJpyA")
+        secret = os.getenv("FIRS_WEBHOOK_SECRET")
+        if not secret:
+            raise RuntimeError("FIRS_WEBHOOK_SECRET environment variable is required")
+        self.webhook_secret = secret
         
         # Initialize webhook receiver and callback manager
         self.webhook_receiver = WebhookReceiver(self.webhook_secret)

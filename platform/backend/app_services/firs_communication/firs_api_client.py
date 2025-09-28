@@ -31,6 +31,7 @@ from urllib.parse import urljoin
 
 from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
 from .party_cache import PartyCache, TINCache
+from .certificate_provider import FIRSCertificateProvider
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +184,8 @@ class FIRSAPIClient:
         *,
         party_cache: Optional[PartyCache] = None,
         tin_cache: Optional[TINCache] = None,
+        certificate_provider: Optional[FIRSCertificateProvider] = None,
+        certificate_provider_scope: Optional[str] = None,
     ):
         self.config = config
 
@@ -196,6 +199,9 @@ class FIRSAPIClient:
         self._certificate_pool: List[str] = self._initialize_certificate_pool()
         self._current_certificate_index: int = 0
         self._last_certificate_rotation: Optional[datetime] = None
+        self._certificate_provider = certificate_provider
+        self._certificate_provider_scope = certificate_provider_scope
+        self._last_provider_certificate: Optional[str] = None
 
         # Rate limiting
         self.request_timestamps: List[datetime] = []
@@ -324,6 +330,7 @@ class FIRSAPIClient:
         timestamp = str(int(time.time()))
         request_id = f"req_{timestamp}_{uuid.uuid4().hex[:8]}"
 
+        self._ensure_certificate_from_provider()
         headers = {
             "accept": "application/json",
             "x-api-key": self.config.api_key,
@@ -340,7 +347,33 @@ class FIRSAPIClient:
             headers.update({k: v for k, v in extra_headers.items() if v is not None})
 
         return headers
-    
+
+    def _ensure_certificate_from_provider(self) -> None:
+        if not self._certificate_provider:
+            return
+        try:
+            certificate = self._certificate_provider.get_active_certificate(
+                organization_id=self._certificate_provider_scope
+            )
+        except Exception:
+            return
+
+        if not certificate:
+            return
+
+        if certificate in self._certificate_pool:
+            self._current_certificate_index = self._certificate_pool.index(certificate)
+        else:
+            self._certificate_pool.insert(0, certificate)
+            self._current_certificate_index = 0
+
+        if certificate != self.config.certificate:
+            self.config.certificate = certificate
+
+        self._last_provider_certificate = certificate
+        if not self._last_certificate_rotation:
+            self._last_certificate_rotation = datetime.utcnow()
+
     async def _check_rate_limits(self) -> bool:
         """Check if request can be made within rate limits"""
         try:
@@ -740,6 +773,7 @@ class FIRSAPIClient:
 
     def rotate_certificate(self) -> Optional[str]:
         """Force rotation to the next certificate in the pool."""
+        self._ensure_certificate_from_provider()
         if not self._certificate_pool or len(self._certificate_pool) <= 1:
             return self._select_certificate()
         self._current_certificate_index = (self._current_certificate_index + 1) % len(self._certificate_pool)
@@ -768,6 +802,19 @@ class FIRSAPIClient:
         if self._certificate_pool:
             return self._certificate_pool[self._current_certificate_index]
         return self.config.certificate if self.config.certificate else None
+
+    def set_certificate_provider(
+        self,
+        provider: Optional[FIRSCertificateProvider],
+        *,
+        scope: Optional[str] = None,
+    ) -> None:
+        """Attach or replace the certificate provider and refresh state."""
+
+        self._certificate_provider = provider
+        self._certificate_provider_scope = scope
+        self._last_provider_certificate = None
+        self._ensure_certificate_from_provider()
 
     def _initialize_certificate_pool(self) -> List[str]:
         pool: List[str] = []
@@ -813,6 +860,8 @@ def create_firs_api_client(
     *,
     party_cache_ttl_minutes: float = 30.0,
     tin_cache_ttl_minutes: float = 15.0,
+    certificate_provider: Optional[FIRSCertificateProvider] = None,
+    certificate_provider_scope: Optional[str] = None,
 ) -> FIRSAPIClient:
     """
     Factory function to create FIRS API client
@@ -825,6 +874,8 @@ def create_firs_api_client(
         api_secret: FIRS API secret (x-api-secret header)
         certificate: Base64 encoded certificate (x-certificate header)
         config_overrides: Additional configuration options
+        certificate_provider: Provider to resolve active certificates from lifecycle store
+        certificate_provider_scope: Optional identifier passed to the provider (e.g., organization)
         
     Returns:
         Configured FIRS API client
@@ -853,6 +904,8 @@ def create_firs_api_client(
         config,
         party_cache=party_cache,
         tin_cache=tin_cache,
+        certificate_provider=certificate_provider,
+        certificate_provider_scope=certificate_provider_scope,
     )
 
 
@@ -863,6 +916,9 @@ def create_production_firs_client(
     api_key: str,
     api_secret: str = "",
     certificate: str = "",
+    *,
+    certificate_provider: Optional[FIRSCertificateProvider] = None,
+    certificate_provider_scope: Optional[str] = None,
     **kwargs
 ) -> FIRSAPIClient:
     """Create production FIRS API client"""
@@ -873,6 +929,8 @@ def create_production_firs_client(
         api_key=api_key,
         api_secret=api_secret,
         certificate=certificate,
+        certificate_provider=certificate_provider,
+        certificate_provider_scope=certificate_provider_scope,
         config_overrides=kwargs
     )
 
@@ -884,6 +942,9 @@ def create_sandbox_firs_client(
     api_key: str,
     api_secret: str = "",
     certificate: str = "",
+    *,
+    certificate_provider: Optional[FIRSCertificateProvider] = None,
+    certificate_provider_scope: Optional[str] = None,
     **kwargs
 ) -> FIRSAPIClient:
     """Create sandbox FIRS API client"""
@@ -894,5 +955,7 @@ def create_sandbox_firs_client(
         api_key=api_key,
         api_secret=api_secret,
         certificate=certificate,
+        certificate_provider=certificate_provider,
+        certificate_provider_scope=certificate_provider_scope,
         config_overrides=kwargs
-    )
+)

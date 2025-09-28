@@ -8,7 +8,7 @@ import logging
 import json
 import uuid
 from typing import Dict, Any, List, Optional, Union, Tuple
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from dataclasses import dataclass
 
@@ -541,7 +541,34 @@ class DashboardGenerator:
 
     async def _get_validation_results_breakdown(self, org_id: str, start: date, end: date) -> Dict[str, Any]:
         """Get validation results breakdown."""
-        return {"passed": 1089, "failed": 158, "pending": 23}
+        generated_at = datetime.now(timezone.utc)
+        failed_by_rule = [
+            {
+                "rule_id": "FIRS_001",
+                "rule_name": "Invoice Number Format",
+                "failure_count": 64
+            },
+            {
+                "rule_id": "FIRS_002",
+                "rule_name": "TIN Validation",
+                "failure_count": 52
+            },
+            {
+                "rule_id": "FIRS_003",
+                "rule_name": "Digital Signature Required",
+                "failure_count": 42
+            }
+        ]
+
+        return {
+            "passed": 1089,
+            "failed": 158,
+            "pending": 23,
+            "failed_by_rule": failed_by_rule,
+            "metadata": {
+                "last_refreshed_at": generated_at.isoformat()
+            }
+        }
 
     async def _get_issue_tracking_data(self, org_id: str, start: date, end: date) -> Dict[str, Any]:
         """Get issue tracking data."""

@@ -34,7 +34,8 @@ async def test_compliance_endpoints_route_to_services(monkeypatch, tmp_path):
     monkeypatch.setattr(APIPermissionGuard, "check_endpoint_permission", fake_check_permission, raising=False)
 
     app = FastAPI()
-    router = create_compliance_router(HTTPRoleDetector(), APIPermissionGuard(), MessageRouter())
+    guard = APIPermissionGuard(app)
+    router = create_compliance_router(HTTPRoleDetector(), guard, MessageRouter())
     app.include_router(router, prefix="/api/v1/si")
 
     client = TestClient(app)

@@ -1,0 +1,186 @@
+{
+  "FIRSInvoice": {
+    "version": "1.0",
+    "standard": "BIS_Billing_3.0_UBL",
+    
+    "documentMetadata": {
+      "invoiceNumber": "string (required)",
+      "invoiceDate": "YYYY-MM-DD (required)",
+      "invoiceType": "enum: STANDARD|CREDIT|DEBIT (required)",
+      "currencyCode": "NGN (required)",
+      "exchangeRate": "number (optional for foreign currency)",
+      "documentStatus": "enum: DRAFT|ISSUED|VALIDATED|CANCELLED",
+      "uniqueIdentifier": "string (assigned by FIRS after validation)",
+      "issueTime": "HH:MM:SS",
+      "dueDate": "YYYY-MM-DD",
+      "taxPointDate": "YYYY-MM-DD"
+    },
+    
+    "supplierInformation": {
+      "tin": "string (required - Tax Identification Number)",
+      "cacNumber": "string (required - CAC Registration Number)",
+      "name": "string (required)",
+      "tradeName": "string (optional)",
+      "address": {
+        "streetName": "string (required)",
+        "buildingNumber": "string",
+        "cityName": "string (required)",
+        "postalZone": "string",
+        "stateCode": "string (required)",
+        "countryCode": "NG (required)"
+      },
+      "contact": {
+        "telephone": "string (required)",
+        "email": "string (required)",
+        "contactPerson": "string"
+      },
+      "bankDetails": {
+        "accountNumber": "string",
+        "bankName": "string",
+        "bankCode": "string"
+      },
+      "industryClassificationCode": "string"
+    },
+    
+    "buyerInformation": {
+      "tin": "string (required for B2B)",
+      "cacNumber": "string (required for registered businesses)",
+      "name": "string (required)",
+      "tradeName": "string (optional)",
+      "address": {
+        "streetName": "string (required)",
+        "buildingNumber": "string",
+        "cityName": "string (required)",
+        "postalZone": "string",
+        "stateCode": "string (required)",
+        "countryCode": "string (required)"
+      },
+      "contact": {
+        "telephone": "string",
+        "email": "string (required)",
+        "contactPerson": "string"
+      },
+      "customerType": "enum: B2B|B2C|GOVERNMENT|EXPORT"
+    },
+    
+    "lineItems": [
+      {
+        "lineNumber": "integer (required)",
+        "productCode": "string",
+        "productDescription": "string (required)",
+        "hscode": "string (Harmonized System Code)",
+        "quantity": "number (required)",
+        "unitOfMeasure": "string (required)",
+        "unitPrice": "number (required)",
+        "grossAmount": "number (required)",
+        "discountAmount": "number",
+        "discountRate": "number",
+        "netAmount": "number (required)",
+        "vatCategory": "enum: STANDARD|ZERO_RATED|EXEMPT",
+        "vatRate": "number (required - typically 7.5%)",
+        "vatAmount": "number (required)",
+        "totalAmount": "number (required)",
+        "otherCharges": [
+          {
+            "chargeType": "string",
+            "chargeAmount": "number",
+            "chargeDescription": "string"
+          }
+        ]
+      }
+    ],
+    
+    "taxSummary": {
+      "subtotal": "number (required)",
+      "totalDiscount": "number",
+      "totalVAT": "number (required)",
+      "withholdingTax": {
+        "rate": "number",
+        "amount": "number",
+        "type": "string"
+      },
+      "otherTaxes": [
+        {
+          "taxType": "string",
+          "taxRate": "number",
+          "taxAmount": "number",
+          "taxableAmount": "number"
+        }
+      ],
+      "totalPayable": "number (required)"
+    },
+    
+    "paymentInformation": {
+      "paymentTerms": "string",
+      "paymentMethod": "enum: CASH|TRANSFER|CHEQUE|CARD|OTHER",
+      "paymentReference": "string",
+      "prepaidAmount": "number",
+      "outstandingAmount": "number"
+    },
+    
+    "additionalDocumentReferences": {
+      "purchaseOrderNumber": "string",
+      "contractReference": "string",
+      "deliveryNoteNumber": "string",
+      "ewayBillNumber": "string",
+      "previousInvoiceNumber": "string (for credit/debit notes)"
+    },
+    
+    "deliveryInformation": {
+      "deliveryDate": "YYYY-MM-DD",
+      "deliveryAddress": {
+        "streetName": "string",
+        "cityName": "string",
+        "stateCode": "string"
+      },
+      "deliveryTerms": "string",
+      "shippingMarks": "string"
+    },
+    
+    "digitalSignature": {
+      "signatureMethod": "string",
+      "signatureValue": "string",
+      "certificateReference": "string",
+      "timestamp": "ISO 8601 datetime"
+    },
+    
+    "auditTrail": {
+      "createdBy": "string",
+      "createdDate": "ISO 8601 datetime",
+      "modifiedBy": "string",
+      "modifiedDate": "ISO 8601 datetime",
+      "validatedBy": "FIRS",
+      "validationDate": "ISO 8601 datetime"
+    }
+  },
+  
+  "transformationRules": {
+    "validation": [
+      "All mandatory fields must be present",
+      "TIN must be valid FIRS-registered number",
+      "VAT calculations must be accurate",
+      "Invoice number must be unique",
+      "Dates must be in correct format"
+    ],
+    
+    "businessRules": [
+      "B2B transactions require buyer TIN",
+      "B2C transactions require reporting but simplified buyer info",
+      "Export transactions may have zero VAT rate",
+      "Credit notes must reference original invoice",
+      "Withholding tax applies to specific transaction types"
+    ],
+    
+    "apiIntegration": {
+      "endpoint": "https://einvoice.firs.gov.ng/api/v1/invoice",
+      "method": "POST",
+      "authentication": "OAuth 2.0 / API Key",
+      "responseFormat": "JSON",
+      "requiredHeaders": {
+        "Content-Type": "application/json",
+        "X-FIRS-TIN": "Supplier TIN",
+        "X-API-Key": "Your API Key"
+      }
+    }
+  }
+}

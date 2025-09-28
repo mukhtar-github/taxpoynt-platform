@@ -25,6 +25,8 @@ Security Features:
 - Circuit breaker pattern for resilience
 """
 
+from typing import Optional
+
 # Core FIRS Communication Services
 from .firs_api_client import (
     FIRSAPIClient,
@@ -82,6 +84,7 @@ from .connection_pool import (
 )
 
 from .party_cache import PartyCache, TINCache
+from .certificate_provider import FIRSCertificateProvider
 
 __all__ = [
     # FIRS API Client
@@ -137,6 +140,9 @@ __all__ = [
     # Cache helpers
     'PartyCache',
     'TINCache',
+
+    # Certificate helpers
+    'FIRSCertificateProvider',
 ]
 
 # Version information
@@ -151,7 +157,10 @@ def create_complete_firs_client(
     client_secret: str = "",
     api_key: str = "",
     enable_connection_pooling: bool = True,
-    strict_validation: bool = False
+    strict_validation: bool = False,
+    *,
+    certificate_provider: Optional[FIRSCertificateProvider] = None,
+    certificate_provider_scope: Optional[str] = None,
 ):
     """
     Factory function to create a complete FIRS client setup
@@ -196,7 +205,12 @@ def create_complete_firs_client(
     )
     
     # Create API client
-    api_client = FIRSAPIClient(config=config, auth_handler=auth_handler)
+    api_client = FIRSAPIClient(
+        config=config,
+        auth_handler=auth_handler,
+        certificate_provider=certificate_provider,
+        certificate_provider_scope=certificate_provider_scope,
+    )
     
     return api_client, request_builder, response_parser, connection_pool
 

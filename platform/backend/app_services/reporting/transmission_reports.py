@@ -25,15 +25,31 @@ from core_platform.data_management.models.firs_submission import (
     SubmissionStatus,
 )
 
-try:
-    import matplotlib.pyplot as plt  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    plt = None  # type: ignore
+_PLOT_LIBRARIES: Optional[Tuple[Optional[Any], Optional[Any]]] = None
 
-try:
-    import seaborn as sns  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    sns = None  # type: ignore
+
+def _get_plotting_libraries() -> Tuple[Optional[Any], Optional[Any]]:
+    """Lazily import matplotlib/seaborn only when charts are needed."""
+    global _PLOT_LIBRARIES
+
+    if _PLOT_LIBRARIES is not None:
+        return _PLOT_LIBRARIES
+
+    try:
+        import matplotlib.pyplot as plt_mod  # type: ignore
+    except Exception:  # pragma: no cover - optional dependency
+        _PLOT_LIBRARIES = (None, None)
+        return _PLOT_LIBRARIES
+
+    sns_mod: Optional[Any]
+    try:
+        import seaborn as sns_import  # type: ignore
+        sns_mod = sns_import
+    except Exception:  # pragma: no cover - optional dependency
+        sns_mod = None
+
+    _PLOT_LIBRARIES = (plt_mod, sns_mod)
+    return _PLOT_LIBRARIES
 
 
 class ReportFormat(str, Enum):
@@ -648,68 +664,70 @@ class TransmissionReportGenerator:
     async def _generate_charts(self, records: List[TransmissionRecord], summary: TransmissionSummary) -> Dict[str, str]:
         """Generate charts for the report"""
         charts = {}
-        
-        if plt is None:
+
+        plt_mod, sns_mod = _get_plotting_libraries()
+
+        if plt_mod is None:
             self.logger.debug("Matplotlib not available; skipping chart generation")
             return charts
-        
+
         try:
-            if sns is not None:
-                plt.style.use('seaborn-v0_8')
-            
+            if sns_mod is not None:
+                plt_mod.style.use('seaborn-v0_8')
+
             # Status distribution chart
             if summary.status_breakdown:
-                fig, ax = plt.subplots(figsize=(10, 6))
+                fig, ax = plt_mod.subplots(figsize=(10, 6))
                 statuses = list(summary.status_breakdown.keys())
                 counts = list(summary.status_breakdown.values())
-                
-                colors = plt.cm.Set3(range(len(statuses)))
+
+                colors = plt_mod.cm.Set3(range(len(statuses)))
                 ax.pie(counts, labels=statuses, autopct='%1.1f%%', colors=colors)
                 ax.set_title('Transmission Status Distribution')
-                
+
                 # Convert to base64
                 buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+                fig.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
                 buffer.seek(0)
                 charts['status_distribution'] = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-            
+                plt_mod.close(fig)
+
             # Hourly distribution chart
             if summary.hourly_distribution:
-                fig, ax = plt.subplots(figsize=(12, 6))
+                fig, ax = plt_mod.subplots(figsize=(12, 6))
                 hours = sorted(summary.hourly_distribution.keys())
                 counts = [summary.hourly_distribution[hour] for hour in hours]
-                
+
                 ax.bar(hours, counts, color='skyblue', alpha=0.7)
                 ax.set_title('Transmissions by Hour of Day')
                 ax.set_xlabel('Hour')
                 ax.set_ylabel('Number of Transmissions')
                 ax.tick_params(axis='x', rotation=45)
-                
+
                 buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+                fig.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
                 buffer.seek(0)
                 charts['hourly_distribution'] = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-            
+                plt_mod.close(fig)
+
             # Processing time distribution
             processing_times = [r.processing_time_seconds for r in records if r.processing_time_seconds]
             if processing_times:
-                fig, ax = plt.subplots(figsize=(10, 6))
+                fig, ax = plt_mod.subplots(figsize=(10, 6))
                 ax.hist(processing_times, bins=30, color='lightgreen', alpha=0.7, edgecolor='black')
                 ax.set_title('Processing Time Distribution')
                 ax.set_xlabel('Processing Time (seconds)')
                 ax.set_ylabel('Frequency')
-                
+
                 buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+                fig.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
                 buffer.seek(0)
                 charts['processing_time_distribution'] = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-            
+                plt_mod.close(fig)
+
         except Exception as e:
             self.logger.warning(f"Error generating charts: {str(e)}")
-        
+
         return charts
     
     async def _format_report(self, 

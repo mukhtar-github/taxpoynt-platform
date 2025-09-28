@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional
 import aiohttp
 
 from core_platform.utils.firs_response import extract_firs_identifiers
+from .certificate_provider import FIRSCertificateProvider
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +33,16 @@ logger = logging.getLogger(__name__)
 class FIRSHttpClient:
     """Thin async HTTP client for FIRS APIs (header-based auth)."""
 
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        *,
+        certificate_provider: Optional[FIRSCertificateProvider] = None,
+    ):
         self.base_url = (base_url or os.getenv("FIRS_API_URL") or "").rstrip("/")
         self.api_key = os.getenv("FIRS_API_KEY", "")
         self.api_secret = os.getenv("FIRS_API_SECRET", "")
-        self.certificate_b64 = os.getenv("FIRS_ENCRYPTION_KEY", "")
+        self._certificate_provider = certificate_provider or FIRSCertificateProvider()
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def start(self):
@@ -50,15 +56,20 @@ class FIRSHttpClient:
             self._session = None
 
     def _headers(self) -> Dict[str, str]:
-        return {
+        headers = {
             "accept": "application/json",
             "x-api-key": self.api_key,
             "x-api-secret": self.api_secret,
             "x-timestamp": str(int(time.time())),
             "x-request-id": str(uuid.uuid4()),
-            "x-certificate": self.certificate_b64,
             "Content-Type": "application/json"
         }
+
+        certificate = self._certificate_provider.get_active_certificate()
+        if certificate:
+            headers["x-certificate"] = certificate
+
+        return headers
 
     async def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
