@@ -21,6 +21,8 @@ from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
 from app_services import get_app_service_registry, APPServiceRegistry
 from app_services import ReportingServiceManager
+from app_services.reporting.firs_metrics_service import FIRSMetricsService
+from api_gateway.utils.error_mapping import v1_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,7 @@ class DashboardDataEndpointsV1:
             dependencies=[Depends(self._require_app_role)]
         )
         self._fallback_reporting_callback = None
+        self.firs_metrics_service = FIRSMetricsService()
 
         # Define dashboard capabilities
         self.dashboard_capabilities = {
@@ -198,6 +201,15 @@ class DashboardDataEndpointsV1:
             methods=["POST"],
             summary="Submit FIRS batch",
             description="Submit validated batch to FIRS",
+            response_model=V1ResponseModel
+        )
+
+        self.router.add_api_route(
+            "/metrics/firs",
+            self.get_firs_metrics,
+            methods=["GET"],
+            summary="Get FIRS API metrics",
+            description="Aggregated FIRS API metrics for dashboards",
             response_model=V1ResponseModel
         )
         
@@ -409,7 +421,17 @@ class DashboardDataEndpointsV1:
         except Exception as e:
             logger.error(f"Error submitting FIRS batch in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to submit FIRS batch")
-    
+
+    async def get_firs_metrics(self, request: Request):
+        """Expose aggregated FIRS API metrics for dashboards."""
+        try:
+            await self._require_app_role(request)
+            metrics = await self.firs_metrics_service.get_metrics_snapshot()
+            return build_v1_response(metrics, "firs_metrics_snapshot")
+        except Exception as exc:
+            logger.error(f"Error fetching FIRS metrics in v1: {exc}")
+            return v1_error_response(exc, action="get_firs_metrics_snapshot")
+
     # Dashboard Metrics Endpoints
     async def get_dashboard_metrics(self, request: Request):
         """Get comprehensive dashboard metrics"""

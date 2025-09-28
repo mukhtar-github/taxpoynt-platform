@@ -62,6 +62,8 @@ from .regulatory_dashboard import (
     get_dashboard_templates
 )
 
+from .firs_metrics_service import FIRSMetricsService
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -118,7 +120,10 @@ __all__ = [
     "DashboardDataAggregator",
     "create_regulatory_dashboard",
     "create_custom_widget",
-    "get_dashboard_templates"
+    "get_dashboard_templates",
+
+    # FIRS metrics
+    "FIRSMetricsService",
 ]
 
 

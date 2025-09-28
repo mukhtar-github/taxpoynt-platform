@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query, Path
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_platform.authentication.role_manager import PlatformRole
@@ -22,6 +23,12 @@ from api_gateway.utils.error_mapping import v1_error_response
 from api_gateway.utils.pagination import normalize_pagination
 from core_platform.data_management.db_async import get_async_session
 from core_platform.idempotency.store import IdempotencyStore
+from .firs_request_models import (
+    GenerateInvoiceRequest,
+    GenerateInvoiceBatchRequest,
+    SubmitInvoiceRequest,
+    SubmitInvoiceBatchRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -165,30 +172,23 @@ class InvoiceSubmissionEndpointsV1:
         """Generate FIRS-compliant invoice"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
-            # Validate required fields
-            required_fields = ["taxpayer_id", "invoice_data"]
-            missing_fields = [field for field in required_fields if field not in body]
-            if missing_fields:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing required fields: {', '.join(missing_fields)}"
-                )
-            
+            raw_body = await request.json()
+            try:
+                payload = GenerateInvoiceRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="generate_firs_compliant_invoice")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="generate_firs_compliant_invoice",
                 payload={
-                    "generation_data": body,
+                    "generation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
             )
             
             return self._create_v1_response(result, "firs_compliant_invoice_generated")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error generating FIRS-compliant invoice in v1: {e}")
             return v1_error_response(e, action="generate_firs_compliant_invoice")
@@ -197,13 +197,17 @@ class InvoiceSubmissionEndpointsV1:
         """Generate invoice batch"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                payload = GenerateInvoiceBatchRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="generate_invoice_batch")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="generate_invoice_batch",
                 payload={
-                    "batch_generation_data": body,
+                    "batch_generation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
@@ -219,7 +223,12 @@ class InvoiceSubmissionEndpointsV1:
         """Submit invoice to FIRS"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
+            raw_body = await request.json()
+            try:
+                submission_payload = SubmitInvoiceRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="submit_invoice")
+            body = submission_payload.dict(exclude_none=True)
             # Idempotency key handling
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
             requester_id = str(context.user_id) if context and context.user_id else None
@@ -272,7 +281,12 @@ class InvoiceSubmissionEndpointsV1:
     ):
         """Submit invoice batch to FIRS"""
         try:
-            body = await request.json()
+            raw_body = await request.json()
+            try:
+                submission_payload = SubmitInvoiceBatchRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="submit_invoice_batch")
+            body = submission_payload.dict(exclude_none=True)
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
             requester_id = str(context.user_id) if context and context.user_id else None
             if idem_key:

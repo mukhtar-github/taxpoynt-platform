@@ -81,6 +81,8 @@ from .connection_pool import (
     create_firs_connection_pool
 )
 
+from .party_cache import PartyCache, TINCache
+
 __all__ = [
     # FIRS API Client
     'FIRSAPIClient',
@@ -130,7 +132,11 @@ __all__ = [
     'LoadBalancingStrategy',
     'ConnectionMetrics',
     'PoolConfig',
-    'create_firs_connection_pool'
+    'create_firs_connection_pool',
+
+    # Cache helpers
+    'PartyCache',
+    'TINCache',
 ]
 
 # Version information

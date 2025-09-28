@@ -6,8 +6,10 @@ Handles UBL, PEPPOL, ISO standards validation and regulatory compliance checking
 """
 import logging
 from typing import Dict, Any, List, Optional
+
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query, Path
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -17,6 +19,11 @@ from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
 from api_gateway.utils.error_mapping import v1_error_response
+from .firs_request_models import (
+    UBLComplianceRequest,
+    UBLBatchComplianceRequest,
+    GenericValidationPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -254,30 +261,23 @@ class ComplianceValidationEndpointsV1:
         """Validate UBL compliance"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
-            # Validate required fields
-            required_fields = ["document_data"]
-            missing_fields = [field for field in required_fields if field not in body]
-            if missing_fields:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing required fields: {', '.join(missing_fields)}"
-                )
-            
+            raw_body = await request.json()
+            try:
+                payload = UBLComplianceRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="validate_ubl_compliance")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="validate_ubl_compliance",
                 payload={
-                    "validation_data": body,
+                    "validation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
             )
             
             return self._create_v1_response(result, "ubl_compliance_validated")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error validating UBL compliance in v1: {e}")
             return v1_error_response(e, action="validate_ubl_compliance")
@@ -286,13 +286,17 @@ class ComplianceValidationEndpointsV1:
         """Validate UBL batch compliance"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                payload = UBLBatchComplianceRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="validate_ubl_batch_compliance")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="validate_ubl_batch",
                 payload={
-                    "batch_validation_data": body,
+                    "batch_validation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
@@ -308,13 +312,17 @@ class ComplianceValidationEndpointsV1:
         """Validate PEPPOL compliance"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                payload = GenericValidationPayload.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="validate_peppol_compliance")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="validate_peppol_compliance",
                 payload={
-                    "validation_data": body,
+                    "validation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
@@ -330,13 +338,17 @@ class ComplianceValidationEndpointsV1:
         """Validate ISO 20022 compliance"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                payload = GenericValidationPayload.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="validate_iso20022_compliance")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="validate_iso20022_compliance",
                 payload={
-                    "validation_data": body,
+                    "validation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
@@ -351,13 +363,17 @@ class ComplianceValidationEndpointsV1:
         """Validate ISO 27001 compliance"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                payload = GenericValidationPayload.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="validate_iso27001_compliance")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="validate_iso27001_compliance",
                 payload={
-                    "validation_data": body,
+                    "validation_data": payload.dict(exclude_none=True),
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }

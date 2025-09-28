@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from typing import Dict, Any, Tuple
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from ..api_versions.v1.si_endpoints.version_models import V1ErrorModel
@@ -84,8 +85,7 @@ def v1_error_response(exc: Exception, *, action: str = "operation_failed") -> JS
         )
     except Exception:
         pass
-    return JSONResponse(status_code=status_code, content=model.dict())
+    return JSONResponse(status_code=status_code, content=jsonable_encoder(model))
 
 
 __all__ = ["map_exception_to_v1_error", "v1_error_response"]
-

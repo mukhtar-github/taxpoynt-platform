@@ -631,6 +631,8 @@ class APPServiceRegistry:
                 "api_client": firs_api_client,
                 "http_client": firs_http_client,
                 "resource_cache": resource_cache,
+                "party_cache": getattr(firs_api_client, "party_cache", None),
+                "tin_cache": getattr(firs_api_client, "tin_cache", None),
                 "certificate_store": certificate_store,
                 "operations": firs_operations,
                 "remote_irn_enabled": FIRS_REMOTE_IRN_ENABLED,

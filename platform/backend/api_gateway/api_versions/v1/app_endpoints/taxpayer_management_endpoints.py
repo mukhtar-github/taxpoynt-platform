@@ -6,8 +6,10 @@ Handles taxpayer onboarding, lifecycle management, and FIRS grant tracking.
 """
 import logging
 from typing import Dict, Any, List, Optional
+
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query, Path
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -16,6 +18,11 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from api_gateway.utils.error_mapping import v1_error_response
+from .firs_request_models import (
+    TaxpayerCreateRequest,
+    TaxpayerUpdateRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -401,17 +408,14 @@ class TaxpayerManagementEndpointsV1:
     async def create_taxpayer(self, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Create taxpayer"""
         try:
-            body = await request.json()
-            
-            # Validate required fields
-            required_fields = ["name", "tax_id", "contact_info"]
-            missing_fields = [field for field in required_fields if field not in body]
-            if missing_fields:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing required fields: {', '.join(missing_fields)}"
-                )
-            
+            context = context or await self._require_app_role(request)
+            raw_body = await request.json()
+            try:
+                payload = TaxpayerCreateRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="create_taxpayer")
+            body = payload.dict(exclude_none=True)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="create_taxpayer",
@@ -423,11 +427,9 @@ class TaxpayerManagementEndpointsV1:
             )
             
             return self._create_v1_response(result, "taxpayer_created", status_code=201)
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error creating taxpayer in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create taxpayer")
+            return v1_error_response(e, action="create_taxpayer")
     
     async def get_taxpayer(self, taxpayer_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get taxpayer details"""
@@ -455,8 +457,14 @@ class TaxpayerManagementEndpointsV1:
     async def update_taxpayer(self, taxpayer_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
         """Update taxpayer"""
         try:
-            body = await request.json()
-            
+            context = context or await self._require_app_role(request)
+            raw_body = await request.json()
+            try:
+                payload = TaxpayerUpdateRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="update_taxpayer")
+            body = payload.dict(exclude_none=True)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="update_taxpayer",
@@ -471,7 +479,7 @@ class TaxpayerManagementEndpointsV1:
             return self._create_v1_response(result, "taxpayer_updated")
         except Exception as e:
             logger.error(f"Error updating taxpayer {taxpayer_id} in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to update taxpayer")
+            return v1_error_response(e, action="update_taxpayer")
     
     async def delete_taxpayer(self, taxpayer_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Delete taxpayer (deactivate)"""

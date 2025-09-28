@@ -7,10 +7,12 @@ Handles communication with FIRS e-invoicing infrastructure.
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
+
+from email.utils import format_datetime, parsedate_to_datetime
 from fastapi import APIRouter, Request, Response, HTTPException, Depends, status, Query, Path
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from email.utils import format_datetime, parsedate_to_datetime
+from pydantic import ValidationError
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -20,6 +22,14 @@ from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
 from api_gateway.utils.pagination import normalize_pagination
+from api_gateway.utils.error_mapping import v1_error_response
+from .firs_request_models import (
+    SubmitInvoiceRequest,
+    SubmitInvoiceBatchRequest,
+    FIRSAuthenticationRequest,
+    FIRSConnectionTestRequest,
+    GenericValidationPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -408,13 +418,17 @@ class FIRSIntegrationEndpointsV1:
         """Authenticate with FIRS"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                auth_payload = FIRSAuthenticationRequest(auth_data=raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="authenticate_with_firs")
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="authenticate_with_firs",
                 payload={
-                    "auth_data": body,
+                    "auth_data": auth_payload.auth_data,
                     "app_id": context.user_id,
                     "api_version": "v1"
                 }
@@ -423,7 +437,7 @@ class FIRSIntegrationEndpointsV1:
             return self._create_v1_response(result, "firs_authentication_completed")
         except Exception as e:
             logger.error(f"Error authenticating with FIRS in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to authenticate with FIRS")
+            return v1_error_response(e, action="authenticate_with_firs")
     
     async def refresh_firs_token(self, request: Request):
         """Refresh FIRS authentication token"""
@@ -447,21 +461,21 @@ class FIRSIntegrationEndpointsV1:
         """Test FIRS connection with provided credentials"""
         try:
             context = await self._require_app_role(request)
-            body = await request.json()
-            
-            # Validate required fields
-            if not body.get('api_key') or not body.get('api_secret'):
-                raise HTTPException(status_code=400, detail="API key and secret are required")
-            
+            raw_body = await request.json()
+            try:
+                payload = FIRSConnectionTestRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="test_firs_connection")
+
             # Test connection to FIRS
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="test_firs_connection",
                 payload={
                     "credentials": {
-                        "api_key": body.get('api_key'),
-                        "api_secret": body.get('api_secret'),
-                        "environment": body.get('environment', 'sandbox')
+                        "api_key": payload.api_key,
+                        "api_secret": payload.api_secret,
+                        "environment": payload.environment,
                     },
                     "app_id": context.user_id,
                     "api_version": "v1"
@@ -469,11 +483,9 @@ class FIRSIntegrationEndpointsV1:
             )
             
             return self._create_v1_response(result, "firs_connection_tested")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error testing FIRS connection in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to test FIRS connection")
+            return v1_error_response(e, action="test_firs_connection")
     
     async def get_firs_auth_status(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS authentication status"""
@@ -496,17 +508,13 @@ class FIRSIntegrationEndpointsV1:
     async def submit_invoice_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice to FIRS"""
         try:
-            body = await request.json()
-            
-            # Validate required fields
-            required_fields = ["invoice_data", "taxpayer_id"]
-            missing_fields = [field for field in required_fields if field not in body]
-            if missing_fields:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing required fields: {', '.join(missing_fields)}"
-                )
-            
+            raw_body = await request.json()
+            try:
+                submission_payload = SubmitInvoiceRequest.parse_obj(raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="submit_invoice_to_firs")
+            body = submission_payload.dict(exclude_none=True)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="submit_invoice_to_firs",
@@ -518,17 +526,23 @@ class FIRSIntegrationEndpointsV1:
             )
             
             return self._create_v1_response(result, "invoice_submitted_to_firs")
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error submitting invoice to FIRS in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit invoice to FIRS")
+            return v1_error_response(e, action="submit_invoice_to_firs")
     
     async def submit_invoice_batch_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Submit invoice batch to FIRS"""
         try:
-            body = await request.json()
-            
+            raw_body = await request.json()
+            try:
+                body_payload = SubmitInvoiceBatchRequest.parse_obj(raw_body)
+            except ValidationError:
+                try:
+                    body_payload = GenericValidationPayload.parse_obj(raw_body)
+                except ValidationError as exc:
+                    return v1_error_response(ValueError(str(exc)), action="submit_invoice_batch_to_firs")
+            body = body_payload.dict(exclude_none=True)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="submit_invoice_batch_to_firs",
@@ -542,7 +556,7 @@ class FIRSIntegrationEndpointsV1:
             return self._create_v1_response(result, "invoice_batch_submitted_to_firs")
         except Exception as e:
             logger.error(f"Error submitting invoice batch to FIRS in v1: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit invoice batch to FIRS")
+            return v1_error_response(e, action="submit_invoice_batch_to_firs")
     
     async def get_firs_submission_status(self, submission_id: str, request: Request):
         """Get FIRS submission status"""

@@ -30,6 +30,7 @@ import certifi
 from urllib.parse import urljoin
 
 from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
+from .party_cache import PartyCache, TINCache
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,10 @@ class FIRSAPIClient:
     def __init__(
         self,
         config: FIRSConfig,
-        auth_handler: Optional[Any] = None
+        auth_handler: Optional[Any] = None,
+        *,
+        party_cache: Optional[PartyCache] = None,
+        tin_cache: Optional[TINCache] = None,
     ):
         self.config = config
 
@@ -203,6 +207,12 @@ class FIRSAPIClient:
 
         # SSL context for TLS 1.3
         self._ssl_context: Optional[ssl.SSLContext] = None
+
+        # Cache layers for repeated lookups
+        self.party_cache = party_cache or PartyCache()
+        self.tin_cache = tin_cache or TINCache()
+        self._party_refresh_tasks: Dict[str, asyncio.Task] = {}
+        self._tin_refresh_tasks: Dict[str, asyncio.Task] = {}
     
     async def start(self) -> None:
         """Start the FIRS API client"""
@@ -259,6 +269,14 @@ class FIRSAPIClient:
             if self.session:
                 await self.session.close()
                 self.session = None
+
+            for task in list(self._party_refresh_tasks.values()):
+                task.cancel()
+            self._party_refresh_tasks.clear()
+
+            for task in list(self._tin_refresh_tasks.values()):
+                task.cancel()
+            self._tin_refresh_tasks.clear()
 
             if self.auth_handler and hasattr(self.auth_handler, "stop"):
                 try:
@@ -558,27 +576,121 @@ class FIRSAPIClient:
 
     async def create_party(self, payload: Dict[str, Any]) -> FIRSResponse:
         """Create or update a party record in FIRS."""
-        return await self.make_request(
+        response = await self.make_request(
             endpoint=FIRSEndpoint.INVOICE_PARTY,
             method="POST",
             data=payload,
         )
+        party_id = (
+            payload.get("partyId")
+            or payload.get("party_id")
+            or (response.data or {}).get("partyId")
+            if isinstance(response.data, dict)
+            else None
+        )
+        if response.success and party_id:
+            await self.party_cache.set(party_id, response)
+        elif party_id:
+            await self.party_cache.invalidate(party_id)
+        return response
 
     async def get_party(self, party_id: str) -> FIRSResponse:
-        """Fetch a party record from FIRS."""
+        """Fetch a party record from FIRS with caching and background revalidation."""
+
+        cached = await self.party_cache.get(party_id, allow_stale=True)
+        if cached:
+            is_fresh = await self.party_cache.is_fresh(party_id)
+            logger.debug("Party cache hit for %s (fresh=%s)", party_id, is_fresh)
+            if not is_fresh:
+                self._schedule_party_refresh(party_id)
+            return cached
+
+        return await self._load_party(party_id)
+
+    async def _load_party(self, party_id: str) -> FIRSResponse:
         endpoint = FIRSEndpoint.INVOICE_PARTY_DETAIL.value.format(party_id=party_id)
-        return await self.make_request(
+        response = await self.make_request(
             endpoint=endpoint,
             method="GET",
         )
+        if response.success:
+            await self.party_cache.set(party_id, response)
+        return response
+
+    def _schedule_party_refresh(self, party_id: str) -> None:
+        task = self._party_refresh_tasks.get(party_id)
+        if task and not task.done():
+            return
+
+        async def _runner():
+            try:
+                await self._load_party(party_id)
+            except Exception as exc:  # pragma: no cover - background refresh should not raise
+                logger.debug("Party cache refresh failed for %s: %s", party_id, exc)
+            finally:
+                self._party_refresh_tasks.pop(party_id, None)
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # pragma: no cover - typically shouldn't happen inside async context
+            return
+
+        self._party_refresh_tasks[party_id] = loop.create_task(_runner())
 
     async def verify_tin(self, payload: Dict[str, Any]) -> FIRSResponse:
-        """Verify a taxpayer identification number with FIRS utilities."""
-        return await self.make_request(
+        """Verify a taxpayer identification number with caching and revalidation."""
+        tin_value = payload.get("tin") or payload.get("TIN")
+        tin = str(tin_value).strip() if tin_value else None
+        branch = payload.get("branchCode") or payload.get("branch_code")
+
+        if tin:
+            cached = await self.tin_cache.get(tin, extra=branch, allow_stale=True)
+            if cached:
+                is_fresh = await self.tin_cache.is_fresh(tin, extra=branch)
+                logger.debug("TIN cache hit for %s (fresh=%s)", tin, is_fresh)
+                if not is_fresh:
+                    self._schedule_tin_refresh(tin, dict(payload), branch)
+                return cached
+
+        return await self._load_tin_verification(dict(payload), tin, branch)
+
+    async def _load_tin_verification(self, payload: Dict[str, Any], tin: Optional[str], branch: Optional[str]) -> FIRSResponse:
+        response = await self.make_request(
             endpoint=FIRSEndpoint.UTILITIES_VERIFY_TIN,
             method="POST",
             data=payload,
         )
+        if tin:
+            if response.success:
+                await self.tin_cache.set(tin, response, extra=branch)
+            else:
+                await self.tin_cache.invalidate(tin, extra=branch)
+        return response
+
+    def _tin_refresh_key(self, tin: str, branch: Optional[str]) -> str:
+        branch_component = (branch or "").strip().upper()
+        return f"{tin.strip().upper()}::{branch_component}"
+
+    def _schedule_tin_refresh(self, tin: str, payload: Dict[str, Any], branch: Optional[str]) -> None:
+        key = self._tin_refresh_key(tin, branch)
+        task = self._tin_refresh_tasks.get(key)
+        if task and not task.done():
+            return
+
+        async def _runner():
+            try:
+                await self._load_tin_verification(payload, tin, branch)
+            except Exception as exc:  # pragma: no cover - background refresh
+                logger.debug("TIN cache refresh failed for %s: %s", tin, exc)
+            finally:
+                self._tin_refresh_tasks.pop(key, None)
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # pragma: no cover
+            return
+
+        self._tin_refresh_tasks[key] = loop.create_task(_runner())
 
     async def get_resources(self, resource: str) -> FIRSResponse:
         """Fetch resource metadata (currencies, invoice types, etc.)."""
@@ -697,7 +809,10 @@ def create_firs_api_client(
     certificate: str = "",
     certificates: Optional[List[str]] = None,
     certificate_rotation_interval_seconds: int = 0,
-    config_overrides: Optional[Dict[str, Any]] = None
+    config_overrides: Optional[Dict[str, Any]] = None,
+    *,
+    party_cache_ttl_minutes: float = 30.0,
+    tin_cache_ttl_minutes: float = 15.0,
 ) -> FIRSAPIClient:
     """
     Factory function to create FIRS API client
@@ -731,7 +846,14 @@ def create_firs_api_client(
             if hasattr(config, key):
                 setattr(config, key, value)
     
-    return FIRSAPIClient(config)
+    party_cache = PartyCache(ttl_minutes=party_cache_ttl_minutes)
+    tin_cache = TINCache(ttl_minutes=tin_cache_ttl_minutes)
+
+    return FIRSAPIClient(
+        config,
+        party_cache=party_cache,
+        tin_cache=tin_cache,
+    )
 
 
 # Convenience function for creating production client
