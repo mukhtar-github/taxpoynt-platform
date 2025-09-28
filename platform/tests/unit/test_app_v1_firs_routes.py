@@ -148,6 +148,30 @@ def test_test_firs_connection_validation_error(app_client):
     assert body["error_code"] == "VALIDATION_ERROR"
 
 
+def test_submit_invoice_to_firs_idempotent_replay(app_client):
+    client, _role_detector, _permission_guard, message_router = app_client
+
+    payload = {"taxpayer_id": "TIN999", "invoice_data": {"amount": 500}}
+    headers = {"x-request-id": "fixed-request-id-123"}
+
+    first_response = client.post(
+        "/api/v1/app/firs/invoices/submit", json=payload, headers=headers
+    )
+    assert first_response.status_code == 200
+    assert first_response.headers.get("X-Idempotency-Key") == "fixed-request-id-123"
+
+    second_response = client.post(
+        "/api/v1/app/firs/invoices/submit", json=payload, headers=headers
+    )
+
+    assert second_response.status_code == 200
+    assert second_response.headers.get("X-Idempotent-Replay") == "true"
+    assert second_response.headers.get("X-Idempotency-Key") == "fixed-request-id-123"
+    assert second_response.json() == first_response.json()
+
+    # Ensure message router was invoked only once despite two HTTP requests
+    assert len(message_router.calls) == 1
+
 def test_get_firs_auth_status_routes(app_client):
     client, _role_detector, _permission_guard, message_router = app_client
 

@@ -7,6 +7,7 @@ Handles communication with FIRS e-invoicing infrastructure.
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
+from dataclasses import dataclass
 
 from email.utils import format_datetime, parsedate_to_datetime
 from fastapi import APIRouter, Request, Response, HTTPException, Depends, status, Query, Path
@@ -31,7 +32,21 @@ from .firs_request_models import (
     GenericValidationPayload,
 )
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core_platform.data_management.db_async import get_async_session
+from core_platform.idempotency.store import IdempotencyStore
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _IdempotencyContext:
+    key: str
+    requester_id: Optional[str]
+    stored_response: Optional[Dict[str, Any]] = None
+    stored_status_code: int = 200
+    should_finalize: bool = False
 
 
 class FIRSIntegrationEndpointsV1:
@@ -103,6 +118,64 @@ class FIRSIntegrationEndpointsV1:
         if not context.has_role(PlatformRole.PLATFORM_ADMIN):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator privileges required")
         return context
+
+    async def _start_idempotent_operation(
+        self,
+        *,
+        request: Request,
+        context: HTTPRoutingContext,
+        db: AsyncSession,
+        payload: Any,
+    ) -> Optional[_IdempotencyContext]:
+        """Begin idempotency tracking using the incoming x-request-id header."""
+
+        request_id_header = request.headers.get("x-request-id")
+        if not request_id_header:
+            return None
+
+        requester_id = str(context.user_id) if context and context.user_id else None
+        request_hash = IdempotencyStore.compute_request_hash(payload or {})
+
+        exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+            db,
+            requester_id=requester_id,
+            key=request_id_header,
+            method=request.method,
+            endpoint=str(request.url.path),
+            request_hash=request_hash,
+        )
+
+        if conflict:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="x-request-id already used with a different request payload",
+            )
+
+        return _IdempotencyContext(
+            key=request_id_header,
+            requester_id=requester_id,
+            stored_response=stored,
+            stored_status_code=stored_code or 200,
+            should_finalize=stored is None,
+        )
+
+    async def _finalize_idempotent_operation(
+        self,
+        ctx: Optional[_IdempotencyContext],
+        db: AsyncSession,
+        response: Dict[str, Any],
+        status_code: int = 200,
+    ) -> None:
+        if not ctx or not ctx.key or not ctx.should_finalize:
+            return
+
+        await IdempotencyStore.finalize_success(
+            db,
+            requester_id=ctx.requester_id,
+            key=ctx.key,
+            response=response,
+            status_code=status_code,
+        )
 
     def _setup_routes(self):
         """Setup FIRS integration routes"""
@@ -505,7 +578,12 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get FIRS auth status")
     
     # Invoice Submission Endpoints
-    async def submit_invoice_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+    async def submit_invoice_to_firs(
+        self,
+        request: Request,
+        context: HTTPRoutingContext = Depends(_require_app_role),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Submit invoice to FIRS"""
         try:
             raw_body = await request.json()
@@ -515,22 +593,57 @@ class FIRSIntegrationEndpointsV1:
                 return v1_error_response(ValueError(str(exc)), action="submit_invoice_to_firs")
             body = submission_payload.dict(exclude_none=True)
 
+            idem_ctx = await self._start_idempotent_operation(
+                request=request,
+                context=context,
+                db=db,
+                payload=body,
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                headers = {
+                    "X-Idempotent-Replay": "true",
+                    "X-Idempotency-Key": idem_ctx.key,
+                }
+                return JSONResponse(
+                    status_code=idem_ctx.stored_status_code,
+                    content=idem_ctx.stored_response,
+                    headers=headers,
+                )
+
+            request_id_value = request.headers.get("x-request-id") or getattr(request.state, "request_id", None)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="submit_invoice_to_firs",
                 payload={
                     "submission_data": body,
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": request_id_value,
                 }
             )
-            
-            return self._create_v1_response(result, "invoice_submitted_to_firs")
+
+            response_model = self._create_v1_response(result, "invoice_submitted_to_firs")
+            json_content = jsonable_encoder(response_model)
+
+            await self._finalize_idempotent_operation(idem_ctx, db, json_content)
+
+            headers = {}
+            if idem_ctx:
+                headers["X-Idempotency-Key"] = idem_ctx.key
+
+            return JSONResponse(status_code=200, content=json_content, headers=headers)
         except Exception as e:
             logger.error(f"Error submitting invoice to FIRS in v1: {e}")
             return v1_error_response(e, action="submit_invoice_to_firs")
     
-    async def submit_invoice_batch_to_firs(self, request: Request, context: HTTPRoutingContext = Depends(_require_app_role)):
+    async def submit_invoice_batch_to_firs(
+        self,
+        request: Request,
+        context: HTTPRoutingContext = Depends(_require_app_role),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Submit invoice batch to FIRS"""
         try:
             raw_body = await request.json()
@@ -543,17 +656,47 @@ class FIRSIntegrationEndpointsV1:
                     return v1_error_response(ValueError(str(exc)), action="submit_invoice_batch_to_firs")
             body = body_payload.dict(exclude_none=True)
 
+            idem_ctx = await self._start_idempotent_operation(
+                request=request,
+                context=context,
+                db=db,
+                payload=body,
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                headers = {
+                    "X-Idempotent-Replay": "true",
+                    "X-Idempotency-Key": idem_ctx.key,
+                }
+                return JSONResponse(
+                    status_code=idem_ctx.stored_status_code,
+                    content=idem_ctx.stored_response,
+                    headers=headers,
+                )
+
+            request_id_value = request.headers.get("x-request-id") or getattr(request.state, "request_id", None)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="submit_invoice_batch_to_firs",
                 payload={
                     "batch_data": body,
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": request_id_value,
                 }
             )
-            
-            return self._create_v1_response(result, "invoice_batch_submitted_to_firs")
+
+            response_model = self._create_v1_response(result, "invoice_batch_submitted_to_firs")
+            json_content = jsonable_encoder(response_model)
+
+            await self._finalize_idempotent_operation(idem_ctx, db, json_content)
+
+            headers = {}
+            if idem_ctx:
+                headers["X-Idempotency-Key"] = idem_ctx.key
+
+            return JSONResponse(status_code=200, content=json_content, headers=headers)
         except Exception as e:
             logger.error(f"Error submitting invoice batch to FIRS in v1: {e}")
             return v1_error_response(e, action="submit_invoice_batch_to_firs")
@@ -577,7 +720,13 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error getting FIRS submission status {submission_id} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get FIRS submission status")
 
-    async def transmit_firs_invoice(self, irn: str, request: Request):
+    async def transmit_firs_invoice(
+        self,
+        irn: str,
+        request: Request,
+        context: HTTPRoutingContext = Depends(_require_app_role),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Transmit invoice by IRN (mirrors FIRS MBS transmit endpoint)."""
         try:
             # Optional payload passthrough for future flags
@@ -587,7 +736,26 @@ class FIRSIntegrationEndpointsV1:
             except Exception:
                 body = {}
 
-            context = await self._require_app_role(request)
+            idem_ctx = await self._start_idempotent_operation(
+                request=request,
+                context=context,
+                db=db,
+                payload={"irn": irn, "options": body},
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                headers = {
+                    "X-Idempotent-Replay": "true",
+                    "X-Idempotency-Key": idem_ctx.key,
+                }
+                return JSONResponse(
+                    status_code=idem_ctx.stored_status_code,
+                    content=idem_ctx.stored_response,
+                    headers=headers,
+                )
+
+            request_id_value = request.headers.get("x-request-id") or getattr(request.state, "request_id", None)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="transmit_firs_invoice",
@@ -595,16 +763,32 @@ class FIRSIntegrationEndpointsV1:
                     "irn": irn,
                     "options": body or {},
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": request_id_value,
                 }
             )
 
-            return self._create_v1_response(result, "firs_invoice_transmitted")
+            response_model = self._create_v1_response(result, "firs_invoice_transmitted")
+            json_content = jsonable_encoder(response_model)
+
+            await self._finalize_idempotent_operation(idem_ctx, db, json_content)
+
+            headers = {}
+            if idem_ctx:
+                headers["X-Idempotency-Key"] = idem_ctx.key
+
+            return JSONResponse(status_code=200, content=json_content, headers=headers)
         except Exception as e:
             logger.error(f"Error transmitting FIRS invoice {irn} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to transmit FIRS invoice")
 
-    async def confirm_firs_receipt(self, irn: str, request: Request):
+    async def confirm_firs_receipt(
+        self,
+        irn: str,
+        request: Request,
+        context: HTTPRoutingContext = Depends(_require_app_role),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Confirm receipt for transmitted invoice (mirror PATCH transmit)."""
         try:
             body = {}
@@ -613,7 +797,26 @@ class FIRSIntegrationEndpointsV1:
             except Exception:
                 body = {}
 
-            context = await self._require_app_role(request)
+            idem_ctx = await self._start_idempotent_operation(
+                request=request,
+                context=context,
+                db=db,
+                payload={"irn": irn, "options": body},
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                headers = {
+                    "X-Idempotent-Replay": "true",
+                    "X-Idempotency-Key": idem_ctx.key,
+                }
+                return JSONResponse(
+                    status_code=idem_ctx.stored_status_code,
+                    content=idem_ctx.stored_response,
+                    headers=headers,
+                )
+
+            request_id_value = request.headers.get("x-request-id") or getattr(request.state, "request_id", None)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="confirm_firs_receipt",
@@ -621,11 +824,21 @@ class FIRSIntegrationEndpointsV1:
                     "irn": irn,
                     "options": body or {},
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": request_id_value,
                 }
             )
 
-            return self._create_v1_response(result, "firs_receipt_confirmed")
+            response_model = self._create_v1_response(result, "firs_receipt_confirmed")
+            json_content = jsonable_encoder(response_model)
+
+            await self._finalize_idempotent_operation(idem_ctx, db, json_content)
+
+            headers = {}
+            if idem_ctx:
+                headers["X-Idempotency-Key"] = idem_ctx.key
+
+            return JSONResponse(status_code=200, content=json_content, headers=headers)
         except Exception as e:
             logger.error(f"Error confirming receipt for FIRS invoice {irn} in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to confirm FIRS invoice receipt")
@@ -995,10 +1208,14 @@ class FIRSIntegrationEndpointsV1:
             raise HTTPException(status_code=500, detail="Failed to get FIRS reporting dashboard")
     
     # FIRS Invoice Update Endpoints (Required for FIRS Certification)
-    async def update_firs_invoice(self, request: Request):
+    async def update_firs_invoice(
+        self,
+        request: Request,
+        context: HTTPRoutingContext = Depends(_require_app_role),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Update FIRS invoice"""
         try:
-            context = await self._require_app_role(request)
             body = await request.json()
             
             # Validate required fields for invoice update
@@ -1009,18 +1226,48 @@ class FIRSIntegrationEndpointsV1:
                     status_code=400,
                     detail=f"Missing required fields: {', '.join(missing_fields)}"
                 )
-            
+
+            idem_ctx = await self._start_idempotent_operation(
+                request=request,
+                context=context,
+                db=db,
+                payload=body,
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                headers = {
+                    "X-Idempotent-Replay": "true",
+                    "X-Idempotency-Key": idem_ctx.key,
+                }
+                return JSONResponse(
+                    status_code=idem_ctx.stored_status_code,
+                    content=idem_ctx.stored_response,
+                    headers=headers,
+                )
+
+            request_id_value = request.headers.get("x-request-id") or getattr(request.state, "request_id", None)
+
             result = await self.message_router.route_message(
                 service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                 operation="update_firs_invoice",
                 payload={
                     "invoice_update": body,
                     "app_id": context.user_id,
-                    "api_version": "v1"
+                    "api_version": "v1",
+                    "request_id": request_id_value,
                 }
             )
-            
-            return self._create_v1_response(result, "firs_invoice_updated")
+
+            response_model = self._create_v1_response(result, "firs_invoice_updated")
+            json_content = jsonable_encoder(response_model)
+
+            await self._finalize_idempotent_operation(idem_ctx, db, json_content)
+
+            headers = {}
+            if idem_ctx:
+                headers["X-Idempotency-Key"] = idem_ctx.key
+
+            return JSONResponse(status_code=200, content=json_content, headers=headers)
         except HTTPException:
             raise
         except Exception as e:

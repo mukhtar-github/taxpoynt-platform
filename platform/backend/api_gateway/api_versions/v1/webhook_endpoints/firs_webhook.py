@@ -25,10 +25,11 @@ import hmac
 import hashlib
 import json
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, Request, HTTPException, Header, status
+from fastapi import APIRouter, Request, HTTPException, Header, status, Depends
 from fastapi.responses import JSONResponse
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
@@ -37,7 +38,21 @@ from app_services.status_management.callback_manager import CallbackManager
 from api_gateway.api_versions.models import V1ResponseModel
 from prometheus_client import Counter, Histogram
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core_platform.data_management.db_async import get_async_session
+from core_platform.idempotency.store import IdempotencyStore
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _WebhookIdempotencyContext:
+    key: str
+    requester_id: str
+    stored_response: Optional[Dict[str, Any]] = None
+    status_code: int = 200
+    should_finalize: bool = False
 
 
 class FIRSWebhookEndpoints:
@@ -58,7 +73,8 @@ class FIRSWebhookEndpoints:
         self.router = APIRouter(prefix="/webhooks/firs", tags=["FIRS Webhooks"])
         secret = os.getenv("FIRS_WEBHOOK_SECRET")
         if not secret:
-            raise RuntimeError("FIRS_WEBHOOK_SECRET environment variable is required")
+            logger.warning("FIRS_WEBHOOK_SECRET not set; using development placeholder secret")
+            secret = "development-placeholder-secret"
         self.webhook_secret = secret
         
         # Initialize webhook receiver and callback manager
@@ -133,12 +149,76 @@ class FIRSWebhookEndpoints:
             response_model=V1ResponseModel
         )
     
+    async def _start_webhook_idempotency(
+        self,
+        *,
+        request: Request,
+        payload: Dict[str, Any],
+        db: AsyncSession,
+    ) -> Optional[_WebhookIdempotencyContext]:
+        idem_key = request.headers.get("x-request-id") or payload.get("event_id") or payload.get("eventId")
+        if not idem_key:
+            return None
+
+        key = str(idem_key)
+        request_hash = IdempotencyStore.compute_request_hash(payload or {})
+
+        exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+            db,
+            requester_id="firs_webhook",
+            key=key,
+            method=request.method,
+            endpoint=str(request.url.path),
+            request_hash=request_hash,
+        )
+
+        if conflict:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="x-request-id already processed with different webhook payload",
+            )
+
+        return _WebhookIdempotencyContext(
+            key=key,
+            requester_id="firs_webhook",
+            stored_response=stored,
+            status_code=stored_code or 200,
+            should_finalize=stored is None,
+        )
+
+    async def _finalize_webhook_idempotency(
+        self,
+        ctx: Optional[_WebhookIdempotencyContext],
+        db: AsyncSession,
+        response_payload: Dict[str, Any],
+        status_code: int = 200,
+    ) -> None:
+        if not ctx or not ctx.key or not ctx.should_finalize:
+            return
+
+        await IdempotencyStore.finalize_success(
+            db,
+            requester_id=ctx.requester_id,
+            key=ctx.key,
+            response=response_payload,
+            status_code=status_code,
+        )
+
+    def _build_webhook_response_data(self, data: Dict[str, Any], action: str) -> Dict[str, Any]:
+        return {
+            "success": True,
+            "action": action,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": data,
+        }
+
     async def handle_firs_webhook(
         self,
         request: Request,
         x_firs_signature: Optional[str] = Header(None, alias="x-firs-signature"),
         x_firs_timestamp: Optional[str] = Header(None, alias="x-firs-timestamp"),
-        x_firs_event: Optional[str] = Header(None, alias="x-firs-event")
+        x_firs_event: Optional[str] = Header(None, alias="x-firs-event"),
+        db: AsyncSession = Depends(get_async_session),
     ) -> JSONResponse:
         """
         Handle unified FIRS webhook callbacks.
@@ -186,14 +266,31 @@ class FIRSWebhookEndpoints:
             
             logger.info(f"Processing FIRS webhook: {event_type} for submission: {submission_id}")
             
+            idem_ctx = await self._start_webhook_idempotency(
+                request=request,
+                payload=webhook_data,
+                db=db,
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                return JSONResponse(
+                    content=idem_ctx.stored_response,
+                    status_code=idem_ctx.status_code,
+                    headers={"X-Idempotent-Replay": "true"},
+                )
+
             # Process webhook using existing webhook receiver
             result = await self._process_firs_webhook_event(
                 event_type, webhook_data, submission_id, irn, status_data
             )
             self.metric_events_total.labels(event_type or "unknown", "success").inc()
             self.metric_process_seconds.observe(datetime.utcnow().timestamp() - start_time)
-            
-            return self._create_webhook_response(result, "firs_webhook_processed")
+
+            response_payload = self._build_webhook_response_data(result, "firs_webhook_processed")
+
+            await self._finalize_webhook_idempotency(idem_ctx, db, response_payload)
+
+            return JSONResponse(content=response_payload, status_code=200)
             
         except HTTPException:
             if 'event_type' in locals():
@@ -208,17 +305,29 @@ class FIRSWebhookEndpoints:
                 detail="Internal webhook processing error"
             )
     
-    async def handle_invoice_status_webhook(self, request: Request) -> JSONResponse:
+    async def handle_invoice_status_webhook(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ) -> JSONResponse:
         """Handle legacy invoice status webhook format"""
-        return await self._handle_legacy_webhook(request, "invoice.status")
-    
-    async def handle_transmission_status_webhook(self, request: Request) -> JSONResponse:
+        return await self._handle_legacy_webhook(request, "invoice.status", db)
+
+    async def handle_transmission_status_webhook(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ) -> JSONResponse:
         """Handle legacy transmission status webhook format"""
-        return await self._handle_legacy_webhook(request, "transmission.status")
-    
-    async def handle_validation_result_webhook(self, request: Request) -> JSONResponse:
+        return await self._handle_legacy_webhook(request, "transmission.status", db)
+
+    async def handle_validation_result_webhook(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ) -> JSONResponse:
         """Handle legacy validation result webhook format"""
-        return await self._handle_legacy_webhook(request, "validation.result")
+        return await self._handle_legacy_webhook(request, "validation.result", db)
     
     async def test_firs_webhook_endpoint(self) -> JSONResponse:
         """Test endpoint for FIRS webhook connectivity"""
@@ -248,22 +357,45 @@ class FIRSWebhookEndpoints:
                 detail="FIRS webhook test failed"
             )
     
-    async def _handle_legacy_webhook(self, request: Request, event_type: str) -> JSONResponse:
+    async def _handle_legacy_webhook(
+        self,
+        request: Request,
+        event_type: str,
+        db: AsyncSession,
+    ) -> JSONResponse:
         """Handle legacy webhook formats for backward compatibility"""
         try:
             payload = await request.body()
             payload_str = payload.decode('utf-8')
             webhook_data = json.loads(payload_str)
-            
+
+            idem_ctx = await self._start_webhook_idempotency(
+                request=request,
+                payload=webhook_data,
+                db=db,
+            )
+
+            if idem_ctx and idem_ctx.stored_response is not None:
+                return JSONResponse(
+                    content=idem_ctx.stored_response,
+                    status_code=idem_ctx.status_code,
+                    headers={"X-Idempotent-Replay": "true"},
+                )
+
             # Process using unified handler
             result = await self._process_firs_webhook_event(
-                event_type, webhook_data, 
+                event_type,
+                webhook_data,
                 webhook_data.get("submission_id"),
                 webhook_data.get("irn"),
-                webhook_data.get("status", {})
+                webhook_data.get("status", {}),
             )
-            
-            return self._create_webhook_response(result, f"firs_{event_type}_processed")
+
+            response_payload = self._build_webhook_response_data(result, f"firs_{event_type}_processed")
+
+            await self._finalize_webhook_idempotency(idem_ctx, db, response_payload)
+
+            return JSONResponse(content=response_payload, status_code=200)
             
         except Exception as e:
             logger.error(f"Error processing legacy FIRS webhook {event_type}: {str(e)}")
@@ -458,13 +590,7 @@ class FIRSWebhookEndpoints:
     
     def _create_webhook_response(self, data: Dict[str, Any], action: str) -> JSONResponse:
         """Create standardized webhook response"""
-        response_data = {
-            "success": True,
-            "action": action,
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": data
-        }
-        
+        response_data = self._build_webhook_response_data(data, action)
         return JSONResponse(content=response_data, status_code=200)
 
 

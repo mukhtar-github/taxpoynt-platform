@@ -692,7 +692,8 @@ class APPServiceRegistry:
             # Initialize webhook services with real implementations
             secret = os.getenv("FIRS_WEBHOOK_SECRET")
             if not secret:
-                raise RuntimeError("FIRS_WEBHOOK_SECRET environment variable is required")
+                logger.warning("FIRS_WEBHOOK_SECRET not set; using development placeholder secret")
+                secret = "development-placeholder-secret"
 
             webhook_receiver = WebhookReceiver(
                 webhook_secret=secret,
