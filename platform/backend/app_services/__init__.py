@@ -62,6 +62,7 @@ from .firs_communication.firs_api_client import (
     FIRSEndpoint,
     create_firs_api_client,
 )
+from .firs_communication.certificate_provider import FIRSCertificateProvider
 from .firs_communication.firs_payload_mapper import build_firs_invoice
 from .validation.firs_validator import FIRSValidator
 from .validation.submission_validator import (
@@ -284,7 +285,22 @@ class APPServiceRegistry:
             try:
                 from core_platform.messaging.queue_manager import get_queue_manager
                 qm = get_queue_manager()
-                await qm.initialize()
+                init_timeout = 5.0 if os.getenv("PYTEST_CURRENT_TEST") else None
+                if not getattr(qm, "is_initialized", False):
+                    try:
+                        if init_timeout:
+                            await asyncio.wait_for(qm.initialize(), timeout=init_timeout)
+                        else:
+                            await qm.initialize()
+                    except asyncio.TimeoutError:
+                        logger.warning("Queue manager initialization timed out; skipping AP outbound consumer bootstrap")
+                    except Exception as init_error:
+                        logger.warning(f"Queue manager initialization failed: {init_error}")
+
+                if not getattr(qm, "is_initialized", False):
+                    logger.debug("Queue manager unavailable; skipping AP outbound consumer registration")
+                    return
+
                 # Optional: override retry policy from environment for ap_outbound
                 try:
                     delays_env = os.getenv("OUTBOUND_RETRY_DELAYS")
@@ -558,8 +574,21 @@ class APPServiceRegistry:
     async def _register_firs_services(self):
         """Register FIRS communication services"""
         try:
+            # Lazy import to avoid SI module import at app import time
+            try:
+                from si_services.certificate_management.certificate_store import CertificateStore as _CertificateStore  # type: ignore
+                certificate_store = _CertificateStore()
+            except Exception:
+                certificate_store = None
+                logger.debug("Certificate store unavailable; continuing without it")
+
+            certificate_provider = FIRSCertificateProvider(certificate_store=certificate_store)
+
             # Initialize FIRS services with real implementations
-            firs_api_client = await self._create_firs_api_client()
+            firs_api_client = await self._create_firs_api_client(
+                certificate_provider=certificate_provider
+            )
+
             # Thin HTTP client + resource cache for current FIRS header-based flows
             try:
                 from .firs_communication.firs_http_client import FIRSHttpClient
@@ -575,19 +604,11 @@ class APPServiceRegistry:
                     os.environ.setdefault("FIRS_API_KEY", os.getenv("FIRS_SANDBOX_API_KEY", ""))
                     os.environ.setdefault("FIRS_API_SECRET", os.getenv("FIRS_SANDBOX_API_SECRET", ""))
 
-                firs_http_client = FIRSHttpClient()
+                firs_http_client = FIRSHttpClient(certificate_provider=certificate_provider)
                 resource_cache = FIRSResourceCache(firs_http_client)
             except Exception:
                 firs_http_client = None
                 resource_cache = None
-
-            # Lazy import to avoid SI module import at app import time
-            try:
-                from si_services.certificate_management.certificate_store import CertificateStore as _CertificateStore  # type: ignore
-                certificate_store = _CertificateStore()
-            except Exception:
-                certificate_store = None
-                logger.debug("Certificate store unavailable; continuing without it")
 
             firs_operations = [
                 "process_firs_webhook",
@@ -634,6 +655,7 @@ class APPServiceRegistry:
                 "party_cache": getattr(firs_api_client, "party_cache", None),
                 "tin_cache": getattr(firs_api_client, "tin_cache", None),
                 "certificate_store": certificate_store,
+                "certificate_provider": certificate_provider,
                 "operations": firs_operations,
                 "remote_irn_enabled": FIRS_REMOTE_IRN_ENABLED,
             }
@@ -668,8 +690,12 @@ class APPServiceRegistry:
         """Register webhook processing services"""
         try:
             # Initialize webhook services with real implementations
+            secret = os.getenv("FIRS_WEBHOOK_SECRET")
+            if not secret:
+                raise RuntimeError("FIRS_WEBHOOK_SECRET environment variable is required")
+
             webhook_receiver = WebhookReceiver(
-                webhook_secret=os.getenv("FIRS_WEBHOOK_SECRET", "yRLXTUtWIU2OlMyKOBAWEVmjIop1xJe5ULPJLYoJpyA"),
+                webhook_secret=secret,
                 max_payload_size=1024 * 1024  # 1MB
             )
             event_processor = EventProcessor()
@@ -996,256 +1022,355 @@ class APPServiceRegistry:
     async def _register_certificate_services(self):
         """Register APP-side certificate management service"""
         try:
-            from core_platform.data_management.db_async import get_async_session
-            from si_services.certificate_management.certificate_service import CertificateService
+            from si_services.certificate_management.certificate_store import (
+                CertificateStore,
+                CertificateStatus,
+                StoredCertificate,
+            )
+            from si_services.certificate_management.certificate_generator import CertificateGenerator
+            from si_services.certificate_management.lifecycle_manager import LifecycleManager
+            from si_services.certificate_management.key_manager import KeyManager
+
+            certificate_store = CertificateStore()
+            certificate_generator = CertificateGenerator()
+            key_manager = KeyManager()
+            lifecycle_manager = LifecycleManager(
+                certificate_store=certificate_store,
+                certificate_generator=certificate_generator,
+                key_manager=key_manager,
+            )
+
+            def _resolve_org_id(payload: Dict[str, Any]) -> str:
+                certificate_data = payload.get("certificate_data") or {}
+                org_id = payload.get("organization_id") or certificate_data.get("organization_id")
+                if not org_id:
+                    raise ValueError("organization_id is required")
+                return str(org_id)
+
+            def _resolve_certificate_id(payload: Dict[str, Any]) -> str:
+                certificate_id = payload.get("certificate_id")
+                if not certificate_id:
+                    raise ValueError("certificate_id is required")
+                return str(certificate_id)
+
+            def _as_dict(cert: StoredCertificate) -> Dict[str, Any]:
+                return _stored_to_dict(cert)
+
+            async def _create_certificate(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_data = payload.get("certificate_data") or {}
+                organization_id = _resolve_org_id(payload)
+                certificate_type = (
+                    certificate_data.get("certificate_type")
+                    or payload.get("certificate_type")
+                    or "signing"
+                )
+                metadata = certificate_data.get("metadata") or {}
+                pem_content = (
+                    certificate_data.get("certificate_pem")
+                    or certificate_data.get("pem")
+                    or certificate_data.get("data")
+                )
+                private_key_pem = (
+                    certificate_data.get("private_key")
+                    or certificate_data.get("private_key_pem")
+                )
+                generated_key_path = None
+
+                if not pem_content:
+                    subject_info = certificate_data.get("subject_info") or {
+                        "common_name": certificate_data.get("common_name") or f"Org {organization_id} Certificate",
+                    }
+                    validity_days = int(certificate_data.get("validity_days", 365) or 365)
+                    cert_pem, key_pem = certificate_generator.generate_self_signed_certificate(
+                        subject_info=subject_info,
+                        validity_days=validity_days,
+                    )
+                    pem_content = cert_pem.decode("utf-8")
+                    private_key_pem = key_pem.decode("utf-8")
+                    metadata.setdefault("generated", True)
+                    metadata.setdefault("subject_info", subject_info)
+
+                certificate_id = certificate_store.store_certificate(
+                    certificate_pem=pem_content.encode("utf-8") if isinstance(pem_content, str) else pem_content,
+                    organization_id=organization_id,
+                    certificate_type=certificate_type,
+                    metadata=metadata,
+                )
+
+                if private_key_pem:
+                    key_path = key_manager.store_key(
+                        private_key_pem.encode("utf-8") if isinstance(private_key_pem, str) else private_key_pem,
+                        key_name=f"{certificate_id}_private",
+                        key_type="private",
+                    )
+                    generated_key_path = key_path
+
+                cert_info = certificate_store.get_certificate_info(certificate_id)
+                response_data = {
+                    "certificate_id": certificate_id,
+                    "certificate_pem": pem_content,
+                    "organization_id": organization_id,
+                    "metadata": metadata,
+                }
+                if generated_key_path:
+                    response_data["private_key_path"] = generated_key_path
+                if cert_info:
+                    response_data["certificate"] = _as_dict(cert_info)
+
+                return {
+                    "operation": "create_certificate",
+                    "success": True,
+                    "data": response_data,
+                }
+
+            async def _list_certificates(payload: Dict[str, Any]) -> Dict[str, Any]:
+                filters = payload.get("filters") or {}
+                organization_id = filters.get("organization_id") or payload.get("organization_id")
+                status_filter = filters.get("status")
+                certificate_type = filters.get("certificate_type") or filters.get("type")
+
+                certificates = certificate_store.list_certificates(organization_id=organization_id)
+
+                def _matches(cert: StoredCertificate) -> bool:
+                    if certificate_type and cert.certificate_type != certificate_type:
+                        return False
+                    if status_filter and cert.status.value != status_filter:
+                        return False
+                    return True
+
+                records = [_as_dict(cert) for cert in certificates if _matches(cert)]
+                status_counts = Counter(item.get("status", "unknown") for item in records)
+                return {
+                    "operation": "list_certificates",
+                    "success": True,
+                    "data": {
+                        "certificates": records,
+                        "count": len(records),
+                        "statusCounts": dict(status_counts),
+                        "filters": filters,
+                    },
+                }
+
+            async def _get_certificate(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_id = _resolve_certificate_id(payload)
+                info = certificate_store.get_certificate_info(certificate_id)
+                certificate_pem = certificate_store.retrieve_certificate(certificate_id)
+
+                if not info:
+                    return {
+                        "operation": "get_certificate",
+                        "success": False,
+                        "error": "certificate_not_found",
+                    }
+
+                data = _as_dict(info)
+                if certificate_pem:
+                    data["certificate_pem"] = certificate_pem.decode("utf-8")
+                return {
+                    "operation": "get_certificate",
+                    "success": True,
+                    "data": data,
+                }
+
+            async def _update_certificate(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_id = _resolve_certificate_id(payload)
+                updates = payload.get("updates") or {}
+                metadata_updates = updates.get("metadata") or {}
+                status_update = updates.get("status")
+
+                status_enum = None
+                if status_update:
+                    try:
+                        status_enum = CertificateStatus(status_update)
+                    except ValueError as exc:
+                        raise ValueError(f"Unsupported status '{status_update}'") from exc
+
+                success = certificate_store.update_certificate_status(
+                    certificate_id=certificate_id,
+                    status=status_enum or CertificateStatus.ACTIVE,
+                    metadata=metadata_updates if metadata_updates else None,
+                )
+
+                return {
+                    "operation": "update_certificate",
+                    "success": success,
+                    "data": {
+                        "certificate_id": certificate_id,
+                        "status": status_enum.value if status_enum else None,
+                        "metadata": metadata_updates,
+                    },
+                }
+
+            async def _delete_certificate(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_id = _resolve_certificate_id(payload)
+                success = certificate_store.delete_certificate(certificate_id)
+                return {
+                    "operation": "delete_certificate",
+                    "success": success,
+                    "data": {"certificate_id": certificate_id},
+                }
+
+            async def _renew_certificate(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_id = _resolve_certificate_id(payload)
+                validity_days = payload.get("validity_days")
+                reuse_key = payload.get("reuse_key", True)
+
+                new_cert_id, success = lifecycle_manager.renew_certificate(
+                    certificate_id=certificate_id,
+                    validity_days=validity_days,
+                    reuse_key=reuse_key,
+                )
+
+                return {
+                    "operation": "renew_certificate",
+                    "success": success,
+                    "data": {
+                        "certificate_id": certificate_id,
+                        "renewed_certificate_id": new_cert_id,
+                    },
+                }
+
+            async def _get_renewal_status(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_id = _resolve_certificate_id(payload)
+                info = certificate_store.get_certificate_info(certificate_id)
+                if not info:
+                    return {
+                        "operation": "get_renewal_status",
+                        "success": False,
+                        "error": "certificate_not_found",
+                    }
+                data = _as_dict(info)
+                renewal_threshold = lifecycle_manager.default_renewal_days
+                days_until_expiry = data.get("days_until_expiry")
+                status = "valid"
+                if days_until_expiry is None:
+                    status = "unknown"
+                elif days_until_expiry < 0:
+                    status = "expired"
+                elif days_until_expiry <= renewal_threshold:
+                    status = "needs_renewal"
+                data.update(
+                    {
+                        "status": status,
+                        "renewal_threshold_days": renewal_threshold,
+                        "needs_renewal": status == "needs_renewal",
+                    }
+                )
+                return {
+                    "operation": "get_renewal_status",
+                    "success": True,
+                    "data": data,
+                }
+
+            async def _list_expiring(payload: Dict[str, Any]) -> Dict[str, Any]:
+                days_ahead = int(payload.get("days_ahead", 30) or 30)
+                organization_id = payload.get("organization_id")
+                now = datetime.now(timezone.utc)
+                expiring: List[Dict[str, Any]] = []
+                for cert in certificate_store.list_certificates(organization_id=organization_id):
+                    info = _as_dict(cert)
+                    not_after = info.get("not_after")
+                    if not not_after:
+                        continue
+                    try:
+                        expires_at = datetime.fromisoformat(str(not_after))
+                    except Exception:
+                        continue
+                    delta_days = (expires_at - now).days
+                    if 0 <= delta_days <= days_ahead:
+                        info["days_until_expiry"] = delta_days
+                        expiring.append(info)
+
+                return {
+                    "operation": "list_expiring_certificates",
+                    "success": True,
+                    "data": {
+                        "days_ahead": days_ahead,
+                        "count": len(expiring),
+                        "items": expiring,
+                    },
+                }
+
+            async def _validate_certificate(payload: Dict[str, Any]) -> Dict[str, Any]:
+                certificate_data = payload.get("certificate_data")
+                if not certificate_data:
+                    raise ValueError("certificate_data is required")
+                if isinstance(certificate_data, dict):
+                    certificate_data = (
+                        certificate_data.get("certificate_pem")
+                        or certificate_data.get("pem")
+                        or certificate_data.get("data")
+                    )
+                if not certificate_data:
+                    raise ValueError("certificate PEM content is required")
+
+                info = certificate_generator.extract_certificate_info(
+                    certificate_data.encode("utf-8") if isinstance(certificate_data, str) else certificate_data
+                )
+
+                return {
+                    "operation": "validate_certificate",
+                    "success": True,
+                    "data": {
+                        "is_valid": True,
+                        "certificate_info": info,
+                    },
+                }
+
+            async def _get_certificate_overview(payload: Dict[str, Any]) -> Dict[str, Any]:
+                organization_id = payload.get("organization_id")
+                days_ahead = int(payload.get("days_ahead", 30) or 30)
+                certificates = [_as_dict(cert) for cert in certificate_store.list_certificates(organization_id=organization_id)]
+                expiring = [cert for cert in certificates if (cert.get("days_until_expiry") is not None and cert["days_until_expiry"] <= days_ahead)]
+                lifecycle_categories = lifecycle_manager.check_certificate_expiration(organization_id=organization_id)
+                overview = build_certificate_overview_payload(
+                    certificates=certificates,
+                    expiring=expiring,
+                    lifecycle_categories=lifecycle_categories,
+                    organization_id=organization_id,
+                    days_ahead=days_ahead,
+                )
+                return {
+                    "operation": "get_certificate_overview",
+                    "success": True,
+                    "data": overview,
+                }
+
+            operation_handlers: Dict[str, Any] = {
+                "create_certificate": _create_certificate,
+                "list_certificates": _list_certificates,
+                "get_certificate": _get_certificate,
+                "update_certificate": _update_certificate,
+                "delete_certificate": _delete_certificate,
+                "renew_certificate": _renew_certificate,
+                "get_renewal_status": _get_renewal_status,
+                "list_expiring_certificates": _list_expiring,
+                "validate_certificate": _validate_certificate,
+                "get_certificate_overview": _get_certificate_overview,
+            }
 
             async def certificate_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+                handler = operation_handlers.get(operation)
+                if not handler:
+                    return {
+                        "operation": operation,
+                        "success": False,
+                        "error": "unsupported_operation",
+                    }
                 try:
-                    async for db in get_async_session():
-                        service = CertificateService(db=db)
-                        certificate_store = service.certificate_store
-                        lifecycle_manager = service.lifecycle_manager
-
-                        organization_id = payload.get("organization_id")
-                        filters = payload.get("filters") or {}
-
-                        if operation == "create_certificate":
-                            cd = payload.get("certificate_data") or {}
-                            org_id = (
-                                cd.get("organization_id") if isinstance(cd, dict) else None
-                            ) or organization_id
-
-                            if not org_id:
-                                raise ValueError("organization_id is required to create certificate")
-
-                            cert_type = (
-                                cd.get("certificate_type") if isinstance(cd, dict) else None
-                            ) or payload.get("certificate_type", "signing")
-
-                            if isinstance(cd, dict) and cd.get("subject_info"):
-                                validity_days = int(cd.get("validity_days", 365))
-                                cert_id, cert_pem = await service.generate_certificate(
-                                    subject_info=cd["subject_info"],
-                                    organization_id=org_id,
-                                    validity_days=validity_days,
-                                    certificate_type=cert_type,
-                                )
-                                return {
-                                    "operation": operation,
-                                    "success": True,
-                                    "data": {
-                                        "certificate_id": cert_id,
-                                        "certificate_pem": cert_pem,
-                                    },
-                                }
-
-                            pem = None
-                            meta = None
-                            if isinstance(cd, dict):
-                                pem = cd.get("certificate_pem") or cd.get("pem") or cd.get("data")
-                                meta = cd.get("metadata")
-                            elif isinstance(cd, str):
-                                pem = cd
-
-                            if not pem:
-                                raise ValueError("certificate_data must include certificate PEM content")
-
-                            cert_id = await service.store_certificate(
-                                pem,
-                                organization_id=org_id,
-                                certificate_type=cert_type,
-                                metadata=meta,
-                            )
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": {"certificate_id": cert_id},
-                            }
-
-                        if operation == "list_certificates":
-                            status_filter = filters.get("status")
-                            cert_type = filters.get("certificate_type") or filters.get("type")
-                            org_id = filters.get("organization_id") or organization_id
-                            certificates = service.list_certificates(
-                                organization_id=org_id,
-                                certificate_type=cert_type,
-                                status=status_filter,
-                            )
-                            enriched = [_serialize_certificate_record(item) for item in certificates]
-                            status_counts = Counter(item.get("status", "unknown") for item in enriched)
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": {
-                                    "certificates": enriched,
-                                    "count": len(enriched),
-                                    "statusCounts": dict(status_counts),
-                                },
-                            }
-
-                        if operation == "get_certificate_overview":
-                            org_id = organization_id or filters.get("organization_id")
-                            certificates = service.list_certificates(organization_id=org_id)
-                            days_ahead = int(payload.get("days_ahead", 30))
-                            expiring = service.check_expiring_certificates(days_ahead)
-                            lifecycle_categories = lifecycle_manager.check_certificate_expiration(org_id)
-                            overview = build_certificate_overview_payload(
-                                certificates,
-                                expiring,
-                                lifecycle_categories,
-                                organization_id=org_id,
-                                days_ahead=days_ahead,
-                            )
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": overview,
-                            }
-
-                        if operation == "get_certificate":
-                            certificate_id = payload.get("certificate_id")
-                            info = (
-                                certificate_store.get_certificate_info(certificate_id)
-                                if certificate_store and certificate_id
-                                else None
-                            )
-                            pem = (
-                                service.retrieve_certificate(certificate_id)
-                                if certificate_id
-                                else None
-                            )
-                            if not info and not pem:
-                                return {
-                                    "operation": operation,
-                                    "success": False,
-                                    "error": "not_found",
-                                }
-                            info_payload = (
-                                _serialize_stored_certificate(info)
-                                if info
-                                else None
-                            )
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": {
-                                    "certificate_id": certificate_id,
-                                    "certificate": info_payload,
-                                    "certificate_pem": pem,
-                                },
-                            }
-
-                        if operation == "update_certificate":
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": {"status": "no_op"},
-                            }
-
-                        if operation == "delete_certificate":
-                            certificate_id = payload.get("certificate_id")
-                            ok = await service.revoke_certificate(
-                                certificate_id,
-                                reason=payload.get("reason", "revoked_by_app"),
-                            )
-                            return {
-                                "operation": operation,
-                                "success": ok,
-                                "data": {"certificate_id": certificate_id},
-                            }
-
-                        if operation == "renew_certificate":
-                            certificate_id = payload.get("certificate_id")
-                            validity_days = int(payload.get("validity_days", 365))
-                            new_id, ok = service.renew_certificate(
-                                certificate_id,
-                                validity_days,
-                            )
-                            return {
-                                "operation": operation,
-                                "success": ok,
-                                "data": {
-                                    "new_certificate_id": new_id,
-                                    "previous_certificate_id": certificate_id,
-                                },
-                            }
-
-                        if operation == "get_renewal_status":
-                            certificate_id = payload.get("certificate_id")
-                            info = (
-                                certificate_store.get_certificate_info(certificate_id)
-                                if certificate_id
-                                else None
-                            )
-                            if not info:
-                                return {
-                                    "operation": operation,
-                                    "success": False,
-                                    "error": "not_found",
-                                }
-                            info_payload = _serialize_stored_certificate(info)
-                            days_until_expiry = info_payload.get("days_until_expiry")
-                            renewal_threshold = lifecycle_manager.default_renewal_days
-                            status = "valid"
-                            if days_until_expiry is None:
-                                status = "unknown"
-                            elif days_until_expiry < 0:
-                                status = "expired"
-                            elif days_until_expiry <= renewal_threshold:
-                                status = "needs_renewal"
-                            renewal_window_start = None
-                            try:
-                                expiry = datetime.fromisoformat(str(info_payload.get("not_after")))
-                                renewal_window_start = (
-                                    expiry - timedelta(days=renewal_threshold)
-                                ).isoformat()
-                            except Exception:
-                                pass
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": {
-                                    "certificate_id": certificate_id,
-                                    "status": status,
-                                    "days_until_expiry": days_until_expiry,
-                                    "renewal_threshold_days": renewal_threshold,
-                                    "renewal_window_start": renewal_window_start,
-                                    "certificate": info_payload,
-                                },
-                            }
-
-                        if operation == "list_expiring_certificates":
-                            days = int(payload.get("days_ahead", 30))
-                            expiring = service.check_expiring_certificates(days)
-                            expiring_enriched = [
-                                _serialize_certificate_record(item) for item in expiring
-                            ]
-                            return {
-                                "operation": operation,
-                                "success": True,
-                                "data": {
-                                    "days_ahead": days,
-                                    "count": len(expiring_enriched),
-                                    "items": expiring_enriched,
-                                },
-                            }
-
-                        if operation == "validate_certificate":
-                            cd = payload.get("certificate_data")
-                            result = service.validate_certificate(cd)
-                            return {
-                                "operation": operation,
-                                "success": result.get("is_valid", False),
-                                "data": result,
-                            }
-
-                        return {
-                            "operation": operation,
-                            "success": False,
-                            "error": "unsupported_operation",
-                        }
-                except Exception as e:
-                    return {"operation": operation, "success": False, "error": str(e)}
+                    return await handler(payload or {})
+                except Exception as exc:
+                    logger.error(
+                        "Certificate service operation '%s' failed: %s",
+                        operation,
+                        exc,
+                        exc_info=True,
+                    )
+                    return {
+                        "operation": operation,
+                        "success": False,
+                        "error": str(exc),
+                    }
 
             endpoint_id = await self.message_router.register_service(
                 service_name="certificate_management",
@@ -1255,18 +1380,7 @@ class APPServiceRegistry:
                 tags=["certificate", "pki", "security"],
                 metadata={
                     "service_type": "certificate_management",
-                    "operations": [
-                        "create_certificate",
-                        "get_certificate",
-                        "update_certificate",
-                        "delete_certificate",
-                        "renew_certificate",
-                        "get_renewal_status",
-                        "list_expiring_certificates",
-                        "validate_certificate",
-                        "list_certificates",
-                        "get_certificate_overview",
-                    ],
+                    "operations": list(operation_handlers.keys()),
                 },
             )
 
@@ -1274,6 +1388,7 @@ class APPServiceRegistry:
             logger.info(f"APP certificate management service registered: {endpoint_id}")
         except Exception as e:
             logger.error(f"Failed to register APP certificate services: {str(e)}")
+
     
     async def _register_authentication_services(self):
         """Register authentication and seals services"""
@@ -1523,7 +1638,7 @@ class APPServiceRegistry:
         
         return app_onboarding_callback
     
-    async def _create_firs_api_client(self):
+    async def _create_firs_api_client(self, *, certificate_provider: Optional[FIRSCertificateProvider] = None):
         """Create FIRS API client with proper configuration"""
         try:
             from .firs_communication.firs_api_client import (
@@ -1549,8 +1664,9 @@ class APPServiceRegistry:
                 api_key=api_key,
                 api_secret=api_secret,
                 certificate=certificate,
+                certificate_provider=certificate_provider,
             )
-            
+
             return client
             
         except Exception as e:
@@ -4025,6 +4141,21 @@ class APPServiceRegistry:
             finally:
                 await client.stop()
 
+        async def _call_optional(resource: Any, method_name: str) -> Optional[Any]:
+            """Invoke optional sync/async helpers on caching/http collaborators."""
+            if not resource:
+                return None
+            method = getattr(resource, method_name, None)
+            if not callable(method):
+                return None
+            try:
+                result = method()
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
+            except Exception:
+                return None
+
         async def firs_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 # Utilities
@@ -4032,6 +4163,7 @@ class APPServiceRegistry:
                 resource_cache = firs_service.get("resource_cache")
                 # Avoid runtime import dependency on SI modules for type annotation
                 certificate_store: Optional[Any] = firs_service.get("certificate_store")
+                certificate_provider: Optional[FIRSCertificateProvider] = firs_service.get("certificate_provider")
 
                 async def _fetch_transmissions(tin: Optional[str] = None) -> Dict[str, Any]:
                     if not http_client:
@@ -4344,10 +4476,10 @@ class APPServiceRegistry:
                         "retrieved_at": _utc_now(),
                         "resource_keys": sorted(normalized.keys()) if isinstance(normalized, dict) else [],
                     }
-                    combined_etag = resource_cache.get_combined_etag()
+                    combined_etag = await _call_optional(resource_cache, "get_combined_etag")
                     if combined_etag:
                         metadata["etag"] = combined_etag
-                    last_modified_ts = resource_cache.get_last_modified()
+                    last_modified_ts = await _call_optional(resource_cache, "get_last_modified")
                     if last_modified_ts:
                         metadata["last_modified"] = _format_last_modified(last_modified_ts)
                     return {
@@ -4721,6 +4853,11 @@ class APPServiceRegistry:
                     }
                     if success:
                         data["new_certificate_id"] = new_cert_id
+                        if certificate_provider:
+                            certificate_provider.refresh(organization_id=payload.get("organization_id"))
+                        api_client = firs_service.get("api_client")
+                        if api_client:
+                            api_client.set_certificate_provider(certificate_provider)
                     else:
                         data["error"] = "renewal_failed"
                     return {"operation": operation, "success": success, "data": data}
