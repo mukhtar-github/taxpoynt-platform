@@ -201,7 +201,8 @@ class SIAPPCorrelationService:
         firs_response_id: Optional[str],
         firs_status: str,
         response_data: Optional[Dict] = None,
-        identifiers: Optional[Dict[str, Any]] = None
+        identifiers: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Update correlation with FIRS response.
@@ -221,7 +222,17 @@ class SIAPPCorrelationService:
                 logger.warning(f"Correlation not found for IRN {irn}")
                 return False
             
-            correlation.set_firs_response(firs_response_id, firs_status, response_data)
+            correlation.set_firs_response(firs_response_id, firs_status, response_data, metadata)
+
+            if metadata:
+                submission_meta = correlation.submission_metadata or {}
+                timeline = submission_meta.get("timeline")
+                if isinstance(timeline, list):
+                    timeline = timeline + [metadata]
+                else:
+                    timeline = [metadata]
+                submission_meta["timeline"] = timeline
+                correlation.submission_metadata = submission_meta
 
             submission = await self._get_firs_submission(irn, correlation)
             if submission:

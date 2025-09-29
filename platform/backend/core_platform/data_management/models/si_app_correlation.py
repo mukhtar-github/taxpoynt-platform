@@ -8,9 +8,12 @@ This enables status synchronization between SI and APP roles.
 import uuid
 import enum
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from sqlalchemy import Column, String, ForeignKey, Boolean, Text, JSON, Enum, DateTime, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
+
 from .base import BaseModel
 
 class CorrelationStatus(enum.Enum):
@@ -129,18 +132,32 @@ class SIAPPCorrelation(BaseModel):
         self.app_submitted_at = datetime.utcnow()
         self.update_status(CorrelationStatus.APP_SUBMITTED, metadata)
     
-    def set_firs_response(self, firs_response_id: str, firs_status: str, response_data: dict = None):
+    def set_firs_response(
+        self,
+        firs_response_id: str,
+        firs_status: str,
+        response_data: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
         """Set FIRS response information."""
         self.firs_response_id = firs_response_id
         self.firs_status = firs_status
         self.firs_response_at = datetime.utcnow()
         self.firs_response_data = response_data
-        
+
         # Update status based on FIRS response
-        if firs_status.lower() in ['accepted', 'success', 'approved']:
-            self.update_status(CorrelationStatus.FIRS_ACCEPTED, {'firs_status': firs_status})
-        elif firs_status.lower() in ['rejected', 'failed', 'error']:
-            self.update_status(CorrelationStatus.FIRS_REJECTED, {'firs_status': firs_status})
+        status_metadata: Dict[str, Any] = {'firs_status': firs_status}
+        if metadata:
+            status_metadata.update(metadata)
+
+        lowered_status = firs_status.lower() if isinstance(firs_status, str) else str(firs_status).lower()
+
+        if lowered_status in ['accepted', 'success', 'approved']:
+            self.update_status(CorrelationStatus.FIRS_ACCEPTED, status_metadata)
+        elif lowered_status in ['rejected', 'failed', 'error']:
+            self.update_status(CorrelationStatus.FIRS_REJECTED, status_metadata)
+        else:
+            self.update_status(self.current_status, status_metadata)
     
     def set_failed(self, error_details: dict = None):
         """Mark correlation as failed."""

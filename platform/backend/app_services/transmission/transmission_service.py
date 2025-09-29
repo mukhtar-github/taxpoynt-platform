@@ -39,6 +39,10 @@ from core_platform.messaging.queue_manager import (
     QueueStrategy,
     QueuedMessage,
 )
+from core_platform.utils.firs_response import (
+    extract_firs_identifiers,
+    merge_identifiers_into_payload,
+)
 
 from app_services.firs_communication.firs_payload_mapper import build_firs_invoice
 from app_services.transmission.retry_handler import RetryHandler, RetryPolicy, RetryStrategy
@@ -149,6 +153,7 @@ class TransmissionService:
         )
         self._digital_certificate_service = DigitalCertificateService()
         self._signing_certificate_cache: Dict[str, Optional[str]] = {}
+        self._correlation_sla_target_ms = self._resolve_correlation_sla_target_ms()
 
     async def handle(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         handlers = {
@@ -460,6 +465,124 @@ class TransmissionService:
 
     def _now_iso(self) -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    def _resolve_correlation_sla_target_ms(self) -> Optional[int]:
+        for raw_value, multiplier in (
+            (os.getenv("APP_CORRELATION_SLA_MS"), 1.0),
+            (os.getenv("APP_CORRELATION_SLA_MINUTES"), 60_000.0),
+        ):
+            if raw_value is None:
+                continue
+            try:
+                candidate = float(raw_value) * multiplier
+            except (TypeError, ValueError):
+                continue
+            if candidate <= 0:
+                return None
+            return int(candidate)
+
+        default_raw = os.getenv("APP_CORRELATION_SLA_DEFAULT_MS")
+        if default_raw is not None:
+            try:
+                default_value = float(default_raw)
+            except (TypeError, ValueError):
+                return None
+            if default_value <= 0:
+                return None
+            return int(default_value)
+
+        return 900_000
+
+    def _build_correlation_metadata(
+        self,
+        *,
+        stage: str,
+        pipeline_started_at: datetime,
+        previous_stage_at: datetime,
+        submission_id: Optional[str],
+        correlation_id: Optional[str],
+        organization_id: Optional[str],
+        si_invoice_id: Optional[str],
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], datetime]:
+        now = datetime.now(timezone.utc)
+        metadata: Dict[str, Any] = {
+            "stage": stage,
+            "timestamp": now.isoformat(),
+            "source": "app_transmission",
+            "pipeline_started_at": pipeline_started_at.isoformat(),
+        }
+        if submission_id:
+            metadata["submission_id"] = submission_id
+        if correlation_id:
+            metadata["correlation_id"] = correlation_id
+        if organization_id:
+            metadata["organization_id"] = organization_id
+        if si_invoice_id:
+            metadata["si_invoice_id"] = si_invoice_id
+
+        elapsed_ms = max(0, int((now - pipeline_started_at).total_seconds() * 1000))
+        stage_elapsed_ms = max(0, int((now - previous_stage_at).total_seconds() * 1000))
+        metadata["timings"] = {
+            "elapsed_ms": elapsed_ms,
+            "stage_elapsed_ms": stage_elapsed_ms,
+        }
+
+        sla_target_ms = self._correlation_sla_target_ms
+        if sla_target_ms is not None:
+            metadata["sla"] = {
+                "target_ms": sla_target_ms,
+                "elapsed_ms": elapsed_ms,
+                "breached": elapsed_ms > sla_target_ms,
+            }
+
+        if extra:
+            metadata.update(extra)
+
+        return metadata, now
+
+    async def _emit_correlation_event(
+        self,
+        operation: str,
+        *,
+        irn: Optional[str],
+        app_submission_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        firs_response_id: Optional[str] = None,
+        firs_status: Optional[str] = None,
+        response_data: Optional[Dict[str, Any]] = None,
+        identifiers: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if not irn or not self.message_router:
+            return
+
+        payload: Dict[str, Any] = {"irn": irn}
+        if app_submission_id:
+            payload["app_submission_id"] = app_submission_id
+        if metadata is not None:
+            payload["metadata"] = metadata
+        if firs_response_id:
+            payload["firs_response_id"] = firs_response_id
+        if firs_status:
+            payload["firs_status"] = firs_status
+        if response_data is not None:
+            payload["response_data"] = response_data
+        if identifiers:
+            payload["identifiers"] = identifiers
+
+        try:
+            await self.message_router.route_message(
+                service_role=ServiceRole.HYBRID,
+                operation=operation,
+                payload=payload,
+            )
+        except Exception as exc:  # pragma: no cover - correlation telemetry is best-effort
+            self.logger.debug(
+                "Correlation event %s skipped for IRN %s: %s",
+                operation,
+                irn,
+                exc,
+            )
 
     def _iso(self, dt: Optional[datetime]) -> Optional[str]:
         if not dt:
@@ -1516,6 +1639,13 @@ class TransmissionService:
         raw_submission = payload.get("submission_data")
         submission_data = raw_submission if isinstance(raw_submission, dict) else {}
 
+        pipeline_started_at = datetime.now(timezone.utc)
+        last_stage_at = pipeline_started_at
+        event_index = 0
+
+        correlation_id_ref = payload.get("correlation_id") or submission_data.get("correlation_id")
+        si_invoice_ref = payload.get("si_invoice_id") or submission_data.get("si_invoice_id")
+
         invoice_payload = self._normalize_invoice_payload(payload.get("invoice_data"))
         organization_id = self._resolve_org_id(payload) or self._resolve_org_id(submission_data)
         invoice_number_primary = self._resolve_invoice_number(payload)
@@ -1524,8 +1654,11 @@ class TransmissionService:
             payload.get("submission_id")
             or payload.get("transmission_id")
             or submission_data.get("submission_id")
+            or submission_data.get("transmission_id")
         )
         irn_candidate = payload.get("irn") or submission_data.get("irn")
+
+        request_id = payload.get("request_id") or submission_data.get("request_id")
 
         record = None
         if not self._looks_like_invoice_payload(invoice_payload):
@@ -1553,7 +1686,39 @@ class TransmissionService:
             invoice_payload = dict(invoice_payload)
             invoice_payload.setdefault("irn", irn_value)
 
-        request_id = payload.get("request_id")
+        correlation_submission_ref = (
+            submission_identifier
+            or request_id
+            or invoice_number
+            or invoice_number_primary
+            or invoice_number_fallback
+            or irn_value
+        )
+
+        if irn_value:
+            received_metadata_extra = {
+                "invoice_number": invoice_number,
+                "pipeline_event_index": event_index,
+                "request_id": request_id,
+            }
+            received_metadata, last_stage_at = self._build_correlation_metadata(
+                stage="APP_RECEIVED",
+                pipeline_started_at=pipeline_started_at,
+                previous_stage_at=last_stage_at,
+                submission_id=correlation_submission_ref,
+                correlation_id=correlation_id_ref,
+                organization_id=organization_id,
+                si_invoice_id=si_invoice_ref,
+                extra=received_metadata_extra,
+            )
+            await self._emit_correlation_event(
+                "update_app_received",
+                irn=irn_value,
+                app_submission_id=correlation_submission_ref,
+                metadata=received_metadata,
+            )
+            event_index += 1
+
         options = None
         if isinstance(payload.get("options"), dict):
             options = dict(payload["options"])
@@ -1576,7 +1741,62 @@ class TransmissionService:
         if irn_value:
             firs_payload["irn"] = irn_value
 
+        if irn_value:
+            submitting_extra = {
+                "invoice_number": invoice_number,
+                "pipeline_event_index": event_index,
+                "request_id": request_id,
+                "options_applied": bool(options),
+            }
+            submitting_metadata, last_stage_at = self._build_correlation_metadata(
+                stage="APP_SUBMITTING",
+                pipeline_started_at=pipeline_started_at,
+                previous_stage_at=last_stage_at,
+                submission_id=correlation_submission_ref,
+                correlation_id=correlation_id_ref,
+                organization_id=organization_id,
+                si_invoice_id=si_invoice_ref,
+                extra=submitting_extra,
+            )
+            await self._emit_correlation_event(
+                "update_app_submitting",
+                irn=irn_value,
+                metadata=submitting_metadata,
+            )
+            event_index += 1
+
         firs_response = await self._call_firs("submit_invoice_to_firs", firs_payload)
+        firs_response_data = (
+            firs_response.get("data") if isinstance(firs_response, dict) else {}
+        )
+        firs_response_payload = (
+            dict(firs_response_data) if isinstance(firs_response_data, dict) else {}
+        )
+        firs_status = (
+            (firs_response.get("status") if isinstance(firs_response, dict) else None)
+            or firs_response_payload.get("status")
+            or firs_response_payload.get("documentStatus")
+            or firs_response_payload.get("document_status")
+            or "submitted"
+        )
+        firs_response_id = (
+            firs_response_payload.get("submission_id")
+            or firs_response_payload.get("submissionId")
+            or firs_response_payload.get("id")
+        )
+        firs_identifiers = (
+            firs_response.get("identifiers") if isinstance(firs_response, dict) else None
+        )
+        if not firs_identifiers and isinstance(firs_response_payload, dict):
+            firs_identifiers = extract_firs_identifiers(firs_response_payload) or None
+        if firs_identifiers:
+            firs_response_payload = merge_identifiers_into_payload(
+                dict(firs_response_payload),
+                firs_identifiers,
+            )
+            if isinstance(firs_response, dict):
+                firs_response = dict(firs_response)
+                firs_response["identifiers"] = firs_identifiers
 
         submission = None
         async with self._session_scope() as session:
@@ -1590,6 +1810,81 @@ class TransmissionService:
                     request_id=request_id,
                 )
 
+        submission_ref = (
+            str(submission.id)
+            if submission and getattr(submission, "id", None) is not None
+            else correlation_submission_ref
+        )
+        correlation_submission_ref = submission_ref or correlation_submission_ref
+
+        if irn_value:
+            submission_state = getattr(submission, "status", None)
+            if submission_state and hasattr(submission_state, "value"):
+                submission_state_value = str(submission_state.value)
+            elif submission_state is not None:
+                submission_state_value = str(submission_state)
+            else:
+                submission_state_value = None
+
+            submitted_extra = {
+                "invoice_number": invoice_number,
+                "pipeline_event_index": event_index,
+                "request_id": request_id,
+                "submission_status": submission_state_value,
+                "firs_status": firs_status,
+                "submission_id": submission_ref,
+            }
+            submitted_metadata, last_stage_at = self._build_correlation_metadata(
+                stage="APP_SUBMITTED",
+                pipeline_started_at=pipeline_started_at,
+                previous_stage_at=last_stage_at,
+                submission_id=submission_ref,
+                correlation_id=correlation_id_ref,
+                organization_id=organization_id,
+                si_invoice_id=si_invoice_ref,
+                extra=submitted_extra,
+            )
+            await self._emit_correlation_event(
+                "update_app_submitted",
+                irn=irn_value,
+                metadata=submitted_metadata,
+            )
+            event_index += 1
+
+        if irn_value:
+            response_extra = {
+                "invoice_number": invoice_number,
+                "pipeline_event_index": event_index,
+                "request_id": request_id,
+                "firs_status": firs_status,
+                "firs_success": bool(firs_response.get("success"))
+                if isinstance(firs_response, dict)
+                else None,
+                "submission_id": submission_ref,
+            }
+            response_metadata, last_stage_at = self._build_correlation_metadata(
+                stage="FIRS_RESPONSE",
+                pipeline_started_at=pipeline_started_at,
+                previous_stage_at=last_stage_at,
+                submission_id=submission_ref,
+                correlation_id=correlation_id_ref,
+                organization_id=organization_id,
+                si_invoice_id=si_invoice_ref,
+                extra=response_extra,
+            )
+            correlation_response_payload = dict(firs_response_payload)
+            correlation_response_payload["correlation_metadata"] = response_metadata
+            await self._emit_correlation_event(
+                "update_firs_response",
+                irn=irn_value,
+                metadata=response_metadata,
+                firs_response_id=str(firs_response_id) if firs_response_id else None,
+                firs_status=str(firs_status) if firs_status else None,
+                response_data=correlation_response_payload,
+                identifiers=firs_identifiers,
+            )
+            event_index += 1
+
         try:
             delivery = payload.get("delivery") or submission_data.get("delivery") or {}
             await self._enqueue_outbound_delivery(organization_id, [invoice_payload], delivery)
@@ -1598,14 +1893,12 @@ class TransmissionService:
 
         if not firs_response.get("success"):
             retry_config = self._extract_retry_config(payload) or self._extract_retry_config(submission_data)
-            submission_ref = str(submission.id) if submission else (
-                submission_identifier if isinstance(submission_identifier, str) else None
-            )
+            submission_ref_retry = submission_ref
             document_id = (
                 invoice_number
                 or invoice_number_primary
                 or invoice_number_fallback
-                or submission_ref
+                or submission_ref_retry
                 or self._make_identifier("INV")
             )
             request = self._create_transmission_request(
@@ -1614,7 +1907,7 @@ class TransmissionService:
                 organization_id=organization_id,
                 operation="submit_invoice_to_firs",
                 metadata={
-                    "submission_id": submission_ref,
+                    "submission_id": submission_ref_retry,
                     "request_id": request_id,
                     "retry_config": retry_config,
                     "payload": {

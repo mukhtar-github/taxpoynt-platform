@@ -23,7 +23,15 @@ from core_platform.data_management.models.firs_submission import InvoiceType, Su
 
 
 class DummyRouter(MessageRouter):
+    def __init__(self):
+        self.calls = []
+
     async def route_message(self, service_role, operation, payload, source_service=None):
+        self.calls.append({
+            "role": service_role,
+            "operation": operation,
+            "payload": payload,
+        })
         return {"success": True, "data": {"operation": operation, "payload": payload}}
 
 
@@ -113,6 +121,7 @@ async def test_handle_submit_invoice_includes_pipeline_metadata(monkeypatch):
         "invoice_data": {"invoice_number": "INV-010"},
         "submission_data": {},
         "organization_id": str(UUID("11111111-1111-1111-1111-111111111111")),
+        "irn": "IRN-010",
     }
 
     result = await service._handle_submit_invoice(payload)
@@ -121,6 +130,32 @@ async def test_handle_submit_invoice_includes_pipeline_metadata(monkeypatch):
     assert result["signature"] == pipeline_metadata["signature"]
     assert "late_warning" in result.get("pipeline_warnings", [])
     service._schedule_status_poll.assert_awaited()
+
+    operations = [call["operation"] for call in service.message_router.calls]
+    assert operations[:4] == [
+        "update_app_received",
+        "update_app_submitting",
+        "update_app_submitted",
+        "update_firs_response",
+    ]
+
+    stages = [
+        service.message_router.calls[i]["payload"]["metadata"]["stage"]
+        for i in range(4)
+    ]
+    assert stages == [
+        "APP_RECEIVED",
+        "APP_SUBMITTING",
+        "APP_SUBMITTED",
+        "FIRS_RESPONSE",
+    ]
+
+    final_payload = service.message_router.calls[3]["payload"]
+    assert "correlation_metadata" in final_payload["response_data"]
+    assert (
+        final_payload["response_data"]["correlation_metadata"]["stage"]
+        == "FIRS_RESPONSE"
+    )
 
 
 @pytest.mark.asyncio

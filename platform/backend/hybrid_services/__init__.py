@@ -1208,7 +1208,8 @@ class HybridServiceRegistry:
                             firs_response_id=payload.get("firs_response_id"),
                             firs_status=payload.get("firs_status"),
                             response_data=payload.get("response_data"),
-                            identifiers=payload.get("identifiers")
+                            identifiers=payload.get("identifiers"),
+                            metadata=payload.get("metadata"),
                         )
                         return {"operation": operation, "success": success, "data": {"updated": success}}
                     elif operation == "get_correlation_statistics":

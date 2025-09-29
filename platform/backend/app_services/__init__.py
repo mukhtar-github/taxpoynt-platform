@@ -4372,6 +4372,67 @@ class APPServiceRegistry:
                     invoice_data = payload.get("invoice_data")
                     invoice_data = dict(invoice_data) if isinstance(invoice_data, dict) else {}
 
+                    pipeline_started_at = datetime.now(timezone.utc)
+                    last_stage_at = pipeline_started_at
+                    event_index = 0
+                    correlation_sla_ms = getattr(transmission_logic, "_correlation_sla_target_ms", None)
+                    correlation_id_ref = payload.get("correlation_id")
+                    organization_id = (
+                        payload.get("organization_id")
+                        or payload.get("tenant_id")
+                        or invoice_data.get("organization_id")
+                        or invoice_data.get("tenant_id")
+                    )
+                    si_invoice_ref = payload.get("si_invoice_id") or invoice_data.get("si_invoice_id")
+                    submission_ref = payload.get("submission_id") or payload.get("transmission_id")
+                    request_id = payload.get("request_id")
+                    correlation_submission_ref = (
+                        submission_ref
+                        or request_id
+                        or invoice_data.get("invoiceNumber")
+                        or invoice_data.get("invoice_number")
+                    )
+
+                    def _correlation_metadata(stage: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                        nonlocal last_stage_at, event_index
+                        now = datetime.now(timezone.utc)
+                        metadata: Dict[str, Any] = {
+                            "stage": stage,
+                            "timestamp": now.isoformat(),
+                            "source": "app_service",
+                            "pipeline_started_at": pipeline_started_at.isoformat(),
+                            "pipeline_event_index": event_index,
+                        }
+                        if correlation_submission_ref:
+                            metadata["submission_id"] = correlation_submission_ref
+                        if correlation_id_ref:
+                            metadata["correlation_id"] = correlation_id_ref
+                        if organization_id:
+                            metadata["organization_id"] = organization_id
+                        if si_invoice_ref:
+                            metadata["si_invoice_id"] = si_invoice_ref
+
+                        elapsed_ms = max(0, int((now - pipeline_started_at).total_seconds() * 1000))
+                        stage_elapsed_ms = max(0, int((now - last_stage_at).total_seconds() * 1000))
+                        metadata["timings"] = {
+                            "elapsed_ms": elapsed_ms,
+                            "stage_elapsed_ms": stage_elapsed_ms,
+                        }
+
+                        if correlation_sla_ms:
+                            metadata["sla"] = {
+                                "target_ms": correlation_sla_ms,
+                                "elapsed_ms": elapsed_ms,
+                                "breached": elapsed_ms > correlation_sla_ms,
+                            }
+
+                        if extra:
+                            metadata.update(extra)
+
+                        last_stage_at = now
+                        event_index += 1
+                        return metadata
+
                     sign_resp = await http_client.sign_invoice(invoice_data)
                     if not sign_resp.get("success"):
                         return {"operation": operation, "success": False, "data": {"sign": sign_resp}}
@@ -4390,11 +4451,46 @@ class APPServiceRegistry:
                     if not irn:
                         return {"operation": operation, "success": False, "error": "missing_irn_for_transmit"}
 
+                    correlation_submission_ref = correlation_submission_ref or irn
+
+                    try:
+                        received_metadata = _correlation_metadata(
+                            "APP_RECEIVED",
+                            {
+                                "operation": operation,
+                                "request_id": request_id,
+                                "invoice_number": invoice_data.get("invoiceNumber")
+                                or invoice_data.get("invoice_number"),
+                            },
+                        )
+                        await self.message_router.route_message(
+                            service_role=ServiceRole.HYBRID,
+                            operation="update_app_received",
+                            payload={
+                                "irn": irn,
+                                "app_submission_id": correlation_submission_ref,
+                                "metadata": received_metadata,
+                            },
+                        )
+                    except Exception:
+                        logger.debug("Correlation update_app_received skipped")
+
                     try:
                         await self.message_router.route_message(
                             service_role=ServiceRole.HYBRID,
                             operation="update_app_submitting",
-                            payload={"irn": irn, "metadata": {"source": "app_service", "operation": "submit_to_firs"}},
+                            payload={
+                                "irn": irn,
+                                "metadata": _correlation_metadata(
+                                    "APP_SUBMITTING",
+                                    {
+                                        "operation": operation,
+                                        "request_id": request_id,
+                                        "invoice_number": invoice_data.get("invoiceNumber")
+                                        or invoice_data.get("invoice_number"),
+                                    },
+                                ),
+                            },
                         )
                     except Exception:
                         logger.debug("Correlation update_app_submitting skipped")
@@ -4407,22 +4503,57 @@ class APPServiceRegistry:
                     final_irn = tx_identifiers.get("irn") if tx_identifiers else irn
                     if final_irn and "irn" not in invoice_data:
                         invoice_data["irn"] = final_irn
+                    if final_irn:
+                        correlation_submission_ref = correlation_submission_ref or final_irn
+
+                    data = tx_resp.get("data") if isinstance(tx_resp, dict) else None
+                    base_payload = data if isinstance(data, dict) else (tx_resp if isinstance(tx_resp, dict) else {})
+                    normalized_payload = merge_identifiers_into_payload(base_payload, tx_identifiers or {})
+                    firs_status = (
+                        (tx_resp.get("status") if isinstance(tx_resp, dict) else None)
+                        or base_payload.get("status")
+                        or "submitted"
+                    )
+                    firs_response_id = (
+                        data.get("submission_id") if isinstance(data, dict) else None
+                    ) or (
+                        data.get("id") if isinstance(data, dict) else None
+                    )
+                    if firs_response_id:
+                        correlation_submission_ref = str(firs_response_id)
 
                     try:
                         await self.message_router.route_message(
                             service_role=ServiceRole.HYBRID,
                             operation="update_app_submitted",
-                            payload={"irn": final_irn or irn, "metadata": {"source": "app_service", "operation": "submit_to_firs"}},
+                            payload={
+                                "irn": final_irn or irn,
+                                "metadata": _correlation_metadata(
+                                    "APP_SUBMITTED",
+                                    {
+                                        "operation": operation,
+                                        "request_id": request_id,
+                                        "firs_status": firs_status,
+                                        "submission_reference": correlation_submission_ref,
+                                    },
+                                ),
+                            },
                         )
                     except Exception:
                         logger.debug("Correlation update_app_submitted skipped")
 
                     try:
-                        data = tx_resp.get("data") if isinstance(tx_resp, dict) else None
-                        base_payload = data if isinstance(data, dict) else (tx_resp if isinstance(tx_resp, dict) else {})
-                        normalized_payload = merge_identifiers_into_payload(base_payload, tx_identifiers or {})
-                        firs_status = (tx_resp.get("status") if isinstance(tx_resp, dict) else None) or (base_payload.get("status") if isinstance(base_payload, dict) else None) or "submitted"
-                        firs_response_id = (data.get("submission_id") if isinstance(data, dict) else None) or (data.get("id") if isinstance(data, dict) else None)
+                        response_metadata = _correlation_metadata(
+                            "FIRS_RESPONSE",
+                            {
+                                "operation": operation,
+                                "request_id": request_id,
+                                "firs_status": firs_status,
+                                "submission_reference": correlation_submission_ref,
+                            },
+                        )
+                        normalized_payload_with_meta = dict(normalized_payload)
+                        normalized_payload_with_meta["correlation_metadata"] = response_metadata
                         await self.message_router.route_message(
                             service_role=ServiceRole.HYBRID,
                             operation="update_firs_response",
@@ -4430,8 +4561,9 @@ class APPServiceRegistry:
                                 "irn": final_irn or irn,
                                 "firs_response_id": str(firs_response_id) if firs_response_id else None,
                                 "firs_status": str(firs_status),
-                                "response_data": normalized_payload,
+                                "response_data": normalized_payload_with_meta,
                                 "identifiers": tx_identifiers,
+                                "metadata": response_metadata,
                             },
                         )
                     except Exception:
