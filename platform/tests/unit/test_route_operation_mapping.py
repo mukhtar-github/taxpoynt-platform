@@ -24,6 +24,8 @@ def test_route_operation_mapping_subset_no_missing(monkeypatch):
     from core_platform.messaging.message_router import MessageRouter, ServiceRole
 
     # Build message router and coordinator
+    monkeypatch.setenv("FIRS_WEBHOOK_SECRET", "test-secret")
+
     msg_router = MessageRouter()
     version_coord = APIVersionCoordinator(msg_router)
 
@@ -79,6 +81,8 @@ def test_route_operation_mapping_all_no_missing(monkeypatch):
     from api_gateway.role_routing.role_detector import HTTPRoleDetector
     from api_gateway.role_routing.permission_guard import APIPermissionGuard
     from core_platform.messaging.message_router import MessageRouter, ServiceRole
+
+    monkeypatch.setenv("FIRS_WEBHOOK_SECRET", "test-secret")
 
     msg_router = MessageRouter()
     version_coord = APIVersionCoordinator(msg_router)

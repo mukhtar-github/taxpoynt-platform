@@ -19,6 +19,10 @@ def _prepare_path():
 def test_all_si_routes_have_registered_handlers():
     _prepare_path()
 
+    import os
+
+    os.environ.setdefault("FIRS_WEBHOOK_SECRET", "test-secret")
+
     from api_gateway.main_gateway_router import MainGatewayRouter
     from api_gateway.api_versions.version_coordinator import APIVersionCoordinator
     from api_gateway.role_routing.role_detector import HTTPRoleDetector

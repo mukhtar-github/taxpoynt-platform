@@ -39,6 +39,7 @@ class StubPermissionGuard:
 
 @pytest.mark.parametrize("route_setup", ["app", "si"])
 def test_v1_response_shape(route_setup, monkeypatch):
+    monkeypatch.setenv("FIRS_WEBHOOK_SECRET", "test-secret")
     app = FastAPI()
     guard = StubPermissionGuard()
     if route_setup == "app":
