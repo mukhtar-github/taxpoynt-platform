@@ -935,6 +935,7 @@ class APPServiceRegistry:
                 "get_transmission_statistics",
                 "transmit_batch",
                 "transmit_real_time",
+                "run_b2c_reporting_job",
             ]
 
             transmission_logic = TransmissionService(self.message_router)

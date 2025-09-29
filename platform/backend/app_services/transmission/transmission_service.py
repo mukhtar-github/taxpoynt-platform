@@ -12,9 +12,9 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager, nullcontext
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,13 +26,19 @@ from core_platform.data_management.models.firs_submission import (
     InvoiceType,
     SubmissionStatus,
 )
+from core_platform.data_management.models.organization import Organization
 from core_platform.data_management.repositories import (
     firs_submission_repo_async as firs_repo,
     invoice_repo_async as invoice_repo,
 )
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.messaging.queue_manager import get_queue_manager
-from core_platform.messaging.queue_manager import QueueConfiguration, QueueType, QueueStrategy
+from core_platform.messaging.queue_manager import (
+    QueueConfiguration,
+    QueueType,
+    QueueStrategy,
+    QueuedMessage,
+)
 
 from app_services.firs_communication.firs_payload_mapper import build_firs_invoice
 from app_services.transmission.retry_handler import RetryHandler, RetryPolicy, RetryStrategy
@@ -42,6 +48,13 @@ from app_services.transmission.secure_transmitter import (
     TransmissionStatus,
     SecurityLevel,
 )
+
+from si_services.schema_compliance import (
+    compliance_checker,
+    ComplianceLevel,
+    ComplianceStatus,
+)
+from si_services.certificate_management.digital_certificate_service import DigitalCertificateService
 
 
 InvoiceRecord = invoice_repo.InvoiceRecord
@@ -122,6 +135,7 @@ class TransmissionService:
         self.logger = logging.getLogger(__name__)
         self._queue_manager = None
         self._queue_consumers_registered = False
+        self._status_poll_consumer_registered = False
         self._retry_handler: Optional[RetryHandler] = None
         self._router_transmitter = self._RouterTransmissionAdapter(self)
         self._default_retry_policy = RetryPolicy(
@@ -133,6 +147,8 @@ class TransmissionService:
             jitter_factor=0.2,
             timeout=1800.0,
         )
+        self._digital_certificate_service = DigitalCertificateService()
+        self._signing_certificate_cache: Dict[str, Optional[str]] = {}
 
     async def handle(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         handlers = {
@@ -160,6 +176,7 @@ class TransmissionService:
             "get_transmission_statistics": self._handle_get_transmission_statistics,
             "transmit_batch": self._handle_queue_transmission,
             "transmit_real_time": self._handle_queue_transmission,
+            "run_b2c_reporting_job": self._handle_run_b2c_reporting_job,
         }
 
         handler = handlers.get(operation)
@@ -242,6 +259,204 @@ class TransmissionService:
             return UUID(str(value))
         except Exception:
             return None
+
+    def _resolve_signature_preferences(
+        self,
+        options: Optional[Dict[str, Any]],
+    ) -> Tuple[bool, bool]:
+        """Return tuple of (sign_enabled, require_signature)."""
+
+        env_sign = str(os.getenv("APP_TRANSMISSION_AUTO_SIGN", "true")).lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        env_required = str(os.getenv("APP_TRANSMISSION_REQUIRE_SIGNATURE", "false")).lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+
+        sign_enabled = env_sign
+        require_signature = env_required
+
+        if isinstance(options, dict):
+            if "sign_before_transmit" in options:
+                sign_enabled = bool(options["sign_before_transmit"])
+            if "require_signature" in options:
+                require_signature = bool(options["require_signature"])
+
+        return sign_enabled, require_signature
+
+    def _extract_validation_warnings(self, report: Dict[str, Any]) -> List[str]:
+        warnings: List[str] = []
+        results = report.get("validation_results")
+        if not isinstance(results, dict):
+            return warnings
+        for stage, outcome in results.items():
+            if not isinstance(outcome, dict):
+                continue
+            for error_entry in outcome.get("errors", []):
+                if isinstance(error_entry, dict) and error_entry.get("severity") in {"warning", "info"}:
+                    message = error_entry.get("message") or stage
+                    warnings.append(f"{stage}:{message}")
+        return warnings
+
+    def _extract_validation_error(self, report: Dict[str, Any]) -> Optional[str]:
+        results = report.get("validation_results")
+        if not isinstance(results, dict):
+            return None
+        for stage, outcome in results.items():
+            if not isinstance(outcome, dict):
+                continue
+            for error_entry in outcome.get("errors", []):
+                if isinstance(error_entry, dict) and error_entry.get("severity") == "error":
+                    message = error_entry.get("message") or stage
+                    return f"{stage}:{message}"
+        return None
+
+    async def _validate_invoice(
+        self,
+        invoice_payload: Dict[str, Any],
+        *,
+        organization_id: Optional[str],
+        invoice_number: Optional[str],
+    ) -> Dict[str, Any]:
+        context = {
+            "organization_id": organization_id,
+            "invoice_number": invoice_number,
+            "source": "app_transmission",
+        }
+        report = compliance_checker.check_full_compliance(
+            invoice_payload,
+            compliance_level=ComplianceLevel.STRICT,
+            transform_if_needed=True,
+            context=context,
+        )
+
+        overall = report.get("overall_status")
+        total_errors = report.get("summary", {}).get("total_errors", 0)
+        if (
+            overall in {ComplianceStatus.ERROR.value, ComplianceStatus.NON_COMPLIANT.value}
+            or (isinstance(total_errors, int) and total_errors > 0)
+        ):
+            first_error = self._extract_validation_error(report) or "validation_failed"
+            raise ValueError(f"invoice_validation_failed:{first_error}")
+
+        return report
+
+    async def _get_signing_certificate_id(self, organization_id: Optional[str]) -> Optional[str]:
+        cache_key = str(organization_id) if organization_id else "default"
+        if cache_key in self._signing_certificate_cache:
+            return self._signing_certificate_cache[cache_key]
+
+        certificate_id = os.getenv("APP_SIGNING_CERTIFICATE_ID")
+
+        if organization_id and not certificate_id:
+            async with self._session_scope() as session:
+                org_uuid = self._ensure_uuid(organization_id)
+                organization = None
+                if org_uuid:
+                    organization = await session.get(Organization, org_uuid)
+                else:
+                    stmt = select(Organization).where(Organization.firs_service_id == str(organization_id)).limit(1)
+                    organization = (await session.execute(stmt)).scalars().first()
+                if organization and organization.firs_configuration:
+                    certificate_id = (
+                        organization.firs_configuration.get("signing_certificate_id")
+                        or organization.firs_configuration.get("certificate_id")
+                    )
+
+        self._signing_certificate_cache[cache_key] = certificate_id
+        return certificate_id
+
+    async def _maybe_sign_invoice(
+        self,
+        invoice_payload: Dict[str, Any],
+        *,
+        organization_id: Optional[str],
+        options: Optional[Dict[str, Any]],
+        validation_warnings: Optional[List[str]] = None,
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]], List[str]]:
+        warnings = list(validation_warnings or [])
+        sign_enabled, require_signature = self._resolve_signature_preferences(options)
+        if not sign_enabled:
+            return invoice_payload, None, warnings
+
+        certificate_id = await self._get_signing_certificate_id(organization_id)
+        if not certificate_id:
+            message = "signing_certificate_unavailable"
+            if require_signature:
+                raise ValueError(message)
+            warnings.append(message)
+            return invoice_payload, None, warnings
+
+        try:
+            signature_info = self._digital_certificate_service.sign_invoice_document(
+                document=invoice_payload,
+                certificate_id=certificate_id,
+            )
+        except Exception as exc:
+            message = f"signature_failed:{exc}"
+            if require_signature:
+                raise ValueError(message)
+            warnings.append(message)
+            return invoice_payload, None, warnings
+
+        signed_payload = dict(invoice_payload)
+        signed_payload["signature"] = signature_info
+        return signed_payload, signature_info, warnings
+
+    async def _prepare_invoice_for_submission(
+        self,
+        invoice: Dict[str, Any],
+        *,
+        organization_id: Optional[str],
+        invoice_number: Optional[str],
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], List[str]]:
+        firs_invoice = build_firs_invoice(invoice)
+        validation_report = await self._validate_invoice(
+            firs_invoice,
+            organization_id=organization_id,
+            invoice_number=invoice_number,
+        )
+        validation_warnings = self._extract_validation_warnings(validation_report)
+        signed_invoice, signature_info, signing_warnings = await self._maybe_sign_invoice(
+            firs_invoice,
+            organization_id=organization_id,
+            options=options,
+            validation_warnings=validation_warnings,
+        )
+        pipeline_metadata = {
+            "validation_report": validation_report,
+            "signature": signature_info,
+        }
+        combined_warnings = validation_warnings + [w for w in signing_warnings if w not in validation_warnings]
+        return signed_invoice, pipeline_metadata, combined_warnings
+
+    def _is_b2c_invoice(self, invoice: Dict[str, Any]) -> bool:
+        if not isinstance(invoice, dict):
+            return False
+        metadata = invoice.get("documentMetadata")
+        if isinstance(metadata, dict):
+            customer_type = metadata.get("customerType") or metadata.get("customer_type")
+            if isinstance(customer_type, str) and customer_type.upper() == "B2C":
+                return True
+        customer = invoice.get("customer") or invoice.get("buyer") or invoice.get("accountingCustomerParty")
+        if isinstance(customer, dict):
+            tax_id = (
+                customer.get("tin")
+                or customer.get("tax_id")
+                or customer.get("taxId")
+                or customer.get("vat")
+            )
+            if tax_id and str(tax_id).strip():
+                return False
+        # Default heuristic: if customer TIN stored elsewhere on submission it'll be set; absence implies B2C
+        return True
 
     def _now_iso(self) -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -624,6 +839,17 @@ class TransmissionService:
                 self.logger.error("Failed to register transmission consumers: %s", exc)
                 raise
 
+        if not self._status_poll_consumer_registered:
+            try:
+                await qm.register_consumer(
+                    "delayed_tasks",
+                    "app_firs_status_poll_worker",
+                    self._consume_status_poll,
+                )
+                self._status_poll_consumer_registered = True
+            except Exception as exc:
+                self.logger.debug("Status poll consumer registration skipped: %s", exc)
+
         self._queue_manager = qm
         return qm
 
@@ -669,6 +895,42 @@ class TransmissionService:
         except Exception as exc:
             self.logger.error("Failed to enqueue transmission job: %s", exc)
             return None
+
+    async def _schedule_status_poll(
+        self,
+        submission: FIRSSubmission,
+        organization_id: Optional[str],
+        *,
+        attempt: int = 1,
+        max_attempts: Optional[int] = None,
+    ) -> Optional[str]:
+        try:
+            qm = await self._ensure_queue_manager()
+        except Exception:
+            return None
+
+        interval_minutes = float(os.getenv("APP_STATUS_POLL_INTERVAL_MINUTES", "15"))
+        delay_seconds = max(60, int(interval_minutes * 60))
+        max_attempts = max_attempts or int(os.getenv("APP_STATUS_POLL_MAX_ATTEMPTS", "16"))
+
+        scheduled_time = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        payload: Dict[str, Any] = {
+            "kind": "firs_status_poll",
+            "submission_id": str(submission.id),
+            "attempt": attempt,
+            "max_attempts": max_attempts,
+            "irn": submission.irn,
+            "last_status": submission.status.value,
+        }
+        org_field = organization_id or (str(submission.organization_id) if submission.organization_id else None)
+        if org_field:
+            payload["organization_id"] = str(org_field)
+
+        return await qm.enqueue_message(
+            "delayed_tasks",
+            payload,
+            scheduled_time=scheduled_time,
+        )
 
     async def _schedule_retry(
         self,
@@ -733,6 +995,18 @@ class TransmissionService:
             except Exception as exc:
                 self.logger.debug("Unable to update submission status for %s: %s", submission_id, exc)
 
+        if persisted and persisted.status in self._BATCH_STATUSES:
+            try:
+                org_identifier = organization_id or (
+                    str(persisted.organization_id) if persisted.organization_id else None
+                )
+                await self._schedule_status_poll(
+                    persisted,
+                    organization_id=org_identifier,
+                )
+            except Exception as exc:
+                self.logger.debug("Status poll scheduling skipped for %s: %s", persisted.id, exc)
+
         return persisted
 
     async def _persist_submission(
@@ -774,7 +1048,24 @@ class TransmissionService:
                 invoice_type_enum = None
 
         response_data = firs_response.get("data") if isinstance(firs_response, dict) else {}
-        response_status = response_data.get("status") if isinstance(response_data, dict) else None
+        normalized_response = dict(response_data) if isinstance(response_data, dict) else {}
+        identifiers = normalized_response.get("identifiers")
+        if isinstance(identifiers, dict):
+            for key, target_key in (
+                ("irn", "irn"),
+                ("csid", "csid"),
+                ("csid_hash", "csidHash"),
+                ("csidHash", "csidHash"),
+                ("qr", "qr"),
+                ("qr_code", "qr"),
+                ("qrCode", "qr"),
+                ("stampMetadata", "stampMetadata"),
+                ("cryptographic_stamp", "stampMetadata"),
+            ):
+                if key in identifiers and target_key not in normalized_response:
+                    normalized_response[target_key] = identifiers[key]
+
+        response_status = normalized_response.get("status") if isinstance(normalized_response, dict) else None
         status_enum = self._map_status(status_hint or response_status, firs_response.get("success"))
 
         async with session.begin():
@@ -798,22 +1089,39 @@ class TransmissionService:
             target.invoice_data = invoice_data
             target.total_amount = total_amount
             target.currency = currency
-            target.firs_response = response_data if isinstance(response_data, dict) else {}  # type: ignore[assignment]
+            target.firs_response = normalized_response  # type: ignore[assignment]
             target.firs_submission_id = (
-                response_data.get("submission_id")
-                or response_data.get("submissionId")
+                normalized_response.get("submission_id")
+                or normalized_response.get("submissionId")
                 or target.firs_submission_id
             )
-            target.firs_status_code = response_data.get("statusCode") or response_data.get("status_code")
-            target.firs_message = response_data.get("message") or firs_response.get("error")
+            target.firs_status_code = normalized_response.get("statusCode") or normalized_response.get("status_code")
+            target.firs_message = normalized_response.get("message") or firs_response.get("error")
             irn_value = self._select_irn(
                 target.irn,
                 None,
                 invoice_payload=invoice_data,
-                firs_response=response_data if isinstance(response_data, dict) else {},
+                firs_response=normalized_response,
             )
             if irn_value:
                 target.irn = irn_value
+            csid_value = normalized_response.get("csid") or normalized_response.get("csid_code")
+            if csid_value:
+                target.csid = csid_value
+            csid_hash_value = normalized_response.get("csidHash") or normalized_response.get("csid_hash")
+            if csid_hash_value:
+                target.csid_hash = csid_hash_value
+            qr_value = (
+                normalized_response.get("qr")
+                or normalized_response.get("qr_code")
+                or normalized_response.get("qrCode")
+                or normalized_response.get("qr_payload")
+            )
+            if qr_value:
+                target.qr_payload = qr_value
+            stamp_metadata = normalized_response.get("stampMetadata") or normalized_response.get("cryptographic_stamp")
+            if stamp_metadata:
+                target.firs_stamp_metadata = stamp_metadata
             now = datetime.now(timezone.utc)
             target.submitted_at = target.submitted_at or now
             if status_enum == SubmissionStatus.ACCEPTED:
@@ -1044,7 +1352,29 @@ class TransmissionService:
             raise ValueError("invoice_payload_unavailable")
 
         request_id = payload.get("request_id")
-        resolved_invoices = [build_firs_invoice(inv) for inv in resolved_invoices]
+        batch_options = None
+        if isinstance(payload.get("options"), dict):
+            batch_options = dict(payload["options"])
+        elif isinstance(batch_submission, dict) and isinstance(batch_submission.get("options"), dict):
+            batch_options = dict(batch_submission["options"])
+
+        prepared_invoices: List[Dict[str, Any]] = []
+        pipeline_reports: List[Dict[str, Any]] = []
+        pipeline_warnings: List[str] = []
+
+        for invoice_entry in resolved_invoices:
+            invoice_number_hint = self._select_invoice_number(None, None, None, invoice_entry)
+            prepared_invoice, meta, warnings = await self._prepare_invoice_for_submission(
+                invoice_entry,
+                organization_id=organization_id,
+                invoice_number=invoice_number_hint,
+                options=batch_options,
+            )
+            prepared_invoices.append(prepared_invoice)
+            pipeline_reports.append(meta)
+            pipeline_warnings.extend(warnings)
+
+        resolved_invoices = prepared_invoices
 
         firs_payload: Dict[str, Any] = {
             "invoices": resolved_invoices,
@@ -1056,6 +1386,7 @@ class TransmissionService:
         firs_response = await self._call_firs("submit_invoice_batch_to_firs", firs_payload)
 
         persisted_ids: List[str] = []
+        persisted_submissions: List[FIRSSubmission] = []
         async with self._session_scope() as session:
             with tenant_context(organization_id) if organization_id else nullcontext():
                 for invoice in resolved_invoices:
@@ -1069,6 +1400,7 @@ class TransmissionService:
                     )
                     if submission:
                         persisted_ids.append(str(submission.id))
+                        persisted_submissions.append(submission)
 
         try:
             delivery = payload.get("delivery") or {}
@@ -1114,11 +1446,30 @@ class TransmissionService:
                     batch_id=submission_batch_id,
                 )
 
-        return {
+        response_payload = {
             "submitted_at": self._now_iso(),
             "firs_response": firs_response,
             "persisted_submissions": persisted_ids,
         }
+        if pipeline_reports:
+            response_payload["pipeline_reports"] = pipeline_reports
+        if pipeline_warnings:
+            response_payload["pipeline_warnings"] = pipeline_warnings
+
+        for submission in persisted_submissions:
+            if submission.status in self._BATCH_STATUSES:
+                try:
+                    org_identifier = organization_id or (
+                        str(submission.organization_id) if submission.organization_id else None
+                    )
+                    await self._schedule_status_poll(
+                        submission,
+                        organization_id=org_identifier,
+                    )
+                except Exception:
+                    self.logger.debug("Status poll scheduling skipped for %s", submission.id)
+
+        return response_payload
 
     async def _handle_submit_invoice_file(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
@@ -1203,8 +1554,19 @@ class TransmissionService:
             invoice_payload.setdefault("irn", irn_value)
 
         request_id = payload.get("request_id")
-        original_invoice = dict(invoice_payload)
-        invoice_payload = build_firs_invoice(original_invoice)
+        options = None
+        if isinstance(payload.get("options"), dict):
+            options = dict(payload["options"])
+        elif isinstance(submission_data.get("options"), dict):
+            options = dict(submission_data["options"])
+
+        prepared_invoice, pipeline_metadata, pipeline_warnings = await self._prepare_invoice_for_submission(
+            invoice_payload or {},
+            organization_id=organization_id,
+            invoice_number=invoice_number,
+            options=options,
+        )
+        invoice_payload = prepared_invoice
 
         firs_payload = {
             "invoice_data": invoice_payload,
@@ -1270,12 +1632,32 @@ class TransmissionService:
                 retry_config=retry_config,
             )
 
-        return {
+        response_payload = {
             "submission_id": str(submission.id) if submission else self._make_identifier("SUB"),
             "submitted_at": self._now_iso(),
             "firs_response": firs_response,
             "submission": self._serialize_submission(submission) if submission else None,
         }
+        if pipeline_metadata.get("validation_report"):
+            response_payload["validation_report"] = pipeline_metadata["validation_report"]
+        if pipeline_metadata.get("signature"):
+            response_payload["signature"] = pipeline_metadata["signature"]
+        if pipeline_warnings:
+            response_payload["pipeline_warnings"] = pipeline_warnings
+
+        if submission and submission.status in self._BATCH_STATUSES:
+            try:
+                org_identifier = organization_id or (
+                    str(submission.organization_id) if submission.organization_id else None
+                )
+                await self._schedule_status_poll(
+                    submission,
+                    organization_id=org_identifier,
+                )
+            except Exception:
+                self.logger.debug("Status poll scheduling skipped for %s", submission.id)
+
+        return response_payload
 
     async def _enqueue_outbound_delivery(
         self,
@@ -1656,6 +2038,113 @@ class TransmissionService:
             "firs_response": firs_response,
         }
 
+    async def _handle_run_b2c_reporting_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        organization_id = self._resolve_org_id(payload)
+        lookback_hours = float(payload.get("lookback_hours") or os.getenv("B2C_REPORTING_LOOKBACK_HOURS", "24"))
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max(1.0, lookback_hours))
+        max_batch = int(payload.get("max_invoices") or os.getenv("B2C_REPORTING_MAX_BATCH", "200"))
+        max_batch = max(1, max_batch)
+
+        status_filter = [
+            SubmissionStatus.PENDING,
+            SubmissionStatus.PROCESSING,
+            SubmissionStatus.SUBMITTED,
+        ]
+
+        submissions: List[FIRSSubmission] = []
+        async with self._session_scope() as session:
+            stmt = select(FIRSSubmission).where(FIRSSubmission.status.in_(status_filter))
+            org_uuid = None
+            if organization_id:
+                org_uuid = self._ensure_uuid(organization_id)
+                if org_uuid:
+                    stmt = stmt.where(FIRSSubmission.organization_id == org_uuid)
+            rows = (await session.execute(stmt)).scalars().all()
+            submissions = rows
+
+        queued: List[str] = []
+        skipped: List[str] = []
+
+        for submission in submissions:
+            if len(queued) >= max_batch:
+                break
+
+            created_ts = getattr(submission, "created_at", None) or submission.submitted_at or submission.updated_at
+            if created_ts and created_ts > cutoff_time:
+                skipped.append(str(submission.id))
+                continue
+
+            invoice_payload = submission.invoice_data if isinstance(submission.invoice_data, dict) else {}
+            if not invoice_payload or not self._is_b2c_invoice(invoice_payload):
+                skipped.append(str(submission.id))
+                continue
+
+            org_identifier = organization_id or (
+                str(submission.organization_id) if submission.organization_id else None
+            )
+
+            try:
+                prepared_invoice, _, _ = await self._prepare_invoice_for_submission(
+                    dict(invoice_payload),
+                    organization_id=org_identifier,
+                    invoice_number=submission.invoice_number,
+                    options=None,
+                )
+            except Exception as exc:
+                self.logger.debug("Skipping B2C invoice %s due to validation failure: %s", submission.invoice_number, exc)
+                skipped.append(str(submission.id))
+                continue
+
+            try:
+                async with self._session_scope() as session:
+                    tenant_id = str(submission.organization_id) if submission.organization_id else org_identifier
+                    with tenant_context(tenant_id) if tenant_id else nullcontext():
+                        existing = await session.get(FIRSSubmission, submission.id)
+                        if existing:
+                            async with session.begin():
+                                existing.invoice_data = prepared_invoice
+            except Exception as exc:
+                self.logger.debug("Unable to refresh invoice payload for %s: %s", submission.id, exc)
+
+            request = self._create_transmission_request(
+                document_id=submission.invoice_number or str(submission.id),
+                document_data=prepared_invoice,
+                organization_id=org_identifier,
+                operation="submit_invoice_to_firs",
+                metadata={
+                    "submission_id": str(submission.id),
+                    "request_id": payload.get("request_id") or self._make_identifier("B2CJOB"),
+                    "pipeline": "b2c_reporting",
+                },
+            )
+
+            await self._queue_transmission_job(
+                queue_name="firs_submissions_high",
+                submission_id=str(submission.id),
+                organization_id=org_identifier,
+                request=request,
+                retry_config=None,
+            )
+
+            try:
+                await self._update_submission_status(
+                    str(submission.id),
+                    org_identifier,
+                    SubmissionStatus.PROCESSING,
+                    invoice_number=submission.invoice_number,
+                )
+            except Exception:
+                self.logger.debug("Status update skipped for B2C submission %s", submission.id)
+
+            queued.append(str(submission.id))
+
+        return {
+            "queued": queued,
+            "skipped": skipped,
+            "generated_at": self._now_iso(),
+            "lookback_hours": lookback_hours,
+        }
+
     async def _handle_get_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         submission_id = payload.get("submission_id")
         invoice_identifier = (
@@ -1915,6 +2404,99 @@ class TransmissionService:
             }
 
         return False
+
+    async def _consume_status_poll(self, message: QueuedMessage) -> bool:
+        payload = getattr(message, "payload", {}) or {}
+        if payload.get("kind") != "firs_status_poll":
+            return True
+
+        submission_id = payload.get("submission_id")
+        if not submission_id:
+            return True
+
+        attempt = int(payload.get("attempt", 1) or 1)
+        max_attempts = int(payload.get("max_attempts", 1) or 1)
+        organization_id = payload.get("organization_id")
+        irn_hint = payload.get("irn")
+
+        submission: Optional[FIRSSubmission] = None
+        org_uuid = self._ensure_uuid(organization_id)
+        tenant_id = str(org_uuid) if org_uuid else (organization_id if isinstance(organization_id, str) else None)
+
+        async with self._session_scope() as session:
+            with tenant_context(tenant_id) if tenant_id else nullcontext():
+                sub_uuid = self._ensure_uuid(submission_id)
+                if sub_uuid:
+                    submission = await firs_repo.get_submission_by_id(
+                        session,
+                        submission_id=sub_uuid,
+                        organization_id=org_uuid,
+                    )
+
+        if not submission:
+            return True
+
+        if submission.status not in self._BATCH_STATUSES:
+            return True
+
+        firs_payload: Dict[str, Any] = {
+            "submission_id": submission_id,
+        }
+        if organization_id:
+            firs_payload["organization_id"] = organization_id
+        irn_value = irn_hint or submission.irn
+        if irn_value:
+            firs_payload["irn"] = irn_value
+
+        try:
+            firs_response = await self._call_firs("get_submission_status", firs_payload)
+        except Exception as exc:
+            self.logger.debug("Status poll call failed for %s: %s", submission_id, exc)
+            firs_response = {"success": False, "error": str(exc)}
+
+        updated_submission = submission
+        if firs_response.get("success"):
+            response_data = firs_response.get("data") if isinstance(firs_response.get("data"), dict) else {}
+            status_hint = None
+            if isinstance(response_data, dict):
+                status_hint = response_data.get("status") or response_data.get("documentStatus")
+            invoice_snapshot = submission.invoice_data if isinstance(submission.invoice_data, dict) else {}
+
+            async with self._session_scope() as session:
+                tenant_ctx_id = str(submission.organization_id) if submission.organization_id else tenant_id
+                with tenant_context(tenant_ctx_id) if tenant_ctx_id else nullcontext():
+                    updated_submission = await self._persist_submission(
+                        session,
+                        organization_id or (str(submission.organization_id) if submission.organization_id else None),
+                        dict(invoice_snapshot),
+                        firs_response,
+                        status_hint=status_hint,
+                        request_id=submission.request_id,
+                    )
+        else:
+            self.logger.debug(
+                "Status poll unsuccessful for %s: %s",
+                submission_id,
+                firs_response.get("error"),
+            )
+
+        final_submission = updated_submission or submission
+        if (
+            final_submission
+            and final_submission.status in self._BATCH_STATUSES
+            and attempt < max_attempts
+        ):
+            try:
+                await self._schedule_status_poll(
+                    final_submission,
+                    organization_id or (str(final_submission.organization_id) if final_submission.organization_id else None),
+                    attempt=attempt + 1,
+                    max_attempts=max_attempts,
+                )
+            except Exception as exc:
+                self.logger.debug("Unable to reschedule status poll for %s: %s", submission_id, exc)
+
+        return True
 
     async def _call_firs(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
