@@ -93,6 +93,9 @@ class FIRSInvoiceResponse(BaseModel):
     invoice_date: str
     status: str
     source_count: int
+    signature: Optional[Dict[str, Any]] = None
+    validation_status: Optional[str] = None
+    warnings: Optional[List[str]] = None
 
 
 class FIRSInvoiceGenerationResponse(BaseModel):
@@ -426,7 +429,10 @@ def create_firs_invoice_router(
                     currency=invoice['currency'],
                     invoice_date=invoice['invoice_date'],
                     status="generated",
-                    source_count=invoice.get('source_data', {}).get('transaction_count', 1)
+                    source_count=invoice.get('source_data', {}).get('transaction_count', 1),
+                    signature=invoice.get('signature'),
+                    validation_status=invoice.get('validation_status'),
+                    warnings=invoice.get('warnings') or None,
                 )
                 invoice_responses.append(invoice_response)
 

@@ -9,6 +9,7 @@ SI (System Integrator) role invoice generation.
 """
 
 import asyncio
+import copy
 import logging
 import os
 import warnings
@@ -31,6 +32,14 @@ from hybrid_services.correlation_management.si_app_correlation_service import SI
 from core_platform.data_management.models.organization import Organization
 from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import (
     FIRSFormatter, FormattingResult
+)
+from si_services.schema_compliance.schema_transformer import schema_transformer
+from si_services.schema_compliance.ubl_validator import ubl_validator
+from si_services.certificate_management.digital_certificate_service import DigitalCertificateService
+from si_services.transformation import (
+    TransformationConfig,
+    TransformationOrchestrator,
+    ERPSystem,
 )
 # Conditional import for unified Odoo connector (org-scoped support)
 try:
@@ -169,6 +178,7 @@ class ComprehensiveFIRSInvoiceGenerator:
         self.firs_formatter = firs_formatter
         self.correlation_service = SIAPPCorrelationService(db_session)
         self._remote_irn_warning_emitted = False
+        self.transformation_orchestrator = TransformationOrchestrator()
         
         # Initialize connectors for all supported systems (graceful handling of missing connectors)
         self.connectors = {
@@ -207,6 +217,9 @@ class ComprehensiveFIRSInvoiceGenerator:
 
         # Org-scoped connector cache
         self._odoo_by_org: Dict[str, Any] = {}
+        self.certificate_service = DigitalCertificateService()
+        self._organization_cache: Dict[str, Organization] = {}
+        self._signing_certificate_cache: Dict[str, Optional[str]] = {}
 
     async def _get_odoo_unified(self, organization_id: UUID):
         """Return an OdooUnifiedConnector for the given organization, preferring org config over env.
@@ -254,6 +267,462 @@ class ComprehensiveFIRSInvoiceGenerator:
         # Fallback to env-level connector
         self._odoo_by_org[key] = self.odoo_unified
         return self.odoo_unified
+
+    async def _get_organization_profile(self, organization_id: UUID) -> Optional[Organization]:
+        """Fetch organization details with simple caching."""
+
+        cache_key = str(organization_id)
+        if cache_key in self._organization_cache:
+            return self._organization_cache[cache_key]
+
+        result = await self.db.execute(select(Organization).where(Organization.id == organization_id))
+        organization = result.scalar_one_or_none()
+        if organization:
+            self._organization_cache[cache_key] = organization
+        return organization
+
+    async def _get_signing_certificate_id(self, organization: Optional[Organization]) -> Optional[str]:
+        """Resolve the certificate ID used for digital signing."""
+
+        cache_key = str(organization.id) if organization else "default"
+        if cache_key in self._signing_certificate_cache:
+            return self._signing_certificate_cache[cache_key]
+
+        certificate_id: Optional[str] = None
+        if organization and organization.firs_configuration and isinstance(organization.firs_configuration, dict):
+            certificate_id = organization.firs_configuration.get("signing_certificate_id") or organization.firs_configuration.get("certificate_id")
+
+        if not certificate_id:
+            certificate_id = os.getenv("SI_SIGNING_CERTIFICATE_ID")
+
+        self._signing_certificate_cache[cache_key] = certificate_id
+        return certificate_id
+
+    def _safe_decimal(self, value: Any, default: Decimal = Decimal('0')) -> Decimal:
+        """Convert arbitrary inputs to Decimal with graceful fallback."""
+
+        try:
+            if value is None:
+                return default
+            return Decimal(str(value))
+        except (ArithmeticError, ValueError, TypeError):
+            return default
+
+    def _infer_vat_rate(
+        self,
+        line_items: List[Dict[str, Any]],
+        tax_amount: Decimal,
+        subtotal: Decimal,
+        fallback: Decimal = Decimal('7.5')
+    ) -> Decimal:
+        """Infer VAT rate from line items or totals."""
+
+        for item in line_items or []:
+            candidate = item.get("tax_rate") or item.get("vat_rate")
+            if candidate is None:
+                continue
+            candidate_decimal = self._safe_decimal(candidate, fallback)
+            if candidate_decimal > 0:
+                return candidate_decimal
+
+        if subtotal > 0:
+            derived = (tax_amount / subtotal) * Decimal('100')
+            if derived > 0:
+                return derived
+
+        return fallback
+
+    def _build_supplier_payload(self, organization: Optional[Organization]) -> Dict[str, Any]:
+        """Create supplier structure expected by the schema transformer."""
+
+        name = organization.display_name if organization else self.firs_formatter.supplier_info.get("name", "Unknown Supplier")
+        tax_id = None
+        registration = None
+        phone = None
+        email = None
+        street = None
+        city = None
+        state = None
+        postal_code = None
+        country = "Nigeria"
+        country_code = "NG"
+
+        if organization:
+            tax_id = organization.tin or organization.vat_number
+            registration = organization.rc_number
+            phone = organization.phone
+            email = organization.email
+            street = organization.address
+            city = organization.city
+            state = organization.state
+            postal_code = organization.postal_code
+            if organization.country:
+                country = organization.country
+
+        return {
+            "name": name,
+            "vat": tax_id,
+            "company_registry": registration,
+            "phone": phone,
+            "email": email,
+            "street": street,
+            "street2": None,
+            "city": city,
+            "zip": postal_code,
+            "state_id": {"name": state} if state else {},
+            "country_id": {"code": country_code, "name": country},
+        }
+
+    def _build_customer_payload(self, customer: Dict[str, Any]) -> Dict[str, Any]:
+        """Create customer structure for the transformer."""
+
+        name = customer.get("name") or customer.get("customer_name") or "Unknown Customer"
+        street = customer.get("street") or customer.get("address")
+        city = customer.get("city")
+        state = customer.get("state")
+        postal_code = customer.get("postal_code")
+        country_code = customer.get("country_code") or "NG"
+        country_name = customer.get("country") or "Nigeria"
+
+        return {
+            "name": name,
+            "vat": customer.get("tin") or customer.get("customer_tin"),
+            "phone": customer.get("phone") or customer.get("telephone"),
+            "email": customer.get("email"),
+            "street": street,
+            "street2": customer.get("street2"),
+            "city": city,
+            "zip": postal_code,
+            "state_id": {"name": state} if state else {},
+            "country_id": {"code": country_code, "name": country_name},
+        }
+
+    def _build_invoice_lines_payload(
+        self,
+        line_items: List[Dict[str, Any]],
+        currency: str,
+        vat_rate: Decimal,
+        total_tax_amount: Decimal
+    ) -> List[Dict[str, Any]]:
+        """Convert internal line items into a structure compatible with the transformer."""
+
+        if not line_items:
+            return []
+
+        count = len(line_items)
+        fallback_tax = total_tax_amount / count if count else Decimal('0')
+        transformed: List[Dict[str, Any]] = []
+
+        for item in line_items:
+            quantity = self._safe_decimal(item.get("quantity") or item.get("qty") or 1, Decimal('1'))
+            subtotal = self._safe_decimal(
+                item.get("subtotal")
+                or item.get("line_total")
+                or item.get("amount")
+                or item.get("net_amount"),
+                Decimal('0'),
+            )
+            tax_amount = self._safe_decimal(item.get("tax_amount"), fallback_tax)
+            line_total = subtotal + tax_amount
+            unit_price = self._safe_decimal(item.get("unit_price"), Decimal('0'))
+            if unit_price == 0 and quantity > 0:
+                unit_price = line_total / quantity
+
+            item_name = item.get("name") or item.get("description") or "Line item"
+            description = item.get("description") or item_name
+            tax_rate = self._safe_decimal(
+                item.get("tax_rate") or item.get("vat_rate"),
+                vat_rate,
+            )
+
+            transformed.append(
+                {
+                    "quantity": float(quantity if quantity > 0 else Decimal('1')),
+                    "price_unit": float(unit_price),
+                    "price_subtotal": float(subtotal),
+                    "product_id": {"name": item_name},
+                    "name": description,
+                    "invoice_line_tax_ids": {
+                        "amount": float(tax_amount),
+                        "currency_id": {"name": currency},
+                        "tax_id": {
+                            "amount": float(tax_rate),
+                            "name": item.get("tax_code") or "VAT",
+                        },
+                    },
+                    "uom_id": {"name": item.get("unit_code") or item.get("uom") or "EA"},
+                }
+            )
+
+        return transformed
+
+    def _prepare_ubl_source(
+        self,
+        invoice_data: Dict[str, Any],
+        organization: Optional[Organization]
+    ) -> Dict[str, Any]:
+        """Prepare source payload for the schema transformer from aggregated invoice data."""
+
+        currency = invoice_data.get("currency", "NGN")
+        subtotal = self._safe_decimal(invoice_data.get("subtotal"), Decimal('0'))
+        tax_amount = self._safe_decimal(invoice_data.get("tax_amount"), Decimal('0'))
+        total_amount = self._safe_decimal(invoice_data.get("total_amount"), subtotal + tax_amount)
+        vat_rate = self._infer_vat_rate(invoice_data.get("line_items", []), tax_amount, subtotal)
+
+        supplier = self._build_supplier_payload(organization)
+        customer = self._build_customer_payload(invoice_data.get("customer", {}))
+        line_payloads = self._build_invoice_lines_payload(
+            invoice_data.get("line_items", []),
+            currency,
+            vat_rate,
+            tax_amount,
+        )
+
+        source_payload: Dict[str, Any] = {
+            "number": invoice_data.get("invoice_number"),
+            "date_invoice": invoice_data.get("invoice_date"),
+            "date_due": invoice_data.get("due_date"),
+            "currency_id": {"name": currency},
+            "amount_untaxed": float(subtotal),
+            "amount_tax": float(tax_amount),
+            "amount_total": float(total_amount),
+            "company_id": supplier,
+            "partner_id": customer,
+            "invoice_line_ids": line_payloads,
+            "tax_line_ids": [
+                {
+                    "base": float(subtotal),
+                    "amount": float(tax_amount),
+                    "currency_id": {"name": currency},
+                    "tax_id": {
+                        "name": "VAT",
+                        "amount": float(vat_rate),
+                    },
+                }
+            ],
+        }
+
+        return source_payload
+
+    def _infer_erp_system(self, transaction: Optional[BusinessTransactionData]) -> ERPSystem:
+        """Infer the ERP system for a transaction for transformation configuration."""
+
+        if not transaction:
+            return ERPSystem.GENERIC
+
+        if transaction.source_type == DataSourceType.ERP:
+            source_id = (transaction.source_id or "").lower()
+            if "odoo" in source_id:
+                return ERPSystem.ODOO
+            if "sap" in source_id:
+                return ERPSystem.SAP
+            if "quickbook" in source_id:
+                return ERPSystem.QUICKBOOKS
+            if "sage" in source_id:
+                return ERPSystem.SAGE
+
+        return ERPSystem.GENERIC
+
+    async def _run_transformation_pipeline(
+        self,
+        base_invoice: Dict[str, Any],
+        source_context: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Execute the transformation orchestrator to obtain normalized invoice data."""
+
+        if not self.transformation_orchestrator or not source_context:
+            return None
+
+        transaction: Optional[BusinessTransactionData] = source_context.get("transaction")
+        if not transaction:
+            transactions: List[BusinessTransactionData] = source_context.get("transactions", [])  # type: ignore[arg-type]
+            if transactions:
+                transaction = transactions[0]
+
+        if not transaction:
+            return None
+
+        erp_payload: Dict[str, Any]
+        if isinstance(transaction.raw_data, dict) and transaction.raw_data:
+            erp_payload = transaction.raw_data
+        else:
+            erp_payload = base_invoice
+
+        erp_system = self._infer_erp_system(transaction)
+
+        config = TransformationConfig(
+            source_erp_system=erp_system,
+            target_currency=base_invoice.get("currency", "NGN"),
+            target_country="Nigeria",
+            strict_validation=False,
+        )
+
+        try:
+            result = await self.transformation_orchestrator.transform_invoice(erp_payload, config)
+        except Exception as exc:
+            logger.warning(
+                "Transformation pipeline execution failed for %s: %s",
+                erp_system.value,
+                exc,
+            )
+            return {
+                "success": False,
+                "erp_system": erp_system.value,
+                "warnings": [],
+                "errors": [str(exc)],
+                "metadata": {"failure_stage": "pipeline_execution"},
+                "processing_time": 0.0,
+                "normalized_invoice": None,
+            }
+
+        return {
+            "success": result.success,
+            "erp_system": erp_system.value,
+            "warnings": result.warnings or [],
+            "errors": result.errors or [],
+            "metadata": result.metadata,
+            "processing_time": result.processing_time,
+            "normalized_invoice": result.transformed_data,
+        }
+
+    def _hydrate_invoice_from_normalized(
+        self,
+        base_invoice: Dict[str, Any],
+        normalized: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Merge normalized invoice data into the working invoice payload when available."""
+
+        if not normalized:
+            return base_invoice
+
+        invoice = copy.deepcopy(base_invoice)
+
+        if normalized.get("invoice_number"):
+            invoice["invoice_number"] = normalized["invoice_number"]
+        if normalized.get("invoice_date"):
+            invoice["invoice_date"] = normalized["invoice_date"]
+        if normalized.get("due_date"):
+            invoice["due_date"] = normalized["due_date"]
+
+        currency_code = normalized.get("currency_code")
+        if currency_code:
+            invoice["currency"] = currency_code
+
+        total_amount = normalized.get("total_amount")
+        tax_amount = normalized.get("tax_amount")
+        if total_amount is not None:
+            invoice["total_amount"] = float(total_amount)
+        if tax_amount is not None:
+            invoice["tax_amount"] = float(tax_amount)
+        if total_amount is not None and tax_amount is not None:
+            invoice["subtotal"] = float(total_amount) - float(tax_amount)
+        elif total_amount is not None and invoice.get("tax_amount") is not None:
+            invoice["subtotal"] = float(total_amount) - float(invoice["tax_amount"])
+        elif tax_amount is not None and invoice.get("total_amount") is not None:
+            invoice["subtotal"] = float(invoice["total_amount"]) - float(tax_amount)
+
+        customer_info = invoice.get("customer", {}).copy()
+        if normalized.get("customer_name"):
+            customer_info.setdefault("name", normalized["customer_name"])
+        if normalized.get("customer_tin"):
+            customer_info.setdefault("tin", normalized["customer_tin"])
+        invoice["customer"] = customer_info
+
+        normalized_lines = normalized.get("line_items")
+        if normalized_lines and not invoice.get("line_items"):
+            converted_lines: List[Dict[str, Any]] = []
+            for line in normalized_lines:
+                converted_lines.append(
+                    {
+                        "name": line.get("description") or line.get("item") or "Line Item",
+                        "description": line.get("description"),
+                        "quantity": line.get("quantity", 0),
+                        "price_unit": line.get("unit_price", 0),
+                        "price_subtotal": line.get("total", 0),
+                        "tax_rate": line.get("tax_rate"),
+                    }
+                )
+            invoice["line_items"] = converted_lines
+
+        return invoice
+
+    async def _process_invoice_pipeline(
+        self,
+        invoice_data: Dict[str, Any],
+        organization: Optional[Organization],
+        include_signature: bool,
+        source_context: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[
+        Dict[str, Any],
+        Dict[str, Any],
+        Optional[Dict[str, Any]],
+        bool,
+        List[Dict[str, Any]],
+        List[str],
+        Dict[str, Any],
+    ]:
+        """Run mapping, validation, and optional signing for an invoice payload."""
+
+        working_invoice = copy.deepcopy(invoice_data)
+        transformation_summary = await self._run_transformation_pipeline(working_invoice, source_context)
+
+        if transformation_summary is None:
+            transformation_summary = {
+                "success": None,
+                "warnings": [],
+                "errors": [],
+                "erp_system": None,
+                "metadata": None,
+                "processing_time": 0.0,
+                "normalized_invoice": None,
+            }
+
+        normalized_invoice = transformation_summary.pop("normalized_invoice", None)
+        working_invoice = self._hydrate_invoice_from_normalized(working_invoice, normalized_invoice)
+
+        pipeline_warnings: List[str] = []
+        summary_warnings = transformation_summary.get("warnings") or []
+        if summary_warnings:
+            pipeline_warnings.extend(summary_warnings)
+
+        summary_errors = transformation_summary.get("errors") or []
+        if summary_errors and transformation_summary.get("success") is False:
+            pipeline_warnings.extend([f"Transformation error: {err}" for err in summary_errors if err])
+
+        source_payload = self._prepare_ubl_source(working_invoice, organization)
+        ubl_invoice = schema_transformer.transform_to_ubl_invoice(source_payload)
+        firs_invoice = schema_transformer.transform_to_firs_format(ubl_invoice)
+        is_valid, validation_errors = ubl_validator.validate_ubl_document(ubl_invoice)
+
+        signature_info: Optional[Dict[str, Any]] = None
+
+        if include_signature:
+            if is_valid:
+                certificate_id = await self._get_signing_certificate_id(organization)
+                if certificate_id:
+                    try:
+                        signature_info = self.certificate_service.sign_invoice_document(
+                            ubl_invoice,
+                            certificate_id=certificate_id,
+                        )
+                    except Exception as exc:
+                        pipeline_warnings.append(f"Digital signature failed: {exc}")
+                else:
+                    pipeline_warnings.append("Signing certificate not configured for organization")
+            else:
+                pipeline_warnings.append("Invoice failed validation; skipping digital signature")
+
+        transformation_summary["invoice_payload"] = copy.deepcopy(working_invoice)
+
+        return (
+            ubl_invoice,
+            firs_invoice,
+            signature_info,
+            is_valid,
+            validation_errors,
+            pipeline_warnings,
+            transformation_summary,
+        )
 
     async def aggregate_business_data(
         self,
@@ -949,6 +1418,7 @@ class ComprehensiveFIRSInvoiceGenerator:
                     selected_transactions, request
                 )
                 invoices.append(invoice_result)
+                warnings.extend(invoice_result.get('warnings', []))
                 captured_irn = invoice_result.get('irn')
                 if captured_irn:
                     irns_generated.append(captured_irn)
@@ -961,6 +1431,7 @@ class ComprehensiveFIRSInvoiceGenerator:
                             transaction, request
                         )
                         invoices.append(invoice_result)
+                        warnings.extend(invoice_result.get('warnings', []))
                         captured_irn = invoice_result.get('irn')
                         if captured_irn:
                             irns_generated.append(captured_irn)
@@ -1035,14 +1506,63 @@ class ComprehensiveFIRSInvoiceGenerator:
         if irn:
             invoice_data['irn'] = irn
 
+        organization = await self._get_organization_profile(request.organization_id)
+        (
+            ubl_invoice,
+            firs_invoice,
+            signature_info,
+            is_valid,
+            validation_errors,
+            pipeline_warnings,
+            transformation_summary,
+        ) = await self._process_invoice_pipeline(
+            invoice_data,
+            organization,
+            request.include_digital_signature,
+            {"transaction": transaction},
+        )
+
+        pipeline_invoice = transformation_summary.get("invoice_payload") if transformation_summary else None
+        response_payload = copy.deepcopy(pipeline_invoice) if pipeline_invoice else dict(invoice_data)
+        response_payload.update(
+            {
+                'ubl_document': ubl_invoice,
+                'firs_document': firs_invoice,
+                'signature': signature_info,
+                'validation_errors': validation_errors,
+                'warnings': pipeline_warnings,
+                'validation_status': 'valid' if is_valid else 'invalid',
+            }
+        )
+
+        if transformation_summary:
+            response_payload['transformation_pipeline'] = {
+                'success': transformation_summary.get('success'),
+                'erp_system': transformation_summary.get('erp_system'),
+                'warnings': transformation_summary.get('warnings', []),
+                'errors': transformation_summary.get('errors', []),
+                'metadata': transformation_summary.get('metadata'),
+                'processing_time': transformation_summary.get('processing_time'),
+            }
+
+        submission_payload = {
+            'source_invoice': invoice_data,
+            'ubl_document': ubl_invoice,
+            'firs_document': firs_invoice,
+            'signature': signature_info,
+            'transformation_pipeline': response_payload.get('transformation_pipeline'),
+        }
+
+        validation_status = ValidationStatus.VALID if is_valid else ValidationStatus.INVALID
+
         # Save to database
         firs_submission = FIRSSubmission(
             organization_id=request.organization_id,
             invoice_number=invoice_data['invoice_number'],
             irn=irn,
-            status=SubmissionStatus.GENERATED,
-            validation_status=ValidationStatus.VALID,
-            invoice_data=invoice_data,
+            status=SubmissionStatus.PENDING,
+            validation_status=validation_status,
+            invoice_data=submission_payload,
             original_data=transaction.raw_data,
             total_amount=transaction.amount,
             currency=transaction.currency,
@@ -1051,11 +1571,17 @@ class ComprehensiveFIRSInvoiceGenerator:
             customer_tin=transaction.customer_tin
         )
 
+        firs_submission.subtotal = Decimal(str(invoice_data['subtotal']))
+        firs_submission.tax_amount = Decimal(str(invoice_data['tax_amount']))
+
+        if not is_valid:
+            firs_submission.error_details = {'validation_errors': validation_errors}
+
         self.db.add(firs_submission)
         await self.db.commit()
 
         # Create SI-APP correlation for status tracking
-        if irn:
+        if irn and is_valid:
             try:
                 await self.correlation_service.create_correlation(
                     organization_id=request.organization_id,
@@ -1068,14 +1594,24 @@ class ComprehensiveFIRSInvoiceGenerator:
                     customer_name=transaction.customer_name,
                     customer_email=transaction.customer_email,
                     customer_tin=transaction.customer_tin,
-                    invoice_data=invoice_data
+                    invoice_data=response_payload
                 )
                 logger.info(f"Created SI-APP correlation for IRN {irn}")
             except Exception as e:
                 logger.warning(f"Failed to create SI-APP correlation for IRN {irn}: {e}")
                 # Don't fail the invoice generation if correlation creation fails
 
-        return invoice_data
+        if not is_valid:
+            detail = (
+                validation_errors[0].get('message')
+                if validation_errors and isinstance(validation_errors[0], dict)
+                else validation_errors[0]
+                if validation_errors
+                else "Unknown validation error"
+            )
+            raise ValueError(f"UBL validation failed: {detail}")
+
+        return response_payload
 
     async def _generate_consolidated_invoice(
         self,
@@ -1099,6 +1635,8 @@ class ComprehensiveFIRSInvoiceGenerator:
             all_line_items.extend(txn.line_items)
             total_amount += txn.amount
             total_tax += txn.tax_amount
+
+        subtotal = total_amount - total_tax
 
         # Create consolidated invoice data
         invoice_data = {
@@ -1127,14 +1665,63 @@ class ComprehensiveFIRSInvoiceGenerator:
         if irn:
             invoice_data['irn'] = irn
 
+        organization = await self._get_organization_profile(request.organization_id)
+        (
+            ubl_invoice,
+            firs_invoice,
+            signature_info,
+            is_valid,
+            validation_errors,
+            pipeline_warnings,
+            transformation_summary,
+        ) = await self._process_invoice_pipeline(
+            invoice_data,
+            organization,
+            request.include_digital_signature,
+            {"transactions": transactions},
+        )
+
+        pipeline_invoice = transformation_summary.get("invoice_payload") if transformation_summary else None
+        response_payload = copy.deepcopy(pipeline_invoice) if pipeline_invoice else dict(invoice_data)
+        response_payload.update(
+            {
+                'ubl_document': ubl_invoice,
+                'firs_document': firs_invoice,
+                'signature': signature_info,
+                'validation_errors': validation_errors,
+                'warnings': pipeline_warnings,
+                'validation_status': 'valid' if is_valid else 'invalid',
+            }
+        )
+
+        if transformation_summary:
+            response_payload['transformation_pipeline'] = {
+                'success': transformation_summary.get('success'),
+                'erp_system': transformation_summary.get('erp_system'),
+                'warnings': transformation_summary.get('warnings', []),
+                'errors': transformation_summary.get('errors', []),
+                'metadata': transformation_summary.get('metadata'),
+                'processing_time': transformation_summary.get('processing_time'),
+            }
+
+        submission_payload = {
+            'source_invoice': invoice_data,
+            'ubl_document': ubl_invoice,
+            'firs_document': firs_invoice,
+            'signature': signature_info,
+            'transformation_pipeline': response_payload.get('transformation_pipeline'),
+        }
+
+        validation_status = ValidationStatus.VALID if is_valid else ValidationStatus.INVALID
+
         # Save to database
         firs_submission = FIRSSubmission(
             organization_id=request.organization_id,
             invoice_number=invoice_data['invoice_number'],
             irn=irn,
-            status=SubmissionStatus.GENERATED,
-            validation_status=ValidationStatus.VALID,
-            invoice_data=invoice_data,
+            status=SubmissionStatus.PENDING,
+            validation_status=validation_status,
+            invoice_data=submission_payload,
             original_data={'consolidated_transactions': [txn.raw_data for txn in transactions]},
             total_amount=total_amount,
             currency=primary_transaction.currency,
@@ -1143,11 +1730,17 @@ class ComprehensiveFIRSInvoiceGenerator:
             customer_tin=invoice_data['customer']['tin']
         )
 
+        firs_submission.subtotal = subtotal
+        firs_submission.tax_amount = total_tax
+
+        if not is_valid:
+            firs_submission.error_details = {'validation_errors': validation_errors}
+
         self.db.add(firs_submission)
         await self.db.commit()
 
         # Create SI-APP correlation for consolidated invoice
-        if irn:
+        if irn and is_valid:
             try:
                 await self.correlation_service.create_correlation(
                     organization_id=request.organization_id,
@@ -1160,14 +1753,24 @@ class ComprehensiveFIRSInvoiceGenerator:
                     customer_name=invoice_data['customer']['name'],
                     customer_email=invoice_data['customer']['email'],
                     customer_tin=invoice_data['customer']['tin'],
-                    invoice_data=invoice_data
+                    invoice_data=response_payload
                 )
                 logger.info(f"Created SI-APP correlation for consolidated IRN {irn}")
             except Exception as e:
                 logger.warning(f"Failed to create SI-APP correlation for consolidated IRN {irn}: {e}")
                 # Don't fail the invoice generation if correlation creation fails
 
-        return invoice_data
+        if not is_valid:
+            detail = (
+                validation_errors[0].get('message')
+                if validation_errors and isinstance(validation_errors[0], dict)
+                else validation_errors[0]
+                if validation_errors
+                else "Unknown validation error"
+            )
+            raise ValueError(f"UBL validation failed: {detail}")
+
+        return response_payload
 
     async def _generate_irn(
         self,

@@ -6,9 +6,12 @@ Handles advanced certificate operations, digital signatures, and cryptographic o
 """
 
 import logging
+import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
+from xml.etree import ElementTree as ET
+from xml.dom import minidom
 
 # Import granular components
 from .certificate_generator import CertificateGenerator
@@ -21,7 +24,7 @@ from .ca_integration import CAIntegration
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa
 import base64
 
 logger = logging.getLogger(__name__)
@@ -106,19 +109,29 @@ class DigitalCertificateService:
             
             # Sign data
             data_bytes = data.encode('utf-8')
-            signature = private_key.sign(
-                data_bytes,
-                padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH
-                ),
-                hashes.SHA256()
-            )
-            
+            if isinstance(private_key, rsa.RSAPrivateKey):
+                signature = private_key.sign(
+                    data_bytes,
+                    padding.PSS(
+                        mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH
+                    ),
+                    hashes.SHA256()
+                )
+                algorithm_used = "RSA-PSS-SHA256"
+            elif isinstance(private_key, ec.EllipticCurvePrivateKey):
+                signature = private_key.sign(
+                    data_bytes,
+                    ec.ECDSA(hashes.SHA256())
+                )
+                algorithm_used = f"ECDSA-{private_key.curve.name}-SHA256"
+            else:
+                raise ValueError("Unsupported private key type for signing")
+
             # Create signature info
             signature_info = {
                 'signature': base64.b64encode(signature).decode('utf-8'),
-                'algorithm': 'RSA-PSS-SHA256',
+                'algorithm': algorithm_used,
                 'certificate_id': certificate_id,
                 'certificate_fingerprint': cert_info.fingerprint,
                 'signed_at': datetime.now().isoformat(),
@@ -137,6 +150,100 @@ class DigitalCertificateService:
         except Exception as e:
             logger.error(f"Error signing data with certificate {certificate_id}: {str(e)}")
             raise
+
+    def sign_invoice_document(
+        self,
+        document: Dict[str, Any],
+        certificate_id: str,
+        canonicalization: str = "json",
+        private_key_path: Optional[str] = None,
+        passphrase: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Sign a structured invoice document and return signature metadata with XAdES envelope."""
+
+        canonical_payload = self._canonicalize_document(document, canonicalization)
+        signature_info = self.sign_data(
+            data=canonical_payload,
+            certificate_id=certificate_id,
+            private_key_path=private_key_path,
+            passphrase=passphrase,
+        )
+
+        signature_info['canonical_payload'] = canonical_payload
+        signature_info['signature_format'] = 'XAdES-BES'
+        signature_info['xades_envelope'] = self._build_xades_envelope(signature_info)
+
+        return signature_info
+
+    def _canonicalize_document(self, document: Dict[str, Any], canonicalization: str) -> str:
+        """Create a deterministic representation of the document for signing."""
+
+        if canonicalization.lower() == "json":
+            return json.dumps(document, sort_keys=True, separators=(",", ":"))
+
+        # Fallback to simple string conversion for unsupported modes
+        return str(document)
+
+    def _build_xades_envelope(self, signature_info: Dict[str, Any]) -> str:
+        """Build a minimal XAdES-BES envelope to accompany the detached signature."""
+
+        qualifying_properties = ET.Element(
+            "xades:QualifyingProperties",
+            attrib={
+                "xmlns:xades": "http://uri.etsi.org/01903/v1.3.2#",
+                "Target": "#signed-invoice",
+            },
+        )
+
+        signed_properties = ET.SubElement(
+            qualifying_properties, "xades:SignedProperties", attrib={"Id": "SignedProperties"}
+        )
+        signed_signature_props = ET.SubElement(
+            signed_properties, "xades:SignedSignatureProperties"
+        )
+        ET.SubElement(
+            signed_signature_props, "xades:SigningTime"
+        ).text = signature_info.get("signed_at", datetime.now().isoformat())
+
+        signing_certificate = ET.SubElement(signed_signature_props, "xades:SigningCertificate")
+        cert_element = ET.SubElement(signing_certificate, "xades:Cert")
+        cert_digest = ET.SubElement(cert_element, "xades:CertDigest")
+        ET.SubElement(
+            cert_digest,
+            "xades:DigestMethod",
+            attrib={"Algorithm": "http://www.w3.org/2001/04/xmlenc#sha256"},
+        )
+        ET.SubElement(cert_digest, "xades:DigestValue").text = signature_info.get("data_hash", "")
+
+        issuer_serial = ET.SubElement(cert_element, "xades:IssuerSerial")
+        ET.SubElement(issuer_serial, "xades:X509SerialNumber").text = signature_info.get(
+            "certificate_fingerprint", "unknown"
+        )
+
+        signature_policy_identifier = ET.SubElement(
+            signed_signature_props, "xades:SignaturePolicyIdentifier"
+        )
+        ET.SubElement(signature_policy_identifier, "xades:SignaturePolicyImplied")
+
+        signed_data_object_props = ET.SubElement(
+            signed_properties, "xades:SignedDataObjectProperties"
+        )
+        data_object_format = ET.SubElement(signed_data_object_props, "xades:DataObjectFormat")
+        ET.SubElement(data_object_format, "xades:MimeType").text = "application/json"
+
+        unsigned_properties = ET.SubElement(
+            qualifying_properties, "xades:UnsignedProperties"
+        )
+        unsigned_signature_props = ET.SubElement(
+            unsigned_properties, "xades:UnsignedSignatureProperties"
+        )
+        ET.SubElement(unsigned_signature_props, "xades:SignatureValue").text = signature_info.get(
+            "signature", ""
+        )
+
+        rough_xml = ET.tostring(qualifying_properties, encoding="utf-8")
+        parsed = minidom.parseString(rough_xml)
+        return parsed.toxml()
     
     def verify_signature(
         self,
@@ -174,20 +281,29 @@ class DigitalCertificateService:
             signature_bytes = base64.b64decode(signature_info['signature'])
             data_bytes = data.encode('utf-8')
             
-            # Verify signature
+            # Verify signature based on public key type
             try:
-                public_key.verify(
-                    signature_bytes,
-                    data_bytes,
-                    padding.PSS(
-                        mgf=padding.MGF1(hashes.SHA256()),
-                        salt_length=padding.PSS.MAX_LENGTH
-                    ),
-                    hashes.SHA256()
-                )
+                if isinstance(public_key, rsa.RSAPublicKey):
+                    public_key.verify(
+                        signature_bytes,
+                        data_bytes,
+                        padding.PSS(
+                            mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH
+                        ),
+                        hashes.SHA256()
+                    )
+                elif isinstance(public_key, ec.EllipticCurvePublicKey):
+                    public_key.verify(
+                        signature_bytes,
+                        data_bytes,
+                        ec.ECDSA(hashes.SHA256())
+                    )
+                else:
+                    raise ValueError("Unsupported public key type for verification")
                 signature_valid = True
                 verification_error = None
-                
+
             except Exception as e:
                 signature_valid = False
                 verification_error = str(e)

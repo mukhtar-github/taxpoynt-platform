@@ -11,6 +11,12 @@ from datetime import datetime
 from decimal import Decimal
 import uuid
 
+from .bis_mandatory_fields import (
+    BIS_MANDATORY_FIELD_SPECS,
+    get_value_by_path,
+    set_value_by_path,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,6 +30,7 @@ class SchemaTransformer:
         self.transformation_mappings = self._load_transformation_mappings()
         self.default_values = self._load_default_values()
         self.field_normalizers = self._load_field_normalizers()
+        self.mandatory_field_specs = BIS_MANDATORY_FIELD_SPECS
     
     def transform_to_ubl_invoice(
         self, 
@@ -73,10 +80,14 @@ class SchemaTransformer:
             ubl_invoice["legal_monetary_total"] = self._transform_monetary_total(
                 source_data, mapping
             )
-            
+
+            # Ensure line coverage and mandatory field presence before normalization
+            ubl_invoice = self._ensure_invoice_lines(ubl_invoice)
+            ubl_invoice = self._ensure_mandatory_fields(ubl_invoice)
+
             # Apply field normalizations
             ubl_invoice = self._normalize_fields(ubl_invoice)
-            
+
             # Set FIRS-specific fields
             ubl_invoice = self._apply_firs_requirements(ubl_invoice)
             
@@ -136,37 +147,45 @@ class SchemaTransformer:
         
         # Map basic invoice fields
         header_mapping = mapping.get("invoice_header", {})
-        
+
         # Invoice number
-        header["invoice_number"] = self._get_mapped_value(
+        invoice_number = self._get_mapped_value(
             source_data, header_mapping.get("invoice_number", "number")
         )
-        
+        if not invoice_number:
+            invoice_number = source_data.get("name") or str(uuid.uuid4())
+        header["invoice_number"] = str(invoice_number)
+
         # Invoice type code (default to commercial invoice)
         header["invoice_type_code"] = self._get_mapped_value(
-            source_data, 
+            source_data,
             header_mapping.get("invoice_type_code"),
-            default="380"  # Commercial Invoice
+            default=self.default_values.get("invoice_type_code", "380")
         )
-        
+
         # Invoice date
         invoice_date = self._get_mapped_value(
             source_data, header_mapping.get("invoice_date", "date_invoice")
         )
-        header["invoice_date"] = self._normalize_date(invoice_date)
-        
+        normalized_invoice_date = self._normalize_date(invoice_date)
+        if not normalized_invoice_date:
+            normalized_invoice_date = datetime.utcnow().strftime('%Y-%m-%d')
+        header["invoice_date"] = normalized_invoice_date
+
         # Due date
         due_date = self._get_mapped_value(
             source_data, header_mapping.get("due_date", "date_due")
         )
-        if due_date:
-            header["due_date"] = self._normalize_date(due_date)
-        
+        normalized_due_date = self._normalize_date(due_date)
+        if not normalized_due_date:
+            normalized_due_date = normalized_invoice_date
+        header["due_date"] = normalized_due_date
+
         # Currency code
         header["currency_code"] = self._get_mapped_value(
             source_data,
             header_mapping.get("currency_code", "currency_id.name"),
-            default="NGN"
+            default=self.default_values.get("currency_code", "NGN")
         )
         
         # Document references
@@ -187,24 +206,28 @@ class SchemaTransformer:
         if not supplier_source:
             supplier_source = source_data  # Fallback to root level
         
+        supplier_name = self._get_mapped_value(
+            supplier_source,
+            supplier_mapping.get("name", "name"),
+            default=self.default_values.get("supplier_name", "Unknown Supplier")
+        )
+
         supplier = {
             "party": {
                 "party_name": [
                     {
-                        "name": self._get_mapped_value(
-                            supplier_source, 
-                            supplier_mapping.get("name", "name")
-                        )
+                        "name": supplier_name
                     }
                 ],
                 "postal_address": self._transform_address(
-                    supplier_source, supplier_mapping.get("address", {})
+                    supplier_source, supplier_mapping.get("address", {}), context="supplier"
                 ),
                 "party_tax_scheme": [
                     {
                         "company_id": self._get_mapped_value(
                             supplier_source,
-                            supplier_mapping.get("tax_id", "vat")
+                            supplier_mapping.get("tax_id", "vat"),
+                            default=self.default_values.get("supplier_tax_id", "UNKNOWN")
                         ),
                         "tax_scheme": {
                             "id": "VAT",
@@ -216,62 +239,120 @@ class SchemaTransformer:
                     {
                         "registration_name": self._get_mapped_value(
                             supplier_source,
-                            supplier_mapping.get("legal_name", "name")
+                            supplier_mapping.get("legal_name", "name"),
+                            default=self.default_values.get("supplier_legal_name", supplier_name)
                         ),
                         "company_id": self._get_mapped_value(
                             supplier_source,
-                            supplier_mapping.get("registration_id", "company_registry")
+                            supplier_mapping.get("registration_id", "company_registry"),
+                            default=self.default_values.get("supplier_registration_id", "UNKNOWN")
                         )
                     }
                 ]
             }
         }
-        
+
+        legal_entities_path = supplier_mapping.get("legal_entities")
+        if legal_entities_path:
+            extracted_entities = self._get_mapped_value(supplier_source, legal_entities_path)
+            legal_entities: List[Dict[str, Any]] = []
+            if isinstance(extracted_entities, list):
+                for entity in extracted_entities:
+                    if isinstance(entity, dict):
+                        legal_entities.append(
+                            {
+                                "registration_name": entity.get("registration_name")
+                                or entity.get("name")
+                                or self.default_values.get("supplier_legal_name", supplier_name),
+                                "company_id": entity.get("company_id")
+                                or entity.get("registration_id")
+                                or self.default_values.get("supplier_registration_id", "UNKNOWN"),
+                            }
+                        )
+            if legal_entities:
+                supplier["party"]["party_legal_entity"] = legal_entities
+
+        supplier_contact = {
+            "telephone": self._get_mapped_value(
+                supplier_source,
+                supplier_mapping.get("phone", "phone"),
+                default=self.default_values.get("supplier_phone", "00000000000")
+            ),
+            "electronic_mail": self._get_mapped_value(
+                supplier_source,
+                supplier_mapping.get("email", "email"),
+                default=self.default_values.get("supplier_email", "no-reply@example.com")
+            ),
+        }
+        supplier["party"]["contact"] = supplier_contact
+
         return supplier
     
     def _transform_customer_party(self, source_data: Dict[str, Any], mapping: Dict[str, Any]) -> Dict[str, Any]:
         """Transform customer party information"""
         customer_mapping = mapping.get("customer", {})
-        
+
         # Extract customer data from source
         customer_source = self._get_mapped_value(
             source_data, customer_mapping.get("source_path", "partner_id")
+        ) or {}
+
+        customer_name = self._get_mapped_value(
+            customer_source,
+            customer_mapping.get("name", "name"),
+            default=self.default_values.get("customer_name", "Unknown Customer")
         )
-        
-        if not customer_source:
-            return {"party": {}}  # Return empty structure if no customer data
-        
+
         customer = {
             "party": {
                 "party_name": [
                     {
-                        "name": self._get_mapped_value(
-                            customer_source,
-                            customer_mapping.get("name", "name")
-                        )
+                        "name": customer_name
                     }
                 ],
                 "postal_address": self._transform_address(
-                    customer_source, customer_mapping.get("address", {})
+                    customer_source, customer_mapping.get("address", {}), context="customer"
                 )
             }
         }
-        
-        # Add tax scheme if customer has tax ID
+
         customer_tax_id = self._get_mapped_value(
             customer_source, customer_mapping.get("tax_id", "vat")
         )
-        if customer_tax_id:
-            customer["party"]["party_tax_scheme"] = [
+        if isinstance(customer_tax_id, list):
+            tax_ids = [tin for tin in customer_tax_id if tin]
+        else:
+            tax_ids = [customer_tax_id] if customer_tax_id else []
+        if not tax_ids:
+            tax_ids = [self.default_values.get("customer_tax_id", "UNKNOWN")]
+
+        customer_tax_schemes = []
+        for tax_id in tax_ids:
+            customer_tax_schemes.append(
                 {
-                    "company_id": customer_tax_id,
+                    "company_id": tax_id,
                     "tax_scheme": {
-                        "id": "VAT",
+                        "id": self.default_values.get("tax_category", "VAT"),
                         "name": "Value Added Tax"
                     }
                 }
-            ]
-        
+            )
+        customer["party"]["party_tax_scheme"] = customer_tax_schemes
+
+        customer_contact = {
+            "telephone": self._get_mapped_value(
+                customer_source,
+                customer_mapping.get("phone", "phone"),
+                default=self.default_values.get("customer_phone", "N/A")
+            ),
+            "electronic_mail": self._get_mapped_value(
+                customer_source,
+                customer_mapping.get("email", "email"),
+                default=self.default_values.get("customer_email", "unknown@example.com")
+            ),
+        }
+        customer["party"]["contact"] = customer_contact
+
         return customer
     
     def _transform_invoice_lines(self, source_data: Dict[str, Any], mapping: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -424,34 +505,46 @@ class SchemaTransformer:
             }
         }
     
-    def _transform_address(self, source_data: Dict[str, Any], address_mapping: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform address information"""
+    def _transform_address(self, source_data: Dict[str, Any], address_mapping: Dict[str, Any], *, context: str) -> Dict[str, Any]:
+        """Transform address information, applying context-specific defaults."""
+
+        prefix = f"{context}_"
         return {
             "street_name": self._get_mapped_value(
-                source_data, address_mapping.get("street", "street")
+                source_data,
+                address_mapping.get("street", "street"),
+                default=self.default_values.get(f"{prefix}street", "UNKNOWN")
             ),
             "additional_street_name": self._get_mapped_value(
-                source_data, address_mapping.get("street2", "street2")
+                source_data,
+                address_mapping.get("street2", "street2"),
+                default=self.default_values.get(f"{prefix}street2", "")
             ),
             "city_name": self._get_mapped_value(
-                source_data, address_mapping.get("city", "city")
+                source_data,
+                address_mapping.get("city", "city"),
+                default=self.default_values.get(f"{prefix}city", "UNKNOWN")
             ),
             "postal_zone": self._get_mapped_value(
-                source_data, address_mapping.get("zip", "zip")
+                source_data,
+                address_mapping.get("zip", "zip"),
+                default=self.default_values.get(f"{prefix}postal_code", "")
             ),
             "country_subentity": self._get_mapped_value(
-                source_data, address_mapping.get("state", "state_id.name")
+                source_data,
+                address_mapping.get("state", "state_id.name"),
+                default=self.default_values.get(f"{prefix}state", "")
             ),
             "country": {
                 "identification_code": self._get_mapped_value(
-                    source_data, 
+                    source_data,
                     address_mapping.get("country_code", "country_id.code"),
-                    default="NG"
+                    default=self.default_values.get(f"{prefix}country_code", self.default_values.get("country_code", "NG"))
                 ),
                 "name": self._get_mapped_value(
                     source_data,
                     address_mapping.get("country_name", "country_id.name"),
-                    default="Nigeria"
+                    default=self.default_values.get(f"{prefix}country_name", "Nigeria")
                 )
             }
         }
@@ -463,12 +556,28 @@ class SchemaTransformer:
         if not tax_data:
             return None
         
+        tax_amount = self._normalize_decimal(
+            self._get_mapped_value(tax_data, tax_mapping.get("amount", "amount"))
+        )
+        tax_currency = self._get_mapped_value(tax_data, tax_mapping.get("currency", "currency_id.name"), default="NGN")
+        tax_percent = self._get_mapped_value(tax_data, tax_mapping.get("percent", "tax_id.amount"))
+
+        tax_category_id = self._get_mapped_value(
+            tax_data, tax_mapping.get("category", "tax_id.name"), default=self.default_values.get("tax_category", "VAT")
+        )
+
         return {
             "tax_amount": {
-                "value": self._normalize_decimal(
-                    self._get_mapped_value(tax_data, tax_mapping.get("amount", "amount"))
-                ),
-                "currency_id": "NGN"
+                "value": tax_amount,
+                "currency_id": tax_currency or "NGN"
+            },
+            "tax_category": {
+                "id": tax_category_id or self.default_values.get("tax_category", "VAT"),
+                "percent": self._normalize_decimal(tax_percent or self.default_values.get("tax_percent", "7.5")),
+                "tax_scheme": {
+                    "id": self.default_values.get("tax_category", "VAT"),
+                    "name": "Value Added Tax"
+                }
             }
         }
     
@@ -542,7 +651,114 @@ class SchemaTransformer:
                         "list_id": "HS"  # Harmonized System
                     }
                 ]
-        
+
+        return data
+
+    def _ensure_invoice_lines(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure at least one invoice line exists with required sub-structure."""
+
+        currency = data.get("currency_code", self.default_values.get("currency_code", "NGN"))
+        lines = data.get("invoice_lines") or []
+
+        if not lines:
+            default_line = {
+                "id": "1",
+                "invoiced_quantity": {
+                    "value": "1.00",
+                    "unit_code": self.default_values.get("unit_code", "EA"),
+                },
+                "line_extension_amount": {
+                    "value": "0.00",
+                    "currency_id": currency,
+                },
+                "item": {
+                    "name": self.default_values.get("line_item_name", "General line item"),
+                    "description": self.default_values.get("line_item_description", ""),
+                },
+                "price": {
+                    "price_amount": {
+                        "value": "0.00",
+                        "currency_id": currency,
+                    }
+                },
+                "tax_total": {
+                    "tax_amount": {
+                        "value": "0.00",
+                        "currency_id": currency,
+                    },
+                    "tax_category": {
+                        "id": self.default_values.get("tax_category", "VAT"),
+                        "percent": self.default_values.get("tax_percent", "7.5"),
+                    },
+                },
+            }
+            lines = [default_line]
+
+        for index, line in enumerate(lines, start=1):
+            line.setdefault("id", str(index))
+
+            quantity = line.setdefault("invoiced_quantity", {})
+            quantity.setdefault("value", "1.00")
+            quantity.setdefault("unit_code", self.default_values.get("unit_code", "EA"))
+
+            extension_amount = line.setdefault("line_extension_amount", {})
+            extension_amount.setdefault("value", "0.00")
+            extension_amount.setdefault("currency_id", currency)
+
+            price = line.setdefault("price", {})
+            price_amount = price.setdefault("price_amount", {})
+            price_amount.setdefault("value", "0.00")
+            price_amount.setdefault("currency_id", currency)
+
+            item = line.setdefault("item", {})
+            item.setdefault("name", self.default_values.get("line_item_name", "General line item"))
+            item.setdefault("description", self.default_values.get("line_item_description", ""))
+
+            tax_total = line.setdefault("tax_total", {})
+            tax_amount = tax_total.setdefault("tax_amount", {})
+            tax_amount.setdefault("value", "0.00")
+            tax_amount.setdefault("currency_id", currency)
+
+            tax_category = tax_total.setdefault("tax_category", {})
+            tax_category.setdefault("id", self.default_values.get("tax_category", "VAT"))
+            tax_category.setdefault("percent", self.default_values.get("tax_percent", "7.5"))
+
+        data["invoice_lines"] = lines
+        return data
+
+    def _get_fallback_for_path(self, path: str) -> Optional[Any]:
+        """Provide fallback values for mandatory fields lacking explicit defaults."""
+
+        fallback_map = {
+            "accounting_supplier_party.party.party_name[0].name": self.default_values.get("supplier_name"),
+            "accounting_supplier_party.party.party_tax_scheme[0].company_id": self.default_values.get("supplier_tax_id", "UNKNOWN"),
+            "accounting_supplier_party.party.party_legal_entity[0].registration_name": self.default_values.get("supplier_legal_name", "Unknown Supplier"),
+            "accounting_customer_party.party.party_name[0].name": self.default_values.get("customer_name"),
+            "invoice_lines[0].id": "1",
+            "invoice_lines[0].invoiced_quantity.value": "1.00",
+            "invoice_lines[0].line_extension_amount.value": "0.00",
+            "invoice_lines[0].item.name": self.default_values.get("line_item_name"),
+            "invoice_lines[0].price.price_amount.value": "0.00",
+        }
+
+        return fallback_map.get(path)
+
+    def _ensure_mandatory_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure all mandatory fields are present, applying defaults or fallbacks."""
+
+        for spec in self.mandatory_field_specs:
+            current_value = get_value_by_path(data, spec.path)
+            if current_value is None:
+                if spec.default is not None:
+                    set_value_by_path(data, spec.path, spec.default)
+                    continue
+
+                fallback = self._get_fallback_for_path(spec.path)
+                if fallback is not None:
+                    set_value_by_path(data, spec.path, fallback)
+                else:
+                    logger.debug("Mandatory field %s (%s) missing and no default available", spec.path, spec.label)
+
         return data
     
     def _generate_firs_metadata(self) -> Dict[str, Any]:
@@ -674,7 +890,35 @@ class SchemaTransformer:
             "country_code": "NG",
             "invoice_type_code": "380",
             "unit_code": "EA",
-            "tax_scheme": "VAT"
+            "tax_scheme": "VAT",
+            "supplier_name": "Unknown Supplier",
+            "supplier_legal_name": "Unknown Supplier",
+            "supplier_registration_id": "UNKNOWN",
+            "supplier_tax_id": "UNKNOWN",
+            "supplier_phone": "00000000000",
+            "supplier_email": "no-reply@example.com",
+            "supplier_street": "Unknown Street",
+            "supplier_street2": "",
+            "supplier_city": "Lagos",
+            "supplier_postal_code": "",
+            "supplier_state": "",
+            "supplier_country_code": "NG",
+            "supplier_country_name": "Nigeria",
+            "customer_name": "Unknown Customer",
+            "customer_tax_id": "UNKNOWN",
+            "customer_phone": "N/A",
+            "customer_email": "unknown@example.com",
+            "customer_street": "UNKNOWN",
+            "customer_street2": "",
+            "customer_city": "UNKNOWN",
+            "customer_postal_code": "",
+            "customer_state": "",
+            "customer_country_code": "NG",
+            "customer_country_name": "Nigeria",
+            "line_item_name": "General line item",
+            "line_item_description": "",
+            "tax_category": "VAT",
+            "tax_percent": "7.5"
         }
     
     def _load_field_normalizers(self) -> Dict[str, callable]:

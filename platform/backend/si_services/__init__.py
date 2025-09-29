@@ -20,6 +20,7 @@ Services Registered:
 
 import logging
 import asyncio
+import json
 from typing import Dict, Any, Optional
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
@@ -594,11 +595,12 @@ class SIServiceRegistry:
                         "validate_certificate",
                         "revoke_certificate",
                         "renew_certificate",
-                        "get_certificate_status"
+                        "get_certificate_status",
+                        "verify_signature",
                     ]
                 }
             )
-            
+
             self.service_endpoints["certificate_management"] = endpoint_id
             logger.info(f"Certificate management service registered: {endpoint_id}")
             
@@ -997,6 +999,7 @@ class SIServiceRegistry:
         """Create callback for certificate operations with AsyncSession DI"""
         from core_platform.data_management.db_async import get_async_session
         from si_services.certificate_management.certificate_service import CertificateService
+        from si_services.certificate_management.digital_certificate_service import DigitalCertificateService
 
         async def cert_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
@@ -1033,6 +1036,25 @@ class SIServiceRegistry:
                         certificate_data = payload.get("certificate_data")
                         result = service.validate_certificate(certificate_data)
                         return {"operation": operation, "success": result.get("is_valid", False), "data": result}
+
+                    if operation == "verify_signature":
+                        certificate_id = payload.get("certificate_id")
+                        data_payload = payload.get("data")
+                        signature_info = payload.get("signature_info", {})
+                        if isinstance(data_payload, dict):
+                            data_payload = json.dumps(data_payload, sort_keys=True, separators=(",", ":"))
+
+                        verifier = DigitalCertificateService()
+                        verification_result = verifier.verify_signature(
+                            data=data_payload or "",
+                            signature_info=signature_info,
+                            certificate_id=certificate_id,
+                        )
+                        return {
+                            "operation": operation,
+                            "success": verification_result.get("is_valid", False),
+                            "data": verification_result,
+                        }
 
                     if operation == "get_certificate_status":
                         certificate_id = payload.get("certificate_id")
