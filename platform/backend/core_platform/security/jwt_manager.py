@@ -191,7 +191,7 @@ class ProductionJWTManager:
         """Create JWT access token with secure payload"""
         now = datetime.now(timezone.utc)
         expire = now + timedelta(minutes=self.access_token_expire_minutes)
-        
+
         payload = {
             "sub": str(user_data.get("user_id")),
             "email": user_data.get("email"),
@@ -205,9 +205,15 @@ class ProductionJWTManager:
             "iss": "taxpoynt-platform",
             "aud": "taxpoynt-api"
         }
-        
+
+        extra_claims = user_data.get("extra_claims") if isinstance(user_data, dict) else None
+        if isinstance(extra_claims, dict):
+            for key, value in extra_claims.items():
+                if key not in payload:
+                    payload[key] = value
+
         token = jwt.encode(payload, self.jwt_secret, algorithm=self.algorithm)
-        
+
         # Cache token metadata for revocation
         self._cache_token_metadata(payload["jti"], {
             "user_id": payload["sub"],
@@ -215,7 +221,7 @@ class ProductionJWTManager:
             "expires_at": expire.isoformat(),
             "created_at": now.isoformat()
         })
-        
+
         return token
     
     def create_refresh_token(self, user_id: str) -> str:
@@ -348,6 +354,45 @@ class ProductionJWTManager:
         }
         
         return self.create_access_token(user_data)
+
+    def create_custom_token(
+        self,
+        payload: Dict[str, Any],
+        *,
+        expires_in_seconds: int,
+        token_type: str = "custom",
+    ) -> str:
+        """Create a JWT with custom payload and expiry (used for OAuth tokens)."""
+
+        now = datetime.now(timezone.utc)
+        expire = now + timedelta(seconds=max(1, int(expires_in_seconds)))
+
+        token_payload = dict(payload)
+        token_payload.setdefault("sub", token_payload.get("client_id"))
+        token_payload.setdefault("iss", "taxpoynt-platform")
+        token_payload.setdefault("aud", token_payload.get("aud") or "taxpoynt-api")
+        token_payload["token_type"] = token_payload.get("token_type", token_type)
+        token_payload["iat"] = now
+        token_payload["exp"] = expire
+        token_payload["jti"] = self._generate_token_id()
+
+        token = jwt.encode(token_payload, self.jwt_secret, algorithm=self.algorithm)
+
+        metadata = {
+            "user_id": token_payload.get("sub"),
+            "token_type": token_payload.get("token_type"),
+            "expires_at": expire.isoformat(),
+            "created_at": now.isoformat(),
+        }
+        client_id = token_payload.get("client_id")
+        if client_id:
+            metadata["client_id"] = str(client_id)
+        usage = token_payload.get("token_usage")
+        if usage:
+            metadata["token_usage"] = usage
+
+        self._cache_token_metadata(token_payload["jti"], metadata)
+        return token
     
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data for database storage"""

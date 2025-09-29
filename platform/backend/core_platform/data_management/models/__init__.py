@@ -11,6 +11,7 @@ from .organization import Organization, OrganizationUser
 from .integration import Integration, IntegrationCredentials
 from .firs_submission import FIRSSubmission
 from .si_app_correlation import SIAPPCorrelation, CorrelationStatus
+from .oauth_client import OAuthClient, OAuthClientStatus
 from .banking import (
     BankingConnection, BankAccount, BankTransaction, 
     BankingWebhook, BankingSyncLog, BankingCredentials,
@@ -64,6 +65,8 @@ __all__ = [
     "FIRSSubmission",
     "SIAPPCorrelation",
     "CorrelationStatus",
+    "OAuthClient",
+    "OAuthClientStatus",
     "BankingConnection",
     "BankAccount",
     "BankTransaction",

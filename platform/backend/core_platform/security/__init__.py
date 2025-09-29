@@ -68,6 +68,11 @@ from .jwt_manager import (
     get_jwt_manager,
     initialize_jwt_manager
 )
+from .oauth2_manager import (
+    OAuth2Manager,
+    get_oauth2_manager,
+    initialize_oauth2_manager,
+)
 
 from .rate_limiter import (
     ProductionRateLimiter,
@@ -145,6 +150,11 @@ __all__ = [
     'ProductionJWTManager',
     'get_jwt_manager',
     'initialize_jwt_manager',
+
+    # OAuth2 Manager
+    'OAuth2Manager',
+    'get_oauth2_manager',
+    'initialize_oauth2_manager',
     
     # Rate Limiter
     'ProductionRateLimiter',
@@ -175,6 +185,14 @@ async def initialize_platform_security():
         print("✅ JWT Manager initialized successfully")
     except Exception as e:
         print(f"❌ Failed to initialize JWT Manager: {e}")
+        success = False
+
+    # Initialize OAuth2 manager (external clients)
+    try:
+        initialize_oauth2_manager()
+        print("✅ OAuth2 manager initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize OAuth2 manager: {e}")
         success = False
     
     # Initialize Rate Limiter (critical for security)

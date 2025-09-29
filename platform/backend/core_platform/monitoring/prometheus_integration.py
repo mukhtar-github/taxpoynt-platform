@@ -198,6 +198,44 @@ class PrometheusIntegration:
             description="Active database connections",
             labels=["pool_name", "database"]
         ))
+
+        # Messaging / queue metrics
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_firs_queue_current_size",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="Current backlog size for FIRS submission queues",
+            labels=["queue"]
+        ))
+
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_firs_queue_dead_letter_total",
+            metric_type=PrometheusMetricsType.GAUGE,
+            description="Total messages routed to dead letter queues for FIRS submissions",
+            labels=["queue"]
+        ))
+
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_firs_transmission_result_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Transmission outcomes for FIRS submission pipeline",
+            labels=["queue", "outcome"]
+        ))
+
+        # SLA monitoring metrics
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_sla_breach_total",
+            metric_type=PrometheusMetricsType.COUNTER,
+            description="Count of SLA breaches across platform services",
+            labels=["service", "stage", "breach_type"]
+        ))
+
+        self.register_metric(PrometheusMetric(
+            name="taxpoynt_sla_elapsed_seconds",
+            metric_type=PrometheusMetricsType.HISTOGRAM,
+            description="Observed elapsed time for tracked SLA windows",
+            labels=["service", "stage"],
+            buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1800.0]
+        ))
         # Additional DB pool stats
         self.register_metric(PrometheusMetric(
             name="taxpoynt_database_pool_stats",

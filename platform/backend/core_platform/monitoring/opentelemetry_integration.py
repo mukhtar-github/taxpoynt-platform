@@ -645,19 +645,57 @@ async def trace_banking_operation(provider: str, operation: str,
     integration = get_opentelemetry_integration()
     if not integration:
         return MockTracedSpan(f"banking_{operation}")
-    
+
     attributes = {
         "taxpoynt.banking.provider": provider,
         "taxpoynt.banking.operation": operation,
         "taxpoynt.banking.account_type": account_type,
         "taxpoynt.component": "banking_integration"
     }
-    
+
     if customer_id:
         attributes["taxpoynt.customer.id"] = customer_id
-    
+
     return integration.create_span(
         f"taxpoynt.banking.{operation}",
         kind=SpanKind.CLIENT,
         attributes=attributes
     )
+
+
+async def record_sla_event(
+    *,
+    service: str,
+    stage: str,
+    elapsed_ms: Optional[float],
+    target_ms: Optional[float],
+    breached: bool,
+) -> None:
+    """Emit an SLA tracking span to OpenTelemetry."""
+
+    integration = get_opentelemetry_integration()
+    if not integration:
+        return
+
+    elapsed = float(elapsed_ms) if elapsed_ms is not None else None
+    target = float(target_ms) if target_ms is not None else None
+
+    attributes = {
+        "taxpoynt.component": "sla_monitoring",
+        "taxpoynt.sla.service": service,
+        "taxpoynt.sla.stage": stage,
+        "taxpoynt.sla.breached": str(breached).lower(),
+    }
+    if elapsed is not None:
+        attributes["taxpoynt.sla.elapsed_ms"] = elapsed
+    if target is not None:
+        attributes["taxpoynt.sla.target_ms"] = target
+
+    span = integration.create_span(
+        f"taxpoynt.sla.{service}.{stage}",
+        kind=SpanKind.INTERNAL,
+        attributes=attributes,
+    )
+    with span:
+        if breached:
+            span.set_status(StatusCode.ERROR, "SLA breached")

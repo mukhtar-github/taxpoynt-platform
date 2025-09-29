@@ -768,20 +768,33 @@ class MessageQueue:
                 self.metrics.current_queue_size = len(self.message_registry)
                 # Push Prometheus gauges for ap_outbound queue
                 try:
+                    from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+                    prom = get_prometheus_integration()
+                    if not prom:
+                        continue
+
                     if self.queue_name == "ap_outbound":
-                        from core_platform.monitoring.prometheus_integration import get_prometheus_integration
-                        prom = get_prometheus_integration()
-                        if prom:
-                            prom.record_metric("taxpoynt_ap_outbound_current_queue_size", float(self.metrics.current_queue_size), {"queue": "ap_outbound"})
-                            # Oldest message age seconds
-                            oldest_ts = None
-                            for m in self.message_registry.values():
-                                ts = getattr(m, 'scheduled_time', None) or getattr(m, 'created_time', None)
-                                if ts and (oldest_ts is None or ts < oldest_ts):
-                                    oldest_ts = ts
-                            if oldest_ts:
-                                age = max(0.0, (datetime.now(timezone.utc) - oldest_ts).total_seconds())
-                                prom.record_metric("taxpoynt_ap_outbound_oldest_message_age_seconds", float(age))
+                        prom.record_metric("taxpoynt_ap_outbound_current_queue_size", float(self.metrics.current_queue_size), {"queue": "ap_outbound"})
+                        oldest_ts = None
+                        for m in self.message_registry.values():
+                            ts = getattr(m, 'scheduled_time', None) or getattr(m, 'created_time', None)
+                            if ts and (oldest_ts is None or ts < oldest_ts):
+                                oldest_ts = ts
+                        if oldest_ts:
+                            age = max(0.0, (datetime.now(timezone.utc) - oldest_ts).total_seconds())
+                            prom.record_metric("taxpoynt_ap_outbound_oldest_message_age_seconds", float(age))
+
+                    if self.queue_name in {"firs_submissions_high", "firs_submissions_retry"}:
+                        prom.record_metric(
+                            "taxpoynt_firs_queue_current_size",
+                            float(self.metrics.current_queue_size),
+                            {"queue": self.queue_name},
+                        )
+                        prom.record_metric(
+                            "taxpoynt_firs_queue_dead_letter_total",
+                            float(self.metrics.dead_letter_messages),
+                            {"queue": self.queue_name},
+                        )
                 except Exception:
                     pass
                 
@@ -1245,6 +1258,15 @@ class QueueManager:
                     if ap:
                         ap_size = int(ap.get_metrics().current_queue_size)
                         prom.record_metric("taxpoynt_ap_outbound_current_queue_size", float(ap_size), {"queue": "ap_outbound"})
+                    firs_high = self.queues.get("firs_submissions_high")
+                    if firs_high:
+                        high_size = int(firs_high.get_metrics().current_queue_size)
+                        prom.record_metric("taxpoynt_firs_queue_current_size", float(high_size), {"queue": "firs_submissions_high"})
+                        prom.record_metric("taxpoynt_firs_queue_dead_letter_total", float(firs_high.get_metrics().dead_letter_messages), {"queue": "firs_submissions_high"})
+                    firs_retry = self.queues.get("firs_submissions_retry")
+                    if firs_retry:
+                        retry_size = int(firs_retry.get_metrics().current_queue_size)
+                        prom.record_metric("taxpoynt_firs_queue_current_size", float(retry_size), {"queue": "firs_submissions_retry"})
                 except Exception:
                     # Soft-fail metrics
                     pass

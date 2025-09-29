@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 # Import existing models
 from core_platform.data_management.models.user import User, UserRole
 from core_platform.data_management.models.organization import Organization, BusinessType, OrganizationStatus
+from core_platform.data_management.models.oauth_client import OAuthClient, OAuthClientStatus
 from core_platform.data_management.models.base import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class AuthDatabaseManager:
         
         # Create session maker
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        
+
         # Create tables if they don't exist
         self._create_tables()
     
@@ -120,27 +121,23 @@ class AuthDatabaseManager:
         """Helper method to migrate columns for a specific table."""
         for column_name, column_type in columns:
             try:
-                # Check if column exists (database-agnostic approach)
                 if self._column_exists(conn, table_name, column_name):
                     logger.debug(f"Column {column_name} already exists in {table_name}")
                     continue
-                
-                # Add column if it doesn't exist
+
                 logger.info(f"Adding {column_name} column to {table_name} table...")
-                
-                # Convert PostgreSQL types to SQLite types if needed
+
                 sqlite_type = self._convert_to_sqlite_type(column_type)
-                
+
                 conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {sqlite_type}"))
                 conn.commit()
-                
-                # For SQLite, set a default value for timestamp columns after creation
+
                 if "sqlite" in self.database_url.lower() and column_name == "last_activity_at":
                     conn.execute(text(f"UPDATE {table_name} SET {column_name} = CURRENT_TIMESTAMP WHERE {column_name} IS NULL"))
                     conn.commit()
-                
+
                 logger.info(f"✅ Added {column_name} to {table_name}")
-                    
+
             except Exception as e:
                 logger.warning(f"Could not add {column_name} to {table_name}: {e}")
     
@@ -181,6 +178,88 @@ class AuthDatabaseManager:
     def get_session(self) -> Session:
         """Get database session."""
         return self.SessionLocal()
+
+    # ------------------------------------------------------------------
+    # OAuth client helpers
+    # ------------------------------------------------------------------
+
+    def list_oauth_clients(self) -> List[OAuthClient]:
+        session = self.get_session()
+        try:
+            return session.query(OAuthClient).all()
+        except Exception as exc:
+            logger.error(f"Failed to list OAuth clients: {exc}")
+            return []
+        finally:
+            session.close()
+
+    def get_oauth_client_by_client_id(self, client_id: str) -> Optional[OAuthClient]:
+        session = self.get_session()
+        try:
+            return (
+                session.query(OAuthClient)
+                .filter(OAuthClient.client_id == client_id)
+                .one_or_none()
+            )
+        except Exception as exc:
+            logger.error(f"Failed to load OAuth client {client_id}: {exc}")
+            return None
+        finally:
+            session.close()
+
+    def upsert_oauth_client(
+        self,
+        *,
+        client_id: str,
+        client_secret_hash: str,
+        client_name: str,
+        allowed_grant_types: List[str],
+        allowed_scopes: List[str],
+        redirect_uris: List[str],
+        is_confidential: bool,
+        status: OAuthClientStatus,
+        metadata: Dict[str, Any],
+    ) -> OAuthClient:
+        session = self.get_session()
+        try:
+            client = (
+                session.query(OAuthClient)
+                .filter(OAuthClient.client_id == client_id)
+                .one_or_none()
+            )
+
+            if client is None:
+                client = OAuthClient(
+                    client_id=client_id,
+                    client_secret_hash=client_secret_hash,
+                    client_name=client_name,
+                    allowed_grant_types=allowed_grant_types,
+                    allowed_scopes=allowed_scopes,
+                    redirect_uris=redirect_uris,
+                    is_confidential=is_confidential,
+                    status=status,
+                    metadata_blob=metadata,
+                )
+                session.add(client)
+            else:
+                client.client_secret_hash = client_secret_hash
+                client.client_name = client_name
+                client.allowed_grant_types = allowed_grant_types
+                client.allowed_scopes = allowed_scopes
+                client.redirect_uris = redirect_uris
+                client.is_confidential = is_confidential
+                client.status = status
+                client.client_metadata = metadata
+
+            session.commit()
+            session.refresh(client)
+            return client
+        except Exception as exc:
+            session.rollback()
+            logger.error(f"Failed to upsert OAuth client {client_id}: {exc}")
+            raise
+        finally:
+            session.close()
     
     def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new user using existing User model."""

@@ -30,7 +30,9 @@ from core_platform.data_management.models.organization import Organization
 from core_platform.data_management.repositories import (
     firs_submission_repo_async as firs_repo,
     invoice_repo_async as invoice_repo,
+    participant_repo_async as participant_repo,
 )
+from core_platform.data_management.models.network import ParticipantStatus
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.messaging.queue_manager import get_queue_manager
 from core_platform.messaging.queue_manager import (
@@ -584,6 +586,102 @@ class TransmissionService:
                 exc,
             )
 
+    def _record_transmission_metric(self, queue_name: str, outcome: str) -> None:
+        try:
+            from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+
+            prom = get_prometheus_integration()
+            if prom:
+                prom.record_metric(
+                    "taxpoynt_firs_transmission_result_total",
+                    1,
+                    {"queue": queue_name, "outcome": outcome},
+                )
+        except Exception:
+            pass
+
+    async def _record_sla_telemetry(self, metadata: Dict[str, Any], stage: str) -> None:
+        if not isinstance(metadata, dict):
+            return
+
+        sla_blob = metadata.get("sla") if isinstance(metadata, dict) else None
+        if not isinstance(sla_blob, dict):
+            return
+
+        elapsed_ms = sla_blob.get("elapsed_ms")
+        target_ms = sla_blob.get("target_ms")
+        breached = bool(sla_blob.get("breached"))
+
+        try:
+            from core_platform.monitoring.prometheus_integration import get_prometheus_integration
+
+            prom = get_prometheus_integration()
+            if prom and elapsed_ms is not None:
+                prom.record_metric(
+                    "taxpoynt_sla_elapsed_seconds",
+                    float(elapsed_ms) / 1000.0,
+                    {"service": "app_transmission", "stage": stage},
+                )
+                if breached:
+                    breach_type = "hard" if target_ms is not None and elapsed_ms > target_ms else "soft"
+                    prom.record_metric(
+                        "taxpoynt_sla_breach_total",
+                        1,
+                        {"service": "app_transmission", "stage": stage, "breach_type": breach_type},
+                    )
+        except Exception:
+            pass
+
+        try:
+            from core_platform.monitoring.opentelemetry_integration import record_sla_event
+
+            await record_sla_event(
+                service="app_transmission",
+                stage=stage,
+                elapsed_ms=float(elapsed_ms) if elapsed_ms is not None else None,
+                target_ms=float(target_ms) if target_ms is not None else None,
+                breached=breached,
+            )
+        except Exception:
+            pass
+
+    async def _dispatch_dead_letter(
+        self,
+        message: QueuedMessage,
+        request: TransmissionRequest,
+        result: TransmissionResult,
+        error: Optional[str] = None,
+    ) -> None:
+        try:
+            from core_platform.messaging.dead_letter_handler import (
+                get_dead_letter_handler,
+                FailureReason,
+            )
+
+            handler = get_dead_letter_handler()
+            if not handler:
+                return
+
+            metadata = {
+                "document_id": request.document_id,
+                "organization_id": request.metadata.get("organization_id"),
+                "operation": request.metadata.get("operation"),
+                "queue": message.queue_name,
+                "transmission_status": getattr(result.status, "value", str(result.status)),
+                "transmission_id": result.transmission_id,
+            }
+
+            await handler.handle_failed_message(
+                message,
+                failure_reason=FailureReason.RETRY_EXHAUSTED,
+                error_message=error or result.error_message or "transmission_failed",
+                source_queue=message.queue_name,
+                source_service="app_transmission",
+                metadata=metadata,
+            )
+        except Exception as exc:
+            self.logger.debug("Dead-letter dispatch skipped: %s", exc)
+
     def _iso(self, dt: Optional[datetime]) -> Optional[str]:
         if not dt:
             return None
@@ -1014,7 +1112,14 @@ class TransmissionService:
             payload["retry_policy"] = retry_config
 
         try:
-            return await qm.enqueue_message(queue_name, payload)
+            return await qm.enqueue_message(
+                queue_name,
+                payload,
+                metadata={
+                    "source_service": "app_transmission",
+                    "operation": request.metadata.get("operation"),
+                },
+            )
         except Exception as exc:
             self.logger.error("Failed to enqueue transmission job: %s", exc)
             return None
@@ -1718,6 +1823,7 @@ class TransmissionService:
                 metadata=received_metadata,
             )
             event_index += 1
+            await self._record_sla_telemetry(received_metadata, "APP_RECEIVED")
 
         options = None
         if isinstance(payload.get("options"), dict):
@@ -1764,6 +1870,7 @@ class TransmissionService:
                 metadata=submitting_metadata,
             )
             event_index += 1
+            await self._record_sla_telemetry(submitting_metadata, "APP_SUBMITTING")
 
         firs_response = await self._call_firs("submit_invoice_to_firs", firs_payload)
         firs_response_data = (
@@ -1850,6 +1957,7 @@ class TransmissionService:
                 metadata=submitted_metadata,
             )
             event_index += 1
+            await self._record_sla_telemetry(submitted_metadata, "APP_SUBMITTED")
 
         if irn_value:
             response_extra = {
@@ -1884,6 +1992,7 @@ class TransmissionService:
                 identifiers=firs_identifiers,
             )
             event_index += 1
+            await self._record_sla_telemetry(response_metadata, "FIRS_RESPONSE")
 
         try:
             delivery = payload.get("delivery") or submission_data.get("delivery") or {}
@@ -1980,22 +2089,41 @@ class TransmissionService:
         qm = get_queue_manager()
         await qm.initialize()
 
+        participant_cache: Dict[str, Optional[str]] = {}
+
+        async def resolve_endpoint(identifier_value: str) -> Optional[str]:
+            if identifier_value in participant_cache:
+                return participant_cache[identifier_value]
+            async with self._session_scope() as session:
+                participant = await participant_repo.get_participant_by_identifier(session, identifier_value)
+                if participant and participant.status == ParticipantStatus.ACTIVE:
+                    endpoint = participant.ap_endpoint_url
+                else:
+                    endpoint = None
+            participant_cache[identifier_value] = endpoint
+            return endpoint
+
         # Prepare one message per invoice to keep retries independent
         for inv in invoices:
-            # Auto-infer identifier if not provided explicitly
             identifier = participant_identifier or (self._extract_buyer_identifier(inv) if auto_enabled else None)
-            # Skip if neither explicit endpoint nor identifier available
-            if not endpoint_url and not identifier:
+            resolved_endpoint = endpoint_url
+            if not resolved_endpoint and identifier:
+                resolved_endpoint = await resolve_endpoint(identifier)
+            if not resolved_endpoint and not identifier:
                 continue
 
             payload = {
                 "organization_id": organization_id,
                 "identifier": identifier,
-                "endpoint_url": endpoint_url,
+                "endpoint_url": resolved_endpoint,
                 "document": inv,
                 "metadata": delivery.get("metadata") or {},
             }
-            await qm.enqueue_message("ap_outbound", payload)
+            await qm.enqueue_message(
+                "ap_outbound",
+                payload,
+                metadata={"source_service": "store_and_forward", "participant_identifier": identifier or ""},
+            )
 
     def _extract_buyer_identifier(self, invoice: Dict[str, Any]) -> Optional[str]:
         """Best-effort extraction of buyer participant identifier (e.g., TIN) from invoice payload.
@@ -2681,6 +2809,7 @@ class TransmissionService:
         )
 
         if result.status == TransmissionStatus.DELIVERED:
+            self._record_transmission_metric(message.queue_name, "delivered")
             return {
                 "status": "delivered",
                 "document_id": request.document_id,
@@ -2689,6 +2818,7 @@ class TransmissionService:
 
         retry_id = await self._schedule_retry(request, result, retry_config)
         if retry_id:
+            self._record_transmission_metric(message.queue_name, "retry_scheduled")
             return {
                 "status": "scheduled_retry",
                 "retry_id": retry_id,
@@ -2696,6 +2826,8 @@ class TransmissionService:
                 "queue": message.queue_name,
             }
 
+        await self._dispatch_dead_letter(message, request, result, result.error_message)
+        self._record_transmission_metric(message.queue_name, "dead_letter")
         return False
 
     async def _consume_status_poll(self, message: QueuedMessage) -> bool:

@@ -4,12 +4,13 @@ Authentication Router - Shared Across All Service Types
 Provides authentication endpoints accessible to SI, APP, and Hybrid users.
 Integrates with role-based routing system and supports user onboarding flow.
 """
+import base64
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
@@ -27,9 +28,13 @@ if str(project_root) not in sys.path:
 try:
     from core_platform.authentication.role_manager import PlatformRole
     from core_platform.messaging.message_router import MessageRouter, ServiceRole
+    from core_platform.security import get_oauth2_manager
 except ImportError:
-    # Use fallback classes from __init__.py
-    from . import PlatformRole, MessageRouter, ServiceRole
+    from . import PlatformRole, MessageRouter, ServiceRole  # type: ignore
+
+    def get_oauth2_manager():  # type: ignore
+        raise RuntimeError("OAuth2 manager unavailable in fallback mode")
+
 from .models import HTTPRoutingContext
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
@@ -109,6 +114,28 @@ class TokenResponse(BaseModel):
     expires_in: int
     user: UserResponse
 
+
+class OAuthTokenResponse(BaseModel):
+    """OAuth 2.0 token response payload."""
+
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+    scope: Optional[str] = None
+
+
+class OAuthIntrospectionResponse(BaseModel):
+    """OAuth 2.0 token introspection response."""
+
+    active: bool
+    client_id: Optional[str] = None
+    scope: Optional[str] = None
+    token_type: Optional[str] = None
+    exp: Optional[int] = None
+    iat: Optional[int] = None
+    grant_type: Optional[str] = None
+    token_usage: Optional[str] = None
+
 # Database integration (production-ready)
 from .auth_database import get_auth_database
 
@@ -119,6 +146,31 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def _oauth_error(error: str, status_code: int, description: Optional[str] = None) -> HTTPException:
+    payload = {"error": error}
+    if description:
+        payload["error_description"] = description
+    headers = {"WWW-Authenticate": 'Basic realm="TaxPoynt OAuth2"'} if status_code == status.HTTP_401_UNAUTHORIZED else {}
+    return HTTPException(status_code=status_code, detail=payload, headers=headers)
+
+
+def _extract_client_credentials(request: Request, form_data: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("basic "):
+        try:
+            encoded = auth_header.split(" ", 1)[1]
+            decoded = base64.b64decode(encoded).decode()
+            client_id, client_secret = decoded.split(":", 1)
+            return client_id or None, client_secret or None
+        except Exception:
+            return None, None
+
+    # Fallback to form parameters
+    client_id = form_data.get("client_id")
+    client_secret = form_data.get("client_secret")
+    return client_id, client_secret
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token using centralized manager."""
@@ -197,7 +249,59 @@ def create_auth_router(
     """Factory function to create authentication router"""
     
     router = APIRouter(prefix="/auth", tags=["Authentication"])
-    
+
+    @router.post("/oauth/token", response_model=OAuthTokenResponse, include_in_schema=False)
+    async def oauth_token(request: Request):
+        oauth_manager = get_oauth2_manager()
+        form = await request.form()
+
+        client_id, client_secret = _extract_client_credentials(request, form)
+        if not client_id or not client_secret:
+            raise _oauth_error("invalid_client", status.HTTP_401_UNAUTHORIZED, "Client authentication failed")
+
+        grant_type = (form.get("grant_type") or "").strip().lower()
+        if grant_type != "client_credentials":
+            raise _oauth_error("unsupported_grant_type", status.HTTP_400_BAD_REQUEST, "Only client_credentials grant is supported")
+
+        client = oauth_manager.validate_client_credentials(client_id, client_secret)
+        if not client:
+            raise _oauth_error("invalid_client", status.HTTP_401_UNAUTHORIZED, "Client authentication failed")
+
+        scope = form.get("scope")
+        try:
+            token_bundle = oauth_manager.issue_client_credentials_token(client, scope)
+        except ValueError as exc:
+            if str(exc) == "invalid_scope":
+                raise _oauth_error("invalid_scope", status.HTTP_400_BAD_REQUEST, "Requested scope is not permitted for this client")
+            raise _oauth_error("invalid_request", status.HTTP_400_BAD_REQUEST, str(exc))
+
+        return OAuthTokenResponse(
+            access_token=token_bundle.access_token,
+            token_type=token_bundle.token_type,
+            expires_in=token_bundle.expires_in,
+            scope=token_bundle.scope or None,
+        )
+
+    @router.post("/oauth/introspect", response_model=OAuthIntrospectionResponse, include_in_schema=False)
+    async def oauth_introspect(request: Request):
+        oauth_manager = get_oauth2_manager()
+        form = await request.form()
+
+        client_id, client_secret = _extract_client_credentials(request, form)
+        if not client_id or not client_secret:
+            raise _oauth_error("invalid_client", status.HTTP_401_UNAUTHORIZED, "Client authentication failed")
+
+        client = oauth_manager.validate_client_credentials(client_id, client_secret)
+        if not client:
+            raise _oauth_error("invalid_client", status.HTTP_401_UNAUTHORIZED, "Client authentication failed")
+
+        token = form.get("token")
+        if not token:
+            raise _oauth_error("invalid_request", status.HTTP_400_BAD_REQUEST, "token parameter is required")
+
+        result = oauth_manager.introspect(token)
+        return OAuthIntrospectionResponse(**result)
+
     @router.post("/register", response_model=TokenResponse)
     async def register_user(user_data: UserRegisterRequest):
         """Register a new user with organization"""
