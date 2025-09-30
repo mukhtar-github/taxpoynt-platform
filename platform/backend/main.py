@@ -294,7 +294,15 @@ def create_taxpoynt_app() -> FastAPI:
     
     # Include main router
     app.include_router(gateway_controller.router)
-    
+
+    # Attach shared authentication routes so registration/login endpoints are accessible
+    auth_router = create_auth_router(
+        gateway_controller.role_detector,
+        permission_guard,
+        temp_message_router,
+    )
+    app.include_router(auth_router, prefix="/api/v1")
+
     # Store gateway controller for later message router updates (future-proof)
     app.state.gateway_controller = gateway_controller
     # Backward-compat: expose under previous private attribute as well

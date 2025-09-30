@@ -1024,14 +1024,21 @@ class APPServiceRegistry:
     async def _register_certificate_services(self):
         """Register APP-side certificate management service"""
         try:
-            from si_services.certificate_management.certificate_store import (
-                CertificateStore,
-                CertificateStatus,
-                StoredCertificate,
-            )
-            from si_services.certificate_management.certificate_generator import CertificateGenerator
-            from si_services.certificate_management.lifecycle_manager import LifecycleManager
-            from si_services.certificate_management.key_manager import KeyManager
+            try:
+                from si_services.certificate_management.certificate_store import (
+                    CertificateStore,
+                    CertificateStatus,
+                    StoredCertificate,
+                )
+                from si_services.certificate_management.certificate_generator import CertificateGenerator
+                from si_services.certificate_management.lifecycle_manager import LifecycleManager
+                from si_services.certificate_management.key_manager import KeyManager
+            except (ImportError, AttributeError) as import_err:
+                logger.warning(
+                    "Certificate services unavailable; skipping APP registration: %s",
+                    import_err,
+                )
+                return
 
             certificate_store = CertificateStore()
             certificate_generator = CertificateGenerator()

@@ -843,7 +843,23 @@ class MessageQueue:
             
             async with aiofiles.open(persistence_file, 'r') as f:
                 content = await f.read()
+
+            if not content or not content.strip():
+                self.logger.debug(
+                    "Persistence file %s is empty; skipping queued message restore",
+                    persistence_file,
+                )
+                return
+
+            try:
                 persistence_data = json.loads(content)
+            except json.JSONDecodeError as exc:
+                self.logger.warning(
+                    "Skipping corrupted persistence file %s: %s",
+                    persistence_file,
+                    exc,
+                )
+                return
             
             # Restore messages
             for msg_data in persistence_data.get('messages', []):
