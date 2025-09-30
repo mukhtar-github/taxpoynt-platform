@@ -131,6 +131,40 @@ python -c "from core_platform.config.environment import get_config; config = get
 4. **Start Backend**: `uvicorn main:app --reload`
 5. **Start Frontend**: `cd platform/frontend && npm run dev`
 
+### OAuth Client Seeding
+
+Use the helper to create baseline OAuth 2.0 clients (monitoring dashboards, participant gateway, etc.) without hand-writing SQL:
+
+```bash
+export OAUTH2_MONITORING_CLIENT_SECRET="<strong-password>"
+export OAUTH2_PARTICIPANT_GATEWAY_CLIENT_SECRET="<strong-password>"
+
+# Optional: override the client ids while keeping secrets in env vars
+export OAUTH2_MONITORING_CLIENT_ID="taxpoynt-monitoring-dashboard"
+export OAUTH2_PARTICIPANT_GATEWAY_CLIENT_ID="participant-gateway"
+
+python platform/backend/scripts/seed_default_oauth_clients.py
+```
+
+The script respects any JSON you already provide via `OAUTH2_DEFAULT_CLIENTS` and skips entries without matching secrets, so it is safe to rerun.
+
+### Observability Dashboards
+
+Queue throughput and SLA metrics now flow into the `/metrics` endpoint (port `9090`). To visualise them locally:
+
+```bash
+# Start Prometheus + Grafana + Jaeger in a separate terminal
+docker-compose -f docker-compose.monitoring.yml up -d
+
+# Grafana: http://localhost:3002 (admin/admin by default)
+# Prometheus: http://localhost:9091
+# Jaeger: http://localhost:16686
+```
+
+Grafana auto-loads the `Queue & SLA Overview` dashboard from `monitoring/grafana/dashboards/queue_sla.json`. Import additional dashboards by placing them in the same directory.
+
+> **Tip:** export `OTEL_ENABLED=true` before starting the backend so spans flow into Jaeger via the built-in OpenTelemetry exporter.
+
 ### Making Database Changes
 
 1. **Create Migration**: `alembic revision --autogenerate -m "description"`
