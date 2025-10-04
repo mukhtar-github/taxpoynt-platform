@@ -5,6 +5,7 @@ Access Point Provider endpoints for direct FIRS system integration.
 Handles communication with FIRS e-invoicing infrastructure.
 """
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
@@ -33,9 +34,11 @@ from .firs_request_models import (
     GenericValidationPayload,
 )
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models.organization import Organization
 from core_platform.idempotency.store import IdempotencyStore
 
 logger = logging.getLogger(__name__)
@@ -101,19 +104,6 @@ class FIRSIntegrationEndpointsV1:
         self._setup_routes()
         logger.info("FIRS Integration Endpoints V1 initialized")
 
-    @staticmethod
-    def _unwrap_operation_result(result: Any, *, error_message: str) -> Dict[str, Any]:
-        """Normalize message router responses into a plain data payload."""
-
-        if isinstance(result, dict):
-            if result.get("success") is False:
-                detail = result.get("error") or error_message
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
-            return result.get("data", result)
-        if result is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message)
-        return result
-    
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
         """Local guard to enforce Access Point Provider role and permissions."""
         context = await self.role_detector.detect_role_context(request)
@@ -592,23 +582,84 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error testing FIRS connection in v1: {e}")
             return v1_error_response(e, action="test_firs_connection")
 
+    @staticmethod
+    def _mask_secret(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        value_str = str(value)
+        if len(value_str) <= 4:
+            return "*" * len(value_str)
+        return "*" * (len(value_str) - 4) + value_str[-4:]
+
+    @classmethod
+    def _build_status_payload(cls, config: Dict[str, Any], organization_id: Optional[str]) -> Dict[str, Any]:
+        environment = str(config.get("environment", "sandbox")).lower()
+        sandbox_url = config.get("sandbox_url") or os.getenv("FIRS_SANDBOX_URL", "https://sandbox-api.firs.gov.ng")
+        production_url = config.get("production_url") or os.getenv("FIRS_PRODUCTION_URL") or os.getenv("FIRS_API_URL", "https://api.firs.gov.ng")
+
+        api_key_present = bool(config.get("api_key"))
+        api_secret_present = bool(config.get("api_secret"))
+        has_credentials = api_key_present and api_secret_present
+
+        status = config.get("connection_status") or ("configured" if has_credentials else "disconnected")
+
+        return {
+            "status": status,
+            "environment": environment,
+            "api_version": config.get("api_version", "v1"),
+            "sandbox_url": sandbox_url,
+            "production_url": production_url,
+            "last_connected": config.get("last_connected"),
+            "rate_limit": config.get("rate_limit"),
+            "uptime_percentage": config.get("uptime_percentage"),
+            "webhook_url": config.get("webhook_url"),
+            "has_credentials": has_credentials,
+            "api_key_masked": cls._mask_secret(config.get("api_key")),
+            "api_secret_masked": cls._mask_secret(config.get("api_secret")),
+            "last_updated_at": config.get("last_updated_at"),
+            "last_updated_by": config.get("last_updated_by"),
+            "metadata": {
+                "organization_id": organization_id,
+                "last_error": config.get("last_error"),
+                "last_connection_status": config.get("connection_status"),
+            },
+        }
+
+    @staticmethod
+    def _resolve_secret_update(incoming: Optional[str], existing: Optional[str]) -> Optional[str]:
+        if incoming is None:
+            return existing
+        incoming_str = str(incoming)
+        if not incoming_str.strip():
+            return None
+        if existing:
+            masked = FIRSIntegrationEndpointsV1._mask_secret(existing)
+            if incoming_str == masked or set(incoming_str) == {"*"}:
+                return existing
+        return incoming_str
+
     async def get_firs_connection_status(self, request: Request):
         """Get current FIRS connection status and stored credential metadata."""
         try:
             context = await self._require_app_role(request)
-            result = await MessageRouter.route_message(
-                self.message_router,
-                ServiceRole.ACCESS_POINT_PROVIDER,
-                "get_firs_connection_status",
-                {
-                    "app_id": context.user_id,
-                    "organization_id": getattr(context, "organization_id", None),
-                    "api_version": "v1",
-                }
-            )
+            org_id = getattr(context, "organization_id", None)
 
-            data = self._unwrap_operation_result(result, error_message="Failed to retrieve FIRS connection status")
-            return self._create_v1_response(data, "firs_connection_status_retrieved")
+            if not org_id:
+                data = self._build_status_payload({}, None)
+                return self._create_v1_response(data, "firs_connection_status_retrieved")
+
+            async for session in get_async_session():
+                organization: Optional[Organization] = await session.get(Organization, org_id)
+                if not organization:
+                    data = self._build_status_payload({}, str(org_id))
+                    data["metadata"]["last_error"] = "organization_not_found"
+                    return self._create_v1_response(data, "firs_connection_status_retrieved")
+
+                config = dict(organization.firs_configuration or {})
+                data = self._build_status_payload(config, str(org_id))
+                return self._create_v1_response(data, "firs_connection_status_retrieved")
+
+            raise RuntimeError("Database session unavailable")
         except HTTPException:
             raise
         except Exception as e:
@@ -625,20 +676,56 @@ class FIRSIntegrationEndpointsV1:
             except ValidationError as exc:
                 return v1_error_response(ValueError(str(exc)), action="update_firs_credentials")
 
-            result = await MessageRouter.route_message(
-                self.message_router,
-                ServiceRole.ACCESS_POINT_PROVIDER,
-                "update_firs_credentials",
-                {
-                    "credentials": credentials.dict(exclude_unset=True),
-                    "app_id": context.user_id,
-                    "organization_id": getattr(context, "organization_id", None),
-                    "api_version": "v1",
-                }
-            )
+            org_id = getattr(context, "organization_id", None)
+            if not org_id:
+                return v1_error_response(
+                    ValueError("Organization context is required"), action="update_firs_credentials"
+                )
 
-            data = self._unwrap_operation_result(result, error_message="Failed to save FIRS credentials")
-            return self._create_v1_response(data, "firs_credentials_saved")
+            async for session in get_async_session():
+                organization: Optional[Organization] = await session.get(Organization, org_id)
+                if not organization:
+                    return v1_error_response(
+                        ValueError("Organization not found"), action="update_firs_credentials"
+                    )
+
+                existing_config = dict(organization.firs_configuration or {})
+                updated_config = dict(existing_config)
+
+                updated_config["environment"] = str(
+                    credentials.environment or existing_config.get("environment", "sandbox")
+                ).lower()
+                updated_config["webhook_url"] = (
+                    credentials.webhook_url if credentials.webhook_url is not None else existing_config.get("webhook_url")
+                )
+
+                updated_config["api_key"] = self._resolve_secret_update(
+                    credentials.api_key, existing_config.get("api_key")
+                )
+                updated_config["api_secret"] = self._resolve_secret_update(
+                    credentials.api_secret, existing_config.get("api_secret")
+                )
+
+                if updated_config.get("api_key") and updated_config.get("api_secret"):
+                    updated_config["connection_status"] = "configured"
+                else:
+                    updated_config["connection_status"] = "disconnected"
+
+                updated_config["api_version"] = "v1"
+                updated_config["last_updated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+                updated_config["last_updated_by"] = (
+                    str(context.user_id) if getattr(context, "user_id", None) else existing_config.get("last_updated_by")
+                )
+
+                organization.firs_configuration = updated_config
+                session.add(organization)
+                await session.commit()
+                await session.refresh(organization)
+
+                data = self._build_status_payload(updated_config, str(org_id))
+                return self._create_v1_response(data, "firs_credentials_saved")
+
+            raise RuntimeError("Database session unavailable")
         except HTTPException:
             raise
         except Exception as e:
