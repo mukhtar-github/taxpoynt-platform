@@ -51,7 +51,7 @@ export default function NewReportPage() {
   const generateReport = async () => {
     try {
       setGenerating(true);
-      const response = await apiClient.post<APIResponse<{ reportId: string; downloadUrl: string }>>('/api/v1/app/reports/generate', config);
+      const response = await apiClient.post<APIResponse<{ reportId: string; downloadUrl: string }>>('/app/reports/generate', config);
       
       if (response.success && response.data) {
         // Download the report

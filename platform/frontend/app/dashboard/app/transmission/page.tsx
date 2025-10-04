@@ -66,8 +66,8 @@ export default function APPTransmissionPage() {
       const apiClient = new TaxPoyntAPIClient();
       
       // Load pending invoices
-      const invoicesResponse = await apiClient.get<APIResponse>('/api/v1/app/invoices/pending');
-      const batchesResponse = await apiClient.get<APIResponse>('/api/v1/app/transmission/batches');
+      const invoicesResponse = await apiClient.get<APIResponse>('/app/invoices/pending');
+      const batchesResponse = await apiClient.get<APIResponse>('/app/transmission/batches');
       
       if (invoicesResponse.success && batchesResponse.success) {
         setInvoices(invoicesResponse.data.invoices || []);
@@ -162,7 +162,7 @@ export default function APPTransmissionPage() {
       const apiClient = new TaxPoyntAPIClient();
       
       // First validate invoices
-      const validationResponse = await apiClient.post<APIResponse>('/api/v1/app/firs/validate-batch', {
+      const validationResponse = await apiClient.post<APIResponse>('/app/firs/validate-batch', {
         invoice_ids: selectedInvoices
       });
 
@@ -174,7 +174,7 @@ export default function APPTransmissionPage() {
       setTransmissionStatus('transmitting');
 
       // Submit to FIRS
-      const transmissionResponse = await apiClient.post<APIResponse>('/api/v1/app/firs/submit-batch', {
+      const transmissionResponse = await apiClient.post<APIResponse>('/app/firs/submit-batch', {
         invoice_ids: selectedInvoices,
         batch_settings: {
           environment: 'sandbox',

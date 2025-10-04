@@ -70,7 +70,7 @@ export default function APPFIRSPage() {
   const loadFIRSStatus = async () => {
     try {
       const apiClient = new TaxPoyntAPIClient();
-      const response = await apiClient.get<APIResponse>('/api/v1/app/firs/status');
+      const response = await apiClient.get<APIResponse>('/app/firs/status');
       
       if (response.success) {
         setConnectionStatus(response.data);
@@ -115,7 +115,7 @@ export default function APPFIRSPage() {
 
     try {
       const apiClient = new TaxPoyntAPIClient();
-      const response = await apiClient.post<APIResponse>('/api/v1/app/firs/test-connection', {
+      const response = await apiClient.post<APIResponse>('/app/firs/test-connection', {
         api_key: credentials.api_key,
         api_secret: credentials.api_secret,
         environment: credentials.environment
@@ -160,7 +160,7 @@ export default function APPFIRSPage() {
 
     try {
       const apiClient = new TaxPoyntAPIClient();
-      const response = await apiClient.post<APIResponse>('/api/v1/app/firs/credentials', credentials);
+      const response = await apiClient.post<APIResponse>('/app/firs/credentials', credentials);
 
       if (response.success) {
         await loadFIRSStatus();

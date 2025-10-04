@@ -46,6 +46,8 @@ from core_platform.data_management.repositories.firs_submission_repo_async impor
 )
 from core_platform.data_management.models.firs_submission import FIRSSubmission
 from core_platform.data_management.models.si_app_correlation import SIAPPCorrelation
+from core_platform.data_management.models.organization import Organization
+from core_platform.data_management.models.user import User
 
 from .status_management.app_configuration import AppConfigurationStore
 
@@ -633,6 +635,8 @@ class APPServiceRegistry:
                 "authenticate_with_firs",
                 "refresh_firs_token",
                 "test_firs_connection",
+                "get_firs_connection_status",
+                "update_firs_credentials",
                 "get_firs_auth_status",
                 "get_firs_system_info",
                 "check_firs_system_health",
@@ -4017,6 +4021,77 @@ class APPServiceRegistry:
                     return resolved
             return None
 
+        async def _resolve_identity(source: Dict[str, Any]) -> Tuple[Optional[uuid.UUID], Optional[uuid.UUID]]:
+            """Resolve user and organization UUIDs from the payload."""
+
+            user_uuid = _to_uuid(source.get("app_id") or source.get("user_id"))
+            org_uuid = _to_uuid(_resolve_org_id(source))
+
+            if not org_uuid and user_uuid:
+                async for session in get_async_session():
+                    user_obj = await session.get(User, user_uuid)
+                    if user_obj and user_obj.organization_id:
+                        org_uuid = user_obj.organization_id
+                    break
+
+            return user_uuid, org_uuid
+
+        def _mask_secret(value: Optional[str]) -> str:
+            if not value:
+                return ""
+            value_str = str(value)
+            if len(value_str) <= 4:
+                return "*" * len(value_str)
+            return "*" * (len(value_str) - 4) + value_str[-4:]
+
+        def _build_status_payload(config: Optional[Dict[str, Any]], organization_id: Optional[uuid.UUID]) -> Dict[str, Any]:
+            cfg = dict(config or {})
+            environment = str(cfg.get("environment") or "sandbox").lower()
+            sandbox_url = cfg.get("sandbox_url") or os.getenv("FIRS_SANDBOX_URL", "https://sandbox-api.firs.gov.ng")
+            production_url = cfg.get("production_url") or os.getenv("FIRS_PRODUCTION_URL") or os.getenv("FIRS_API_URL", "https://api.firs.gov.ng")
+
+            api_key_present = bool(cfg.get("api_key"))
+            api_secret_present = bool(cfg.get("api_secret"))
+            has_credentials = api_key_present and api_secret_present
+
+            connection_status = cfg.get("connection_status")
+            if not connection_status:
+                connection_status = "configured" if has_credentials else "disconnected"
+
+            return {
+                "status": connection_status,
+                "environment": environment,
+                "api_version": cfg.get("api_version", "v1"),
+                "sandbox_url": sandbox_url,
+                "production_url": production_url,
+                "last_connected": cfg.get("last_connected"),
+                "rate_limit": cfg.get("rate_limit"),
+                "uptime_percentage": cfg.get("uptime_percentage"),
+                "webhook_url": cfg.get("webhook_url"),
+                "has_credentials": has_credentials,
+                "api_key_masked": _mask_secret(cfg.get("api_key")),
+                "api_secret_masked": _mask_secret(cfg.get("api_secret")),
+                "last_updated_at": cfg.get("last_updated_at"),
+                "last_updated_by": cfg.get("last_updated_by"),
+                "metadata": {
+                    "organization_id": str(organization_id) if organization_id else None,
+                    "last_error": cfg.get("last_error"),
+                    "last_connection_status": cfg.get("connection_status"),
+                },
+            }
+
+        def _resolve_secret_update(incoming: Optional[str], existing: Optional[str]) -> Optional[str]:
+            if incoming is None:
+                return existing
+            incoming_str = str(incoming)
+            if not incoming_str.strip():
+                return None
+            if existing:
+                masked = _mask_secret(existing)
+                if incoming_str == masked or set(incoming_str) == {"*"}:
+                    return existing
+            return incoming_str
+
         def _resolve_invoice_number(*sources: Optional[Dict[str, Any]]) -> Optional[str]:
             for source in sources:
                 if not isinstance(source, dict):
@@ -4873,6 +4948,88 @@ class APPServiceRegistry:
                         "success": True,
                         "data": {"status": "unknown", "reason": "http_client_unavailable", "timestamp": _utc_now()}
                     }
+
+                elif operation == "get_firs_connection_status":
+                    user_uuid, org_uuid = await _resolve_identity(payload)
+                    if not org_uuid:
+                        status_payload = _build_status_payload({}, None)
+                        status_payload["metadata"]["last_error"] = "organization_not_found"
+                        return {"operation": operation, "success": True, "data": status_payload}
+
+                    async for session in get_async_session():
+                        organization = await session.get(Organization, org_uuid)
+                        if not organization:
+                            status_payload = _build_status_payload({}, org_uuid)
+                            status_payload["metadata"]["last_error"] = "organization_not_found"
+                            return {"operation": operation, "success": True, "data": status_payload}
+
+                        config = organization.firs_configuration if isinstance(organization.firs_configuration, dict) else {}
+                        status_payload = _build_status_payload(config, org_uuid)
+                        if user_uuid and not status_payload.get("last_updated_by"):
+                            status_payload["last_updated_by"] = str(user_uuid)
+                        return {"operation": operation, "success": True, "data": status_payload}
+
+                    return {"operation": operation, "success": False, "error": "session_unavailable"}
+
+                elif operation == "update_firs_credentials":
+                    credentials_payload = (
+                        payload.get("credentials")
+                        if isinstance(payload.get("credentials"), dict)
+                        else payload
+                    )
+                    if not isinstance(credentials_payload, dict):
+                        return {"operation": operation, "success": False, "error": "invalid_credentials_payload"}
+
+                    user_uuid, org_uuid = await _resolve_identity(payload)
+                    if not org_uuid:
+                        return {"operation": operation, "success": False, "error": "organization_not_found"}
+
+                    async for session in get_async_session():
+                        organization = await session.get(Organization, org_uuid)
+                        if not organization:
+                            return {"operation": operation, "success": False, "error": "organization_not_found"}
+
+                        existing_config = dict(organization.firs_configuration or {})
+
+                        resolved_api_key = _resolve_secret_update(
+                            credentials_payload.get("api_key"), existing_config.get("api_key")
+                        )
+                        resolved_api_secret = _resolve_secret_update(
+                            credentials_payload.get("api_secret"), existing_config.get("api_secret")
+                        )
+                        environment = str(
+                            credentials_payload.get("environment")
+                            or existing_config.get("environment")
+                            or "sandbox"
+                        ).lower()
+                        webhook_url = credentials_payload.get("webhook_url", existing_config.get("webhook_url"))
+
+                        updated_config = dict(existing_config)
+                        updated_config.update({
+                            "environment": environment,
+                            "webhook_url": webhook_url,
+                            "last_updated_at": _utc_now(),
+                            "last_updated_by": str(user_uuid) if user_uuid else existing_config.get("last_updated_by"),
+                            "api_version": "v1",
+                        })
+
+                        updated_config["api_key"] = resolved_api_key
+                        updated_config["api_secret"] = resolved_api_secret
+
+                        if updated_config.get("api_key") and updated_config.get("api_secret"):
+                            updated_config.setdefault("connection_status", "configured")
+                        else:
+                            updated_config["connection_status"] = "disconnected"
+
+                        organization.firs_configuration = updated_config
+                        session.add(organization)
+                        await session.commit()
+                        await session.refresh(organization)
+
+                        status_payload = _build_status_payload(updated_config, org_uuid)
+                        return {"operation": operation, "success": True, "data": status_payload}
+
+                    return {"operation": operation, "success": False, "error": "session_unavailable"}
 
                 elif operation == "get_firs_auth_status":
                     return {

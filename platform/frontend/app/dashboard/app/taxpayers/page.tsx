@@ -61,8 +61,8 @@ export default function TaxpayerManagementPage() {
     try {
       setLoading(true);
       const [metricsResponse, taxpayersResponse] = await Promise.all([
-        apiClient.get<APIResponse<TaxpayerMetrics>>('/api/v1/app/taxpayers/metrics'),
-        apiClient.get<APIResponse<Taxpayer[]>>('/api/v1/app/taxpayers')
+        apiClient.get<APIResponse<TaxpayerMetrics>>('/app/taxpayers/metrics'),
+        apiClient.get<APIResponse<Taxpayer[]>>('/app/taxpayers')
       ]);
       
       if (metricsResponse.success && metricsResponse.data && 
@@ -185,7 +185,7 @@ export default function TaxpayerManagementPage() {
 
   const handleStatusUpdate = async (taxpayerId: string, newStatus: string) => {
     try {
-      const response = await apiClient.post<APIResponse>(`/api/v1/app/taxpayers/${taxpayerId}/status`, {
+      const response = await apiClient.post<APIResponse>(`/app/taxpayers/${taxpayerId}/status`, {
         status: newStatus,
         reason: 'Updated from taxpayer management dashboard'
       });

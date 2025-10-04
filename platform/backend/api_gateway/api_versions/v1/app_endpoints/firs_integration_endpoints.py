@@ -29,6 +29,7 @@ from .firs_request_models import (
     SubmitInvoiceBatchRequest,
     FIRSAuthenticationRequest,
     FIRSConnectionTestRequest,
+    FIRSCredentialsRequest,
     GenericValidationPayload,
 )
 
@@ -99,6 +100,19 @@ class FIRSIntegrationEndpointsV1:
         
         self._setup_routes()
         logger.info("FIRS Integration Endpoints V1 initialized")
+
+    @staticmethod
+    def _unwrap_operation_result(result: Any, *, error_message: str) -> Dict[str, Any]:
+        """Normalize message router responses into a plain data payload."""
+
+        if isinstance(result, dict):
+            if result.get("success") is False:
+                detail = result.get("error") or error_message
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+            return result.get("data", result)
+        if result is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message)
+        return result
     
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
         """Local guard to enforce Access Point Provider role and permissions."""
@@ -233,6 +247,24 @@ class FIRSIntegrationEndpointsV1:
             methods=["POST"],
             summary="Test FIRS connection",
             description="Test connection to FIRS with provided credentials",
+            response_model=V1ResponseModel
+        )
+
+        self.router.add_api_route(
+            "/status",
+            self.get_firs_connection_status,
+            methods=["GET"],
+            summary="Get FIRS connection status",
+            description="Retrieve the current FIRS connection state, saved credentials metadata, and environment configuration",
+            response_model=V1ResponseModel
+        )
+
+        self.router.add_api_route(
+            "/credentials",
+            self.update_firs_credentials,
+            methods=["POST"],
+            summary="Save FIRS credentials",
+            description="Persist FIRS credentials and configuration for the Access Point Provider account",
             response_model=V1ResponseModel
         )
         
@@ -554,12 +586,65 @@ class FIRSIntegrationEndpointsV1:
                     "api_version": "v1"
                 }
             )
-            
+
             return self._create_v1_response(result, "firs_connection_tested")
         except Exception as e:
             logger.error(f"Error testing FIRS connection in v1: {e}")
             return v1_error_response(e, action="test_firs_connection")
-    
+
+    async def get_firs_connection_status(self, request: Request):
+        """Get current FIRS connection status and stored credential metadata."""
+        try:
+            context = await self._require_app_role(request)
+            result = await MessageRouter.route_message(
+                self.message_router,
+                ServiceRole.ACCESS_POINT_PROVIDER,
+                "get_firs_connection_status",
+                {
+                    "app_id": context.user_id,
+                    "organization_id": getattr(context, "organization_id", None),
+                    "api_version": "v1",
+                }
+            )
+
+            data = self._unwrap_operation_result(result, error_message="Failed to retrieve FIRS connection status")
+            return self._create_v1_response(data, "firs_connection_status_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Error retrieving FIRS connection status in v1: %s", e, exc_info=True)
+            return v1_error_response(e, action="get_firs_connection_status")
+
+    async def update_firs_credentials(self, request: Request):
+        """Persist FIRS credentials and configuration for the APP account."""
+        try:
+            context = await self._require_app_role(request)
+            raw_body = await request.json()
+            try:
+                credentials = FIRSCredentialsRequest(**raw_body)
+            except ValidationError as exc:
+                return v1_error_response(ValueError(str(exc)), action="update_firs_credentials")
+
+            result = await MessageRouter.route_message(
+                self.message_router,
+                ServiceRole.ACCESS_POINT_PROVIDER,
+                "update_firs_credentials",
+                {
+                    "credentials": credentials.dict(exclude_unset=True),
+                    "app_id": context.user_id,
+                    "organization_id": getattr(context, "organization_id", None),
+                    "api_version": "v1",
+                }
+            )
+
+            data = self._unwrap_operation_result(result, error_message="Failed to save FIRS credentials")
+            return self._create_v1_response(data, "firs_credentials_saved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Error updating FIRS credentials in v1: %s", e, exc_info=True)
+            return v1_error_response(e, action="update_firs_credentials")
+
     async def get_firs_auth_status(self, context: HTTPRoutingContext = Depends(_require_app_role)):
         """Get FIRS authentication status"""
         try:

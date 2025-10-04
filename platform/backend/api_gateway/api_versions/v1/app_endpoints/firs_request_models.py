@@ -71,6 +71,25 @@ class FIRSConnectionTestRequest(_ExtraAllowModel):
     environment: Optional[str] = Field("sandbox", description="Target environment")
 
 
+class FIRSCredentialsRequest(_ExtraAllowModel):
+    api_key: Optional[str] = Field(
+        None,
+        description="FIRS API key. Provide the full value to update; leave masked or blank to retain the current secret.",
+    )
+    api_secret: Optional[str] = Field(
+        None,
+        description="FIRS API secret. Provide the full value to update; leave masked or blank to retain the current secret.",
+    )
+    environment: Optional[str] = Field(
+        "sandbox",
+        description="Target FIRS environment (sandbox or production)",
+    )
+    webhook_url: Optional[str] = Field(
+        None,
+        description="Webhook endpoint to receive FIRS status callbacks",
+    )
+
+
 class FIRSAuthenticationRequest(_ExtraAllowModel):
     auth_data: Dict[str, Any] = Field(..., description="Authentication payload to forward to FIRS")
 

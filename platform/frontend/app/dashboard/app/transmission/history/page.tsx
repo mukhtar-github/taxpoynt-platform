@@ -47,7 +47,7 @@ export default function TransmissionHistoryPage() {
   const loadTransmissionHistory = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get<APIResponse<TransmissionRecord[]>>('/api/v1/app/transmission/history', {
+      const response = await apiClient.get<APIResponse<TransmissionRecord[]>>('/app/transmission/history', {
         params: {
           page: currentPage,
           limit: itemsPerPage,
@@ -177,7 +177,7 @@ export default function TransmissionHistoryPage() {
 
   const downloadReport = async (transmissionId: string) => {
     try {
-      const response = await apiClient.get<Blob>(`/api/v1/app/transmission/${transmissionId}/report`, {
+      const response = await apiClient.get<Blob>(`/app/transmission/${transmissionId}/report`, {
         responseType: 'blob'
       });
       

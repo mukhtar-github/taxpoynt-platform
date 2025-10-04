@@ -1,0 +1,1 @@
+{"success":false,"error":"Error -2 connecting to redis.railway.internal:6379. Name or service not known.","error_code":"INTERNAL_ERROR","api_version":"v1","timestamp":"2025-10-04T07:43:21.355618","details":{"action":"get_firs_connection_status"}}

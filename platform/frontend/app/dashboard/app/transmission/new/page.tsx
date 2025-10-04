@@ -41,7 +41,7 @@ export default function NewTransmissionPage() {
   const loadAvailableBatches = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get<APIResponse<InvoiceBatch[]>>('/api/v1/app/transmission/available-batches');
+      const response = await apiClient.get<APIResponse<InvoiceBatch[]>>('/app/transmission/available-batches');
       if (response.success && response.data) {
         setAvailableBatches(response.data);
         setIsDemo(false);
@@ -110,7 +110,7 @@ export default function NewTransmissionPage() {
       
       let response;
       if (transmissionMode === 'batch') {
-        response = await apiClient.post<APIResponse>('/api/v1/app/transmission/submit-batches', {
+        response = await apiClient.post<APIResponse>('/app/transmission/submit-batches', {
           batchIds: selectedBatches,
           priority: 'normal',
           validateBeforeSubmission: true
@@ -121,7 +121,7 @@ export default function NewTransmissionPage() {
         formData.append('autoValidate', 'true');
         formData.append('priority', 'normal');
         
-        response = await apiClient.post<APIResponse>('/api/v1/app/transmission/submit-file', formData);
+        response = await apiClient.post<APIResponse>('/app/transmission/submit-file', formData);
       }
       
       if (response.success) {

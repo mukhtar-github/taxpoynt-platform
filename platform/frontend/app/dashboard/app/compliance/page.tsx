@@ -49,7 +49,7 @@ export default function ComplianceReportsPage() {
   const loadComplianceMetrics = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get<APIResponse<ComplianceMetrics>>('/api/v1/app/compliance/metrics');
+      const response = await apiClient.get<APIResponse<ComplianceMetrics>>('/app/compliance/metrics');
       if (response.success && response.data) {
         setMetrics(response.data);
         setIsDemo(false);
@@ -114,7 +114,7 @@ export default function ComplianceReportsPage() {
   const generateNewReport = async () => {
     try {
       setGenerating(true);
-      const response = await apiClient.post<APIResponse>('/api/v1/app/compliance/generate-report', {
+      const response = await apiClient.post<APIResponse>('/app/compliance/generate-report', {
         type: selectedReportType,
         includeMetrics: true,
         format: 'pdf'

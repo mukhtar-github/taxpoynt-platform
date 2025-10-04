@@ -63,8 +63,8 @@ export default function StatusTrackingPage() {
     try {
       setLoading(true);
       const [metricsResponse, transmissionsResponse] = await Promise.all([
-        apiClient.get<APIResponse<TrackingMetrics>>('/api/v1/app/tracking/metrics'),
-        apiClient.get<APIResponse<TransmissionStatus[]>>('/api/v1/app/tracking/transmissions')
+        apiClient.get<APIResponse<TrackingMetrics>>('/app/tracking/metrics'),
+        apiClient.get<APIResponse<TransmissionStatus[]>>('/app/tracking/transmissions')
       ]);
       
       if (metricsResponse.success && metricsResponse.data && 

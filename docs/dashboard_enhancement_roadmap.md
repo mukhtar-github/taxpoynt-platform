@@ -12,7 +12,7 @@ These enhancements align with our ERP-first integration strategy, with particula
 
 ### Integration Type Comparison
 
-**Priority: High**  
+**Priority: High**
 **Estimated Effort: 3 days**
 
 Implement comparative metrics across different integration types to provide insights into performance differences and help identify optimization opportunities.

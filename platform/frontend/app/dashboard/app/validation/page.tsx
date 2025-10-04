@@ -57,8 +57,8 @@ export default function DataValidationPage() {
     try {
       setLoading(true);
       const [metricsResponse, resultsResponse] = await Promise.all([
-        apiClient.get<APIResponse<ValidationMetrics>>('/api/v1/app/validation/metrics'),
-        apiClient.get<APIResponse<ValidationResult[]>>('/api/v1/app/validation/recent-results')
+        apiClient.get<APIResponse<ValidationMetrics>>('/app/validation/metrics'),
+        apiClient.get<APIResponse<ValidationResult[]>>('/app/validation/recent-results')
       ]);
       
       if (metricsResponse.success && metricsResponse.data && 
@@ -152,7 +152,7 @@ export default function DataValidationPage() {
       formData.append('validateSchema', 'true');
       formData.append('validateBusinessRules', 'true');
       
-      const response = await apiClient.post<APIResponse<ValidationResult>>('/api/v1/app/validation/validate-batch', formData);
+      const response = await apiClient.post<APIResponse<ValidationResult>>('/app/validation/validate-batch', formData);
       
       if (response.success && response.data) {
         // Add new result to the list

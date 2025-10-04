@@ -45,7 +45,7 @@ export default function SecurityCenterPage() {
   const loadSecurityMetrics = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get<APIResponse<SecurityMetrics>>('/api/v1/app/security/metrics');
+      const response = await apiClient.get<APIResponse<SecurityMetrics>>('/app/security/metrics');
       if (response.success && response.data) {
         setMetrics(response.data);
         setIsDemo(false);
@@ -79,7 +79,7 @@ export default function SecurityCenterPage() {
   const runSecurityScan = async () => {
     try {
       setScanning(true);
-      const response = await apiClient.post<APIResponse>('/api/v1/app/security/scan', {
+      const response = await apiClient.post<APIResponse>('/app/security/scan', {
         scanType: 'comprehensive',
         includeVulnerabilityCheck: true
       });

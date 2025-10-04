@@ -108,7 +108,7 @@ export default function APPInvoiceProcessingSetupPage() {
         environment: setupData.environment
       });
       
-      const response = await apiClient.post<APIResponse>('/api/v1/app/firs/test-connection', sanitizedData);
+      const response = await apiClient.post<APIResponse>('/app/firs/test-connection', sanitizedData);
       
       if (response.success) {
         setConnectionStatus('success');
@@ -147,7 +147,7 @@ export default function APPInvoiceProcessingSetupPage() {
       const sanitizedSetupData = secureConfig.sanitizeConfig(setupData);
       
       // Save FIRS configuration
-      await apiClient.post<APIResponse>('/api/v1/app/setup/firs-configuration', {
+      await apiClient.post<APIResponse>('/app/setup/firs-configuration', {
         ...sanitizedSetupData,
         user_id: user?.id || ''
       });
