@@ -110,7 +110,11 @@ try:
     # Core platform components (production ready)
     from core_platform.authentication.role_manager import RoleManager
     from core_platform.messaging.redis_message_router import get_redis_message_router, RedisMessageRouter
-    from core_platform.messaging.message_router import ServiceRole
+    from core_platform.messaging.message_router import (
+        ServiceRole,
+        MessageRouter,
+        get_message_router as get_inmemory_message_router,
+    )
     
     # Phase 6: Enterprise Fault Tolerance Infrastructure
     from hybrid_services.error_management import (
@@ -266,8 +270,18 @@ def create_taxpoynt_app() -> FastAPI:
     
     # Create temporary message router for gateway initialization
     # (will be replaced with production messaging in startup)
-    from core_platform.messaging import get_redis_message_router
-    temp_message_router = get_redis_message_router()
+    def _initialize_temp_message_router() -> MessageRouter:
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            try:
+                logger.info(f"Attempting to initialize Redis message router (REDIS_URL={redis_url})")
+                return get_redis_message_router()
+            except Exception as exc:
+                logger.warning("Redis message router unavailable (%s). Falling back to in-memory router.", exc)
+        logger.info("Using in-memory message router")
+        return get_inmemory_message_router()
+
+    temp_message_router = _initialize_temp_message_router()
     
     # Create version coordinator
     version_coordinator = APIVersionCoordinator(temp_message_router)
