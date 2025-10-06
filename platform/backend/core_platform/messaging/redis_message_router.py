@@ -477,6 +477,34 @@ class RedisMessageRouter(MessageRouter):
             source_service=source_service,
         )
 
+    async def _find_target_endpoints(self, message: RoutedMessage, rule: RoutingRule):
+        """Restrict routing targets to services that advertise the requested operation."""
+        endpoints = await super()._find_target_endpoints(message, rule)
+
+        if not endpoints:
+            return endpoints
+
+        operation = None
+        metadata = getattr(message.routing_context, "routing_metadata", None) or {}
+        if isinstance(metadata, dict):
+            operation = metadata.get("operation")
+        if operation is None and isinstance(message.payload, dict):
+            operation = message.payload.get("operation")
+
+        if not operation:
+            return endpoints
+
+        filtered = []
+        for endpoint in endpoints:
+            advertised_ops = endpoint.metadata.get("operations") if endpoint.metadata else None
+            if not advertised_ops:
+                filtered.append(endpoint)
+                continue
+            if operation in advertised_ops:
+                filtered.append(endpoint)
+
+        return filtered or endpoints
+
     async def _route_message_v2(
         self,
         service_role: ServiceRole,
