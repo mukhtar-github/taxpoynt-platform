@@ -434,53 +434,108 @@ class RedisMessageRouter(MessageRouter):
         logger.info(f"Added routing rule: {rule_id}")
         return rule_id
     
-    async def route_message(self, message: RoutedMessage) -> List[str]:
-        """Route message using Redis-backed state"""
-        try:
-            # Update routing statistics
-            self.routing_stats["messages_routed"] += 1
-            
-            # Find applicable routing rules
-            applicable_rules = await self._find_applicable_rules(message)
-            
-            if not applicable_rules:
-                logger.warning(f"No routing rules found for message {message.message_id}")
-                self.routing_stats["routing_failures"] += 1
-                return []
-            
-            # Route to targets based on rules
-            targets = []
-            for rule in applicable_rules:
-                rule_targets = await self._route_by_rule(message, rule)
-                targets.extend(rule_targets)
-            
-            # Remove duplicates while preserving order
-            unique_targets = []
-            seen = set()
-            for target in targets:
-                if target not in seen:
-                    unique_targets.append(target)
-                    seen.add(target)
-            
-            # Store active route
-            await self._store_active_route(message)
-            
-            # Update message route history
-            message.route_history.extend(unique_targets)
-            
-            if unique_targets:
-                self.routing_stats["successful_deliveries"] += len(unique_targets)
-                logger.info(f"Routed message {message.message_id} to {len(unique_targets)} targets")
-            else:
-                self.routing_stats["failed_deliveries"] += 1
-                logger.warning(f"Failed to route message {message.message_id}")
-            
-            return unique_targets
-            
-        except Exception as e:
-            logger.error(f"Message routing error: {e}")
-            self.routing_stats["routing_failures"] += 1
-            return []
+    async def route_message(self, *args, **kwargs):
+        """Bridge legacy and v2 routing signatures for Redis router instances."""
+        if args and isinstance(args[0], RoutedMessage) and len(args) == 1 and not kwargs:
+            return await self._route_message_from_routed_message(args[0])
+
+        service_role = kwargs.pop("service_role", None)
+        if service_role is None and args:
+            service_role = args[0]
+
+        operation = kwargs.pop("operation", None)
+        if operation is None and len(args) > 1:
+            operation = args[1]
+
+        payload = kwargs.pop("payload", None)
+        if payload is None and len(args) > 2:
+            payload = args[2]
+
+        if service_role is None or operation is None or payload is None:
+            raise TypeError("route_message requires service_role, operation, and payload")
+
+        priority = kwargs.pop("priority", "normal")
+        if len(args) > 3:
+            priority = args[3]
+
+        tenant_id = kwargs.pop("tenant_id", None)
+        correlation_id = kwargs.pop("correlation_id", None)
+        source_service = kwargs.pop("source_service", "api_gateway")
+
+        if kwargs:
+            # Surface unsupported kwargs early instead of silently dropping them
+            unexpected = ", ".join(sorted(kwargs.keys()))
+            raise TypeError(f"route_message received unexpected keyword arguments: {unexpected}")
+
+        return await self._route_message_v2(
+            service_role,
+            operation,
+            payload,
+            priority=priority,
+            tenant_id=tenant_id,
+            correlation_id=correlation_id,
+            source_service=source_service,
+        )
+
+    async def _route_message_v2(
+        self,
+        service_role: ServiceRole,
+        operation: str,
+        payload: Dict[str, Any],
+        *,
+        priority: str = "normal",
+        tenant_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        source_service: str = "api_gateway",
+    ) -> Dict[str, Any]:
+        previous_ids: Set[str] = set(self.active_routes.keys())
+        result = await super().route_message(
+            service_role,
+            operation,
+            payload,
+            priority=priority,
+            tenant_id=tenant_id,
+            correlation_id=correlation_id,
+            source_service=source_service,
+        )
+
+        new_ids = set(self.active_routes.keys()) - previous_ids
+        for message_id in new_ids:
+            message = self.active_routes.get(message_id)
+            if not message:
+                continue
+            try:
+                await self._store_active_route(message)
+            except Exception as exc:  # pragma: no cover - best effort persistence
+                logger.warning(f"Failed to persist active route {message_id}: {exc}")
+
+        return result
+
+    async def _route_message_from_routed_message(self, message: RoutedMessage) -> Dict[str, Any]:
+        routing_context = message.routing_context
+        metadata = getattr(routing_context, "routing_metadata", {}) or {}
+        operation = metadata.get("operation")
+        if operation is None and isinstance(message.payload, dict):
+            operation = message.payload.get("operation")
+        if operation is None:
+            raise TypeError("Legacy RoutedMessage missing operation metadata")
+
+        target_role = routing_context.target_role or routing_context.source_role or ServiceRole.SYSTEM_INTEGRATOR
+        priority = (
+            message.priority.value
+            if isinstance(getattr(message, "priority", None), EventPriority)
+            else str(getattr(message, "priority", "normal"))
+        )
+
+        return await self._route_message_v2(
+            target_role,
+            operation,
+            message.payload,
+            priority=priority,
+            tenant_id=routing_context.tenant_id,
+            correlation_id=routing_context.correlation_id,
+            source_service=routing_context.source_service,
+        )
     
     async def _store_active_route(self, message: RoutedMessage):
         """Store active route in Redis"""
