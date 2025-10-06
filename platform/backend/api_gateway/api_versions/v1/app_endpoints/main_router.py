@@ -39,6 +39,8 @@ from .tracking_management_endpoints import create_tracking_management_router
 from .report_generation_endpoints import create_report_generation_router
 from .dashboard_data_endpoints import create_dashboard_data_router
 from .onboarding_endpoints import create_app_onboarding_router
+from .setup_endpoints import create_app_setup_router
+from .compliance_reporting_endpoints import create_compliance_reporting_router
 from .network_routing_endpoints import create_network_routing_router
 from .webhook_endpoints import create_app_webhook_router
 
@@ -205,6 +207,21 @@ class APPRouterV1:
             self.message_router
         )
         self.router.include_router(onboarding_router, dependencies=[Depends(self.tenant_scope)])
+
+        # APP Setup Routes (wizard persistence)
+        setup_router = create_app_setup_router(
+            self.role_detector,
+            self.permission_guard,
+        )
+        self.router.include_router(setup_router, dependencies=[Depends(self.tenant_scope)])
+
+        # Compliance Reporting Routes
+        compliance_router = create_compliance_reporting_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router,
+        )
+        self.router.include_router(compliance_router, dependencies=[Depends(self.tenant_scope)])
     
     def _setup_routes(self):
         """Configure general APP v1 routes"""

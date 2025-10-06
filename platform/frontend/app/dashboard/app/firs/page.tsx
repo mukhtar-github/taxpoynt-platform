@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
-import { TaxPoyntAPIClient } from '../../../../shared_components/api/client';
+import apiClient from '../../../../shared_components/api/client';
 import { APIResponse } from '../../../../si_interface/types';
 
 interface FIRSConnectionStatus {
@@ -21,6 +21,17 @@ interface FIRSConnectionStatus {
   };
   uptime_percentage?: number;
   error_message?: string;
+  has_credentials?: boolean;
+  api_key_masked?: string | null;
+  api_secret_masked?: string | null;
+  webhook_url?: string | null;
+  last_updated_at?: string | null;
+  last_updated_by?: string | null;
+  metadata?: {
+    organization_id?: string | null;
+    last_error?: string | null;
+    last_connection_status?: string | null;
+  };
 }
 
 interface APICredentials {
@@ -30,9 +41,21 @@ interface APICredentials {
   webhook_url?: string;
 }
 
+interface FIRSCredentialsPayload {
+  credentials?: {
+    api_key_masked?: string | null;
+    api_secret_masked?: string | null;
+    environment?: 'sandbox' | 'production';
+    webhook_url?: string | null;
+    last_updated_at?: string | null;
+    last_updated_by?: string | null;
+  };
+  status: FIRSConnectionStatus;
+}
+
 export default function APPFIRSPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'credentials' | 'webhooks' | 'logs'>('overview');
   const [connectionStatus, setConnectionStatus] = useState<FIRSConnectionStatus>({
@@ -50,6 +73,7 @@ export default function APPFIRSPage() {
   const [credentialsError, setCredentialsError] = useState<string>('');
   const [testingConnection, setTestingConnection] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -68,44 +92,73 @@ export default function APPFIRSPage() {
   }, [router]);
 
   const loadFIRSStatus = async () => {
+    setLoadError(null);
+
     try {
-      const apiClient = new TaxPoyntAPIClient();
-      const response = await apiClient.get<APIResponse>('/app/firs/status');
-      
-      if (response.success) {
-        setConnectionStatus(response.data);
-        setCredentials({
-          api_key: response.data.api_key_masked || '',
-          api_secret: response.data.api_secret_masked || '',
-          environment: response.data.environment || 'sandbox',
-          webhook_url: response.data.webhook_url || ''
-        });
+      const [statusResponse, credentialsResponse] = await Promise.all([
+        apiClient.get<APIResponse<FIRSConnectionStatus>>('/app/firs/status'),
+        apiClient.get<APIResponse<FIRSCredentialsPayload>>('/app/firs/credentials')
+      ]);
+
+      const statusData = statusResponse.success && statusResponse.data
+        ? statusResponse.data
+        : null;
+
+      if (statusData) {
+        setConnectionStatus(prev => ({
+          ...prev,
+          ...statusData,
+          error_message: statusData.error_message ?? undefined,
+        }));
         setIsDemo(false);
       } else {
-        setIsDemo(true);
+        const statusMessage = statusResponse.message || 'Unable to load FIRS status.';
+        setConnectionStatus(prev => ({
+          ...prev,
+          status: 'error',
+          last_connected: undefined,
+          uptime_percentage: undefined,
+          rate_limit: undefined,
+          error_message: statusMessage,
+        }));
+        setLoadError(statusMessage);
+      }
+
+      const credentialsData = credentialsResponse.success
+        ? credentialsResponse.data?.credentials
+        : null;
+
+      if (credentialsData) {
+        setCredentials(prev => ({
+          api_key: '',
+          api_secret: '',
+          environment: credentialsData.environment || statusData?.environment || prev.environment,
+          webhook_url: credentialsData.webhook_url || '',
+        }));
+      } else if (!credentialsResponse.success) {
+        const credentialsMessage = credentialsResponse.message || 'Unable to load stored credentials.';
+        setLoadError(prev => prev ?? credentialsMessage);
       }
     } catch (error) {
-      console.error('Failed to load FIRS status, using demo data:', error);
-      setIsDemo(true);
-      // Set demo data for now
-      setConnectionStatus({
-        status: 'connected',
-        last_connected: new Date().toISOString(),
-        api_version: 'v1.0',
-        environment: 'sandbox',
-        sandbox_url: 'https://eivc-k6z6d.ondigitalocean.app',
-        production_url: 'https://einvoicing.firs.gov.ng',
-        rate_limit: {
-          remaining: 950,
-          reset_time: new Date(Date.now() + 3600000).toISOString()
-        },
-        uptime_percentage: 99.9
-      });
+      console.error('Failed to load FIRS status:', error);
+      const failureMessage = 'Failed to load FIRS status. Please retry.';
+      setConnectionStatus(prev => ({
+        ...prev,
+        status: 'error',
+        last_connected: undefined,
+        uptime_percentage: undefined,
+        rate_limit: undefined,
+        error_message: failureMessage,
+      }));
+      setIsDemo(false);
+      setLoadError(failureMessage);
     }
   };
 
   const testConnection = async () => {
-    if (!credentials.api_key || !credentials.api_secret) {
+    const { api_key, api_secret, environment, webhook_url } = credentials;
+
+    if (!api_key || !api_secret) {
       setCredentialsError('API Key and Secret are required');
       return;
     }
@@ -114,11 +167,11 @@ export default function APPFIRSPage() {
     setCredentialsError('');
 
     try {
-      const apiClient = new TaxPoyntAPIClient();
       const response = await apiClient.post<APIResponse>('/app/firs/test-connection', {
-        api_key: credentials.api_key,
-        api_secret: credentials.api_secret,
-        environment: credentials.environment
+        api_key,
+        api_secret,
+        environment,
+        webhook_url: webhook_url || undefined,
       });
 
       if (response.success) {
@@ -126,7 +179,7 @@ export default function APPFIRSPage() {
           ...connectionStatus,
           status: 'connected',
           last_connected: new Date().toISOString(),
-          environment: credentials.environment
+          environment
         });
       } else {
         setConnectionStatus({
@@ -150,7 +203,9 @@ export default function APPFIRSPage() {
   };
 
   const saveCredentials = async () => {
-    if (!credentials.api_key || !credentials.api_secret) {
+    const { api_key, api_secret, environment, webhook_url } = credentials;
+
+    if (!api_key || !api_secret) {
       setCredentialsError('API Key and Secret are required');
       return;
     }
@@ -159,12 +214,22 @@ export default function APPFIRSPage() {
     setCredentialsError('');
 
     try {
-      const apiClient = new TaxPoyntAPIClient();
-      const response = await apiClient.post<APIResponse>('/app/firs/credentials', credentials);
+      const response = await apiClient.post<APIResponse>('/app/firs/credentials', {
+        api_key,
+        api_secret,
+        environment,
+        webhook_url,
+      });
 
       if (response.success) {
         await loadFIRSStatus();
         setActiveTab('overview');
+        setCredentials({
+          api_key: '',
+          api_secret: '',
+          environment,
+          webhook_url: webhook_url || '',
+        });
       } else {
         setCredentialsError(response.message || 'Failed to save credentials');
       }
@@ -212,6 +277,11 @@ export default function APPFIRSPage() {
       activeTab="firs"
     >
       <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6">
+        {loadError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {loadError}
+          </div>
+        )}
         
         {/* Header */}
         <div className="mb-8">

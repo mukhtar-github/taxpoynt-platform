@@ -18,6 +18,19 @@ from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
 from api_gateway.utils.error_mapping import v1_error_response
+from core_platform.data_management.db_async import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from core_platform.data_management.repositories.firs_submission_repo_async import (
+    get_validation_metrics_data,
+    list_recent_validation_results_data,
+    get_validation_error_summary,
+    get_validation_error_insights,
+)
+from core_platform.data_management.repositories.validation_batch_repo_async import (
+    record_validation_batch,
+    summarize_validation_batches,
+)
+from core_platform.data_management.models.organization import Organization
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +136,15 @@ class ValidationManagementEndpointsV1:
             summary="Get recent validation results",
             description="Get recent validation results and history",
             response_model=V1ResponseModel
+        )
+
+        self.router.add_api_route(
+            "/recent-batches",
+            self.get_recent_validation_batches,
+            methods=["GET"],
+            summary="Get recent validation batches",
+            description="List recently executed validation batches with summaries",
+            response_model=V1ResponseModel,
         )
         
         self.router.add_api_route(
@@ -240,111 +262,130 @@ class ValidationManagementEndpointsV1:
         )
     
     # Validation Metrics Endpoints
-    async def get_validation_metrics(self, request: Request):
+    async def get_validation_metrics(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get comprehensive validation metrics"""
         try:
             context = await self._require_app_role(request)
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_validation_metrics",
-                payload={
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+            metrics = await get_validation_metrics_data(
+                db,
+                organization_id=context.organization_id,
             )
-            
-            # Add demo data if service not available
-            if not result:
-                result = {
-                    "totalValidated": 1247,
-                    "passRate": 99.8,
-                    "errorRate": 0.2,
-                    "warningRate": 2.1,
-                    "schemaErrors": 0,
-                    "formatErrors": 1,
-                    "businessRuleErrors": 2,
-                    "averageValidationTime": "2.3 seconds",
-                    "throughput": "450 invoices/minute"
-                }
-            
-            # Add capabilities information
-            result["capabilities"] = self.validation_capabilities
-            
-            return self._create_v1_response(result, "validation_metrics_retrieved")
+            metrics["capabilities"] = self.validation_capabilities
+            return self._create_v1_response(metrics, "validation_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation metrics in v1: {e}")
             return v1_error_response(e, action="get_validation_metrics")
     
-    async def get_validation_overview(self, request: Request):
+    async def get_validation_overview(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+        limit: int = Query(5, description="Recent results to include"),
+    ):
         """Get validation overview"""
         try:
             context = await self._require_app_role(request)
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_validation_overview",
-                payload={
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+            metrics = await get_validation_metrics_data(
+                db,
+                organization_id=context.organization_id,
             )
-            
-            return self._create_v1_response(result, "validation_overview_retrieved")
+            errors = await get_validation_error_summary(
+                db,
+                organization_id=context.organization_id,
+                limit=limit,
+            )
+            recent = await list_recent_validation_results_data(
+                db,
+                organization_id=context.organization_id,
+                limit=limit,
+            )
+            overview = {
+                "metrics": metrics,
+                "errorSummary": errors,
+                "recentResults": recent,
+            }
+            return self._create_v1_response(overview, "validation_overview_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation overview in v1: {e}")
             return v1_error_response(e, action="get_validation_overview")
     
     # Validation Results Endpoints
-    async def get_recent_validation_results(self, 
-                                          limit: Optional[int] = Query(10, description="Number of results to return"),
-                                          context: HTTPRoutingContext = Depends(lambda: None)):
+    async def get_recent_validation_results(
+        self,
+        request: Request,
+        limit: Optional[int] = Query(10, description="Number of results to return"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get recent validation results"""
         try:
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_recent_validation_results",
-                payload={
-                    "limit": limit,
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+            context = await self._require_app_role(request)
+            results = await list_recent_validation_results_data(
+                db,
+                organization_id=context.organization_id,
+                limit=limit or 10,
             )
-            
-            # Add demo data if service not available
-            if not result:
-                result = [
-                    {
-                        "id": "VAL-2024-001",
-                        "batchId": "BATCH-2024-015",
-                        "invoiceCount": 156,
-                        "status": "passed",
-                        "timestamp": "2024-01-15 14:30:00",
-                        "errors": [],
-                        "passedInvoices": 156,
-                        "failedInvoices": 0
-                    },
-                    {
-                        "id": "VAL-2024-002",
-                        "batchId": "BATCH-2024-014",
-                        "invoiceCount": 89,
-                        "status": "warning",
-                        "timestamp": "2024-01-15 13:45:00",
-                        "errors": [
-                            {
-                                "type": "business_rule",
-                                "field": "vatAmount",
-                                "message": "VAT calculation discrepancy detected",
-                                "severity": "warning"
-                            }
-                        ],
-                        "passedInvoices": 89,
-                        "failedInvoices": 0
-                    }
-                ]
-            
-            return self._create_v1_response(result, "recent_validation_results_retrieved")
+            return self._create_v1_response(results, "recent_validation_results_retrieved")
         except Exception as e:
             logger.error(f"Error getting recent validation results in v1: {e}")
             return v1_error_response(e, action="get_recent_validation_results")
+
+    async def get_recent_validation_batches(
+        self,
+        request: Request,
+        limit: Optional[int] = Query(10, description="Number of batches to include"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """Return the latest validation batch runs for the tenant."""
+
+        try:
+            context = await self._require_app_role(request)
+            snapshot = await summarize_validation_batches(
+                db,
+                organization_id=context.organization_id,
+                limit=limit or 10,
+            )
+
+            recent_batches = []
+            if isinstance(snapshot, dict):
+                for item in snapshot.get("items", []):
+                    recent_batches.append(
+                        {
+                            "batchId": item.get("batchId"),
+                            "status": item.get("status"),
+                            "totals": item.get("totals"),
+                            "createdAt": item.get("createdAt"),
+                            "errorSummary": item.get("errorSummary"),
+                        }
+                    )
+
+            sla_hours = 4
+            if context.organization_id:
+                org = await db.get(Organization, context.organization_id)
+                if org and isinstance(org.firs_configuration, dict):
+                    configured = org.firs_configuration.get("compliance_sla_hours")
+                    try:
+                        if configured is not None:
+                            sla_hours = max(1, int(configured))
+                    except (TypeError, ValueError):
+                        logger.debug(
+                            "Invalid compliance_sla_hours configuration for org %s",
+                            context.organization_id,
+                        )
+
+            payload = {
+                "summary": snapshot.get("summary") if isinstance(snapshot, dict) else None,
+                "recentBatches": recent_batches,
+                "slaHours": sla_hours,
+            }
+
+            return self._create_v1_response(payload, "recent_validation_batches_retrieved")
+        except Exception as exc:
+            logger.error("Error getting recent validation batches in v1: %s", exc)
+            return v1_error_response(exc, action="get_recent_validation_batches")
     
     async def get_validation_result(self, validation_id: str, request: Request):
         """Get detailed validation result"""
@@ -392,46 +433,69 @@ class ValidationManagementEndpointsV1:
             logger.error(f"Error validating single invoice in v1: {e}")
             return v1_error_response(e, action="validate_single_invoice")
     
-    async def validate_invoice_batch(self, request: Request):
+    async def validate_invoice_batch(
+        self,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Validate invoice batch"""
         try:
             context = await self._require_app_role(request)
-            # Handle both JSON and file upload
-            if request.headers.get("content-type", "").startswith("multipart/form-data"):
-                # File upload handling would go here
-                # For now, return demo result
+            body: Dict[str, Any] = {}
+            result: Optional[Dict[str, Any]] = None
+
+            content_type = request.headers.get("content-type", "")
+            if content_type.startswith("multipart/form-data"):
                 result = {
                     "validation_id": f"VAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                     "batch_id": f"BATCH-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                     "status": "processing",
                     "invoice_count": 0,
-                    "estimated_completion": "2-3 minutes"
+                    "estimated_completion": "2-3 minutes",
                 }
             else:
                 body = await request.json()
-                
                 result = await self.message_router.route_message(
                     service_role=ServiceRole.ACCESS_POINT_PROVIDER,
                     operation="validate_invoice_batch",
                     payload={
                         "batch_data": body,
                         "app_id": context.user_id,
-                        "api_version": "v1"
-                    }
+                        "api_version": "v1",
+                    },
                 )
-                
-                # Add demo data if service not available
-                if not result:
-                    result = {
-                        "validation_id": f"VAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                        "batch_id": body.get("batch_id", f"BATCH-{datetime.now().strftime('%Y%m%d-%H%M%S')}"),
-                        "status": "completed",
-                        "invoice_count": len(body.get("invoices", [])),
-                        "passed_count": len(body.get("invoices", [])),
-                        "failed_count": 0,
-                        "errors": []
-                    }
-            
+
+            if not result:
+                result = {
+                    "validation_id": f"VAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                    "batch_id": body.get("batch_id", f"BATCH-{datetime.now().strftime('%Y%m%d-%H%M%S')}"),
+                    "status": "completed",
+                    "invoice_count": len(body.get("invoices", [])),
+                    "passed_count": len(body.get("invoices", [])),
+                    "failed_count": 0,
+                    "errors": [],
+                }
+
+            try:
+                batch_payload = result.get("data") if isinstance(result, dict) and "data" in result else result
+                if isinstance(batch_payload, dict):
+                    summary = batch_payload.get("summary", {})
+                    if not summary and "invoice_count" in batch_payload:
+                        summary = {
+                            "total": batch_payload.get("invoice_count", 0),
+                            "passed": batch_payload.get("passed_count", 0),
+                            "failed": batch_payload.get("failed_count", 0),
+                        }
+                        batch_payload.setdefault("summary", summary)
+
+                    await record_validation_batch(
+                        db,
+                        organization_id=context.organization_id,
+                        batch_payload=batch_payload,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to persist validation batch history: %s", exc)
+
             return self._create_v1_response(result, "invoice_batch_validated")
         except Exception as e:
             logger.error(f"Error validating invoice batch in v1: {e}")
@@ -555,42 +619,58 @@ class ValidationManagementEndpointsV1:
             return v1_error_response(e, action="get_firs_validation_standards")
     
     # Error Analysis Endpoints
-    async def get_validation_error_analysis(self, 
-                                          request: Request,
-                                          period: Optional[str] = Query("30d", description="Analysis period")):
+    async def get_validation_error_analysis(
+        self,
+        request: Request,
+        period: Optional[str] = Query("30d", description="Analysis period"),
+        limit: int = Query(100, description="Number of error samples"),
+        db: AsyncSession = Depends(get_async_session),
+    ):
         """Get validation error analysis"""
         try:
             context = await self._require_app_role(request)
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_validation_error_analysis",
-                payload={
-                    "period": period,
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+            summary = await get_validation_error_summary(
+                db,
+                organization_id=context.organization_id,
+                limit=limit,
             )
-            
-            return self._create_v1_response(result, "validation_error_analysis_retrieved")
+            summary["period"] = period
+            return self._create_v1_response(summary, "validation_error_analysis_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation error analysis in v1: {e}")
             return v1_error_response(e, action="get_validation_error_analysis")
     
-    async def get_validation_error_help(self, error_code: str, request: Request):
+    async def get_validation_error_help(
+        self,
+        error_code: str,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+        limit: int = Query(25, description="Number of samples to include"),
+    ):
         """Get validation error help"""
         try:
             context = await self._require_app_role(request)
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.ACCESS_POINT_PROVIDER,
-                operation="get_validation_error_help",
-                payload={
-                    "error_code": error_code,
-                    "app_id": context.user_id,
-                    "api_version": "v1"
-                }
+            insights = await get_validation_error_insights(
+                db,
+                organization_id=context.organization_id,
+                error_code=error_code,
+                limit=limit,
             )
-            
-            return self._create_v1_response(result, "validation_error_help_retrieved")
+
+            payload = {
+                "errorCode": error_code,
+                "occurrences": insights.get("occurrences", 0),
+                "samples": insights.get("samples", []),
+            }
+
+            if payload["occurrences"] == 0:
+                payload["guidance"] = [
+                    "Verify mandatory FIRS fields referenced in the error.",
+                    "Confirm VAT and tax calculations align with current rules.",
+                    "Update mapping rules or contact support if the issue persists.",
+                ]
+
+            return self._create_v1_response(payload, "validation_error_help_retrieved")
         except Exception as e:
             logger.error(f"Error getting validation error help for {error_code} in v1: {e}")
             return v1_error_response(e, action="get_validation_error_help")

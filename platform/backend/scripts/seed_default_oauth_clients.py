@@ -50,6 +50,12 @@ DEFAULT_CLIENT_SPECS: List[SeedSpec] = [
         metadata={
             "description": "Grafana/Prometheus dashboards for queue throughput and SLA monitoring",
             "owner": "observability",
+            "consent_summary": "Grant read-only access to operational metrics exposed by TaxPoynt dashboards.",
+            "scope_descriptions": {
+                "metrics.read": "Read-only access to Prometheus metrics for observability dashboards.",
+                "queues.read": "View live queue depth and worker throughput to monitor ingestion health.",
+                "sla.read": "Read SLA status and breach indicators for alerting pipelines.",
+            },
         },
     ),
     SeedSpec(
@@ -64,6 +70,11 @@ DEFAULT_CLIENT_SPECS: List[SeedSpec] = [
         metadata={
             "description": "Store-and-forward participant integration (four-corner support)",
             "owner": "hybrid-services",
+            "consent_summary": "Allow the participant gateway to submit invoices and synchronise participant records on behalf of connected platforms.",
+            "scope_descriptions": {
+                "invoices.submit": "Submit validated invoice payloads to the TaxPoynt transmission pipeline.",
+                "participants.sync": "Register or update participant metadata required for four-corner routing.",
+            },
         },
     ),
 ]

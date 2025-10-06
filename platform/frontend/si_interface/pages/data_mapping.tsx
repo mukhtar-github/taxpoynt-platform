@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import apiClient from '../../shared_components/api/client';
 
 interface DataField {
   id: string;
@@ -231,16 +232,11 @@ export const DataMapping: React.FC<DataMappingProps> = ({
 
   const loadExistingMappings = async () => {
     try {
-      const response = await fetch(`/api/v1/si/data-mapping/${organizationId}/${selectedSystem?.systemId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMappingRules(data.mapping_rules || []);
-      }
+      const data = await apiClient.get<{ mapping_rules?: MappingRule[] }>(
+        `/si/data-mapping/${organizationId}/${selectedSystem?.systemId}`
+      );
+
+      setMappingRules(data?.mapping_rules || []);
     } catch (error) {
       console.error('Failed to load existing mappings:', error);
     }
@@ -284,21 +280,16 @@ export const DataMapping: React.FC<DataMappingProps> = ({
 
     setIsValidating(true);
     try {
-      const response = await fetch('/api/v1/si/data-mapping/validate', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          system_id: selectedSystem.systemId,
-          organization_id: organizationId,
-          mapping_rules: mappingRules,
-          firs_schema: firsInvoiceSchema
-        })
+      const result = await apiClient.post<{
+        success: boolean;
+        errors?: Record<string, string[]>;
+        preview_data?: any;
+      }>('/si/data-mapping/validate', {
+        system_id: selectedSystem.systemId,
+        organization_id: organizationId,
+        mapping_rules: mappingRules,
+        firs_schema: firsInvoiceSchema
       });
-
-      const result = await response.json();
       
       if (result.success) {
         setValidationErrors({});
@@ -321,20 +312,14 @@ export const DataMapping: React.FC<DataMappingProps> = ({
     if (!selectedSystem || mappingRules.length === 0) return;
 
     try {
-      const response = await fetch('/api/v1/si/data-mapping/save', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const result = await apiClient.post<{ success: boolean; error?: string }>(
+        '/si/data-mapping/save',
+        {
           system_id: selectedSystem.systemId,
           organization_id: organizationId,
           mapping_rules: mappingRules
-        })
-      });
-
-      const result = await response.json();
+        }
+      );
       
       if (result.success) {
         alert('✅ Mapping configuration saved successfully!');

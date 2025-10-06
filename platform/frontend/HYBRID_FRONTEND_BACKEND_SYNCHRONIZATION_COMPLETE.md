@@ -151,7 +151,7 @@ async def get_unified_metrics(self, request: Request, context: HTTPRoutingContex
 const loadHybridDashboardData = async () => {
   try {
     // Call real backend endpoints
-    const response = await fetch('/api/v1/hybrid/dashboard/unified-metrics');
+    const metrics = await apiClient.get('/hybrid/dashboard/unified-metrics');
     if (response.ok) {
       setMetrics(realData);
       setIsDemo(false);

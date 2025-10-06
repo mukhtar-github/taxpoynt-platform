@@ -16,6 +16,7 @@ from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..si_endpoints.version_models import V1ResponseModel
+from api_gateway.utils.v1_response import build_v1_response
 
 logger = logging.getLogger(__name__)
 
@@ -149,12 +150,12 @@ class OnboardingEndpointsV1:
     
     def _create_v1_response(self, data: Any, operation: str) -> V1ResponseModel:
         """Create standardized V1 response"""
-        return V1ResponseModel(
-            success=True,
-            data=data,
-            message=f"Operation '{operation}' completed successfully",
-            version="1.0"
-        )
+        payload = {
+            "success": True,
+            "data": data,
+            "message": f"Operation '{operation}' completed successfully",
+        }
+        return build_v1_response(payload, action=operation)
     
     def _get_primary_service_role(self, context: HTTPRoutingContext) -> ServiceRole:
         """Get primary service role for onboarding operations"""
@@ -177,8 +178,8 @@ class OnboardingEndpointsV1:
                 )
             
             # Process setup through hybrid services
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="complete_hybrid_setup",
                 payload={
                     "user_id": context.user_id,
@@ -244,8 +245,8 @@ class OnboardingEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="get_onboarding_status",
                 payload={"user_id": context.user_id}
             )
@@ -278,8 +279,8 @@ class OnboardingEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="save_setup_progress",
                 payload={
                     "user_id": context.user_id,
@@ -305,8 +306,8 @@ class OnboardingEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="validate_setup_configuration",
                 payload={
                     "user_id": context.user_id,
@@ -337,8 +338,8 @@ class OnboardingEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="test_system_integrations",
                 payload={
                     "user_id": context.user_id,

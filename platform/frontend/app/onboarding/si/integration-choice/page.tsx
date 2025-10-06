@@ -9,9 +9,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
-import { TaxPoyntButton } from '../../../../design_system';
 import { SkipWithTimeButton } from '../../../../shared_components/onboarding';
 
 interface IntegrationChoice {
@@ -30,7 +29,7 @@ export default function SIIntegrationChoicePage() {
   const router = useRouter();
   const [selectedIntegration, setSelectedIntegration] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -110,6 +109,7 @@ export default function SIIntegrationChoicePage() {
   const handleIntegrationSelect = async (integrationId: string) => {
     const choice = integrationChoices.find(c => c.id === integrationId);
     if (!choice) return;
+    if (!user) return;
 
     setIsLoading(true);
     setSelectedIntegration(integrationId);
@@ -161,14 +161,14 @@ export default function SIIntegrationChoicePage() {
             Choose Your Integration Path 🛤️
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Select how you'd like to connect your systems to TaxPoynt. 
+            Select how you&apos;d like to connect your systems to TaxPoynt. 
             You can always add more integrations later.
           </p>
           
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
             <div className="flex items-center justify-center text-indigo-800 text-sm">
               <span className="mr-2">👋</span>
-              <span>Welcome, {user.first_name}! Let's set up your <strong>System Integration</strong> workspace.</span>
+              <span>Welcome, {user.first_name}! Let&apos;s set up your <strong>System Integration</strong> workspace.</span>
             </div>
           </div>
         </div>

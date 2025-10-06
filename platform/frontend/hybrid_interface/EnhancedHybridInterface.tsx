@@ -23,13 +23,15 @@ export interface EnhancedHybridInterfaceProps {
   className?: string;
 }
 
+type HybridRole = 'si' | 'app' | 'unified';
+
 export const EnhancedHybridInterface: React.FC<EnhancedHybridInterfaceProps> = ({
   userName = 'Hybrid User',
   userEmail = 'user@company.com',
   className = ''
 }) => {
   const router = useRouter();
-  const [activeRole, setActiveRole] = useState<'si' | 'app' | 'unified'>('unified');
+  const [activeRole, setActiveRole] = useState<HybridRole>('unified');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   // Combined metrics from both SI and APP perspectives
@@ -60,7 +62,7 @@ export const EnhancedHybridInterface: React.FC<EnhancedHybridInterfaceProps> = (
     }
   };
 
-  const handleRoleSwitch = (role: 'si' | 'app' | 'unified') => {
+  const handleRoleSwitch = (role: HybridRole) => {
     setActiveRole(role);
     if (role === 'si') {
       router.push('/dashboard/si');
@@ -134,14 +136,16 @@ export const EnhancedHybridInterface: React.FC<EnhancedHybridInterfaceProps> = (
             </div>
             
             <div className="flex space-x-2">
-              {[
-                { id: 'unified', label: 'Unified View', icon: '🔄', color: 'purple' },
-                { id: 'si', label: 'System Integrator', icon: '🔗', color: 'indigo' },
-                { id: 'app', label: 'Access Point Provider', icon: '🏛️', color: 'green' }
-              ].map((role) => (
+              {(
+                [
+                  { id: 'unified', label: 'Unified View', icon: '🔄', color: 'purple' },
+                  { id: 'si', label: 'System Integrator', icon: '🔗', color: 'indigo' },
+                  { id: 'app', label: 'Access Point Provider', icon: '🏛️', color: 'green' }
+                ] as Array<{ id: HybridRole; label: string; icon: string; color: string }>
+              ).map((role) => (
                 <button
                   key={role.id}
-                  onClick={() => handleRoleSwitch(role.id as any)}
+                  onClick={() => handleRoleSwitch(role.id)}
                   className={`flex items-center px-6 py-3 rounded-xl transition-all duration-200 ${
                     activeRole === role.id
                       ? `bg-${role.color}-500 text-white shadow-lg`

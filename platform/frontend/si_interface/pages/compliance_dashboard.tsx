@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import apiClient from '../../shared_components/api/client';
 
 interface ComplianceStatus {
   category: 'firs' | 'vat' | 'cbn' | 'ndpr' | 'general';
@@ -188,16 +189,11 @@ export const ComplianceDashboard: React.FC<ComplianceDashboardProps> = ({
   const fetchComplianceData = async () => {
     try {
       const params = organizationId ? `?organization_id=${organizationId}` : '';
-      const response = await fetch(`/api/v1/si/compliance/status${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ compliance_status?: ComplianceStatus[] }>(
+        `/si/compliance/status${params}`
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setComplianceData(data.compliance_status || mockComplianceData);
-      }
+      setComplianceData(data.compliance_status || mockComplianceData);
     } catch (error) {
       console.error('Failed to fetch compliance data:', error);
       setComplianceData(mockComplianceData);
@@ -208,16 +204,11 @@ export const ComplianceDashboard: React.FC<ComplianceDashboardProps> = ({
 
   const fetchMetrics = async () => {
     try {
-      const response = await fetch('/api/v1/si/compliance/metrics', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ metrics: ComplianceMetrics }>(
+        '/si/compliance/metrics'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setMetrics(data.metrics);
-      }
+      setMetrics(data.metrics);
     } catch (error) {
       console.error('Failed to fetch compliance metrics:', error);
     }
@@ -225,16 +216,11 @@ export const ComplianceDashboard: React.FC<ComplianceDashboardProps> = ({
 
   const fetchFIRSSubmissions = async () => {
     try {
-      const response = await fetch('/api/v1/si/compliance/firs-submissions', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ submissions?: FIRSSubmission[] }>(
+        '/si/compliance/firs-submissions'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setFirsSubmissions(data.submissions || []);
-      }
+      setFirsSubmissions(data.submissions || []);
     } catch (error) {
       console.error('Failed to fetch FIRS submissions:', error);
     }
@@ -287,32 +273,24 @@ export const ComplianceDashboard: React.FC<ComplianceDashboardProps> = ({
 
   const generateComplianceReport = async () => {
     try {
-      const response = await fetch('/api/v1/si/compliance/reports/generate', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const blob = await apiClient.post<Blob>(
+        '/si/compliance/reports/generate',
+        {
           organization_id: organizationId,
           report_type: 'comprehensive',
           include_recommendations: true
-        })
-      });
+        },
+        { responseType: 'blob' }
+      );
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `compliance-report-${new Date().toISOString().split('T')[0]}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        alert('❌ Failed to generate compliance report');
-      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `compliance-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
       console.error('Failed to generate report:', error);
       alert('❌ Failed to generate compliance report');

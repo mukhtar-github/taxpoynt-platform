@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 interface CRMSystem {
   id: string;
@@ -104,32 +105,25 @@ export const CRMDashboard: React.FC<CRMDashboardProps> = ({
 
   const loadCRMConnections = async () => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/crm/connections`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ connections?: CRMConnection[] }>(
+        '/si/business-systems/crm/connections'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        
-        // Update system statuses based on connections
-        const updatedSystems = crmSystems.map(system => {
-          const connection = data.connections?.find((conn: CRMConnection) => conn.systemId === system.id);
-          if (connection) {
-            return {
-              ...system,
-              status: 'connected' as const,
-              lastSync: connection.syncSettings.lastSuccessfulSync,
-              customerCount: Math.floor(Math.random() * 5000) + 100,
-              opportunityCount: Math.floor(Math.random() * 500) + 50
-            };
-          }
-          return system;
-        });
-        setCrmSystems(updatedSystems);
-      }
+      setConnections(data.connections || []);
+
+      setCrmSystems(prevSystems => prevSystems.map(system => {
+        const connection = data.connections?.find(conn => conn.systemId === system.id);
+        if (connection) {
+          return {
+            ...system,
+            status: 'connected' as const,
+            lastSync: connection.syncSettings.lastSuccessfulSync,
+            customerCount: Math.floor(Math.random() * 5000) + 100,
+            opportunityCount: Math.floor(Math.random() * 500) + 50
+          };
+        }
+        return system;
+      }));
     } catch (error) {
       console.error('Failed to load CRM connections:', error);
     }
@@ -144,31 +138,24 @@ export const CRMDashboard: React.FC<CRMDashboardProps> = ({
     setIsConnecting(true);
     
     try {
-      const response = await fetch(`/api/v1/si/business-systems/crm/test-connection`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ success: boolean; message?: string }>(
+        '/si/business-systems/crm/test-connection',
+        {
           systemId,
           testData: {
             instanceUrl: 'https://company.salesforce.com',
             clientId: 'test_client_id'
           }
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          alert('CRM connection test successful!');
-          if (onConnectionSuccess) {
-            onConnectionSuccess(systemId);
-          }
-        } else {
-          alert('Connection test failed: ' + data.message);
         }
+      );
+
+      if (data.success) {
+        alert('CRM connection test successful!');
+        if (onConnectionSuccess) {
+          onConnectionSuccess(systemId);
+        }
+      } else {
+        alert('Connection test failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('CRM connection test failed:', error);
@@ -180,36 +167,23 @@ export const CRMDashboard: React.FC<CRMDashboardProps> = ({
 
   const handleSyncNow = async (systemId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/crm/sync`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/crm/sync', { systemId });
 
-      if (response.ok) {
-        // Update status to syncing
-        const updatedSystems = crmSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'syncing' as const }
+      setCrmSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'syncing' as const }
+          : system
+      ));
+
+      setTimeout(() => {
+        setCrmSystems(prevSystems => prevSystems.map(system =>
+          system.id === systemId
+            ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
             : system
-        );
-        setCrmSystems(updatedSystems);
-        
-        // Simulate sync completion
-        setTimeout(() => {
-          const finalSystems = updatedSystems.map(system => 
-            system.id === systemId 
-              ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
-              : system
-          );
-          setCrmSystems(finalSystems);
-        }, 3000);
-        
-        alert('CRM sync started successfully');
-      }
+        ));
+      }, 3000);
+
+      alert('CRM sync started successfully');
     } catch (error) {
       console.error('Failed to sync CRM:', error);
       alert('Failed to start CRM sync');
@@ -222,27 +196,17 @@ export const CRMDashboard: React.FC<CRMDashboardProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/business-systems/crm/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/crm/disconnect', { systemId });
 
-      if (response.ok) {
-        const updatedSystems = crmSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'disconnected' as const, lastSync: undefined, customerCount: undefined, opportunityCount: undefined }
-            : system
-        );
-        setCrmSystems(updatedSystems);
-        
-        setConnections(connections.filter(conn => conn.systemId !== systemId));
-        
-        alert('CRM system disconnected successfully');
-      }
+      setCrmSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'disconnected' as const, lastSync: undefined, customerCount: undefined, opportunityCount: undefined }
+          : system
+      ));
+
+      setConnections(prev => prev.filter(conn => conn.systemId !== systemId));
+
+      alert('CRM system disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect CRM system:', error);
       alert('Failed to disconnect CRM system');

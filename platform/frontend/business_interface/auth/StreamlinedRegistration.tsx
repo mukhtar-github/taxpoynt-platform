@@ -17,9 +17,10 @@ interface StreamlinedRegistrationProps {
   onCompleteRegistration: (registrationData: StreamlinedRegistrationData) => Promise<void>;
   isLoading?: boolean;
   error?: string;
+  initialServicePackage?: 'si' | 'app' | 'hybrid';
 }
 
-interface StreamlinedRegistrationData {
+export interface StreamlinedRegistrationData {
   first_name: string;
   last_name: string;
   email: string;
@@ -38,10 +39,11 @@ interface StreamlinedRegistrationData {
 export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = ({
   onCompleteRegistration,
   isLoading = false,
-  error
+  error,
+  initialServicePackage
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<StreamlinedRegistrationData>({
+  const [formData, setFormData] = useState<StreamlinedRegistrationData>(() => ({
     first_name: '',
     last_name: '',
     email: '',
@@ -49,12 +51,12 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     business_name: '',
     companyType: '',
     companySize: '',
-    service_package: 'si',
+    service_package: initialServicePackage ?? 'si',
     terms_accepted: false,
     privacy_accepted: false,
     trial_started: true,
     trial_start_date: new Date().toISOString()
-  });
+  }));
   
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -99,6 +101,23 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
       formPersistence.stopAutoSave();
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialServicePackage) {
+      return;
+    }
+
+    setFormData(prev => {
+      if (prev.service_package === initialServicePackage) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        service_package: initialServicePackage
+      };
+    });
+  }, [initialServicePackage]);
 
   // Save form data when it changes
   useEffect(() => {

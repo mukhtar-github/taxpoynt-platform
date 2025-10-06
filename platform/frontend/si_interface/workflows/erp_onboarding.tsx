@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import apiClient from '../../shared_components/api/client';
 import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 
 interface OnboardingStep {
@@ -304,24 +305,21 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
   const loadOnboardingProgress = async () => {
     try {
-      const response = await fetch(`/api/v1/si/onboarding/${organizationId}/progress`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{
+        progress?: {
+          currentStep: number;
+          stepsCompleted: string[];
+        };
+      }>(`/si/onboarding/${organizationId}/progress`);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.progress) {
-          setProgress(data.progress);
-          setCurrentStep(data.progress.currentStep);
-          
-          // Update step completion status
-          setSteps(prev => prev.map(step => ({
-            ...step,
-            completed: data.progress.stepsCompleted.includes(step.id)
-          })));
-        }
+      if (data.progress) {
+        setProgress(data.progress);
+        setCurrentStep(data.progress.currentStep);
+
+        setSteps(prev => prev.map(step => ({
+          ...step,
+          completed: data.progress.stepsCompleted.includes(step.id)
+        })));
       }
     } catch (error) {
       console.error('Failed to load onboarding progress:', error);
@@ -349,25 +347,17 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       });
 
       // Attempt API save (if organizationId exists and we have auth)
-      if (organizationId && localStorage.getItem('taxpoynt_auth_token')) {
-        const response = await fetch(`/api/v1/si/onboarding/${organizationId}/step-complete`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+      if (organizationId && apiClient.isAuthenticated()) {
+        try {
+          await apiClient.post(`/si/onboarding/${organizationId}/step-complete`, {
             step_id: stepId,
             step_data: getCurrentStepData(),
             organization_profile: organizationProfile,
             erp_configuration: erpConfiguration
-          })
-        });
-
-        if (response.ok) {
+          });
           console.log(`✅ ${steps[currentStep].title} saved to server successfully!`);
-        } else {
-          console.warn(`⚠️  ${steps[currentStep].title} saved locally but server sync failed`);
+        } catch (apiError) {
+          console.warn(`⚠️  ${steps[currentStep].title} saved locally but server sync failed`, apiError);
         }
       } else {
         console.log(`💾 ${steps[currentStep].title} saved locally (offline mode)`);
@@ -421,30 +411,18 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     try {
       setIsProcessing(true);
 
-      const response = await fetch(`/api/v1/si/onboarding/${organizationId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          organization_profile: organizationProfile,
-          erp_configuration: erpConfiguration,
-          completion_date: new Date().toISOString()
-        })
+      await apiClient.post(`/si/onboarding/${organizationId}/complete`, {
+        organization_profile: organizationProfile,
+        erp_configuration: erpConfiguration,
+        completion_date: new Date().toISOString()
       });
 
-      if (response.ok) {
-        // Clear saved form data on successful completion
-        erpFormPersistence.clearFormData();
-        console.log('✅ ERP onboarding completed - form data cleared');
-        
-        alert('🎉 ERP onboarding completed successfully!');
-        if (onComplete && organizationId) {
-          onComplete(organizationId);
-        }
-      } else {
-        alert('❌ Failed to complete onboarding');
+      erpFormPersistence.clearFormData();
+      console.log('✅ ERP onboarding completed - form data cleared');
+
+      alert('🎉 ERP onboarding completed successfully!');
+      if (onComplete && organizationId) {
+        onComplete(organizationId);
       }
     } catch (error) {
       console.error('Failed to complete onboarding:', error);

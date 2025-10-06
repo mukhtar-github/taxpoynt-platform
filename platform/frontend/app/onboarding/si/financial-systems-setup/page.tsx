@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
-import { SkipForNowButton, useMobileOptimization } from '../../../../shared_components/onboarding';
+import { SkipForNowButton } from '../../../../shared_components/onboarding';
+import apiClient from '../../../../shared_components/api/client';
 
 interface FinancialIntegration {
   id: string;
@@ -23,7 +24,7 @@ interface FinancialIntegration {
 export default function FinancialSystemsSetupPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [selectedIntegration, setSelectedIntegration] = useState<string>('');
   const [showMonoWidget, setShowMonoWidget] = useState(false);
   const [monoWidgetUrl, setMonoWidgetUrl] = useState<string>('');
@@ -152,13 +153,11 @@ export default function FinancialSystemsSetupPage() {
   const initiateMonomBankingSetup = async () => {
     try {
       // Call the backend to generate Mono widget URL
-      const response = await fetch('/api/v1/si/banking/open-banking/mono/link', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      let monoUrl: string | undefined;
+      try {
+        const data = await apiClient.post<{
+          data?: { mono_url?: string };
+        }>('/si/banking/open-banking/mono/link', {
           customer: {
             name: `${user.first_name} ${user.last_name}`,
             email: user.email
@@ -169,40 +168,41 @@ export default function FinancialSystemsSetupPage() {
             user_id: user.id,
             onboarding_step: 'financial_systems_setup'
           }
-        })
-      });
+        });
 
-      if (!response.ok) {
-        // If API fails, fallback to demo/mock flow for development
-        console.warn('Mono API not available, using demo flow');
+        if (data.data?.mono_url) {
+          setMonoWidgetUrl(data.data.mono_url);
+          setShowMonoWidget(true);
+          monoUrl = data.data.mono_url;
+        } else {
+          console.warn('Mono API response missing widget URL, using demo flow');
+          handleMonoDemoFlow();
+          return;
+        }
+      } catch (apiError) {
+        console.warn('Mono API not available, using demo flow', apiError);
         handleMonoDemoFlow();
         return;
       }
 
-      const data = await response.json();
-      
-      if (data.data?.mono_url) {
-        setMonoWidgetUrl(data.data.mono_url);
-        setShowMonoWidget(true);
-        
-        // Open Mono widget in popup or new tab
-        const monoWindow = window.open(
-          data.data.mono_url, 
-          'mono-banking-widget',
-          'width=500,height=600,scrollbars=yes,resizable=yes'
-        );
-
-        // Listen for completion (this would normally be handled by redirect_url)
-        const checkClosed = setInterval(() => {
-          if (monoWindow?.closed) {
-            clearInterval(checkClosed);
-            handleBankingSetupComplete();
-          }
-        }, 1000);
-
-      } else {
+      if (!monoUrl) {
         throw new Error('No Mono URL received from backend');
       }
+
+      // Open Mono widget in popup or new tab
+      const monoWindow = window.open(
+        monoUrl,
+        'mono-banking-widget',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      // Listen for completion (this would normally be handled by redirect_url)
+      const checkClosed = setInterval(() => {
+        if (monoWindow?.closed) {
+          clearInterval(checkClosed);
+          handleBankingSetupComplete();
+        }
+      }, 1000);
 
     } catch (error) {
       console.error('Mono setup failed:', error);

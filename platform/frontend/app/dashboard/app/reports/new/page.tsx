@@ -31,6 +31,13 @@ interface ReportConfig {
   };
 }
 
+interface ReportTypeOption {
+  value: ReportConfig['type'];
+  label: string;
+  description: string;
+  icon: string;
+}
+
 export default function NewReportPage() {
   const router = useRouter();
   const [config, setConfig] = useState<ReportConfig>({
@@ -46,7 +53,6 @@ export default function NewReportPage() {
     filters: {}
   });
   const [generating, setGenerating] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
 
   const generateReport = async () => {
     try {
@@ -59,16 +65,13 @@ export default function NewReportPage() {
           window.open(response.data.downloadUrl, '_blank');
         }
         router.push('/dashboard/app/compliance');
-        setIsDemo(false);
       } else {
-        setIsDemo(true);
         // Demo: Generate a sample report
         const demoUrl = `data:text/plain;charset=utf-8,DEMO REPORT%0A%0AReport Type: ${config.type}%0AGenerated: ${new Date().toISOString()}%0A%0AThis is a demo report. In production, this would contain real data.`;
         window.open(demoUrl, '_blank');
       }
     } catch (error) {
       console.error('Report generation failed, using demo:', error);
-      setIsDemo(true);
       // Demo: Generate a sample report
       const demoUrl = `data:text/plain;charset=utf-8,DEMO REPORT%0A%0AReport Type: ${config.type}%0AGenerated: ${new Date().toISOString()}%0A%0AThis is a demo report. In production, this would contain real data.`;
       window.open(demoUrl, '_blank');
@@ -88,28 +91,28 @@ export default function NewReportPage() {
     }));
   };
 
-  const reportTypes = [
-    { 
-      value: 'transmission', 
-      label: 'Transmission Report', 
+  const reportTypes: ReportTypeOption[] = [
+    {
+      value: 'transmission',
+      label: 'Transmission Report',
       description: 'Detailed analysis of FIRS transmissions and responses',
       icon: '📤'
     },
-    { 
-      value: 'compliance', 
-      label: 'Compliance Report', 
+    {
+      value: 'compliance',
+      label: 'Compliance Report',
       description: 'Regulatory compliance status and audit trail',
       icon: '📋'
     },
-    { 
-      value: 'security', 
-      label: 'Security Report', 
+    {
+      value: 'security',
+      label: 'Security Report',
       description: 'Security assessments and threat analysis',
       icon: '🛡️'
     },
-    { 
-      value: 'financial', 
-      label: 'Financial Report', 
+    {
+      value: 'financial',
+      label: 'Financial Report',
       description: 'Financial metrics and transaction summaries',
       icon: '💰'
     }
@@ -146,7 +149,7 @@ export default function NewReportPage() {
                     ? 'border-purple-500 bg-purple-50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
-                onClick={() => updateConfig({ type: type.value as any })}
+                onClick={() => updateConfig({ type: type.value })}
               >
                 <div className="flex items-center space-x-3">
                   <span className="text-2xl">{type.icon}</span>
@@ -220,7 +223,7 @@ export default function NewReportPage() {
               </label>
               <select
                 value={config.format}
-                onChange={(e) => updateConfig({ format: e.target.value as any })}
+                onChange={(e) => updateConfig({ format: e.target.value as ReportConfig['format'] })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="pdf">PDF Document</option>

@@ -256,11 +256,10 @@ class APPOnboardingEndpointsV1:
             logger.error(f"Error completing APP onboarding step in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to complete APP onboarding step")
 
-    async def complete_onboarding(self,
-                                  request: Request,
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+    async def complete_onboarding(self, request: Request):
         """Mark entire APP onboarding as complete"""
         try:
+            context = await self._require_app_role(request)
             body = await request.json() if hasattr(request, 'json') else {}
             
             result = await self.message_router.route_message(

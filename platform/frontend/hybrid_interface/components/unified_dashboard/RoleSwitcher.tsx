@@ -37,7 +37,7 @@ interface RoleSwitcherProps {
   currentRole: HybridRole;
   availableRoles: HybridRole[];
   userSession: HybridUserSession;
-  onRoleSwitch: (newRole: HybridRole, context?: any) => void;
+  onRoleSwitch: (newRole: HybridRole, context?: Record<string, unknown>) => void;
   onInterfaceSwitch: (interfaceType: 'si' | 'app' | 'hybrid') => void;
   className?: string;
   compact?: boolean;

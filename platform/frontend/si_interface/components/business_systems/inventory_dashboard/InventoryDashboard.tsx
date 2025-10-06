@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 interface InventorySystem {
   id: string;
@@ -133,34 +134,27 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
   const loadInventoryConnections = async () => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/inventory/connections`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ connections?: InventoryConnection[] }>(
+        '/si/business-systems/inventory/connections'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        
-        // Update system statuses with mock data
-        const updatedSystems = inventorySystems.map(system => {
-          const connection = data.connections?.find((conn: InventoryConnection) => conn.systemId === system.id);
-          if (connection) {
-            return {
-              ...system,
-              status: 'connected' as const,
-              lastSync: connection.syncSettings.lastSuccessfulSync,
-              productCount: Math.floor(Math.random() * 5000) + 500,
-              warehouseCount: Math.floor(Math.random() * 5) + 1,
-              totalValue: Math.floor(Math.random() * 50000000) + 5000000, // ₦5M - ₦55M
-              lowStockItems: Math.floor(Math.random() * 50) + 5
-            };
-          }
-          return system;
-        });
-        setInventorySystems(updatedSystems);
-      }
+      setConnections(data.connections || []);
+
+      setInventorySystems(prevSystems => prevSystems.map(system => {
+        const connection = data.connections?.find(conn => conn.systemId === system.id);
+        if (connection) {
+          return {
+            ...system,
+            status: 'connected' as const,
+            lastSync: connection.syncSettings.lastSuccessfulSync,
+            productCount: Math.floor(Math.random() * 5000) + 500,
+            warehouseCount: Math.floor(Math.random() * 5) + 1,
+            totalValue: Math.floor(Math.random() * 50000000) + 5000000,
+            lowStockItems: Math.floor(Math.random() * 50) + 5
+          };
+        }
+        return system;
+      }));
     } catch (error) {
       console.error('Failed to load inventory connections:', error);
     }
@@ -175,31 +169,24 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     setIsConnecting(true);
     
     try {
-      const response = await fetch(`/api/v1/si/business-systems/inventory/test-connection`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ success: boolean; message?: string }>(
+        '/si/business-systems/inventory/test-connection',
+        {
           systemId,
           testData: {
             apiKey: 'test_api_key',
             baseUrl: 'https://api.inventory-system.com'
           }
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          alert('Inventory system connection test successful!');
-          if (onConnectionSuccess) {
-            onConnectionSuccess(systemId);
-          }
-        } else {
-          alert('Connection test failed: ' + data.message);
         }
+      );
+
+      if (data.success) {
+        alert('Inventory system connection test successful!');
+        if (onConnectionSuccess) {
+          onConnectionSuccess(systemId);
+        }
+      } else {
+        alert('Connection test failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Inventory connection test failed:', error);
@@ -211,36 +198,23 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
   const handleSyncInventory = async (systemId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/inventory/sync`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/inventory/sync', { systemId });
 
-      if (response.ok) {
-        // Update status to syncing
-        const updatedSystems = inventorySystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'syncing' as const }
+      setInventorySystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'syncing' as const }
+          : system
+      ));
+
+      setTimeout(() => {
+        setInventorySystems(prevSystems => prevSystems.map(system =>
+          system.id === systemId
+            ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
             : system
-        );
-        setInventorySystems(updatedSystems);
-        
-        // Simulate sync completion
-        setTimeout(() => {
-          const finalSystems = updatedSystems.map(system => 
-            system.id === systemId 
-              ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
-              : system
-          );
-          setInventorySystems(finalSystems);
-        }, 4000);
-        
-        alert('Inventory sync started successfully');
-      }
+        ));
+      }, 4000);
+
+      alert('Inventory sync started successfully');
     } catch (error) {
       console.error('Failed to sync inventory:', error);
       alert('Failed to sync inventory');
@@ -253,27 +227,17 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/business-systems/inventory/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/inventory/disconnect', { systemId });
 
-      if (response.ok) {
-        const updatedSystems = inventorySystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'disconnected' as const, lastSync: undefined, productCount: undefined, warehouseCount: undefined, totalValue: undefined, lowStockItems: undefined }
-            : system
-        );
-        setInventorySystems(updatedSystems);
-        
-        setConnections(connections.filter(conn => conn.systemId !== systemId));
-        
-        alert('Inventory system disconnected successfully');
-      }
+      setInventorySystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'disconnected' as const, lastSync: undefined, productCount: undefined, warehouseCount: undefined, totalValue: undefined, lowStockItems: undefined }
+          : system
+      ));
+
+      setConnections(prev => prev.filter(conn => conn.systemId !== systemId));
+
+      alert('Inventory system disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect inventory system:', error);
       alert('Failed to disconnect inventory system');

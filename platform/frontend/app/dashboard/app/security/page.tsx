@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
-import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
+import { TaxPoyntButton } from '../../../../design_system';
 import { APIResponse } from '../../../../si_interface/types';
 import apiClient from '../../../../shared_components/api/client';
 
@@ -30,12 +30,20 @@ interface SecurityMetrics {
   }>;
 }
 
+interface SecurityScanResult {
+  timestamp: string;
+  score: number;
+  threatsFound: number;
+  vulnerabilitiesPatched: number;
+  recommendations: string[];
+}
+
 export default function SecurityCenterPage() {
   const router = useRouter();
   const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [scanResults, setScanResults] = useState<any>(null);
+  const [scanResults, setScanResults] = useState<SecurityScanResult | null>(null);
   const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {

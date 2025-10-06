@@ -6,7 +6,7 @@
  * Maintains all existing functionality while providing modern UI/UX.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../shared_components/layouts/DashboardLayout';
 import { DashboardCard } from '../shared_components/dashboard/DashboardCard';
@@ -14,8 +14,53 @@ import { TaxPoyntButton } from '../design_system';
 import { 
   TYPOGRAPHY_STYLES, 
   combineStyles,
-  getSectionBackground
 } from '../design_system/style-utilities';
+import apiClient from '../shared_components/api/client';
+import { APIResponse } from './types';
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const mergeDeep = <T,>(target: T, source: Partial<T>): T => {
+  if (source === undefined || source === null) {
+    return target;
+  }
+
+  if (Array.isArray(source)) {
+    return source.slice() as unknown as T;
+  }
+
+  if (isPlainObject(source)) {
+    const base: Record<string, unknown> = isPlainObject(target)
+      ? { ...(target as Record<string, unknown>) }
+      : {};
+
+    for (const [key, value] of Object.entries(source)) {
+      const existing = isPlainObject(target)
+        ? (target as Record<string, unknown>)[key]
+        : undefined;
+      base[key] = mergeDeep(existing as unknown, value as unknown);
+    }
+
+    return base as T;
+  }
+
+  return source as unknown as T;
+};
+
+const toMillionsDisplay = (value?: number, digits: number = 1): string | null => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  return `₦${(value / 1_000_000).toFixed(digits)}M`;
+};
+
+const toPercentDisplay = (value?: number, digits: number = 1): string | null => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  return `${value.toFixed(digits)}%`;
+};
 
 export interface EnhancedSIInterfaceProps {
   userName?: string;
@@ -29,233 +74,97 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
   className = ''
 }) => {
   const router = useRouter();
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [dashboardData, setDashboardData] = useState<any>(null);
-  const [isDemo, setIsDemo] = useState(false);
+  const [hasLiveData, setHasLiveData] = useState(false);
 
-  // Enhanced metrics with real financial integration data
-  const metrics = {
-    // Business Systems Integration - Enhanced with comprehensive data
-    integrations: { 
-      erp: { 
-        total: 4, 
-        active: 2, 
-        systems: ['SAP ERP', 'Odoo ERP'], 
-        connectedSystems: [
-          { name: 'SAP ERP', status: 'connected', lastSync: '5 min ago', customers: 2847, invoices: 1456, products: 892 },
-          { name: 'Odoo ERP', status: 'connected', lastSync: '12 min ago', customers: 1203, invoices: 758, products: 445 }
-        ],
-        totalCustomers: 4050,
-        totalInvoices: 2214,
-        totalProducts: 1337,
-        monthlyDataVolume: 45600,
-        syncFrequency: 'Every 15 minutes',
-        lastFullSync: '2 hours ago',
-        healthScore: 98.5
-      },
-      crm: { 
-        total: 3, 
-        active: 1, 
-        systems: ['Salesforce CRM'], 
-        connectedSystems: [
-          { name: 'Salesforce CRM', status: 'connected', lastSync: '8 min ago', contacts: 5892, deals: 234, pipeline: 125000000 }
-        ],
-        totalContacts: 5892,
-        totalDeals: 234,
-        pipelineValue: 125000000,
-        monthlyDataVolume: 28400,
-        syncFrequency: 'Every 30 minutes',
-        lastFullSync: '1 hour ago',
-        healthScore: 96.2
-      },
-      pos: { 
-        total: 3, 
-        active: 2, 
-        systems: ['Square POS', 'Shopify POS'], 
-        connectedSystems: [
-          { name: 'Square POS', status: 'connected', lastSync: '3 min ago', dailySales: 145000, transactions: 89, items: 456 },
-          { name: 'Shopify POS', status: 'connected', lastSync: '7 min ago', dailySales: 89500, transactions: 56, items: 234 }
-        ],
-        dailySales: 234500,
-        totalTransactions: 145,
-        totalItems: 690,
-        monthlyDataVolume: 67200,
-        syncFrequency: 'Real-time',
-        lastFullSync: '30 min ago',
-        healthScore: 99.1
-      },
-      ecommerce: {
-        total: 2,
-        active: 1,
-        systems: ['Shopify Store'],
-        connectedSystems: [
-          { name: 'Shopify Store', status: 'connected', lastSync: '4 min ago', orders: 342, products: 156, customers: 1847 }
-        ],
-        totalOrders: 342,
-        totalProducts: 156,
-        totalCustomers: 1847,
-        monthlyDataVolume: 15600,
-        syncFrequency: 'Every 10 minutes',
-        lastFullSync: '45 min ago',
-        healthScore: 97.8
-      },
+  const buildEmptyMetrics = useCallback(() => ({
+    integrations: {
+      erp: { total: 0, active: 0, systems: [], connectedSystems: [] },
+      crm: { total: 0, active: 0, systems: [], connectedSystems: [] },
+      pos: { total: 0, active: 0, systems: [], connectedSystems: [] },
+      ecommerce: { total: 0, active: 0, systems: [], connectedSystems: [] },
       overall: {
-        totalSystems: 12,
-        activeSystems: 6,
-        overallHealthScore: 97.9,
-        totalDataPoints: 156800,
-        syncEfficiency: 98.7,
-        errorRate: 0.3
-      }
-    },
-    
-    // Financial Systems Integration  
-    financial: {
-      banking: { 
-        connected: 3, 
-        providers: ['Mono', 'GTBank', 'Access Bank'],
-        totalAccounts: 7,
-        monthlyTransactions: 2456
+        totalSystems: 0,
+        activeSystems: 0,
+        overallHealthScore: 0,
       },
-      payments: { 
-        connected: 3, 
-        providers: ['Paystack', 'Flutterwave', 'Moniepoint'],
-        monthlyVolume: 145600000
-      }
     },
-    
-    // Auto-Reconciliation Data
+    financial: {
+      banking: { connected: 0, providers: [] },
+      payments: { connected: 0, providers: [] },
+    },
     reconciliation: {
-      autoReconciled: 2341,
-      manualReview: 15,
-      confidenceScores: { high: 2290, medium: 51, low: 15 },
-      successRate: 98.7,
-      categorized: 2356,
-      exceptions: 15
+      autoReconciled: 0,
+      manualReview: 0,
+      successRate: 0,
+      categorized: 0,
+      exceptions: 0,
+      confidenceScores: { high: 0, medium: 0, low: 0 },
     },
-    
-    // Real-time Cash Flow
-    cashFlow: {
-      inflow: 145600000,
-      outflow: 89400000,
-      netFlow: 56200000,
-      categories: {
-        'Sales Revenue': 89200000,
-        'Service Revenue': 56400000,
-        'Operating Expenses': 34200000,
-        'Salary & Wages': 28900000,
-        'Tax Payments': 15600000,
-        'Loan Repayments': 10700000
-      }
+    transactions: {
+      totalInvoices: 0,
+      autoSubmitted: 0,
+      manualReview: 0,
+      queue: 0,
+      successRate: 0,
     },
-    
-    // FIRS Compliance & Invoice Generation
     compliance: {
-      firsStatus: 'Connected',
-      invoicesGenerated: 1456,
-      complianceScore: 98.5,
-      vatTransactions: 2234,
-      pendingSubmissions: 3,
-      lastSubmission: '2 minutes ago'
+      firsStatus: 'Not connected',
+      invoicesGenerated: 0,
+      complianceScore: 0,
+      vatTransactions: 0,
+      pendingSubmissions: 0,
+      lastSubmission: undefined,
     },
-    
-    // System Performance
-    processing: { 
-      rate: 1234, 
-      success: 99.8, 
-      queue: 45,
-      apiLatency: 120,
-      uptime: 99.9
-    }
-  };
+    validation: {
+      summary: {
+        totalBatches: 0,
+        statusCounts: {},
+        totals: { total: 0, passed: 0, failed: 0 },
+        lastRunAt: undefined,
+      },
+      recentBatches: [],
+      slaHours: 4,
+    },
+    lastUpdated: undefined,
+    processing: {
+      rate: 0,
+      success: 0,
+      queue: 0,
+      apiLatency: 0,
+      uptime: 0,
+    },
+    cashFlow: undefined,
+  }), []);
+
+  type DashboardMetrics = ReturnType<typeof buildEmptyMetrics>;
+  const [metrics, setMetrics] = useState<DashboardMetrics>(() => buildEmptyMetrics());
 
   // Load dashboard data from backend APIs
   useEffect(() => {
     const loadDashboardData = async () => {
-      setIsLoading(true);
       try {
-        const authToken = localStorage.getItem('taxpoynt_auth_token');
-        if (!authToken) return;
-
-        // Fetch data from multiple SI endpoints including business systems
-        const [
-          bankingData,
-          transactionsData,
-          reconciliationData,
-          complianceData,
-          businessSystemsData,
-          erpConnectionsData,
-          crmConnectionsData,
-          posConnectionsData
-        ] = await Promise.allSettled([
-          fetch('/api/v1/si/banking/accounts', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/transactions?limit=50', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/reconciliation/status', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/compliance/reports/transactions', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/integrations/status', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/integrations/erp', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/integrations/crm', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }),
-          fetch('/api/v1/si/integrations/pos', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          })
-        ]);
-
-        // Process successful API responses
-        const results = await Promise.all(
-          [bankingData, transactionsData, reconciliationData, complianceData, businessSystemsData, erpConnectionsData, crmConnectionsData, posConnectionsData]
-            .map(async (result, index) => {
-              if (result.status === 'fulfilled' && result.value.ok) {
-                return await result.value.json();
-              }
-              console.warn(`SI API endpoint ${index} failed or unavailable`);
-              return null;
-            })
+        const response = await apiClient.get<APIResponse<Partial<DashboardMetrics>>>(
+          '/si/dashboard/metrics'
         );
 
-        // Check if we have real data from APIs
-        const hasRealData = results.some(result => result !== null);
-        
-        setDashboardData({
-          banking: results[0],
-          transactions: results[1],
-          reconciliation: results[2],
-          compliance: results[3],
-          businessSystems: results[4],
-          erpConnections: results[5],
-          crmConnections: results[6],
-          posConnections: results[7]
-        });
-        
-        setIsDemo(!hasRealData);
-
+        if (response?.success && response.data) {
+          setMetrics((prev) => mergeDeep(prev, response.data));
+          setHasLiveData(true);
+        } else {
+          setHasLiveData(false);
+          setMetrics(buildEmptyMetrics());
+        }
       } catch (error) {
         console.error('Failed to load SI dashboard data:', error);
-        // Continue with mock data for development
-      } finally {
-        setIsLoading(false);
+        setHasLiveData(false);
+        setMetrics(buildEmptyMetrics());
       }
     };
 
     loadDashboardData();
-  }, []);
+  }, [buildEmptyMetrics]);
 
-  const handleCardClick = (cardId: string, route?: string) => {
-    setSelectedMetric(cardId);
+  const handleCardClick = (_cardId: string, route?: string) => {
     if (route) {
       router.push(route);
     }
@@ -267,6 +176,24 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
     }
   );
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'N/A';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat('en-NG', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(parsed);
+  };
+
+  const validationSummary = metrics.validation?.summary ?? { totals: { total: 0, passed: 0, failed: 0 } };
+  const validationTotals = validationSummary.totals ?? { total: 0, passed: 0, failed: 0 };
+  const validationPassRate = validationTotals.total
+    ? Math.round(((validationTotals.passed ?? 0) / validationTotals.total) * 100)
+    : 0;
+  const validationRecent = metrics.validation?.recentBatches ?? [];
+  const validationStatusEntries = Object.entries(validationSummary.statusCounts ?? {});
 
   return (
     <DashboardLayout
@@ -293,9 +220,9 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                 style={TYPOGRAPHY_STYLES.optimizedText}
               >
                 Manage business system integrations and automated e-invoicing workflows
-                {isDemo && (
-                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
-                    Demo Data
+                {!hasLiveData && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                    Awaiting live data
                   </span>
                 )}
               </p>
@@ -324,36 +251,42 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
           {/* Enhanced Quick Stats Bar - Business & Financial Integration Focus */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             {[
-              { 
-                label: 'Business Systems', 
-                value: `${metrics.integrations.overall.activeSystems}/${metrics.integrations.overall.totalSystems}`, 
+              {
+                label: 'Active Systems',
+                value:
+                  metrics.integrations.overall.totalSystems > 0
+                    ? `${metrics.integrations.overall.activeSystems}/${metrics.integrations.overall.totalSystems}`
+                    : `${metrics.integrations.overall.activeSystems}`,
                 color: 'indigo',
-                subtext: `${metrics.integrations.overall.overallHealthScore}% health score`
+                subtext: hasLiveData
+                  ? `${toPercentDisplay(metrics.integrations.overall.overallHealthScore) ?? '--'} health`
+                  : 'Connect your first integration',
               },
-              { 
-                label: 'Auto-Reconciled', 
-                value: `${metrics.reconciliation.autoReconciled}`, 
+              {
+                label: 'Auto-Reconciled',
+                value: metrics.reconciliation.autoReconciled.toLocaleString(),
                 color: 'emerald',
-                subtext: `${metrics.reconciliation.successRate}% success rate`
+                subtext:
+                  toPercentDisplay(metrics.reconciliation.successRate) ?? 'Awaiting reconciliation data',
               },
-              { 
-                label: 'Net Cash Flow', 
-                value: `₦${(metrics.cashFlow.netFlow / 1000000).toFixed(1)}M`, 
+              {
+                label: 'Net Cash Flow',
+                value: toMillionsDisplay(metrics.cashFlow?.netFlow) ?? '--',
                 color: 'green',
-                subtext: 'This month'
+                subtext: metrics.cashFlow ? 'This month' : 'Connect banking data',
               },
-              { 
-                label: 'FIRS Invoices', 
-                value: `${metrics.compliance.invoicesGenerated}`, 
+              {
+                label: 'FIRS Invoices',
+                value: metrics.compliance.invoicesGenerated.toLocaleString(),
                 color: 'blue',
-                subtext: `${metrics.compliance.pendingSubmissions} pending`
+                subtext: `${metrics.compliance.pendingSubmissions} pending`,
               },
-              { 
-                label: 'Compliance Score', 
-                value: `${metrics.compliance.complianceScore}%`, 
+              {
+                label: 'Compliance Score',
+                value: toPercentDisplay(metrics.compliance.complianceScore) ?? '--',
                 color: 'purple',
-                subtext: 'FIRS compliant'
-              }
+                subtext: metrics.compliance.firsStatus ?? 'Status unavailable',
+              },
             ].map((stat, index) => (
               <div 
                 key={index}
@@ -425,39 +358,49 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
             title="Real-time Cash Flow"
             description="Categorized cash flow from all connected financial systems"
             icon="💰"
-            badge={`₦${(metrics.cashFlow.netFlow / 1000000).toFixed(1)}M Net`}
+            badge={toMillionsDisplay(metrics.cashFlow?.netFlow) ?? '--'}
             badgeColor="green"
             variant="highlight"
             onClick={() => handleCardClick('cashflow', '/dashboard/si/cashflow')}
             className="hover:scale-102 transition-transform"
           >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-green-600">Inflow</span>
-                <span className="font-bold text-green-700">₦{(metrics.cashFlow.inflow / 1000000).toFixed(1)}M</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-red-600">Outflow</span>
-                <span className="font-bold text-red-600">₦{(metrics.cashFlow.outflow / 1000000).toFixed(1)}M</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-blue-600">Banking Providers</span>
-                <span className="font-bold text-blue-700">{metrics.financial.banking.connected}</span>
-              </div>
-              
-              <div className="pt-3 border-t border-gray-100">
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div>
-                    <div className="text-lg font-bold text-green-600">₦{(metrics.cashFlow.categories['Sales Revenue'] / 1000000).toFixed(0)}M</div>
-                    <div className="text-xs text-slate-500">Sales</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-blue-600">₦{(metrics.cashFlow.categories['Service Revenue'] / 1000000).toFixed(0)}M</div>
-                    <div className="text-xs text-slate-500">Services</div>
+            {metrics.cashFlow ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-green-600">Inflow</span>
+                  <span className="font-bold text-green-700">{toMillionsDisplay(metrics.cashFlow.inflow)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-red-600">Outflow</span>
+                  <span className="font-bold text-red-600">{toMillionsDisplay(metrics.cashFlow.outflow)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-blue-600">Banking Providers</span>
+                  <span className="font-bold text-blue-700">{metrics.financial.banking.connected}</span>
+                </div>
+                
+                <div className="pt-3 border-t border-gray-100">
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-green-600">
+                        {toMillionsDisplay(metrics.cashFlow.categories['Sales Revenue'], 0) ?? '--'}
+                      </div>
+                      <div className="text-xs text-slate-500">Sales</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {toMillionsDisplay(metrics.cashFlow.categories['Service Revenue'], 0) ?? '--'}
+                      </div>
+                      <div className="text-xs text-slate-500">Services</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-lg bg-green-50 p-4 text-sm text-green-700">
+                Connect a banking provider to unlock cash flow monitoring and SLA tracking.
+              </div>
+            )}
           </DashboardCard>
 
           {/* FIRS Invoice Generation Hub */}
@@ -972,6 +915,101 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Validation Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <DashboardCard
+            title="Validation Performance"
+            description="Recent validation batches for APP-ready invoices"
+            icon="🧪"
+            badge={`${validationTotals.total ?? 0} invoices`}
+            badgeColor="indigo"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-indigo-600">Pass Rate</span>
+                <span className="text-2xl font-black text-indigo-600">{validationPassRate}%</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>Accepted</span>
+                <span className="font-medium text-emerald-600">{validationTotals.passed ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>Failed</span>
+                <span className="font-medium text-rose-600">{validationTotals.failed ?? 0}</span>
+              </div>
+              <div className="pt-3">
+                {validationStatusEntries.length > 0 ? (
+                  <div className="space-y-2">
+                    {validationStatusEntries.map(([status, count]) => {
+                      const share = validationTotals.total
+                        ? Math.round(((count ?? 0) / (validationTotals.total || 1)) * 100)
+                        : 0;
+                      const barWidth = Math.min(share, 100);
+                      return (
+                        <div key={status}>
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span className="capitalize text-slate-600">{status}</span>
+                            <span className="font-medium text-slate-800">{count ?? 0}</span>
+                          </div>
+                          <div className="mt-1 h-2 w-full rounded-full bg-indigo-100">
+                            <div
+                              className="h-2 rounded-full bg-indigo-500 transition-all"
+                              style={{ width: `${barWidth}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-indigo-50 p-3 text-xs text-indigo-700">
+                    Validation history will appear here once batches are processed.
+                  </div>
+                )}
+              </div>
+              <div className="pt-3 border-t border-indigo-100 text-sm text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span>Last Run</span>
+                  <span className="font-medium text-slate-800">{formatDateTime(validationSummary.lastRunAt)}</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span>SLA Threshold</span>
+                  <span className="font-medium text-slate-800">{metrics.validation?.slaHours ?? 4} hours</span>
+                </div>
+              </div>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard
+            title="Recent Validation Batches"
+            description="Preview of batches routed for APP transmission"
+            icon="📋"
+          >
+            <div className="space-y-3">
+              {validationRecent.length > 0 ? (
+                validationRecent.slice(0, 5).map((batch, index) => {
+                  const totals = batch.totals ?? {};
+                  return (
+                    <div key={`${batch.batchId ?? 'batch'}-${index}`} className="bg-slate-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-slate-800">{batch.batchId ?? 'Unknown Batch'}</span>
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${batch.status === 'failed' ? 'bg-rose-100 text-rose-700' : batch.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                          {batch.status ?? 'pending'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {formatDateTime(batch.createdAt)} · {totals.total ?? 0} invoices (✔ {totals.passed ?? 0} · ✖ {totals.failed ?? 0})
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-sm text-slate-500">No validation batches available yet.</div>
+              )}
+            </div>
+          </DashboardCard>
         </div>
 
         {/* Financial Integration Quick Actions */}

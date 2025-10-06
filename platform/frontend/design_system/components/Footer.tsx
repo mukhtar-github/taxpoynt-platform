@@ -88,6 +88,103 @@ export const Footer: React.FC<FooterProps> = ({
     );
   }
 
+  if (variant === 'landing') {
+    const landingSections = [
+      { title: 'Platform', links: navigationLinks.slice(0, 3) },
+      { title: 'Resources', links: resourceLinks.slice(0, 3) },
+      { title: 'Company', links: companyLinks.slice(0, 3) }
+    ];
+
+    const trustHighlights = [
+      'FIRS-certified APP',
+      'ISO 27001 controls',
+      'Secure data residency'
+    ];
+
+    return (
+      <footer
+        className={`bg-slate-950 text-slate-100 border-t border-slate-900 ${className}`}
+      >
+        <div className="max-w-6xl mx-auto px-6 py-16 space-y-12">
+          <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-md space-y-6">
+              <Logo size="lg" color="white" />
+              <p className="text-sm leading-relaxed text-slate-400">
+                TaxPoynt helps Nigerian businesses automate FIRS e-invoicing end to end—
+                from onboarding to live APP and SI operations—without juggling different tools.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  onClick={() => router.push('/onboarding')}
+                >
+                  Start Onboarding
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full sm:w-auto border-slate-700 text-slate-100 hover:text-white hover:border-slate-500"
+                  onClick={() => router.push('/contact')}
+                >
+                  Talk to Sales
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                {trustHighlights.map((highlight) => (
+                  <span key={highlight} className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                    {highlight}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+              {landingSections.map((section) => (
+                <div key={section.title} className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    {section.title}
+                  </h3>
+                  <ul className="space-y-3 text-sm text-slate-400">
+                    {section.links.map((link) => (
+                      <li key={link.label}>
+                        <button
+                          onClick={() => handleNavigation(link.href)}
+                          className="hover:text-slate-200 transition-colors"
+                        >
+                          {link.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-800 pt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-slate-500">
+              © {currentYear} TaxPoynt Limited. All rights reserved.
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-400">
+              {legalLinks.map((link) => (
+                <button
+                  key={link.label}
+                  onClick={() => handleNavigation(link.href)}
+                  className="hover:text-slate-200 transition-colors"
+                >
+                  {link.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
   return (
     <footer className={`bg-gradient-to-br from-gray-900 via-gray-900 to-gray-950 text-white relative overflow-hidden ${className}`}>
       {/* Subtle background pattern */}

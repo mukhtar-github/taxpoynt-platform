@@ -25,6 +25,7 @@ export interface User {
   organization_id?: string;
   first_name?: string; // Add as direct property for easier access
   last_name?: string;   // Add as direct property for easier access
+  business_name?: string;
   profile?: {
     first_name?: string;
     last_name?: string;

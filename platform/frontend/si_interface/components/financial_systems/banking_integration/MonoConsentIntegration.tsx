@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 // Mono-specific consent items that extend TaxPoynt's base consent structure
 interface MonoBankingConsent {
@@ -235,32 +236,21 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
         .flatMap(consent => consent.monoScope)
         .filter((scope, index, array) => array.indexOf(scope) === index); // Remove duplicates
 
-      const response = await fetch('/api/v1/si/banking/open-banking/mono/link', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
+      const data = await apiClient.post<{
+        data?: { mono_url?: string };
+      }>('/si/banking/open-banking/mono/link', {
+        customer: {
+          name: 'Business User', // This would come from user context
+          email: 'user@business.com' // This would come from user context
         },
-        body: JSON.stringify({
-          customer: {
-            name: 'Business User', // This would come from user context
-            email: 'user@business.com' // This would come from user context
-          },
-          scope: grantedScopes.join(' '), // Join scopes for Mono
-          redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
-          meta: {
-            ref: `taxpoynt_consent_${Date.now()}`,
-            consents_granted: Object.keys(consentState.mono).filter(k => consentState.mono[k]),
-            consent_timestamp: new Date().toISOString()
-          }
-        })
+        scope: grantedScopes.join(' '), // Join scopes for Mono
+        redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
+        meta: {
+          ref: `taxpoynt_consent_${Date.now()}`,
+          consents_granted: Object.keys(consentState.mono).filter(k => consentState.mono[k]),
+          consent_timestamp: new Date().toISOString()
+        }
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate Mono widget link');
-      }
-
-      const data = await response.json();
       
       if (data.data?.mono_url) {
         setMonoWidgetUrl(data.data.mono_url);

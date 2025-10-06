@@ -7,6 +7,7 @@ Handles dashboard statistics, pending invoices, and general APP data.
 import logging
 import inspect
 import asyncio
+from decimal import Decimal, InvalidOperation
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
@@ -23,6 +24,11 @@ from app_services import get_app_service_registry, APPServiceRegistry
 from app_services import ReportingServiceManager
 from app_services.reporting.firs_metrics_service import FIRSMetricsService
 from api_gateway.utils.error_mapping import v1_error_response
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models.organization import Organization
+from core_platform.data_management.repositories.validation_batch_repo_async import (
+    summarize_validation_batches,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +85,130 @@ class DashboardDataEndpointsV1:
         
         self._setup_routes()
         logger.info("Dashboard Data Endpoints V1 initialized")
+
+    INVOICE_READY_STATUSES = {"validated", "valid", "pending"}
+    INVOICE_VALIDATED_STATUSES = {"validated", "valid", "approved", "accepted", "submitted"}
+    BATCH_STATUS_GROUPS = {
+        "ready": {"ready", "queued", "pending", "preparing"},
+        "processing": {"processing", "validating"},
+        "transmitting": {"transmitting", "submitted", "acknowledged"},
+        "completed": {"completed", "success", "accepted"},
+        "failed": {"failed", "error", "rejected", "cancelled"},
+    }
+
+    @staticmethod
+    def _normalize_status(value: Any) -> str:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return ""
+
+    def _prepare_pending_invoices_response(self, raw_result: Any) -> Dict[str, Any]:
+        result: Dict[str, Any]
+        if isinstance(raw_result, dict):
+            result = dict(raw_result)
+        else:
+            result = {}
+
+        invoices_payload = result.get("invoices") if isinstance(result, dict) else None
+        if invoices_payload is None:
+            invoices_payload = raw_result
+
+        invoices_list: List[Any] = []
+        if isinstance(invoices_payload, list):
+            invoices_list = invoices_payload
+        elif isinstance(invoices_payload, dict):
+            for value in invoices_payload.values():
+                if isinstance(value, list):
+                    invoices_list.extend(value)
+                else:
+                    invoices_list.append(value)
+
+        total_invoices = len(invoices_list)
+        ready_count = sum(
+            1
+            for item in invoices_list
+            if isinstance(item, dict)
+            and self._normalize_status(item.get("status")) in self.INVOICE_READY_STATUSES
+        )
+        validated_count = sum(
+            1
+            for item in invoices_list
+            if isinstance(item, dict)
+            and self._normalize_status(item.get("status")) in self.INVOICE_VALIDATED_STATUSES
+        )
+        pending_count = max(total_invoices - validated_count, 0)
+
+        summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+        if not isinstance(summary, dict):
+            summary = {}
+        summary.update(
+            {
+                "total": total_invoices,
+                "ready": ready_count,
+                "pending_validation": pending_count,
+                "validated": validated_count,
+            }
+        )
+
+        result["invoices"] = invoices_list
+        result["summary"] = summary
+        return result
+
+    def _prepare_transmission_batches_response(self, raw_result: Any) -> Dict[str, Any]:
+        result: Dict[str, Any]
+        if isinstance(raw_result, dict):
+            result = dict(raw_result)
+        else:
+            result = {}
+
+        batches_payload = result.get("batches") if isinstance(result, dict) else None
+        if batches_payload is None:
+            batches_payload = raw_result
+
+        batches_list: List[Any] = []
+        if isinstance(batches_payload, list):
+            batches_list = batches_payload
+        elif isinstance(batches_payload, dict):
+            for value in batches_payload.values():
+                if isinstance(value, list):
+                    batches_list.extend(value)
+                else:
+                    batches_list.append(value)
+
+        status_counts: Dict[str, int] = {}
+        for item in batches_list:
+            if isinstance(item, dict):
+                status = self._normalize_status(item.get("status"))
+                status_counts[status] = status_counts.get(status, 0) + 1
+
+        def count_group(key: str) -> int:
+            return sum(status_counts.get(status, 0) for status in self.BATCH_STATUS_GROUPS.get(key, set()))
+
+        summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+        if not isinstance(summary, dict):
+            summary = {}
+
+        summary["total"] = len(batches_list)
+
+        def coalesce_summary_value(key: str) -> int:
+            value = summary.get(key)
+            if value is None:
+                return count_group(key)
+            if isinstance(value, (int, float, Decimal)):
+                return int(value)
+            if isinstance(value, str):
+                try:
+                    return int(Decimal(value))
+                except (InvalidOperation, ValueError):
+                    return count_group(key)
+            return count_group(key)
+
+        for key in ("ready", "processing", "transmitting", "completed", "failed"):
+            summary[key] = coalesce_summary_value(key)
+
+        result["batches"] = batches_list
+        result["summary"] = summary
+        return result
 
     async def _require_app_role(self, request: Request) -> HTTPRoutingContext:
         context = await self.role_detector.detect_role_context(request)
@@ -280,7 +410,6 @@ class DashboardDataEndpointsV1:
                 },
             )
             
-            # Add demo data if service not available
             if not result:
                 result = {
                     "invoices": [
@@ -289,25 +418,22 @@ class DashboardDataEndpointsV1:
                             "amount": 125000,
                             "customer": "TechCorp Ltd",
                             "date": "2024-01-15",
-                            "status": "pending_validation"
+                            "status": "pending_validation",
                         },
                         {
-                            "id": "INV-2024-002", 
+                            "id": "INV-2024-002",
                             "amount": 89000,
                             "customer": "Green Energy Solutions",
                             "date": "2024-01-15",
-                            "status": "validated"
-                        }
+                            "status": "validated",
+                        },
                     ],
-                    "total": 156,
-                    "pending_validation": 23,
-                    "validated": 133
                 }
-            
-            # Add capabilities information
-            result["capabilities"] = self.dashboard_capabilities
-            
-            return self._create_v1_response(result, "pending_invoices_retrieved")
+
+            normalized = self._prepare_pending_invoices_response(result)
+            normalized["capabilities"] = self.dashboard_capabilities
+
+            return self._create_v1_response(normalized, "pending_invoices_retrieved")
         except Exception as e:
             logger.error(f"Error getting pending invoices in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get pending invoices")
@@ -328,7 +454,6 @@ class DashboardDataEndpointsV1:
                 },
             )
             
-            # Add demo data if service not available
             if not result:
                 result = {
                     "batches": [
@@ -337,23 +462,21 @@ class DashboardDataEndpointsV1:
                             "name": "January Sales Invoices",
                             "invoiceCount": 156,
                             "status": "ready",
-                            "created": "2024-01-15 10:30:00"
+                            "created": "2024-01-15 10:30:00",
                         },
                         {
                             "id": "BATCH-2024-014",
                             "name": "Service Invoices",
                             "invoiceCount": 89,
                             "status": "processing",
-                            "created": "2024-01-14 16:45:00"
-                        }
+                            "created": "2024-01-14 16:45:00",
+                        },
                     ],
-                    "total": 12,
-                    "ready": 8,
-                    "processing": 3,
-                    "completed": 1
                 }
-            
-            return self._create_v1_response(result, "transmission_batches_retrieved")
+
+            normalized = self._prepare_transmission_batches_response(result)
+
+            return self._create_v1_response(normalized, "transmission_batches_retrieved")
         except Exception as e:
             logger.error(f"Error getting transmission batches in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to get transmission batches")
@@ -475,7 +598,52 @@ class DashboardDataEndpointsV1:
                         "coverage": 100
                     }
                 }
-            
+            if isinstance(result, dict):
+                validation_payload = None
+                sla_hours = 4
+                async for session in get_async_session():
+                    snapshot = await summarize_validation_batches(
+                        session,
+                        organization_id=context.organization_id,
+                        limit=5,
+                    )
+                    raw_items = snapshot.get("items", []) if isinstance(snapshot, dict) else []
+                    recent_batches = [
+                        {
+                            "batchId": item.get("batchId"),
+                            "status": item.get("status"),
+                            "totals": item.get("totals"),
+                            "createdAt": item.get("createdAt"),
+                            "errorSummary": item.get("errorSummary"),
+                        }
+                        for item in raw_items
+                    ]
+
+                    summary = snapshot.get("summary") if isinstance(snapshot, dict) else None
+
+                    org = None
+                    if context.organization_id:
+                        org = await session.get(Organization, context.organization_id)
+                        if org and isinstance(org.firs_configuration, dict):
+                            configured = org.firs_configuration.get("compliance_sla_hours")
+                            try:
+                                if configured is not None:
+                                    sla_hours = max(1, int(configured))
+                            except (TypeError, ValueError):
+                                logger.debug(
+                                    "Invalid compliance_sla_hours configuration for org %s", context.organization_id
+                                )
+
+                    validation_payload = {
+                        "summary": summary,
+                        "recentBatches": recent_batches,
+                        "slaHours": sla_hours,
+                    }
+                    break
+
+                if validation_payload:
+                    result["validation"] = validation_payload
+
             return self._create_v1_response(result, "dashboard_metrics_retrieved")
         except Exception as e:
             logger.error(f"Error getting dashboard metrics in v1: {e}")

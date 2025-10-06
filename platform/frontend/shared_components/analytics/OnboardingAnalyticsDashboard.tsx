@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import apiClient from '../api/client';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -98,21 +99,17 @@ export const OnboardingAnalyticsDashboard: React.FC<DashboardProps> = ({
         ...(filters.stepId && { step_id: filters.stepId })
       });
 
-      const response = await fetch(`/api/v1/analytics/onboarding/metrics?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load analytics: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const query = params.toString();
+      const data = await apiClient.get<{ data: { metrics: DashboardMetrics } }>(
+        `/analytics/onboarding/metrics${query ? `?${query}` : ''}`
+      );
       setMetrics(data.data.metrics);
 
       // Load real-time dashboard data
-      const dashboardResponse = await fetch('/api/v1/analytics/onboarding/dashboard');
-      if (dashboardResponse.ok) {
-        const dashboardData = await dashboardResponse.json();
-        setRealTimeData(dashboardData.data.data);
-      }
+      const dashboardData = await apiClient.get<{ data: { data: any } }>(
+        '/analytics/onboarding/dashboard'
+      );
+      setRealTimeData(dashboardData.data.data);
 
     } catch (err) {
       console.error('Failed to load analytics data:', err);
@@ -131,11 +128,10 @@ export const OnboardingAnalyticsDashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch('/api/v1/analytics/onboarding/dashboard');
-        if (response.ok) {
-          const data = await response.json();
-          setRealTimeData(data.data.data);
-        }
+        const data = await apiClient.get<{ data: { data: any } }>(
+          '/analytics/onboarding/dashboard'
+        );
+        setRealTimeData(data.data.data);
       } catch (error) {
         console.error('Failed to refresh real-time data:', error);
       }

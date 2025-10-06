@@ -35,11 +35,13 @@ import {
 
 import type { UnifiedDashboardMetrics, DashboardComponentProps } from '../../types';
 
+type MetricSource = 'si' | 'app' | 'hybrid' | 'cross_role';
+
 interface CombinedMetricsGridProps extends DashboardComponentProps {
   metrics?: UnifiedDashboardMetrics | null;
   showTrends?: boolean;
   compactView?: boolean;
-  onMetricClick?: (metricKey: string, source: 'si' | 'app' | 'hybrid') => void;
+  onMetricClick?: (metricKey: string, source: MetricSource) => void;
 }
 
 interface MetricTrend {
@@ -52,7 +54,7 @@ interface MetricDefinition {
   key: string;
   title: string;
   description: string;
-  source: 'si' | 'app' | 'hybrid' | 'cross_role';
+  source: MetricSource;
   format: 'number' | 'percentage' | 'duration' | 'currency';
   thresholds: {
     excellent: number;
@@ -272,7 +274,7 @@ export const CombinedMetricsGrid: React.FC<CombinedMetricsGridProps> = ({
 
   const handleMetricClick = (definition: MetricDefinition) => {
     if (onMetricClick) {
-      onMetricClick(definition.key, definition.source as any);
+      onMetricClick(definition.key, definition.source);
     }
   };
 

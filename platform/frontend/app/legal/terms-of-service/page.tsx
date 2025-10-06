@@ -17,7 +17,7 @@ export default function TermsOfServicePage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Agreement to Terms</h2>
               <p className="text-gray-700 mb-4">
-                By accessing and using TaxPoynt platform ("Service"), you agree to be bound by these Terms of Service ("Terms"). 
+                By accessing and using TaxPoynt platform (&ldquo;Service&rdquo;), you agree to be bound by these Terms of Service (&ldquo;Terms&rdquo;). 
                 If you do not agree to these terms, please do not use our service.
               </p>
             </section>
@@ -121,4 +121,3 @@ export default function TermsOfServicePage() {
     </div>
   );
 }
-

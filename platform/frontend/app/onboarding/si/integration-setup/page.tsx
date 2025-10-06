@@ -3,21 +3,21 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ERPOnboarding } from '../../../../si_interface/workflows/erp_onboarding';
+import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';
 
 export default function SIIntegrationSetupPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleOnboardingComplete = async (onboardingData: any) => {
+  const handleOnboardingComplete = async (onboardingData: Record<string, unknown>) => {
     setIsLoading(true);
     
     try {
       // Save onboarding data to user profile
-      // This would typically call an API to update the user's onboarding status
+      // This would typically call an API to update the onboarding status for the user
       console.log('SI Onboarding completed:', onboardingData);
       
       // Redirect to SI dashboard after successful onboarding
-      const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
       const currentUser = { role: 'system_integrator' }; // Get from auth service in real implementation
       router.push(getPostOnboardingUrl(currentUser));
       
@@ -32,7 +32,6 @@ export default function SIIntegrationSetupPage() {
   const handleSkipForNow = () => {
     // Allow user to skip onboarding and go directly to dashboard
     // They can complete it later from the dashboard
-    const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
     const currentUser = { role: 'system_integrator' }; // Get from auth service in real implementation
     router.push(getPostOnboardingUrl(currentUser));
   };

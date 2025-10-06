@@ -42,6 +42,7 @@ from .transaction_endpoints import create_transaction_router
 from .compliance_endpoints import create_compliance_router
 from .firs_invoice_endpoints import create_firs_invoice_router
 from .sdk_management_endpoints import create_sdk_management_router
+from .dashboard_endpoints import create_si_dashboard_router
 from .onboarding_endpoints import create_onboarding_router
 from .utils.si_observability import install_si_instrumentation
 from .utils.si_errors import build_error_response
@@ -185,6 +186,13 @@ class SIRouterV1:
             self.message_router
         )
         self.router.include_router(sdk_management_router, tags=["SDK Management"])
+
+        # Dashboard Routes
+        dashboard_router = create_si_dashboard_router(
+            self.role_detector,
+            self.permission_guard,
+        )
+        self.router.include_router(dashboard_router, tags=["SI Dashboard"])
         
         # Financial System Integration Routes
         banking_router = create_banking_router(

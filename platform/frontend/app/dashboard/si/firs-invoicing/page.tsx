@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { DashboardCard } from '../../../../shared_components/dashboard/DashboardCard';
 import { TaxPoyntButton } from '../../../../design_system';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
+import apiClient from '../../../../shared_components/api/client';
 
 interface InvoiceTemplate {
   id: string;
@@ -30,7 +31,7 @@ interface ReconciledTransaction {
 
 export default function FIRSInvoicingHub() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTransactions, setSelectedTransactions] = useState<ReconciledTransaction[]>([]);
   const [invoiceTemplates, setInvoiceTemplates] = useState<InvoiceTemplate[]>([]);
@@ -38,7 +39,7 @@ export default function FIRSInvoicingHub() {
   const [isDemo, setIsDemo] = useState(false);
 
   // Mock data for demo
-  const mockTemplates: InvoiceTemplate[] = [
+  const mockTemplates = useMemo<InvoiceTemplate[]>(() => ([
     {
       id: 'standard-sales',
       name: 'Standard Sales Invoice',
@@ -63,9 +64,9 @@ export default function FIRSInvoicingHub() {
       isCompliant: true,
       lastUsed: '3 days ago'
     }
-  ];
+  ]), []);
 
-  const mockTransactions: ReconciledTransaction[] = [
+  const mockTransactions = useMemo<ReconciledTransaction[]>(() => ([
     {
       id: 'txn-001',
       amount: 1250000,
@@ -99,7 +100,7 @@ export default function FIRSInvoicingHub() {
       date: '2024-01-14',
       selected: false
     }
-  ];
+  ]), []);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -113,46 +114,36 @@ export default function FIRSInvoicingHub() {
     }
 
     setUser(currentUser);
-    loadFIRSInvoicingData();
-  }, [router]);
 
-  const loadFIRSInvoicingData = async () => {
-    try {
-      setIsLoading(true);
-      const authToken = localStorage.getItem('taxpoynt_auth_token');
-      if (!authToken) return;
+    const loadFIRSInvoicingData = async () => {
+      try {
+        setIsLoading(true);
+        if (!authService.isAuthenticated()) {
+          return;
+        }
 
-      // Fetch real data from SI endpoints
-      const [templatesResponse, transactionsResponse] = await Promise.all([
-        fetch('/api/v1/si/invoices/templates', {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        }),
-        fetch('/api/v1/si/reconciliation/transactions', {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        })
-      ]);
-
-      if (templatesResponse.ok && transactionsResponse.ok) {
         const [templatesData, transactionsData] = await Promise.all([
-          templatesResponse.json(),
-          transactionsResponse.json()
+          apiClient.get<{ templates?: InvoiceTemplate[] }>('/si/invoices/templates'),
+          apiClient.get<{ transactions?: ReconciledTransaction[] }>(
+            '/si/reconciliation/transactions'
+          )
         ]);
 
         setInvoiceTemplates(templatesData.templates || mockTemplates);
         setSelectedTransactions(transactionsData.transactions || mockTransactions);
         setIsDemo(false);
-      } else {
-        throw new Error('API responses not successful');
+      } catch (error) {
+        console.error('Failed to load FIRS invoicing data, using demo data:', error);
+        setIsDemo(true);
+        setInvoiceTemplates(mockTemplates);
+        setSelectedTransactions(mockTransactions);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load FIRS invoicing data, using demo data:', error);
-      setIsDemo(true);
-      setInvoiceTemplates(mockTemplates);
-      setSelectedTransactions(mockTransactions);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    loadFIRSInvoicingData();
+  }, [mockTemplates, mockTransactions, router]);
 
   const handleTransactionSelect = (transactionId: string) => {
     setSelectedTransactions(prev => 
@@ -175,32 +166,20 @@ export default function FIRSInvoicingHub() {
     
     try {
       // Simulate API call to generate FIRS-compliant invoices
-      const response = await fetch('/api/v1/si/invoices/generate', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-                  body: JSON.stringify({
-            transactions: selected.map(txn => ({
-              id: txn.id,
-              amount: txn.amount,
-              customer: txn.customerName,
-              category: txn.category,
-              description: txn.description
-            })),
-            template: 'standard-sales',
-            prepareFIRSCompliant: true
-          })
+      await apiClient.post('/si/invoices/generate', {
+        transactions: selected.map(txn => ({
+          id: txn.id,
+          amount: txn.amount,
+          customer: txn.customerName,
+          category: txn.category,
+          description: txn.description
+        })),
+        template: 'standard-sales',
+        prepareFIRSCompliant: true
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        alert(`✅ Successfully generated ${selected.length} FIRS-compliant invoices!`);
-        router.push('/dashboard/si/invoices');
-      } else {
-        throw new Error('Invoice generation failed');
-      }
+      alert(`✅ Successfully generated ${selected.length} FIRS-compliant invoices!`);
+      router.push('/dashboard/si/invoices');
     } catch (error) {
       console.error('Invoice generation failed:', error);
       // Demo fallback

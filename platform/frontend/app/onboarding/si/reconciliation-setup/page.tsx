@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
+import apiClient from '../../../../shared_components/api/client';
+import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';
 
 interface ReconciliationRule {
   id: string;
@@ -12,9 +14,7 @@ interface ReconciliationRule {
   description: string;
   category: 'transaction_matching' | 'categorization' | 'fraud_detection' | 'compliance';
   enabled: boolean;
-  config: {
-    [key: string]: any;
-  };
+  config: Record<string, unknown>;
 }
 
 interface MatchingCriteria {
@@ -25,10 +25,35 @@ interface MatchingCriteria {
   account_matching: boolean;
 }
 
+interface TransactionCategory {
+  id: string;
+  name: string;
+  color: string;
+  auto_rules: string[];
+  enabled: boolean;
+  selected: boolean;
+}
+
+interface ReconciliationConfigurationPayload {
+  rules: ReconciliationRule[];
+  matchingCriteria: MatchingCriteria;
+  categories: TransactionCategory[];
+  categoryRules: Array<{
+    id: string;
+    name: string;
+    enabled: boolean;
+    selected: boolean;
+    keywords: string[];
+    color: string;
+  }>;
+  organizationId?: string;
+  configuredAt: string;
+}
+
 export default function ReconciliationSetupPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [currentStep, setCurrentStep] = useState<'rules' | 'categories' | 'review'>('rules');
   const [matchingCriteria, setMatchingCriteria] = useState<MatchingCriteria>({
     amount_tolerance: 0.01,
@@ -105,7 +130,7 @@ export default function ReconciliationSetupPage() {
     }
   ]);
 
-  const [transactionCategories, setTransactionCategories] = useState([
+  const [transactionCategories, setTransactionCategories] = useState<TransactionCategory[]>([
     { id: 'sales_revenue', name: 'Sales Revenue', color: '#10B981', auto_rules: ['invoice', 'sale', 'payment received'], enabled: true, selected: false },
     { id: 'service_revenue', name: 'Service Revenue', color: '#3B82F6', auto_rules: ['service', 'consultation', 'subscription'], enabled: true, selected: false },
     { id: 'operating_expenses', name: 'Operating Expenses', color: '#EF4444', auto_rules: ['expense', 'cost', 'purchase'], enabled: true, selected: false },
@@ -143,7 +168,7 @@ export default function ReconciliationSetupPage() {
     );
   };
 
-  const handleMatchingCriteriaChange = (field: keyof MatchingCriteria, value: any) => {
+  const handleMatchingCriteriaChange = <K extends keyof MatchingCriteria>(field: K, value: MatchingCriteria[K]) => {
     setMatchingCriteria(prev => ({
       ...prev,
       [field]: value
@@ -170,7 +195,7 @@ export default function ReconciliationSetupPage() {
     setIsLoading(true);
     
     try {
-      const reconciliationConfig = {
+      const reconciliationConfig: ReconciliationConfigurationPayload = {
         rules: reconciliationRules.filter(r => r.enabled),
         matchingCriteria,
         categories: transactionCategories.filter(c => c.selected),
@@ -196,7 +221,6 @@ export default function ReconciliationSetupPage() {
       OnboardingStateManager.completeOnboarding(user.id);
 
       // Navigate to dashboard
-      const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
       router.push(getPostOnboardingUrl(user));
       
     } catch (error) {
@@ -208,25 +232,12 @@ export default function ReconciliationSetupPage() {
   };
 
   // API integration function
-  const saveReconciliationConfiguration = async (config: any) => {
+  const saveReconciliationConfiguration = async (config: ReconciliationConfigurationPayload) => {
     try {
       // Try to save to the new reconciliation endpoint
-      const response = await fetch('/api/v1/si/reconciliation/configuration', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        },
-        body: JSON.stringify(config)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Reconciliation configuration saved:', result);
-        return result;
-      } else {
-        throw new Error(`Failed to save configuration: ${response.status}`);
-      }
+      const result = await apiClient.post('/si/reconciliation/configuration', config);
+      console.log('✅ Reconciliation configuration saved:', result);
+      return result;
     } catch (error) {
       // Fallback: save to a general configuration endpoint or local storage
       console.warn('Main reconciliation endpoint unavailable, using fallback storage:', error);
@@ -236,21 +247,11 @@ export default function ReconciliationSetupPage() {
       
       // Also try to save to a general configuration endpoint
       try {
-        const fallbackResponse = await fetch('/api/v1/si/configuration', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-          },
-          body: JSON.stringify({
-            type: 'reconciliation',
-            configuration: config
-          })
+        await apiClient.post('/si/configuration', {
+          type: 'reconciliation',
+          configuration: config
         });
-        
-        if (fallbackResponse.ok) {
-          console.log('✅ Configuration saved to fallback endpoint');
-        }
+        console.log('✅ Configuration saved to fallback endpoint');
       } catch (fallbackError) {
         console.warn('Fallback endpoint also unavailable:', fallbackError);
       }
@@ -259,7 +260,6 @@ export default function ReconciliationSetupPage() {
 
   const handleSkip = () => {
     OnboardingStateManager.completeOnboarding(user?.id);
-    const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
     router.push(getPostOnboardingUrl(user));
   };
 

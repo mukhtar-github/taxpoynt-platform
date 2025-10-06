@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../../../design_system';
+import apiClient from '../../../../shared_components/api/client';
 
 interface InvoiceSource {
   id: string;
@@ -44,20 +45,19 @@ interface LineItem {
   taxAmount: number;
 }
 
-interface FIRSInvoiceRequest {
-  transactionIds: string[];
-  invoiceType: 'standard' | 'credit_note' | 'debit_note';
-  consolidate: boolean;
-  overrides?: {
-    customerName?: string;
-    customerEmail?: string;
-    dueDate?: string;
-  };
+interface GeneratedInvoice {
+  irn?: string;
+  invoiceNumber?: string;
+  totalAmount?: number;
+}
+
+interface GenerationResult {
+  invoices?: GeneratedInvoice[];
 }
 
 export default function FIRSInvoiceGeneratorPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [connectedSources, setConnectedSources] = useState<InvoiceSource[]>([]);
   const [transactions, setTransactions] = useState<BusinessTransaction[]>([]);
@@ -65,10 +65,10 @@ export default function FIRSInvoiceGeneratorPage() {
   const [filterSource, setFilterSource] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('not_generated');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationResult, setGenerationResult] = useState<any>(null);
+  const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
 
   // Mock data for comprehensive business and financial system integration
-  const mockSources: InvoiceSource[] = [
+  const mockSources = useMemo<InvoiceSource[]>(() => ([
     { id: 'sap-erp', type: 'erp', name: 'SAP ERP', status: 'connected', lastSync: '5 minutes ago', recordCount: 1456 },
     { id: 'odoo-erp', type: 'erp', name: 'Odoo ERP', status: 'connected', lastSync: '12 minutes ago', recordCount: 758 },
     { id: 'salesforce-crm', type: 'crm', name: 'Salesforce CRM', status: 'connected', lastSync: '8 minutes ago', recordCount: 234 },
@@ -78,9 +78,9 @@ export default function FIRSInvoiceGeneratorPage() {
     { id: 'mono-banking', type: 'banking', name: 'Mono Banking', status: 'connected', lastSync: '2 minutes ago', recordCount: 2456 },
     { id: 'paystack', type: 'payment', name: 'Paystack', status: 'connected', lastSync: '1 minute ago', recordCount: 1234 },
     { id: 'flutterwave', type: 'payment', name: 'Flutterwave', status: 'connected', lastSync: '6 minutes ago', recordCount: 567 }
-  ];
+  ]), []);
 
-  const mockTransactions: BusinessTransaction[] = [
+  const mockTransactions = useMemo<BusinessTransaction[]>(() => ([
     {
       id: 'txn-001',
       source: mockSources[0], // SAP ERP
@@ -183,7 +183,7 @@ export default function FIRSInvoiceGeneratorPage() {
       firsStatus: 'not_generated',
       confidence: 87.3
     }
-  ];
+  ]), [mockSources]);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -197,21 +197,22 @@ export default function FIRSInvoiceGeneratorPage() {
     }
 
     setUser(currentUser);
-    loadBusinessData();
-  }, [router]);
 
-  const loadBusinessData = async () => {
-    setIsLoading(true);
-    try {
-      // In real implementation, fetch from APIs
-      setConnectedSources(mockSources);
-      setTransactions(mockTransactions);
-    } catch (error) {
-      console.error('Failed to load business data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const fetchBusinessData = async () => {
+      setIsLoading(true);
+      try {
+        // In real implementation, fetch from APIs
+        setConnectedSources(mockSources);
+        setTransactions(mockTransactions);
+      } catch (error) {
+        console.error('Failed to load business data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBusinessData();
+  }, [mockSources, mockTransactions, router]);
 
   const getSourceIcon = (type: string) => {
     const icons: Record<string, string> = {
@@ -271,31 +272,20 @@ export default function FIRSInvoiceGeneratorPage() {
       const selectedTxns = transactions.filter(txn => selectedTransactions.includes(txn.id));
       
       // Call FIRS invoice generation API
-      const response = await fetch('/api/v1/si/firs/invoices/generate', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          transactionIds: selectedTransactions,
-          invoiceType: 'standard',
-          consolidate: selectedTransactions.length > 1,
-          generateCompliant: true,
-          includeDigitalSignature: true,
-          sources: selectedTxns.map(txn => ({
-            sourceId: txn.source.id,
-            sourceType: txn.source.type,
-            transactionId: txn.transactionId
-          }))
-        })
+      const result = await apiClient.post<{
+        invoices?: Array<{ irn?: string }>;
+      }>('/si/firs/invoices/generate', {
+        transactionIds: selectedTransactions,
+        invoiceType: 'standard',
+        consolidate: selectedTransactions.length > 1,
+        generateCompliant: true,
+        includeDigitalSignature: true,
+        sources: selectedTxns.map(txn => ({
+          sourceId: txn.source.id,
+          sourceType: txn.source.type,
+          transactionId: txn.transactionId
+        }))
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate FIRS invoice');
-      }
-
-      const result = await response.json();
       setGenerationResult(result);
 
       // Update transaction statuses
@@ -573,7 +563,7 @@ export default function FIRSInvoiceGeneratorPage() {
               <div className="space-y-4">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h4 className="font-medium text-green-800 mb-2">Generated Invoices</h4>
-                  {generationResult.invoices?.map((invoice: any, index: number) => (
+                  {generationResult.invoices?.map((invoice, index) => (
                     <div key={index} className="text-sm text-green-700">
                       <div>IRN: <span className="font-mono">{invoice.irn}</span></div>
                       <div>Invoice Number: {invoice.invoiceNumber}</div>

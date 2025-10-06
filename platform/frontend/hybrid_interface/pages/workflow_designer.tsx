@@ -185,7 +185,7 @@ export const WorkflowDesignerPage: React.FC<WorkflowDesignerPageProps> = ({
     return nodes;
   };
 
-  const handleSaveWorkflow = async (values: any) => {
+  const handleSaveWorkflow = async (values: unknown) => {
     try {
       // Save workflow logic
       console.log('Saving workflow:', { ...currentWorkflow, ...values });

@@ -151,8 +151,8 @@ class WorkflowEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="get_active_workflows",
                 payload={"user_id": context.user_id}
             )
@@ -201,8 +201,8 @@ class WorkflowEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="get_workflow_templates",
                 payload={"user_id": context.user_id}
             )
@@ -277,8 +277,8 @@ class WorkflowEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="create_workflow",
                 payload={
                     "user_id": context.user_id,
@@ -306,8 +306,8 @@ class WorkflowEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="control_workflow",
                 payload={
                     "user_id": context.user_id,
@@ -334,8 +334,8 @@ class WorkflowEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="get_workflow_status",
                 payload={
                     "user_id": context.user_id,
@@ -373,8 +373,8 @@ class WorkflowEndpointsV1:
         try:
             service_role = self._get_primary_service_role(context)
             
-            result = await self.message_router.send_message(
-                service_role,
+            result = await self.message_router.route_message(
+                service_role=service_role,
                 operation="get_workflow_history",
                 payload={
                     "user_id": context.user_id,

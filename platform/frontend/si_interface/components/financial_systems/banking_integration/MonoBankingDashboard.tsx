@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRoleDetector } from '../../../../role_management';
-import { secureTokenStorage } from '../../../../shared_components/utils/secureTokenStorage';
+import apiClient from '../../../../shared_components/api/client';
 
 // Types based on backend Mono integration
 interface MonoAccount {
@@ -86,33 +86,18 @@ export const MonoBankingDashboard: React.FC = () => {
     setError(null);
     
     try {
-      // Fetch from SI banking endpoints
-      const authHeader = secureTokenStorage.getAuthorizationHeader();
-      if (!authHeader) {
+      if (!apiClient.isAuthenticated()) {
         throw new Error('Authentication required');
       }
 
-      const [accountsRes, statsRes] = await Promise.all([
-        fetch('/api/v1/si/banking/open-banking', {
-          headers: { 
-            'Authorization': authHeader,
-            'Content-Type': 'application/json'
-          }
-        }),
-        fetch('/api/v1/si/banking/stats', {
-          headers: { 
-            'Authorization': authHeader,
-            'Content-Type': 'application/json'
-          }
-        })
+      const [accountsData, statsData] = await Promise.all([
+        apiClient.get<{ data?: { connections?: MonoAccount[] } }>(
+          '/si/banking/open-banking'
+        ),
+        apiClient.get<{ data?: BankingConnectionStats }>(
+          '/si/banking/stats'
+        )
       ]);
-
-      if (!accountsRes.ok || !statsRes.ok) {
-        throw new Error('Failed to load banking data');
-      }
-
-      const accountsData = await accountsRes.json();
-      const statsData = await statsRes.json();
 
       setAccounts(accountsData.data?.connections || []);
       setStats(statsData.data || null);
@@ -132,23 +117,13 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const loadTransactions = async (accountId: string) => {
     try {
-      const authHeader = secureTokenStorage.getAuthorizationHeader();
-      if (!authHeader) {
+      if (!apiClient.isAuthenticated()) {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`/api/v1/si/banking/open-banking/${accountId}/transactions?limit=50`, {
-        headers: { 
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load transactions');
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get<{ data?: { transactions?: MonoTransaction[] } }>(
+        `/si/banking/open-banking/${accountId}/transactions?limit=50`
+      );
       setTransactions(data.data?.transactions || []);
       
     } catch (err) {
@@ -158,36 +133,24 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const initiateAccountLinking = async () => {
     try {
-      const authHeader = secureTokenStorage.getAuthorizationHeader();
-      if (!authHeader) {
+      if (!apiClient.isAuthenticated()) {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch('/api/v1/si/banking/open-banking/mono/link', {
-        method: 'POST',
-        headers: { 
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
+      const data = await apiClient.post<{
+        data?: { mono_url?: string };
+      }>('/si/banking/open-banking/mono/link', {
+        customer: {
+          name: detectionResult?.organizationId || 'Unknown',
+          email: 'admin@organization.com'
         },
-        body: JSON.stringify({
-          customer: {
-            name: detectionResult?.organizationId || 'Unknown',
-            email: 'admin@organization.com'
-          },
-          scope: ['identity', 'accounts', 'transactions'],
-          redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
-          meta: {
-            ref: `taxpoynt_${Date.now()}`
-          }
-        })
+        scope: ['identity', 'accounts', 'transactions'],
+        redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
+        meta: {
+          ref: `taxpoynt_${Date.now()}`
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to initiate account linking');
-      }
-
-      const data = await response.json();
-      
       // Redirect to Mono's account linking page
       if (data.data?.mono_url) {
         window.open(data.data.mono_url, '_blank');
@@ -200,22 +163,11 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const syncAccount = async (accountId: string) => {
     try {
-      const authHeader = secureTokenStorage.getAuthorizationHeader();
-      if (!authHeader) {
+      if (!apiClient.isAuthenticated()) {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`/api/v1/si/banking/open-banking/${accountId}/sync`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to sync account');
-      }
+      await apiClient.post(`/si/banking/open-banking/${accountId}/sync`, {});
 
       // Reload data after sync
       await loadBankingData();
@@ -230,28 +182,16 @@ export const MonoBankingDashboard: React.FC = () => {
 
   const generateInvoiceFromTransaction = async (transactionId: string) => {
     try {
-      const authHeader = secureTokenStorage.getAuthorizationHeader();
-      if (!authHeader) {
+      if (!apiClient.isAuthenticated()) {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch('/api/v1/si/banking/transactions/generate-invoice', {
-        method: 'POST',
-        headers: { 
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          transaction_id: transactionId,
-          auto_submit: false
-        })
+      const data = await apiClient.post<{
+        data?: { invoice_id?: string };
+      }>('/si/banking/transactions/generate-invoice', {
+        transaction_id: transactionId,
+        auto_submit: false
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate invoice');
-      }
-
-      const data = await response.json();
       
       // Update transaction to show invoice generated
       setTransactions(prev => prev.map(tx => 

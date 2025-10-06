@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 interface AccountingSystem {
   id: string;
@@ -121,32 +122,25 @@ export const AccountingDashboard: React.FC<AccountingDashboardProps> = ({
 
   const loadAccountingConnections = async () => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/accounting/connections`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ connections?: AccountingConnection[] }>(
+        '/si/business-systems/accounting/connections'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        
-        // Update system statuses with mock data
-        const updatedSystems = accountingSystems.map(system => {
-          const connection = data.connections?.find((conn: AccountingConnection) => conn.systemId === system.id);
-          if (connection) {
-            return {
-              ...system,
-              status: 'connected' as const,
-              lastSync: connection.syncSettings.lastSuccessfulSync,
-              accountCount: Math.floor(Math.random() * 200) + 50,
-              invoiceCount: Math.floor(Math.random() * 1000) + 100
-            };
-          }
-          return system;
-        });
-        setAccountingSystems(updatedSystems);
-      }
+      setConnections(data.connections || []);
+
+      setAccountingSystems(prevSystems => prevSystems.map(system => {
+        const connection = data.connections?.find(conn => conn.systemId === system.id);
+        if (connection) {
+          return {
+            ...system,
+            status: 'connected' as const,
+            lastSync: connection.syncSettings.lastSuccessfulSync,
+            accountCount: Math.floor(Math.random() * 200) + 50,
+            invoiceCount: Math.floor(Math.random() * 1000) + 100
+          };
+        }
+        return system;
+      }));
     } catch (error) {
       console.error('Failed to load accounting connections:', error);
     }
@@ -161,31 +155,24 @@ export const AccountingDashboard: React.FC<AccountingDashboardProps> = ({
     setIsConnecting(true);
     
     try {
-      const response = await fetch(`/api/v1/si/business-systems/accounting/test-connection`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ success: boolean; message?: string }>(
+        '/si/business-systems/accounting/test-connection',
+        {
           systemId,
           testData: {
             companyId: 'test_company_123',
             apiEndpoint: 'https://sandbox-api.accounting.com'
           }
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          alert('Accounting system connection test successful!');
-          if (onConnectionSuccess) {
-            onConnectionSuccess(systemId);
-          }
-        } else {
-          alert('Connection test failed: ' + data.message);
         }
+      );
+
+      if (data.success) {
+        alert('Accounting system connection test successful!');
+        if (onConnectionSuccess) {
+          onConnectionSuccess(systemId);
+        }
+      } else {
+        alert('Connection test failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Accounting connection test failed:', error);
@@ -197,36 +184,23 @@ export const AccountingDashboard: React.FC<AccountingDashboardProps> = ({
 
   const handleSyncChartOfAccounts = async (systemId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/accounting/sync-coa`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/accounting/sync-coa', { systemId });
 
-      if (response.ok) {
-        // Update status to syncing
-        const updatedSystems = accountingSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'syncing' as const }
+      setAccountingSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'syncing' as const }
+          : system
+      ));
+
+      setTimeout(() => {
+        setAccountingSystems(prevSystems => prevSystems.map(system =>
+          system.id === systemId
+            ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
             : system
-        );
-        setAccountingSystems(updatedSystems);
-        
-        // Simulate sync completion
-        setTimeout(() => {
-          const finalSystems = updatedSystems.map(system => 
-            system.id === systemId 
-              ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
-              : system
-          );
-          setAccountingSystems(finalSystems);
-        }, 2000);
-        
-        alert('Chart of Accounts sync started successfully');
-      }
+        ));
+      }, 2000);
+
+      alert('Chart of Accounts sync started successfully');
     } catch (error) {
       console.error('Failed to sync Chart of Accounts:', error);
       alert('Failed to sync Chart of Accounts');
@@ -239,27 +213,17 @@ export const AccountingDashboard: React.FC<AccountingDashboardProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/business-systems/accounting/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/accounting/disconnect', { systemId });
 
-      if (response.ok) {
-        const updatedSystems = accountingSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'disconnected' as const, lastSync: undefined, accountCount: undefined, invoiceCount: undefined }
-            : system
-        );
-        setAccountingSystems(updatedSystems);
-        
-        setConnections(connections.filter(conn => conn.systemId !== systemId));
-        
-        alert('Accounting system disconnected successfully');
-      }
+      setAccountingSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'disconnected' as const, lastSync: undefined, accountCount: undefined, invoiceCount: undefined }
+          : system
+      ));
+
+      setConnections(prev => prev.filter(conn => conn.systemId !== systemId));
+
+      alert('Accounting system disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect accounting system:', error);
       alert('Failed to disconnect accounting system');

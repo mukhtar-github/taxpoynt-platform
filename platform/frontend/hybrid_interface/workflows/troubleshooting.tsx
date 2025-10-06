@@ -72,7 +72,7 @@ interface TroubleshootingProps {
   issueId?: string;
   organizationId: string;
   userRole: 'si' | 'app' | 'hybrid' | 'admin';
-  onResolutionComplete?: (result: any) => void;
+  onResolutionComplete?: (result: unknown) => void;
 }
 
 interface TroubleshootingStep {

@@ -50,8 +50,9 @@ export default function TaxpayerManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+
+  type TaxpayerStatus = Taxpayer['status'];
 
   useEffect(() => {
     loadTaxpayerData();
@@ -164,7 +165,7 @@ export default function TaxpayerManagementPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: TaxpayerStatus) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-orange-100 text-orange-800';
@@ -174,7 +175,7 @@ export default function TaxpayerManagementPage() {
     }
   };
 
-  const getBusinessTypeIcon = (type: string) => {
+  const getBusinessTypeIcon = (type: Taxpayer['businessType']) => {
     switch (type) {
       case 'large': return '🏢';
       case 'medium': return '🏬';
@@ -183,7 +184,7 @@ export default function TaxpayerManagementPage() {
     }
   };
 
-  const handleStatusUpdate = async (taxpayerId: string, newStatus: string) => {
+  const handleStatusUpdate = async (taxpayerId: string, newStatus: TaxpayerStatus) => {
     try {
       const response = await apiClient.post<APIResponse>(`/app/taxpayers/${taxpayerId}/status`, {
         status: newStatus,
@@ -193,12 +194,16 @@ export default function TaxpayerManagementPage() {
       if (response.success) {
         // Update local state
         setTaxpayers(prev => prev.map(tp => 
-          tp.id === taxpayerId ? { ...tp, status: newStatus as any } : tp
+          tp.id === taxpayerId ? { ...tp, status: newStatus } : tp
         ));
       }
     } catch (error) {
       console.error('Failed to update taxpayer status:', error);
     }
+  };
+
+  const handleNewTaxpayerOnboarding = () => {
+    router.push('/onboarding/app');
   };
 
   const filteredTaxpayers = taxpayers.filter(taxpayer => {
@@ -248,7 +253,7 @@ export default function TaxpayerManagementPage() {
             </TaxPoyntButton>
             <TaxPoyntButton
               variant="primary"
-              onClick={() => setShowOnboardingModal(true)}
+              onClick={handleNewTaxpayerOnboarding}
               className="bg-blue-600 hover:bg-blue-700"
             >
               👥 Onboard New Taxpayer

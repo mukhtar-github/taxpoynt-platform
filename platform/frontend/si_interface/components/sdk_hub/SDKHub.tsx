@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TaxPoyntButton } from '../../../design_system';
+import apiClient from '../../../shared_components/api/client';
 import { secureLogger } from '../../../shared_components/utils/secureLogger';
 
 interface SDKInfo {
@@ -57,19 +58,9 @@ export const SDKHub: React.FC<SDKHubProps> = ({
       try {
         setLoading(true);
         setError(null);
-        
-        const response = await fetch('/api/v1/si/sdk/catalog', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch SDK catalog: ${response.status}`);
-        }
-        
-        const data: SDKCatalogResponse = await response.json();
+        const data = await apiClient.get<SDKCatalogResponse>(
+          '/si/sdk/catalog'
+        );
         
         if (data.success) {
           setSdkCatalog(data.data.sdk_catalog);
@@ -123,18 +114,13 @@ export const SDKHub: React.FC<SDKHubProps> = ({
       if (!sdk) return;
 
       // Trigger download
-      const response = await fetch(sdk.downloadUrl, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const endpoint = sdk.downloadUrl.startsWith('/api/v1')
+        ? sdk.downloadUrl.replace('/api/v1', '')
+        : sdk.downloadUrl;
 
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
+      const blob = await apiClient.get<Blob>(endpoint, { responseType: 'blob' });
 
       // Create blob and download
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -332,4 +318,3 @@ export const SDKHub: React.FC<SDKHubProps> = ({
 };
 
 export default SDKHub;
-

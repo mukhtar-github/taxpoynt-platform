@@ -8,9 +8,9 @@ import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { 
   OnboardingProgressIndicator, 
-  SkipForNowButton, 
   useMobileOptimization 
 } from '../../../../shared_components/onboarding';
+import apiClient from '../../../../shared_components/api/client';
 
 interface CombinedSetupData {
   // Business Information
@@ -40,7 +40,7 @@ interface CombinedSetupData {
 export default function HybridCombinedSetupPage() {
   const router = useRouter();
   const { user, loading: userLoading } = useUserContext();
-  const { isMobile, mobileBreakpoint } = useMobileOptimization();
+  const { isMobile } = useMobileOptimization();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [setupData, setSetupData] = useState<CombinedSetupData>({
@@ -75,24 +75,26 @@ export default function HybridCombinedSetupPage() {
     }
     
     // Pre-populate business name if available
-    if ((user as any).business_name) {
+    if (user.business_name) {
       setSetupData(prev => ({
         ...prev,
-        business_name: (user as any).business_name
+        business_name: user.business_name
       }));
     }
   }, [user, userLoading, router]);
 
-  const updateSetupData = (field: keyof CombinedSetupData, value: any) => {
+  const updateSetupData = <K extends keyof CombinedSetupData>(field: K, value: CombinedSetupData[K]) => {
     setSetupData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleArrayToggle = (field: keyof CombinedSetupData, value: string) => {
+  type ArrayFields = 'si_services' | 'business_systems' | 'financial_systems' | 'app_processing_preferences';
+
+  const handleArrayToggle = (field: ArrayFields, value: string) => {
     setSetupData(prev => {
-      const currentArray = prev[field] as string[];
+      const currentArray = prev[field];
       const newArray = currentArray.includes(value)
         ? currentArray.filter(item => item !== value)
         : [...currentArray, value];
@@ -138,31 +140,13 @@ export default function HybridCombinedSetupPage() {
     try {
       console.log('🚀 Completing Hybrid combined setup:', setupData);
       
-      // Save setup data via API (would be real API call)
-      const response = await fetch('/api/v1/hybrid/onboarding/complete-setup', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(setupData)
-      });
+      await apiClient.post('/hybrid/onboarding/complete-setup', setupData);
 
-      if (response.ok) {
-        // Mark onboarding as complete
-        if (user?.id) {
-          OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
-        }
-        
-        // Redirect to Hybrid dashboard
-        router.push('/dashboard/hybrid');
-      } else {
-        console.warn('Setup API not available, using demo completion');
-        if (user?.id) {
-          OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
-        }
-        router.push('/dashboard/hybrid');
+      if (user?.id) {
+        OnboardingStateManager.updateStep(user.id, 'onboarding_complete', true);
       }
+
+      router.push('/dashboard/hybrid');
     } catch (error) {
       console.error('Setup completion failed:', error);
       // Demo completion fallback

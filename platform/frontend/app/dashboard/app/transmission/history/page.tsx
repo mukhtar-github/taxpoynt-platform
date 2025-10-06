@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../../design_system';
@@ -38,13 +38,8 @@ export default function TransmissionHistoryPage() {
   const [dateRange, setDateRange] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [isDemo, setIsDemo] = useState(false);
 
-  useEffect(() => {
-    loadTransmissionHistory();
-  }, [currentPage, statusFilter, dateRange]);
-
-  const loadTransmissionHistory = async () => {
+  const loadTransmissionHistory = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiClient.get<APIResponse<TransmissionRecord[]>>('/app/transmission/history', {
@@ -58,14 +53,12 @@ export default function TransmissionHistoryPage() {
       
       if (response.success && response.data) {
         setTransmissions(response.data);
-        setIsDemo(false);
       } else {
         throw new Error('API response unsuccessful');
       }
     } catch (error) {
       console.error('Failed to load transmission history, using demo data:', error);
       // Fallback to demo data
-      setIsDemo(true);
       setTransmissions([
         {
           id: 'TX-2024-001',
@@ -137,9 +130,15 @@ export default function TransmissionHistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, dateRange, statusFilter]);
 
-  const getStatusColor = (status: string) => {
+  useEffect(() => {
+    loadTransmissionHistory();
+  }, [loadTransmissionHistory]);
+
+  type TransmissionStatus = TransmissionRecord['status'];
+
+  const getStatusColor = (status: TransmissionStatus) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'processing': return 'bg-blue-100 text-blue-800';
@@ -150,7 +149,7 @@ export default function TransmissionHistoryPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: TransmissionStatus) => {
     switch (status) {
       case 'completed': return '✅';
       case 'processing': return '⏳';
@@ -182,7 +181,8 @@ export default function TransmissionHistoryPage() {
       });
       
       // Create download link
-      const url = window.URL.createObjectURL(response as any);
+      const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `transmission-report-${transmissionId}.pdf`;

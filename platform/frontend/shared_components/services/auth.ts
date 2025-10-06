@@ -16,6 +16,7 @@ export interface User {
   role: string;
   service_package?: string;
   is_email_verified?: boolean;
+  business_name?: string;
   organization?: Organization;
   permissions?: string[];
 }

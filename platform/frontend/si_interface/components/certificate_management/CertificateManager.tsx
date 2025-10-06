@@ -17,6 +17,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../design_system/components/Button';
+import apiClient from '../../../shared_components/api/client';
 
 interface Certificate {
   id: string;
@@ -198,16 +199,11 @@ export const CertificateManager: React.FC<CertificateManagerProps> = ({
   const fetchCertificates = async () => {
     try {
       const params = organizationId ? `?organization_id=${organizationId}` : '';
-      const response = await fetch(`/api/v1/si/certificates${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ certificates?: Certificate[] }>(
+        `/si/certificates${params}`
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setCertificates(data.certificates || mockCertificates);
-      }
+      setCertificates(data.certificates || mockCertificates);
     } catch (error) {
       console.error('Failed to fetch certificates:', error);
       setCertificates(mockCertificates);
@@ -218,16 +214,11 @@ export const CertificateManager: React.FC<CertificateManagerProps> = ({
 
   const fetchRequests = async () => {
     try {
-      const response = await fetch('/api/v1/si/certificates/requests', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ requests?: CertificateRequest[] }>(
+        '/si/certificates/requests'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setRequests(data.requests || mockRequests);
-      }
+      setRequests(data.requests || mockRequests);
     } catch (error) {
       console.error('Failed to fetch certificate requests:', error);
       setRequests(mockRequests);
@@ -262,21 +253,11 @@ export const CertificateManager: React.FC<CertificateManagerProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/certificates/${certificateId}/revoke`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        alert('✅ Certificate revoked successfully');
-        fetchCertificates();
-        if (onCertificateAction) {
-          onCertificateAction('revoke', certificateId);
-        }
-      } else {
-        alert('❌ Failed to revoke certificate');
+      await apiClient.post(`/si/certificates/${certificateId}/revoke`, {});
+      alert('✅ Certificate revoked successfully');
+      fetchCertificates();
+      if (onCertificateAction) {
+        onCertificateAction('revoke', certificateId);
       }
     } catch (error) {
       console.error('Failed to revoke certificate:', error);
@@ -286,21 +267,11 @@ export const CertificateManager: React.FC<CertificateManagerProps> = ({
 
   const handleRenewCertificate = async (certificateId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/certificates/${certificateId}/renew`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        alert('✅ Certificate renewal initiated successfully');
-        fetchCertificates();
-        if (onCertificateAction) {
-          onCertificateAction('renew', certificateId);
-        }
-      } else {
-        alert('❌ Failed to initiate certificate renewal');
+      await apiClient.post(`/si/certificates/${certificateId}/renew`, {});
+      alert('✅ Certificate renewal initiated successfully');
+      fetchCertificates();
+      if (onCertificateAction) {
+        onCertificateAction('renew', certificateId);
       }
     } catch (error) {
       console.error('Failed to renew certificate:', error);
@@ -310,25 +281,19 @@ export const CertificateManager: React.FC<CertificateManagerProps> = ({
 
   const handleDownloadCertificate = async (certificateId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/certificates/${certificateId}/download`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const blob = await apiClient.get<Blob>(
+        `/si/certificates/${certificateId}/download`,
+        { responseType: 'blob' }
+      );
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `certificate-${certificateId}.pem`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        alert('❌ Failed to download certificate');
-      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-${certificateId}.pem`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
       console.error('Failed to download certificate:', error);
       alert('❌ Failed to download certificate');

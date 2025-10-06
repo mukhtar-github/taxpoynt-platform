@@ -117,62 +117,56 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     servicePackage: 'si' | 'app' | 'hybrid',
     state: OnboardingState
   ) => {
-    const baseRoutes = {
-      si: '/onboarding/si',
-      app: '/onboarding/app',
-      hybrid: '/onboarding/hybrid'
-    };
-
-    // Determine specific onboarding step based on service and current state
-    switch (servicePackage) {
-      case 'si':
-        if (state.current_step === 'service_introduction' || !state.has_started) {
-          router.push(`${baseRoutes.si}/integration-choice`);
-        } else if (state.current_step === 'integration_choice') {
-          router.push(`${baseRoutes.si}/integration-choice`);
-        } else if (state.current_step === 'business_systems_setup') {
-          router.push(`${baseRoutes.si}/business-systems-setup`);
-        } else if (state.current_step === 'financial_systems_setup') {
-          router.push(`${baseRoutes.si}/financial-systems-setup`);
-        } else if (state.current_step === 'reconciliation_setup') {
-          router.push(`${baseRoutes.si}/reconciliation-setup`);
-        } else if (state.completed_steps.includes('onboarding_complete')) {
+    if (state.completed_steps.includes('onboarding_complete')) {
+      switch (servicePackage) {
+        case 'si':
           router.push('/dashboard/si');
-        } else {
-          // Default to integration choice
-          router.push(`${baseRoutes.si}/integration-choice`);
-        }
-        break;
-
-      case 'app':
-        if (state.current_step === 'service_introduction' || !state.has_started) {
-          router.push(`${baseRoutes.app}/business-verification`);
-        } else if (state.current_step === 'invoice_processing_setup') {
-          router.push(`${baseRoutes.app}/invoice-processing-setup`);
-        } else if (state.completed_steps.includes('onboarding_complete')) {
+          return;
+        case 'app':
           router.push('/dashboard/app');
-        } else {
-          // Default to business verification
-          router.push(`${baseRoutes.app}/business-verification`);
-        }
-        break;
-
-      case 'hybrid':
-        if (state.current_step === 'service_introduction' || !state.has_started) {
-          router.push(`${baseRoutes.hybrid}/service-selection`);
-        } else if (state.current_step === 'combined_setup') {
-          router.push(`${baseRoutes.hybrid}/combined-setup`);
-        } else if (state.completed_steps.includes('onboarding_complete')) {
+          return;
+        case 'hybrid':
+        default:
           router.push('/dashboard/hybrid');
-        } else {
-          // Default to service selection
-          router.push(`${baseRoutes.hybrid}/service-selection`);
-        }
-        break;
+          return;
+      }
+    }
 
+    const unifiedStep = mapLegacyStepToUnified(state.current_step, servicePackage);
+    const query = new URLSearchParams({
+      service: servicePackage,
+      step: unifiedStep,
+    });
+
+    router.push(`/onboarding?${query.toString()}`);
+  };
+
+  const mapLegacyStepToUnified = (
+    legacyStep: string,
+    servicePackage: 'si' | 'app' | 'hybrid'
+  ): string => {
+    if (!legacyStep) {
+      return servicePackage === 'si' && !onboardingState?.has_started
+        ? 'service-selection'
+        : 'company-profile';
+    }
+
+    switch (legacyStep) {
+      case 'service_introduction':
+      case 'integration_choice':
+      case 'business_verification':
+      case 'service_selection':
+        return 'service-selection';
+      case 'business_systems_setup':
+      case 'financial_systems_setup':
+      case 'invoice_processing_setup':
+      case 'combined_setup':
+        return 'service-configuration';
+      case 'reconciliation_setup':
+      case 'onboarding_review':
+        return 'review';
       default:
-        console.warn('⚠️ Unknown service package, redirecting to dashboard');
-        router.push('/dashboard');
+        return 'company-profile';
     }
   };
 

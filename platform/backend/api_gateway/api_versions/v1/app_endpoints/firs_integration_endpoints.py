@@ -251,6 +251,15 @@ class FIRSIntegrationEndpointsV1:
 
         self.router.add_api_route(
             "/credentials",
+            self.get_firs_credentials,
+            methods=["GET"],
+            summary="Get FIRS credentials metadata",
+            description="Retrieve masked FIRS credential information and configuration details",
+            response_model=V1ResponseModel
+        )
+
+        self.router.add_api_route(
+            "/credentials",
             self.update_firs_credentials,
             methods=["POST"],
             summary="Save FIRS credentials",
@@ -665,6 +674,66 @@ class FIRSIntegrationEndpointsV1:
         except Exception as e:
             logger.error("Error retrieving FIRS connection status in v1: %s", e, exc_info=True)
             return v1_error_response(e, action="get_firs_connection_status")
+
+    async def get_firs_credentials(self, request: Request):
+        """Return masked FIRS credentials and configuration snapshot for the APP account."""
+
+        try:
+            context = await self._require_app_role(request)
+            org_id = getattr(context, "organization_id", None)
+
+            if not org_id:
+                empty = {
+                    "credentials": {
+                        "api_key_masked": None,
+                        "api_secret_masked": None,
+                        "environment": "sandbox",
+                        "webhook_url": None,
+                    },
+                    "status": self._build_status_payload({}, None),
+                }
+                return self._create_v1_response(empty, "firs_credentials_retrieved")
+
+            async for session in get_async_session():
+                organization: Optional[Organization] = await session.get(Organization, org_id)
+                if not organization:
+                    empty = {
+                        "credentials": {
+                            "api_key_masked": None,
+                            "api_secret_masked": None,
+                            "environment": "sandbox",
+                            "webhook_url": None,
+                        },
+                        "status": self._build_status_payload({}, str(org_id)),
+                    }
+                    empty["status"]["metadata"]["last_error"] = "organization_not_found"
+                    return self._create_v1_response(empty, "firs_credentials_retrieved")
+
+                config = dict(organization.firs_configuration or {})
+                status_payload = self._build_status_payload(config, str(org_id))
+                credentials_payload = {
+                    "api_key_masked": status_payload.get("api_key_masked"),
+                    "api_secret_masked": status_payload.get("api_secret_masked"),
+                    "environment": status_payload.get("environment", "sandbox"),
+                    "webhook_url": status_payload.get("webhook_url"),
+                    "last_updated_at": status_payload.get("last_updated_at"),
+                    "last_updated_by": status_payload.get("last_updated_by"),
+                }
+
+                return self._create_v1_response(
+                    {
+                        "credentials": credentials_payload,
+                        "status": status_payload,
+                    },
+                    "firs_credentials_retrieved",
+                )
+
+            raise RuntimeError("Database session unavailable")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Error retrieving FIRS credentials in v1: %s", e, exc_info=True)
+            return v1_error_response(e, action="get_firs_credentials")
 
     async def update_firs_credentials(self, request: Request):
         """Persist FIRS credentials and configuration for the APP account."""

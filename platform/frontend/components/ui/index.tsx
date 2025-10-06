@@ -20,7 +20,7 @@
  * @version 2.0.0 - Unified Architecture
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { clsx } from 'clsx';
 import { Button } from '../../design_system/components/Button';
@@ -522,7 +522,13 @@ export const Tabs: React.FC<TabsProps> = ({
   className, 
   ...props 
 }) => {
-  const [activeTab, setActiveTab] = useState(defaultValue || '');
+  const [activeTab, setActiveTab] = useState(value ?? defaultValue ?? '');
+
+  useEffect(() => {
+    if (value !== undefined) {
+      setActiveTab(value);
+    }
+  }, [value]);
 
   const handleTabChange = (newValue: string) => {
     setActiveTab(newValue);

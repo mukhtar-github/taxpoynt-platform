@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../design_system';
+import apiClient from '../../shared_components/api/client';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
 
 interface CodeExample {
@@ -106,19 +107,12 @@ export default function SDKDocumentationPage() {
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`/api/v1/si/sdk/documentation/${selectedSDK}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch documentation: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
+        const data = await apiClient.get<{
+          success: boolean;
+          data: { documentation: BackendDocumentation };
+          message?: string;
+        }>(`/si/sdk/documentation/${selectedSDK}`);
+
         if (data.success) {
           setDocumentation(data.data.documentation);
           secureLogger.info('SDK documentation loaded successfully', { sdk: selectedSDK });

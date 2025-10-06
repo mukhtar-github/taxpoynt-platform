@@ -20,7 +20,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
+import {
   Card as AntCard, 
   Row, 
   Col, 
@@ -40,6 +40,7 @@ import {
   Dropdown,
   Statistic
 } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -66,6 +67,7 @@ import type {
   WorkflowStatus,
   WorkflowType
 } from '../../types';
+import type { BadgeProps } from 'antd/es/badge';
 
 interface WorkflowOrchestratorProps extends WorkflowComponentProps {
   showDesigner?: boolean;
@@ -398,7 +400,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
     }
   };
 
-  const getStatusColor = (status: WorkflowStatus): string => {
+  const getStatusColor = (status: WorkflowStatus): BadgeProps['status'] => {
     switch (status) {
       case 'active': return 'success';
       case 'paused': return 'warning';
@@ -409,7 +411,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
     }
   };
 
-  const getExecutionStatusColor = (status: string): string => {
+  const getExecutionStatusColor = (status: string): BadgeProps['status'] => {
     switch (status) {
       case 'completed': return 'success';
       case 'running': return 'processing';
@@ -445,7 +447,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
       dataIndex: 'status',
       key: 'status',
       render: (status: WorkflowStatus) => (
-        <Badge status={getStatusColor(status) as any} text={status.toUpperCase()} />
+        <Badge status={getStatusColor(status)} text={status.toUpperCase()} />
       )
     },
     {
@@ -464,7 +466,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
       title: 'Actions',
       key: 'actions',
       render: (record: CrossRoleWorkflow) => {
-        const menuItems: any[] = [
+        const menuItems: MenuProps['items'] = [
           {
             key: 'execute',
             icon: <PlayCircleOutlined />,
@@ -475,30 +477,16 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
             key: 'view',
             icon: <EyeOutlined />,
             label: 'View Details'
-          }
+          },
+          ...(allowEdit && !readOnly
+            ? [
+                { key: 'edit', icon: <EditOutlined />, label: 'Edit' },
+                { key: 'copy', icon: <CopyOutlined />, label: 'Duplicate' },
+                { type: 'divider', key: 'divider' as const },
+                { key: 'delete', icon: <DeleteOutlined />, label: 'Delete', danger: true }
+              ]
+            : [])
         ];
-
-        if (allowEdit && !readOnly) {
-          menuItems.push(
-            {
-              key: 'edit',
-              icon: <EditOutlined />,
-              label: 'Edit'
-            },
-            {
-              key: 'copy',
-              icon: <CopyOutlined />,
-              label: 'Duplicate'
-            },
-            { key: 'divider', type: 'divider' },
-            {
-              key: 'delete',
-              icon: <DeleteOutlined />,
-              label: 'Delete',
-              danger: true
-            }
-          );
-        }
 
         return (
           <Space>
@@ -547,7 +535,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Badge status={getExecutionStatusColor(status) as any} text={status.toUpperCase()} />
+        <Badge status={getExecutionStatusColor(status)} text={status.toUpperCase()} />
       )
     },
     {
@@ -912,7 +900,7 @@ export const WorkflowOrchestrator: React.FC<WorkflowOrchestratorProps> = ({
                 <div>
                   <strong>Stage {index + 1}</strong>
                   <Badge 
-                    status={getExecutionStatusColor(stageExec.status) as any}
+                    status={getExecutionStatusColor(stageExec.status)}
                     text={stageExec.status.toUpperCase()}
                     style={{ marginLeft: 8 }}
                   />

@@ -41,6 +41,7 @@ import {
   Select,
   DatePicker
 } from 'antd';
+import type { BadgeProps } from 'antd/es/badge';
 import {
   SafetyCertificateOutlined,
   ExclamationCircleOutlined,
@@ -196,14 +197,14 @@ export const ComplianceCenter: React.FC<ComplianceCenterProps> = ({
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => {
-        const statusConfig = {
+        const statusConfig: Record<ComplianceStandard['status'], { color: BadgeProps['status']; text: string }> = {
           compliant: { color: 'success', text: 'Compliant' },
           non_compliant: { color: 'error', text: 'Non-Compliant' },
           pending: { color: 'warning', text: 'Pending' },
           expired: { color: 'error', text: 'Expired' }
         };
         const config = statusConfig[status as keyof typeof statusConfig];
-        return <Badge status={config.color as any} text={config.text} />;
+        return <Badge status={config.color} text={config.text} />;
       }
     },
     {

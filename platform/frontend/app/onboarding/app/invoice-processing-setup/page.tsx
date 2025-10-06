@@ -5,12 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
-import { 
-  OnboardingProgressIndicator, 
-  SkipForNowButton, 
-  useMobileOptimization 
-} from '../../../../shared_components/onboarding';
-import { TaxPoyntAPIClient } from '../../../../shared_components/api/client';
+import apiClient from '../../../../shared_components/api/client';
 import { APIResponse } from '../../../../si_interface/types';
 import { secureConfig, validateConfig } from '../../../../shared_components/utils/secureConfig';
 import { secureLogger } from '../../../../shared_components/utils/secureLogger';
@@ -31,7 +26,6 @@ interface FIRSSetupData {
 export default function APPInvoiceProcessingSetupPage() {
   const router = useRouter();
   const { user, loading: userLoading } = useUserContext();
-  const { isMobile, mobileBreakpoint } = useMobileOptimization();
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
@@ -99,8 +93,6 @@ export default function APPInvoiceProcessingSetupPage() {
     setConnectionStatus('testing');
     
     try {
-      const apiClient = new TaxPoyntAPIClient();
-      
       // SECURITY: Sanitize data before sending to API
       const sanitizedData = secureConfig.sanitizeConfig({
         api_key: setupData.firs_api_key,
@@ -141,8 +133,6 @@ export default function APPInvoiceProcessingSetupPage() {
     setIsLoading(true);
     
     try {
-      const apiClient = new TaxPoyntAPIClient();
-      
       // SECURITY: Sanitize data before saving to backend
       const sanitizedSetupData = secureConfig.sanitizeConfig(setupData);
       

@@ -29,6 +29,7 @@ from .financial_endpoints import (
 )
 from .transaction_endpoints import create_transaction_router
 from .compliance_endpoints import create_compliance_router
+from .dashboard_endpoints import create_si_dashboard_router
 from .main_router import create_si_v1_router
 
 __all__ = [
@@ -44,5 +45,6 @@ __all__ = [
     "create_validation_router",
     "create_transaction_router",
     "create_compliance_router",
+    "create_si_dashboard_router",
     "create_si_v1_router"
 ]

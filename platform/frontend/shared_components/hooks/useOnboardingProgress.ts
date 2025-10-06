@@ -16,6 +16,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useUserContext } from './useUserContext';
 import { useOnboardingAnalytics } from '../analytics/OnboardingAnalytics';
+import apiClient from '../api/client';
+import { onboardingApi } from '../services/onboardingApi';
+import type { OnboardingState as BackendUnifiedState } from '../services/onboardingApi';
 
 interface OnboardingProgressState {
   currentStep: string;
@@ -38,6 +41,17 @@ interface BackendOnboardingState {
   created_at: string;
   updated_at: string;
 }
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const roleToServicePackage = (role?: string): keyof typeof STEP_CONFIGURATIONS => {
+  if (!role) return 'si';
+  const normalized = role.toLowerCase();
+  if (normalized.includes('access_point')) return 'app';
+  if (normalized.includes('hybrid')) return 'hybrid';
+  return 'si';
+};
 
 interface ProgressAnalytics {
   completionPercentage: number;
@@ -105,29 +119,39 @@ const STEP_CONFIGURATIONS = {
 };
 
 // Utility functions for type conversion
-const convertBackendToLocal = (backendState: BackendOnboardingState): OnboardingProgressState => {
-  return {
-    currentStep: backendState.current_step,
-    completedSteps: backendState.completed_steps,
-    hasStarted: backendState.has_started,
-    isComplete: backendState.is_complete,
-    lastActiveDate: backendState.last_active_date,
-    metadata: backendState.metadata
-  };
+const mapServicePackageFromMetadata = (metadata: Record<string, any>): keyof typeof STEP_CONFIGURATIONS | null => {
+  const raw = metadata?.service_package ?? metadata?.servicePackage;
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.toLowerCase();
+  if (['si', 'system_integrator', 'system-integrator'].includes(normalized)) return 'si';
+  if (['app', 'access_point_provider', 'access-point-provider'].includes(normalized)) return 'app';
+  if (['hybrid', 'hybrid_user', 'hybrid-user'].includes(normalized)) return 'hybrid';
+  return null;
 };
 
-const convertLocalToBackend = (localState: OnboardingProgressState, userId: string): BackendOnboardingState => {
-  const now = new Date().toISOString();
+const convertBackendToLocal = (
+  backendState: BackendOnboardingState | BackendUnifiedState
+): OnboardingProgressState => {
+  const metadata = isRecord(backendState.metadata) ? backendState.metadata : {};
+  const servicePackage = mapServicePackageFromMetadata(metadata);
+
   return {
-    user_id: userId,
-    current_step: localState.currentStep,
-    completed_steps: localState.completedSteps,
-    has_started: localState.hasStarted,
-    is_complete: localState.isComplete,
-    last_active_date: localState.lastActiveDate,
-    metadata: localState.metadata,
-    created_at: localState.metadata.created_at || now,
-    updated_at: now
+    currentStep: typeof backendState.current_step === 'string'
+      ? backendState.current_step
+      : 'service_introduction',
+    completedSteps: Array.isArray(backendState.completed_steps)
+      ? backendState.completed_steps.filter((step): step is string => typeof step === 'string')
+      : [],
+    hasStarted: Boolean(backendState.has_started),
+    isComplete: Boolean(backendState.is_complete),
+    lastActiveDate:
+      typeof backendState.last_active_date === 'string'
+        ? backendState.last_active_date
+        : new Date().toISOString(),
+    metadata: {
+      ...metadata,
+      service_package: servicePackage ?? metadata.service_package ?? metadata.servicePackage,
+    },
   };
 };
 
@@ -144,16 +168,16 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
   // Get step configuration for user role
   const stepConfig = useMemo(() => {
     if (!user?.role) return [];
-    
+
     const roleMap: Record<string, keyof typeof STEP_CONFIGURATIONS> = {
       'system_integrator': 'si',
       'access_point_provider': 'app',
       'hybrid_user': 'hybrid'
     };
-    
-    const configKey = roleMap[user.role] || 'si';
+
+    const configKey = roleMap[user.role] || mapServicePackageFromMetadata(progressState?.metadata || {}) || 'si';
     return STEP_CONFIGURATIONS[configKey] || [];
-  }, [user?.role]);
+  }, [user?.role, progressState?.metadata]);
 
   // Calculate progress analytics
   const analytics = useMemo((): ProgressAnalytics => {
@@ -211,61 +235,100 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
   const loadProgressState = useCallback(async () => {
     if (!user?.id) return;
 
+    const localStorageKey = `onboarding_progress_${user.id}`;
+
     try {
       setIsLoading(true);
       setError(null);
 
-      // Try to load from backend first
-      const { onboardingApi } = await import('../services/onboardingApi');
-      const backendState = await onboardingApi.getOnboardingState();
-      
-      if (backendState) {
-        const localState = convertBackendToLocal(backendState);
-        setProgressState(localState);
-      } else {
-        // Fallback to localStorage
-        const localKey = `onboarding_progress_${user.id}`;
-        const localState = localStorage.getItem(localKey);
-        
-        if (localState) {
-          const parsed = JSON.parse(localState);
-          setProgressState(parsed);
-        } else {
-          // Initialize new progress state
-          const newState: OnboardingProgressState = {
-            currentStep: stepConfig[0]?.id || 'service_introduction',
-            completedSteps: [],
-            hasStarted: true,
-            isComplete: false,
-            lastActiveDate: new Date().toISOString(),
-            metadata: {
-              startTime: new Date().toISOString(),
-              userRole: user.role
-            }
-          };
-          setProgressState(newState);
-          
-          // Save to backend
-          const backendState = convertLocalToBackend(newState, user.id);
-          await onboardingApi.updateOnboardingState(backendState);
-          
-          // Start analytics session
-          if (analyticsService.isInitialized && user.role) {
-            const userRoleMap: Record<string, 'si' | 'app' | 'hybrid'> = {
-              'system_integrator': 'si',
-              'access_point_provider': 'app',
-              'hybrid_user': 'hybrid'
-            };
-            const mappedRole = userRoleMap[user.role] || 'si';
-            
-            analyticsService.startSession(user.id, mappedRole, {
-              initialStep: newState.currentStep,
-              userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-              referrer: typeof document !== 'undefined' ? document.referrer : ''
-            });
-            setSessionStarted(true);
-          }
+      let backendState: BackendOnboardingState | BackendUnifiedState | null = null;
+
+      try {
+        backendState = await onboardingApi.getOnboardingState();
+      } catch (unifiedError) {
+        console.warn('Unified onboarding state fetch failed; falling back to legacy endpoint.', unifiedError);
+      }
+
+      if (!backendState) {
+        try {
+          backendState = await apiClient.get<BackendOnboardingState>('/onboarding/state');
+        } catch (legacyError) {
+          console.warn('Legacy onboarding state fetch failed.', legacyError);
         }
+      }
+
+      if (backendState) {
+        const hydrated = convertBackendToLocal(backendState);
+        hydrated.metadata.service_package =
+          hydrated.metadata.service_package || roleToServicePackage(user.role);
+        setProgressState(hydrated);
+        localStorage.setItem(localStorageKey, JSON.stringify(hydrated));
+
+        if (analyticsService.isInitialized && user.role && !sessionStarted) {
+          const mappedRole = roleToServicePackage(user.role);
+          analyticsService.startSession(user.id, mappedRole, {
+            initialStep: hydrated.currentStep,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            referrer: typeof document !== 'undefined' ? document.referrer : '',
+          });
+          setSessionStarted(true);
+        }
+
+        return;
+      }
+
+      const cachedProgress = localStorage.getItem(localStorageKey);
+      if (cachedProgress) {
+        const parsed = JSON.parse(cachedProgress) as OnboardingProgressState;
+        setProgressState(parsed);
+        if (analyticsService.isInitialized && user.role && !sessionStarted) {
+          const mappedRole = roleToServicePackage(user.role);
+          analyticsService.startSession(user.id, mappedRole, {
+            initialStep: parsed.currentStep,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            referrer: typeof document !== 'undefined' ? document.referrer : '',
+          });
+          setSessionStarted(true);
+        }
+        return;
+      }
+
+      const servicePackage = roleToServicePackage(user.role);
+      const initialStep = stepConfig[0]?.id || 'service_introduction';
+      const newState: OnboardingProgressState = {
+        currentStep: initialStep,
+        completedSteps: [],
+        hasStarted: true,
+        isComplete: false,
+        lastActiveDate: new Date().toISOString(),
+        metadata: {
+          startTime: new Date().toISOString(),
+          userRole: user.role,
+          service_package: servicePackage,
+        },
+      };
+
+      setProgressState(newState);
+      localStorage.setItem(localStorageKey, JSON.stringify(newState));
+
+      try {
+        await onboardingApi.updateOnboardingState({
+          current_step: newState.currentStep,
+          completed_steps: newState.completedSteps,
+          metadata: newState.metadata,
+        });
+      } catch (syncError) {
+        console.warn('Failed to synchronise initial onboarding state.', syncError);
+      }
+
+      if (analyticsService.isInitialized && user.role && !sessionStarted) {
+        const mappedRole = roleToServicePackage(user.role);
+        analyticsService.startSession(user.id, mappedRole, {
+          initialStep: newState.currentStep,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          referrer: typeof document !== 'undefined' ? document.referrer : '',
+        });
+        setSessionStarted(true);
       }
     } catch (err) {
       console.error('Failed to load onboarding progress:', err);
@@ -273,7 +336,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id, stepConfig]);
+  }, [user?.id, user?.role, analyticsService, sessionStarted, stepConfig]);
 
   // Update progress state
   const updateProgress = useCallback(async (step: string, completed = false) => {
@@ -299,10 +362,22 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
       setProgressState(updatedState);
       setLastUpdate(new Date());
 
-      // Update backend
-      const { onboardingApi } = await import('../services/onboardingApi');
-      const backendState = convertLocalToBackend(updatedState, user.id);
-      await onboardingApi.updateOnboardingState(backendState);
+      // Update backend (with legacy fallback)
+      try {
+        await onboardingApi.updateOnboardingState({
+          current_step: updatedState.currentStep,
+          completed_steps: updatedState.completedSteps,
+          metadata: updatedState.metadata,
+        });
+      } catch (syncError) {
+        console.warn('Primary onboarding update failed, attempting legacy endpoint.', syncError);
+        const fallbackNamespace = user.role === 'access_point_provider' ? 'app' : 'si';
+        await apiClient.put(`/${fallbackNamespace}/onboarding/state`, {
+          current_step: updatedState.currentStep,
+          completed_steps: updatedState.completedSteps,
+          metadata: updatedState.metadata,
+        });
+      }
 
       // Update localStorage as backup
       const localKey = `onboarding_progress_${user.id}`;
@@ -314,7 +389,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
     } finally {
       setIsUpdating(false);
     }
-  }, [user?.id, progressState]);
+  }, [user?.id, user?.role, progressState]);
 
   // Complete a specific step
   const completeStep = useCallback(async (stepId: string, metadata: Record<string, any> = {}) => {
@@ -344,10 +419,16 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
       setProgressState(updatedState);
       setLastUpdate(new Date());
 
-      // Update backend
-      const { onboardingApi } = await import('../services/onboardingApi');
-      const backendState = convertLocalToBackend(updatedState, user.id);
-      await onboardingApi.updateOnboardingState(backendState);
+      // Update backend using unified endpoint with legacy fallback
+      try {
+        await onboardingApi.completeOnboardingStep(stepId, metadata);
+      } catch (syncError) {
+        console.warn('Primary step completion failed, attempting legacy endpoint.', syncError);
+        await apiClient.post(
+          `/${user.role === 'access_point_provider' ? 'app' : 'si'}/onboarding/state/step/${stepId}/complete`,
+          { metadata }
+        );
+      }
 
       // Track step completion in analytics
       if (analyticsService.isInitialized && user.role) {
@@ -365,24 +446,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
         analyticsService.trackStepComplete(stepId, user.id, mappedRole, duration, metadata);
       }
 
-      // Also call step completion endpoint for analytics
-      try {
-        const apiConfig = user.role === 'system_integrator' ? 'si' : 
-                         user.role === 'access_point_provider' ? 'app' : 'si';
-        
-        const response = await fetch(`/api/v1/${apiConfig}/onboarding/state/step/${stepId}/complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ metadata })
-        });
-        
-        if (!response.ok) {
-          console.warn('Step completion tracking failed:', response.statusText);
-        }
-      } catch (trackingError) {
-        console.warn('Step completion tracking failed:', trackingError);
-        // Don't fail the main operation for tracking issues
-      }
+      // Legacy analytics endpoint already invoked above when fallback occurs
 
     } catch (err) {
       console.error('Failed to complete step:', err);
@@ -415,9 +479,13 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
       setProgressState(completedState);
       setLastUpdate(new Date());
 
-      // Update backend  
-      const { OnboardingStateManager } = await import('../services/onboardingApi');
-      await OnboardingStateManager.completeOnboarding(user.id);
+      try {
+        await onboardingApi.completeOnboarding(completedState.metadata);
+      } catch (syncError) {
+        console.warn('Primary onboarding completion failed, attempting legacy endpoint.', syncError);
+        const fallbackNamespace = user.role === 'access_point_provider' ? 'app' : 'si';
+        await apiClient.post(`/${fallbackNamespace}/onboarding/complete`, { metadata: completedState.metadata });
+      }
 
     } catch (err) {
       console.error('Failed to mark onboarding complete:', err);
@@ -425,7 +493,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
     } finally {
       setIsUpdating(false);
     }
-  }, [user?.id, progressState, analytics.timeSpent]);
+  }, [user?.id, user?.role, progressState, analytics.timeSpent]);
 
   // Reset progress
   const resetProgress = useCallback(async () => {
@@ -434,13 +502,19 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
     try {
       setIsUpdating(true);
       
-      const { onboardingApi } = await import('../services/onboardingApi');
-      await onboardingApi.resetOnboardingState();
+      try {
+        await onboardingApi.resetOnboardingState();
+      } catch (syncError) {
+        console.warn('Primary onboarding reset failed, attempting legacy endpoint.', syncError);
+        const fallbackNamespace = user.role === 'access_point_provider' ? 'app' : 'si';
+        await apiClient.delete(`/${fallbackNamespace}/onboarding/state/reset`);
+      }
       
       const localKey = `onboarding_progress_${user.id}`;
       localStorage.removeItem(localKey);
       
       setProgressState(null);
+      setSessionStarted(false);
       await loadProgressState();
       
     } catch (err) {
@@ -449,7 +523,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
     } finally {
       setIsUpdating(false);
     }
-  }, [user?.id, loadProgressState]);
+  }, [user?.id, user?.role, loadProgressState]);
 
   // Utility functions
   const getStepStatus = useCallback((stepId: string): 'completed' | 'current' | 'upcoming' | 'blocked' => {

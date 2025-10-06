@@ -31,8 +31,8 @@ export default function SeedOdooPage() {
         throw new Error(body?.detail || "Seeding failed");
       }
       setResult(JSON.stringify(body, null, 2));
-    } catch (e: any) {
-      setError(e?.message || String(e));
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -74,4 +74,3 @@ export default function SeedOdooPage() {
     </div>
   );
 }
-

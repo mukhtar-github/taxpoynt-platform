@@ -57,7 +57,7 @@ interface EndToEndProcessProps {
   processId?: string;
   organizationId: string;
   userRole: 'si' | 'app' | 'hybrid' | 'admin';
-  onProcessComplete?: (result: any) => void;
+  onProcessComplete?: (result: unknown) => void;
 }
 
 interface ProcessStage {
@@ -70,8 +70,8 @@ interface ProcessStage {
   endTime?: Date;
   duration?: number; // seconds
   dependencies: string[];
-  outputs: any[];
-  errors: any[];
+  outputs: string[];
+  errors: string[];
 }
 
 interface ProcessInstance {
@@ -82,7 +82,7 @@ interface ProcessInstance {
   startTime: Date;
   endTime?: Date;
   stages: ProcessStage[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export const EndToEndProcess: React.FC<EndToEndProcessProps> = ({
@@ -495,7 +495,7 @@ export const EndToEndProcess: React.FC<EndToEndProcessProps> = ({
                   title: 'Errors',
                   dataIndex: 'errors',
                   key: 'errors',
-                  render: (errors: any[]) => (
+                  render: (errors: string[]) => (
                     <span style={{ color: errors.length > 0 ? '#ff4d4f' : '#52c41a' }}>
                       {errors.length > 0 ? `${errors.length} errors` : 'No errors'}
                     </span>

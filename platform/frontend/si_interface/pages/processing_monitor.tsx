@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import apiClient from '../../shared_components/api/client';
 
 interface ProcessingJob {
   id: string;
@@ -98,17 +99,12 @@ export const ProcessingMonitor: React.FC<ProcessingMonitorProps> = ({
       const params = new URLSearchParams();
       if (organizationId) params.append('organization_id', organizationId);
       if (systemId) params.append('system_id', systemId);
+      const query = params.toString();
+      const data = await apiClient.get<{ jobs?: ProcessingJob[] }>(
+        `/si/processing/jobs${query ? `?${query}` : ''}`
+      );
 
-      const response = await fetch(`/api/v1/si/processing/jobs?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setJobs(data.jobs || []);
-      }
+      setJobs(data.jobs || []);
     } catch (error) {
       console.error('Failed to fetch processing jobs:', error);
     } finally {
@@ -118,16 +114,11 @@ export const ProcessingMonitor: React.FC<ProcessingMonitorProps> = ({
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/v1/si/processing/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ stats: ProcessingStats }>(
+        '/si/processing/stats'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data.stats);
-      }
+      setStats(data.stats);
     } catch (error) {
       console.error('Failed to fetch processing stats:', error);
     }
@@ -135,19 +126,9 @@ export const ProcessingMonitor: React.FC<ProcessingMonitorProps> = ({
 
   const handleRetryJob = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/processing/jobs/${jobId}/retry`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        alert('✅ Job retry initiated successfully');
-        fetchJobs();
-      } else {
-        alert('❌ Failed to retry job');
-      }
+      await apiClient.post(`/si/processing/jobs/${jobId}/retry`, {});
+      alert('✅ Job retry initiated successfully');
+      fetchJobs();
     } catch (error) {
       console.error('Failed to retry job:', error);
       alert('❌ Failed to retry job');
@@ -156,19 +137,9 @@ export const ProcessingMonitor: React.FC<ProcessingMonitorProps> = ({
 
   const handleCancelJob = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/processing/jobs/${jobId}/cancel`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        alert('✅ Job cancelled successfully');
-        fetchJobs();
-      } else {
-        alert('❌ Failed to cancel job');
-      }
+      await apiClient.post(`/si/processing/jobs/${jobId}/cancel`, {});
+      alert('✅ Job cancelled successfully');
+      fetchJobs();
     } catch (error) {
       console.error('Failed to cancel job:', error);
       alert('❌ Failed to cancel job');

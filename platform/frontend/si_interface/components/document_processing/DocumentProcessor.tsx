@@ -17,6 +17,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../design_system/components/Button';
+import apiClient from '../../../shared_components/api/client';
 
 interface DocumentTemplate {
   id: string;
@@ -303,16 +304,11 @@ export const DocumentProcessor: React.FC<DocumentProcessorProps> = ({
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/v1/si/document-processing/templates', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ templates?: DocumentTemplate[] }>(
+        '/si/document-processing/templates'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setTemplates(data.templates || mockTemplates);
-      }
+      setTemplates(data.templates || mockTemplates);
     } catch (error) {
       console.error('Failed to fetch templates:', error);
       setTemplates(mockTemplates);
@@ -323,16 +319,11 @@ export const DocumentProcessor: React.FC<DocumentProcessorProps> = ({
 
   const fetchProcessingJobs = async () => {
     try {
-      const response = await fetch('/api/v1/si/document-processing/jobs', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ jobs?: ProcessingJob[] }>(
+        '/si/document-processing/jobs'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setProcessingJobs(data.jobs || mockJobs);
-      }
+      setProcessingJobs(data.jobs || mockJobs);
     } catch (error) {
       console.error('Failed to fetch processing jobs:', error);
       setProcessingJobs(mockJobs);
@@ -397,30 +388,23 @@ export const DocumentProcessor: React.FC<DocumentProcessorProps> = ({
         formData.append(`files[${index}]`, file);
       });
 
-      const response = await fetch('/api/v1/si/document-processing/jobs/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        },
-        body: formData
-      });
+      const data = await apiClient.post<{ job: ProcessingJob }>(
+        '/si/document-processing/jobs/create',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        const newJob = data.job;
-        setProcessingJobs(prev => [newJob, ...prev]);
-        setUploadedFiles([]);
-        setShowNewJob(false);
-        alert('✅ Document processing job started successfully!');
-        
-        // Start polling for progress
-        pollJobProgress(newJob.id);
-        
-        if (onProcessingComplete) {
-          onProcessingComplete(newJob.id);
-        }
-      } else {
-        alert('❌ Failed to start document processing job');
+      const newJob = data.job;
+      setProcessingJobs(prev => [newJob, ...prev]);
+      setUploadedFiles([]);
+      setShowNewJob(false);
+      alert('✅ Document processing job started successfully!');
+
+      // Start polling for progress
+      pollJobProgress(newJob.id);
+
+      if (onProcessingComplete) {
+        onProcessingComplete(newJob.id);
       }
     } catch (error) {
       console.error('Failed to start processing:', error);
@@ -431,25 +415,20 @@ export const DocumentProcessor: React.FC<DocumentProcessorProps> = ({
   const pollJobProgress = (jobId: string) => {
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/v1/si/document-processing/jobs/${jobId}/status`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-          }
-        });
+        const data = await apiClient.get<{ job: ProcessingJob }>(
+          `/si/document-processing/jobs/${jobId}/status`
+        );
 
-        if (response.ok) {
-          const data = await response.json();
-          const updatedJob = data.job;
-          
-          setProcessingJobs(prev => prev.map(job => 
-            job.id === jobId ? updatedJob : job
-          ));
+        const updatedJob = data.job;
 
-          if (['completed', 'failed', 'cancelled'].includes(updatedJob.status)) {
-            clearInterval(pollInterval);
-            if (updatedJob.status === 'completed' && onProcessingComplete) {
-              onProcessingComplete(jobId);
-            }
+        setProcessingJobs(prev => prev.map(job =>
+          job.id === jobId ? updatedJob : job
+        ));
+
+        if (['completed', 'failed', 'cancelled'].includes(updatedJob.status)) {
+          clearInterval(pollInterval);
+          if (updatedJob.status === 'completed' && onProcessingComplete) {
+            onProcessingComplete(jobId);
           }
         }
       } catch (error) {

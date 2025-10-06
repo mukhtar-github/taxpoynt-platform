@@ -5,12 +5,17 @@ Hybrid dashboard endpoints for unified metrics and analytics.
 Provides consolidated view of SI and APP operations.
 """
 import logging
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Request, HTTPException, Depends, status
-from fastapi.responses import JSONResponse
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+from fastapi import APIRouter, Request
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models.organization import Organization
+from core_platform.data_management.repositories.validation_batch_repo_async import (
+    summarize_validation_batches,
+)
 from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
@@ -57,7 +62,6 @@ class DashboardEndpointsV1:
             summary="Get unified dashboard metrics",
             description="Get combined metrics from SI and APP operations",
             response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_hybrid_access)]
         )
         
         # Activity Timeline
@@ -68,7 +72,6 @@ class DashboardEndpointsV1:
             summary="Get unified activity timeline",
             description="Get recent activities across all roles and systems",
             response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_hybrid_access)]
         )
         
         # System Health Overview
@@ -79,7 +82,6 @@ class DashboardEndpointsV1:
             summary="Get system health overview",
             description="Get health status of all connected systems",
             response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_hybrid_access)]
         )
         
         # Cross-Role Performance
@@ -90,7 +92,6 @@ class DashboardEndpointsV1:
             summary="Get cross-role performance analytics",
             description="Get performance metrics spanning SI and APP operations",
             response_model=V1ResponseModel,
-            dependencies=[Depends(self._require_hybrid_access)]
         )
 
     async def _require_hybrid_access(self, request: Request):
@@ -109,185 +110,382 @@ class DashboardEndpointsV1:
         """Get primary service role for hybrid operations"""
         return ServiceRole.HYBRID_SERVICES
 
-    async def get_unified_metrics(self, request: Request, context: HTTPRoutingContext = Depends(_require_hybrid_access)):
-        """Get unified dashboard metrics combining SI and APP data"""
-        try:
-            service_role = self._get_primary_service_role(context)
-            
-            # Message SI and APP services for their metrics
-            si_result = await self.message_router.send_message(
-                ServiceRole.SI_SERVICES,
-                operation="get_dashboard_metrics",
-                payload={"user_id": context.user_id}
-            )
-            
-            app_result = await self.message_router.send_message(
-                ServiceRole.APP_SERVICES,
-                operation="get_dashboard_metrics",
-                payload={"user_id": context.user_id}
-            )
-            
-            # Combine metrics from both services
-            unified_metrics = {
-                "totalIntegrations": si_result.get("total_integrations", 0) + app_result.get("total_connections", 0),
-                "totalTransmissions": app_result.get("total_transmissions", 0),
-                "successRate": self._calculate_combined_success_rate(si_result, app_result),
-                "complianceScore": app_result.get("compliance_score", 0),
-                "activeWorkflows": si_result.get("active_processes", 0) + app_result.get("active_queues", 0),
-                "siMetrics": {
-                    "integrations": si_result.get("integrations", {"active": 0, "pending": 0}),
-                    "processing": si_result.get("processing", {"rate": 0, "queue": 0}),
-                    "analytics": si_result.get("analytics", {"revenue": 0, "growth": 0})
-                },
-                "appMetrics": {
-                    "transmission": app_result.get("transmission", {"rate": 0, "queue": 0}),
-                    "firs": app_result.get("firs_status", {"status": "Unknown", "uptime": 0}),
-                    "security": app_result.get("security", {"score": 0, "threats": 0})
-                },
-                "lastUpdated": "now",
-                "dataSource": "real_time"
-            }
-            
-            return self._create_v1_response(unified_metrics, "unified_metrics_retrieved")
-            
-        except Exception as e:
-            logger.error(f"Error getting unified metrics: {e}")
-            # Return demo data as fallback
-            demo_metrics = {
-                "totalIntegrations": 15,
-                "totalTransmissions": 8432,
-                "successRate": 98.7,
-                "complianceScore": 97,
-                "activeWorkflows": 23,
-                "siMetrics": {
-                    "integrations": {"active": 12, "pending": 3},
-                    "processing": {"rate": 1234, "queue": 45},
-                    "analytics": {"revenue": 45200000, "growth": 23}
-                },
-                "appMetrics": {
-                    "transmission": {"rate": 98.7, "queue": 23},
-                    "firs": {"status": "Connected", "uptime": 99.9},
-                    "security": {"score": 96, "threats": 0}
-                },
-                "lastUpdated": "demo",
-                "dataSource": "fallback"
-            }
-            return self._create_v1_response(demo_metrics, "unified_metrics_demo")
+    async def get_unified_metrics(self, request: Request) -> V1ResponseModel:
+        """Get unified dashboard metrics combining SI and APP data."""
+
+        context = await self._require_hybrid_access(request)
+
+        si_data, si_error = await self._route_service_operation(
+            context=context,
+            service_role=ServiceRole.SI_SERVICES,
+            operation="get_dashboard_metrics",
+            payload={"user_id": context.user_id},
+        )
+
+        app_data, app_error = await self._route_service_operation(
+            context=context,
+            service_role=ServiceRole.APP_SERVICES,
+            operation="get_dashboard_metrics",
+            payload={"user_id": context.user_id},
+        )
+
+        validation_payload = await self._fetch_validation_snapshot(context)
+
+        warnings: List[str] = [msg for msg in (si_error, app_error) if msg]
+        unified_metrics = self._compose_unified_metrics(
+            si_data,
+            app_data,
+            validation_payload,
+            has_warnings=bool(warnings),
+        )
+
+        payload: Dict[str, Any] = {
+            "success": not warnings,
+            "data": unified_metrics,
+        }
+        if warnings:
+            detail = "; ".join(warnings)
+            payload["warnings"] = warnings
+            payload["message"] = detail
+
+        action = "unified_metrics_retrieved" if not warnings else "unified_metrics_partial"
+        return self._create_v1_response(payload, action)
     
-    def _calculate_combined_success_rate(self, si_result: Dict, app_result: Dict) -> float:
-        """Calculate combined success rate from SI and APP metrics"""
-        si_rate = si_result.get("success_rate", 0)
-        app_rate = app_result.get("success_rate", 0)
-        
-        # Weighted average based on transaction volumes
-        si_volume = si_result.get("transaction_volume", 1)
-        app_volume = app_result.get("transaction_volume", 1)
-        total_volume = si_volume + app_volume
-        
-        if total_volume == 0:
-            return 0
-        
-        return ((si_rate * si_volume) + (app_rate * app_volume)) / total_volume
+    async def get_activity_timeline(self, request: Request) -> V1ResponseModel:
+        """Get unified activity timeline from all systems."""
 
-    async def get_activity_timeline(self, request: Request, context: HTTPRoutingContext = Depends(_require_hybrid_access)):
-        """Get unified activity timeline from all systems"""
-        try:
-            service_role = self._get_primary_service_role(context)
-            
-            # Get activities from both SI and APP services
-            result = await self.message_router.send_message(
-                service_role,
-                operation="get_unified_activity_timeline",
-                payload={"user_id": context.user_id, "limit": 20}
-            )
-            
-            return self._create_v1_response(result, "activity_timeline_retrieved")
-            
-        except Exception as e:
-            logger.error(f"Error getting activity timeline: {e}")
-            # Demo timeline data
-            demo_timeline = [
-                {
-                    "time": "2 minutes ago",
-                    "action": "SI: New ERP integration completed",
-                    "system": "SAP ERP",
-                    "type": "si",
-                    "status": "success"
-                },
-                {
-                    "time": "5 minutes ago",
-                    "action": "APP: Invoice batch transmitted to FIRS",
-                    "count": "245 invoices",
-                    "type": "app",
-                    "status": "success"
-                },
-                {
-                    "time": "12 minutes ago",
-                    "action": "Workflow: End-to-end process completed",
-                    "result": "Invoice → FIRS submission",
-                    "type": "workflow",
-                    "status": "success"
-                }
-            ]
-            return self._create_v1_response(demo_timeline, "activity_timeline_demo")
+        context = await self._require_hybrid_access(request)
+        service_role = self._get_primary_service_role(context)
 
-    async def get_system_health(self, request: Request, context: HTTPRoutingContext = Depends(_require_hybrid_access)):
-        """Get overall system health across all integrations"""
-        try:
-            service_role = self._get_primary_service_role(context)
-            
-            result = await self.message_router.send_message(
-                service_role,
-                operation="get_system_health_overview",
-                payload={"user_id": context.user_id}
+        data, error = await self._route_service_operation(
+            context=context,
+            service_role=service_role,
+            operation="get_unified_activity_timeline",
+            payload={"user_id": context.user_id, "limit": 20},
+        )
+
+        if error:
+            logger.error("Error getting hybrid activity timeline: %s", error)
+            return self._create_v1_response(
+                {"success": False, "error": error, "message": error},
+                "activity_timeline_failed",
             )
-            
-            return self._create_v1_response(result, "system_health_retrieved")
-            
-        except Exception as e:
-            logger.error(f"Error getting system health: {e}")
-            # Demo health data
-            demo_health = {
-                "overall_status": "healthy",
-                "systems": {
-                    "si_integrations": {"status": "healthy", "uptime": 99.8},
-                    "app_connections": {"status": "healthy", "uptime": 99.9},
-                    "firs_connection": {"status": "healthy", "uptime": 99.5},
-                    "database": {"status": "healthy", "uptime": 100.0}
-                },
-                "alerts": [],
-                "last_check": "now"
+
+        timeline = data if isinstance(data, list) else data or []
+        return self._create_v1_response(
+            {"success": True, "data": timeline},
+            "activity_timeline_retrieved",
+        )
+
+    async def get_system_health(self, request: Request) -> V1ResponseModel:
+        """Get overall system health across all integrations."""
+
+        context = await self._require_hybrid_access(request)
+        service_role = self._get_primary_service_role(context)
+
+        data, error = await self._route_service_operation(
+            context=context,
+            service_role=service_role,
+            operation="get_system_health_overview",
+            payload={"user_id": context.user_id},
+        )
+
+        if error:
+            logger.error("Error getting hybrid system health: %s", error)
+            return self._create_v1_response(
+                {"success": False, "error": error, "message": error},
+                "system_health_failed",
+            )
+
+        return self._create_v1_response(
+            {"success": True, "data": data or {}},
+            "system_health_retrieved",
+        )
+
+    async def get_cross_role_performance(self, request: Request) -> V1ResponseModel:
+        """Get performance analytics spanning SI and APP operations."""
+
+        context = await self._require_hybrid_access(request)
+        service_role = self._get_primary_service_role(context)
+
+        data, error = await self._route_service_operation(
+            context=context,
+            service_role=service_role,
+            operation="get_cross_role_performance",
+            payload={"user_id": context.user_id},
+        )
+
+        if error:
+            logger.error("Error getting hybrid cross-role performance: %s", error)
+            return self._create_v1_response(
+                {"success": False, "error": error, "message": error},
+                "cross_role_performance_failed",
+            )
+
+        return self._create_v1_response(
+            {"success": True, "data": data or {}},
+            "cross_role_performance_retrieved",
+        )
+
+    async def _route_service_operation(
+        self,
+        *,
+        context: HTTPRoutingContext,
+        service_role: ServiceRole,
+        operation: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[Any], Optional[str]]:
+        """Invoke a service operation and return its data or an error message."""
+
+        payload_to_send = payload.copy() if payload else {}
+        tenant_id = getattr(context, "tenant_id", None) or getattr(context, "organization_id", None)
+        correlation_id = getattr(context, "correlation_id", None)
+
+        try:
+            response = await self.message_router.route_message(
+                service_role=service_role,
+                operation=operation,
+                payload=payload_to_send,
+                tenant_id=tenant_id,
+                correlation_id=correlation_id,
+                source_service="api_gateway",
+            )
+        except Exception as exc:  # pragma: no cover - transport failures already logged upstream
+            logger.error(
+                "Hybrid dashboard %s via %s failed: %s",
+                operation,
+                service_role.value,
+                exc,
+                exc_info=True,
+            )
+            return None, f"{service_role.value}:{operation} request failed"
+
+        if not isinstance(response, dict):
+            logger.error(
+                "Hybrid dashboard %s via %s returned invalid payload type: %s",
+                operation,
+                service_role.value,
+                type(response),
+            )
+            return None, f"{service_role.value}:{operation} returned invalid payload"
+
+        if response.get("success") is True:
+            return response.get("data"), None
+
+        if response.get("success") is False:
+            error_detail = response.get("error") or response.get("message")
+            data_block = response.get("data")
+            if not error_detail and isinstance(data_block, dict):
+                error_detail = data_block.get("error")
+            return None, error_detail or f"{service_role.value}:{operation} reported failure"
+
+        if "data" in response and "success" not in response:
+            # Legacy payloads without explicit success flag
+            return response["data"], None
+
+        status_text = response.get("status")
+        if status_text and str(status_text).lower() == "success":
+            trimmed = {
+                key: value
+                for key, value in response.items()
+                if key not in {"status", "operation", "message_id", "timestamp"}
             }
-            return self._create_v1_response(demo_health, "system_health_demo")
+            if trimmed:
+                return trimmed, None
 
-    async def get_cross_role_performance(self, request: Request, context: HTTPRoutingContext = Depends(_require_hybrid_access)):
-        """Get performance analytics spanning SI and APP operations"""
+        logger.error(
+            "Hybrid dashboard %s via %s returned unsupported payload: %s",
+            operation,
+            service_role.value,
+            response,
+        )
+        return None, f"{service_role.value}:{operation} returned unsupported payload"
+
+    async def _fetch_validation_snapshot(self, context: HTTPRoutingContext) -> Optional[Dict[str, Any]]:
+        """Fetch recent validation batches for the hybrid dashboard."""
+
+        organization_id = getattr(context, "organization_id", None)
+        if not organization_id:
+            return None
+
         try:
-            service_role = self._get_primary_service_role(context)
-            
-            result = await self.message_router.send_message(
-                service_role,
-                operation="get_cross_role_performance",
-                payload={"user_id": context.user_id}
-            )
-            
-            return self._create_v1_response(result, "cross_role_performance_retrieved")
-            
-        except Exception as e:
-            logger.error(f"Error getting cross-role performance: {e}")
-            # Demo performance data
-            demo_performance = {
-                "end_to_end_processing_time": "2.5 minutes",
-                "si_to_app_handoff_time": "15 seconds",
-                "total_processed_today": 1247,
-                "success_rate": 98.7,
-                "bottlenecks": [],
-                "optimization_suggestions": [
-                    "Consider batch processing for high-volume periods",
-                    "Enable auto-reconciliation for faster processing"
+            async for session in get_async_session():
+                snapshot = await summarize_validation_batches(
+                    session,
+                    organization_id=organization_id,
+                    limit=5,
+                )
+                if not isinstance(snapshot, dict):
+                    break
+
+                items = snapshot.get("items", [])
+                recent_batches = [
+                    {
+                        "batchId": item.get("batchId"),
+                        "status": item.get("status"),
+                        "totals": item.get("totals"),
+                        "createdAt": item.get("createdAt"),
+                    }
+                    for item in items
                 ]
-            }
-            return self._create_v1_response(demo_performance, "cross_role_performance_demo")
+
+                sla_hours = 4
+                org = await session.get(Organization, organization_id)
+                if org and isinstance(org.firs_configuration, dict):
+                    configured = org.firs_configuration.get("compliance_sla_hours")
+                    try:
+                        if configured is not None:
+                            sla_hours = max(1, int(configured))
+                    except (TypeError, ValueError):
+                        logger.debug(
+                            "Invalid compliance_sla_hours configuration for org %s",
+                            organization_id,
+                        )
+
+                return {
+                    "summary": snapshot.get("summary"),
+                    "recentBatches": recent_batches,
+                    "slaHours": sla_hours,
+                }
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error("Error fetching hybrid validation snapshot: %s", exc, exc_info=True)
+
+        return None
+
+    def _compose_unified_metrics(
+        self,
+        si_data: Optional[Dict[str, Any]],
+        app_data: Optional[Dict[str, Any]],
+        validation_payload: Optional[Dict[str, Any]],
+        *,
+        has_warnings: bool,
+    ) -> Dict[str, Any]:
+        """Normalise SI/APP metrics into the combined hybrid dashboard shape."""
+
+        si_block = si_data or {}
+        app_block = app_data or {}
+
+        integrations = (si_block.get("integrations") or {}).get("overall", {})
+        total_integrations = self._safe_int(integrations.get("totalSystems"))
+        active_integrations = self._safe_int(integrations.get("activeSystems"))
+        pending_integrations = max(total_integrations - active_integrations, 0)
+
+        si_transactions = si_block.get("transactions") or {}
+        si_success_rate = self._safe_float(si_transactions.get("successRate"))
+        si_volume = self._safe_int(si_transactions.get("totalInvoices"))
+        si_queue = self._safe_int(si_transactions.get("queue"))
+
+        app_transmission = app_block.get("transmission") or {}
+        total_transmissions = self._safe_int(app_transmission.get("total"))
+        app_success_rate = self._safe_float(app_transmission.get("rate"))
+        app_queue = self._safe_int(app_transmission.get("queue"))
+
+        compliance_block = app_block.get("compliance") or {}
+        compliance_score = self._safe_float(compliance_block.get("score"))
+        if compliance_score == 0.0:
+            compliance_score = self._safe_float((si_block.get("compliance") or {}).get("complianceScore"))
+
+        performance_block = app_block.get("performance") or {}
+        security_score = self._safe_float(performance_block.get("overall_score"))
+
+        unified_success_rate = self._calculate_combined_success_rate(
+            si_rate=si_success_rate,
+            si_volume=si_volume,
+            app_rate=app_success_rate,
+            app_volume=total_transmissions,
+        )
+
+        unified_metrics = {
+            "unified": {
+                "totalIntegrations": total_integrations,
+                "totalTransmissions": total_transmissions,
+                "successRate": unified_success_rate,
+                "complianceScore": compliance_score,
+                "activeWorkflows": active_integrations,
+            },
+            "si": {
+                "integrations": {
+                    "active": active_integrations,
+                    "pending": pending_integrations,
+                },
+                "processing": {
+                    "rate": si_success_rate,
+                    "queue": si_queue,
+                },
+                "analytics": {
+                    "revenue": 0.0,
+                    "growth": 0.0,
+                },
+            },
+            "app": {
+                "transmission": {
+                    "rate": app_success_rate,
+                    "queue": app_queue,
+                },
+                "firs": {
+                    "status": compliance_block.get("status", "Unknown"),
+                    "uptime": compliance_score,
+                },
+                "security": {
+                    "score": security_score,
+                    "threats": self._safe_int(len(performance_block.get("alerts", []))),
+                },
+            },
+            "validation": validation_payload
+            or {
+                "summary": None,
+                "recentBatches": [],
+                "slaHours": None,
+            },
+            "dataSource": "partial" if has_warnings else "live",
+            "lastUpdated": app_block.get("generated_at")
+            or si_block.get("lastUpdated")
+            or datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        }
+
+        return unified_metrics
+
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        try:
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return int(value)
+            return int(float(value))
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _safe_float(value: Any, default: float = 0.0) -> float:
+        try:
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return float(value)
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _calculate_combined_success_rate(
+        self,
+        *,
+        si_rate: float,
+        si_volume: int,
+        app_rate: float,
+        app_volume: int,
+    ) -> float:
+        """Calculate a weighted success rate using SI and APP volumes."""
+
+        safe_si_volume = max(si_volume, 0)
+        safe_app_volume = max(app_volume, 0)
+        total_volume = safe_si_volume + safe_app_volume
+
+        if total_volume <= 0:
+            return 0.0
+
+        combined = (si_rate * safe_si_volume) + (app_rate * safe_app_volume)
+        return round(combined / total_volume, 2)
 
 
 def create_dashboard_router(

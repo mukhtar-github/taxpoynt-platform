@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
+import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';
 
 interface SetupStep {
   id: string;
@@ -25,7 +26,6 @@ interface SetupStep {
 export default function CompleteIntegrationSetupPage() {
   const router = useRouter();
   const { user, isAuthenticated, isSystemIntegrator, isLoading } = useUserContext({ requireAuth: true });
-  const [isProcessing, setIsProcessing] = useState(false);
   const [setupSteps, setSetupSteps] = useState<SetupStep[]>([
     {
       id: 'business_systems',
@@ -81,7 +81,6 @@ export default function CompleteIntegrationSetupPage() {
   }, [isLoading, isAuthenticated, isSystemIntegrator, user, router]);
 
   const handleStepAction = async (step: SetupStep) => {
-    setIsProcessing(true);
     
     try {
       console.log('🚀 Starting step:', step.id);
@@ -101,7 +100,6 @@ export default function CompleteIntegrationSetupPage() {
       
     } catch (error) {
       console.error('Step navigation failed:', error);
-      setIsProcessing(false);
     }
   };
 
@@ -109,7 +107,6 @@ export default function CompleteIntegrationSetupPage() {
     if (user) {
       // Mark onboarding as complete and go to dashboard
       OnboardingStateManager.completeOnboarding(user.id);
-      const { getPostOnboardingUrl } = require('../../../../shared_components/utils/dashboardRouting');
       router.push(getPostOnboardingUrl(user));
     }
   };
@@ -153,8 +150,8 @@ export default function CompleteIntegrationSetupPage() {
             Complete Integration Setup 🚀
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Let's set up comprehensive integrations for your business. 
-            We'll guide you through each step to ensure everything works perfectly.
+            Let&apos;s set up comprehensive integrations for your business. 
+            We&apos;ll guide you through each step to ensure everything works perfectly.
           </p>
           
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
@@ -243,7 +240,7 @@ export default function CompleteIntegrationSetupPage() {
         {/* Help Section */}
         <div className="mt-12 bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-            What You'll Accomplish 💪
+            What You&apos;ll Accomplish 💪
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
             <div>

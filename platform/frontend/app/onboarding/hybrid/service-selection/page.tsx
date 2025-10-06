@@ -13,7 +13,7 @@ import {
 export default function HybridServiceSelectionPage() {
   const router = useRouter();
   const { user, loading: userLoading } = useUserContext();
-  const { isMobile, mobileBreakpoint } = useMobileOptimization();
+  const { isMobile } = useMobileOptimization();
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 

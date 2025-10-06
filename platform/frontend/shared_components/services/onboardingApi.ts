@@ -60,10 +60,11 @@ export interface OnboardingAnalytics {
 
 export interface ApiResponse<T = any> {
   success: boolean;
-  message: string;
-  data: T;
-  version: string;
+  action: string;
+  api_version: string;
   timestamp: string;
+  data: T;
+  meta?: Record<string, any>;
 }
 
 class OnboardingApiClient {
@@ -72,7 +73,20 @@ class OnboardingApiClient {
   private retryDelay: number = 1000; // 1 second
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    const primaryApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const legacyApiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    let resolvedBase = primaryApiUrl?.trim() || '';
+
+    if (!resolvedBase && legacyApiBase) {
+      resolvedBase = `${legacyApiBase.replace(/\/+$/, '')}/api/v1`;
+    }
+
+    if (!resolvedBase) {
+      resolvedBase = 'http://localhost:8000/api/v1';
+    }
+
+    this.baseUrl = resolvedBase.replace(/\/+$/, '');
   }
 
   /**
@@ -106,7 +120,7 @@ class OnboardingApiClient {
   ): Promise<T> {
     try {
       const headers = await this.getAuthHeaders();
-      const url = `${this.baseUrl}/api/v1/si/onboarding${endpoint}`;
+      const url = `${this.baseUrl}/si/onboarding${endpoint}`;
 
       console.log(`🔄 Making ${method} request to: ${url}`);
 
@@ -132,9 +146,16 @@ class OnboardingApiClient {
       if (response.data.success) {
         console.log(`✅ ${method} ${endpoint} successful`);
         return response.data.data;
-      } else {
-        throw new Error(response.data.message || 'API request failed');
       }
+
+      const metaMessage = typeof response.data.meta?.message === 'string'
+        ? response.data.meta.message
+        : undefined;
+      const metaError = typeof response.data.meta?.error === 'string'
+        ? response.data.meta.error
+        : undefined;
+      const fallbackMessage = metaMessage || metaError || response.data.action || 'API request failed';
+      throw new Error(fallbackMessage);
 
     } catch (error) {
       console.error(`❌ ${method} ${endpoint} failed (attempt ${attempt}):`, error);
@@ -178,8 +199,16 @@ class OnboardingApiClient {
         return new Error('Access denied. Insufficient permissions.');
       }
       
-      if (axiosError.response?.data?.message) {
-        return new Error(axiosError.response.data.message);
+      const payload = axiosError.response?.data;
+      const metaError = typeof payload?.meta?.error === 'string' ? payload.meta.error : undefined;
+      const metaMessage = typeof payload?.meta?.message === 'string' ? payload.meta.message : undefined;
+
+      if (metaError || metaMessage) {
+        return new Error(metaError || metaMessage!);
+      }
+
+      if (typeof payload?.action === 'string') {
+        return new Error(payload.action);
       }
       
       return new Error(`API request failed: ${axiosError.message}`);

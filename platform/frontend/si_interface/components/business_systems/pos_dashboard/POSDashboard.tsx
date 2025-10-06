@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 interface POSSystem {
   id: string;
@@ -144,33 +145,26 @@ export const POSDashboard: React.FC<POSDashboardProps> = ({
 
   const loadPOSConnections = async () => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/pos/connections`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ connections?: POSConnection[] }>(
+        '/si/business-systems/pos/connections'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        
-        // Update system statuses with mock data
-        const updatedSystems = posSystems.map(system => {
-          const connection = data.connections?.find((conn: POSConnection) => conn.systemId === system.id);
-          if (connection) {
-            return {
-              ...system,
-              status: 'connected' as const,
-              lastSync: connection.syncSettings.lastSuccessfulSync,
-              dailySales: Math.floor(Math.random() * 500000) + 50000, // ₦50k - ₦550k
-              transactionCount: Math.floor(Math.random() * 200) + 20,
-              location: 'Lagos Store'
-            };
-          }
-          return system;
-        });
-        setPosSystems(updatedSystems);
-      }
+      setConnections(data.connections || []);
+
+      setPosSystems(prevSystems => prevSystems.map(system => {
+        const connection = data.connections?.find(conn => conn.systemId === system.id);
+        if (connection) {
+          return {
+            ...system,
+            status: 'connected' as const,
+            lastSync: connection.syncSettings.lastSuccessfulSync,
+            dailySales: Math.floor(Math.random() * 500000) + 50000,
+            transactionCount: Math.floor(Math.random() * 200) + 20,
+            location: 'Lagos Store'
+          };
+        }
+        return system;
+      }));
     } catch (error) {
       console.error('Failed to load POS connections:', error);
     }
@@ -185,31 +179,24 @@ export const POSDashboard: React.FC<POSDashboardProps> = ({
     setIsConnecting(true);
     
     try {
-      const response = await fetch(`/api/v1/si/business-systems/pos/test-connection`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ success: boolean; message?: string }>(
+        '/si/business-systems/pos/test-connection',
+        {
           systemId,
           testData: {
             terminalId: 'TEST_TERMINAL_001',
             merchantId: 'TEST_MERCHANT'
           }
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          alert('POS connection test successful!');
-          if (onConnectionSuccess) {
-            onConnectionSuccess(systemId);
-          }
-        } else {
-          alert('Connection test failed: ' + data.message);
         }
+      );
+
+      if (data.success) {
+        alert('POS connection test successful!');
+        if (onConnectionSuccess) {
+          onConnectionSuccess(systemId);
+        }
+      } else {
+        alert('Connection test failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('POS connection test failed:', error);
@@ -221,18 +208,12 @@ export const POSDashboard: React.FC<POSDashboardProps> = ({
 
   const handleStartRealTimeSync = async (systemId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/pos/real-time-sync`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId, enabled: true })
+      await apiClient.post('/si/business-systems/pos/real-time-sync', {
+        systemId,
+        enabled: true
       });
 
-      if (response.ok) {
-        alert('Real-time sync enabled successfully');
-      }
+      alert('Real-time sync enabled successfully');
     } catch (error) {
       console.error('Failed to enable real-time sync:', error);
       alert('Failed to enable real-time sync');
@@ -245,27 +226,17 @@ export const POSDashboard: React.FC<POSDashboardProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/business-systems/pos/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/pos/disconnect', { systemId });
 
-      if (response.ok) {
-        const updatedSystems = posSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'disconnected' as const, lastSync: undefined, dailySales: undefined, transactionCount: undefined }
-            : system
-        );
-        setPosSystems(updatedSystems);
-        
-        setConnections(connections.filter(conn => conn.systemId !== systemId));
-        
-        alert('POS system disconnected successfully');
-      }
+      setPosSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'disconnected' as const, lastSync: undefined, dailySales: undefined, transactionCount: undefined }
+          : system
+      ));
+
+      setConnections(prev => prev.filter(conn => conn.systemId !== systemId));
+
+      alert('POS system disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect POS system:', error);
       alert('Failed to disconnect POS system');

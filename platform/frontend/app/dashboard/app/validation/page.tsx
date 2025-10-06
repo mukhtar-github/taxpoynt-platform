@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
-import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
+import { TaxPoyntButton } from '../../../../design_system';
 import { APIResponse } from '../../../../si_interface/types';
 import apiClient from '../../../../shared_components/api/client';
 

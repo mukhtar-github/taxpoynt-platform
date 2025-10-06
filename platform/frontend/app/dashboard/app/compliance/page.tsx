@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
-import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
+import { TaxPoyntButton } from '../../../../design_system';
 import { APIResponse } from '../../../../si_interface/types';
 import apiClient from '../../../../shared_components/api/client';
 
@@ -31,6 +31,7 @@ interface ComplianceMetrics {
   complianceScore: number;
   lastAudit: string;
   nextDeadline: string;
+  slaHours?: number;
   reports: ComplianceReport[];
 }
 
@@ -41,10 +42,32 @@ export default function ComplianceReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState('audit');
   const [isDemo, setIsDemo] = useState(false);
+  const [slaInput, setSlaInput] = useState('');
+  const [savingSla, setSavingSla] = useState(false);
+  const [slaMessage, setSlaMessage] = useState<string | null>(null);
+  const [slaMetadata, setSlaMetadata] = useState<{ updatedAt?: string; updatedBy?: string } | null>(null);
 
-  useEffect(() => {
-    loadComplianceMetrics();
-  }, []);
+  const formatTimestamp = (value?: string) => {
+    if (!value) return 'N/A';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat('en-NG', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(parsed);
+  };
+
+  const formatDueIn = (deadline?: string) => {
+    if (!deadline) return 'No pending deadlines';
+    const parsed = new Date(deadline);
+    if (Number.isNaN(parsed.getTime())) return deadline;
+    const diffMs = parsed.getTime() - Date.now();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    if (diffHours <= 0) return 'Overdue';
+    if (diffHours < 1) return `${Math.round(diffHours * 60)} minutes`;
+    if (diffHours < 24) return `${Math.round(diffHours)} hours`;
+    return `${Math.round(diffHours / 24)} days`;
+  };
 
   const loadComplianceMetrics = async () => {
     try {
@@ -53,28 +76,33 @@ export default function ComplianceReportsPage() {
       if (response.success && response.data) {
         setMetrics(response.data);
         setIsDemo(false);
+        if (response.data.slaHours !== undefined) {
+          setSlaInput(String(response.data.slaHours));
+        }
       } else {
         throw new Error('API response unsuccessful');
       }
     } catch (error) {
       console.error('Failed to load compliance metrics, using demo data:', error);
-      // Fallback to demo data
       setIsDemo(true);
+      const now = Date.now();
+      const hours = (h: number) => new Date(now + h * 60 * 60 * 1000).toISOString();
       setMetrics({
         totalReports: 145,
         pendingReports: 3,
         overdue: 0,
         complianceScore: 98,
-        lastAudit: '2 weeks ago',
-        nextDeadline: '5 days',
+        lastAudit: hours(-24 * 14),
+        nextDeadline: hours(24 * 5),
+        slaHours: 4,
         reports: [
           {
             id: 'RPT-2024-001',
             title: 'Q1 2024 FIRS Compliance Report',
             type: 'compliance',
             status: 'approved',
-            created: '2024-01-15',
-            deadline: '2024-01-30',
+            created: hours(-24 * 10),
+            deadline: hours(-24 * 5),
             completionPercentage: 100
           },
           {
@@ -82,8 +110,8 @@ export default function ComplianceReportsPage() {
             title: 'Security Audit Report - January',
             type: 'security',
             status: 'pending',
-            created: '2024-01-20',
-            deadline: '2024-01-25',
+            created: hours(-24 * 6),
+            deadline: hours(24 * 1),
             completionPercentage: 85
           },
           {
@@ -91,8 +119,8 @@ export default function ComplianceReportsPage() {
             title: 'Financial Reconciliation Report',
             type: 'financial',
             status: 'draft',
-            created: '2024-01-22',
-            deadline: '2024-01-28',
+            created: hours(-24 * 3),
+            deadline: hours(24 * 2),
             completionPercentage: 60
           },
           {
@@ -100,14 +128,75 @@ export default function ComplianceReportsPage() {
             title: 'Data Protection Compliance',
             type: 'audit',
             status: 'submitted',
-            created: '2024-01-18',
-            deadline: '2024-01-24',
+            created: hours(-24 * 5),
+            deadline: hours(-24 * 1),
             completionPercentage: 100
           }
         ]
       });
+      setSlaInput('4');
+      setSlaMetadata(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadComplianceSla = async () => {
+    try {
+      const response = await apiClient.get<APIResponse<{ slaHours?: number; updatedAt?: string; updatedBy?: string }>>(
+        '/app/setup/compliance-sla'
+      );
+      if (response.success && response.data) {
+        if (response.data.slaHours !== undefined) {
+          setSlaInput(String(response.data.slaHours));
+        }
+        setSlaMetadata({
+          updatedAt: response.data.updatedAt,
+          updatedBy: response.data.updatedBy,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load compliance SLA configuration:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadComplianceMetrics();
+    loadComplianceSla();
+  }, []);
+
+  const handleSlaSave = async () => {
+    const parsed = Number(slaInput);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 168) {
+      setSlaMessage('Please enter a value between 1 and 168 hours.');
+      return;
+    }
+
+    setSavingSla(true);
+    setSlaMessage(null);
+
+    try {
+      const response = await apiClient.patch<APIResponse<{ slaHours: number; updatedAt?: string; updatedBy?: string }>>(
+        '/app/setup/compliance-sla',
+        { sla_hours: parsed }
+      );
+
+      if (response.success && response.data) {
+        setSlaMessage('SLA threshold updated.');
+        setSlaInput(String(response.data.slaHours));
+        setMetrics((prev) => (prev ? { ...prev, slaHours: response.data.slaHours } : prev));
+        setSlaMetadata({
+          updatedAt: response.data.updatedAt,
+          updatedBy: response.data.updatedBy,
+        });
+      } else {
+        throw new Error('API response unsuccessful');
+      }
+    } catch (error) {
+      console.error('Failed to update SLA threshold:', error);
+      setSlaMessage('Unable to update SLA threshold. Please try again.');
+    } finally {
+      setSavingSla(false);
     }
   };
 
@@ -215,7 +304,7 @@ export default function ComplianceReportsPage() {
               <div className="text-3xl font-bold text-green-600">{metrics?.overdue}</div>
               <div className="ml-4">
                 <div className="text-sm font-medium text-gray-600">Overdue</div>
-                <div className="text-xs text-gray-500">Past Deadline</div>
+                <div className="text-xs text-gray-500">Past {(metrics?.slaHours ?? 4)}h SLA</div>
               </div>
             </div>
           </div>
@@ -227,6 +316,50 @@ export default function ComplianceReportsPage() {
                 <div className="text-xs text-gray-500">Excellent</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-xs uppercase text-gray-500">Last Audit</div>
+            <div className="text-sm font-medium text-gray-800">{formatTimestamp(metrics?.lastAudit)}</div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-xs uppercase text-gray-500">Next Deadline</div>
+            <div className="text-sm font-medium text-gray-800">{formatTimestamp(metrics?.nextDeadline)}</div>
+            <div className="text-xs text-gray-500">Due in {formatDueIn(metrics?.nextDeadline)}</div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-xs uppercase text-gray-500">SLA Threshold</div>
+            <div className="text-sm font-medium text-gray-800">{metrics?.slaHours ?? 4} hours</div>
+            <div className="mt-3 flex items-center space-x-2">
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={slaInput}
+                onChange={(event) => setSlaInput(event.target.value)}
+                className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <TaxPoyntButton
+                variant="outline"
+                size="sm"
+                onClick={handleSlaSave}
+                loading={savingSla}
+                disabled={savingSla}
+              >
+                Save
+              </TaxPoyntButton>
+            </div>
+            {slaMessage && (
+              <div className="mt-2 text-xs text-gray-600">{slaMessage}</div>
+            )}
+            {slaMetadata?.updatedAt && (
+              <div className="mt-1 text-xs text-gray-400">
+                Updated {formatTimestamp(slaMetadata.updatedAt)}
+                {slaMetadata.updatedBy ? ` · ${slaMetadata.updatedBy}` : ''}
+              </div>
+            )}
           </div>
         </div>
 
@@ -328,7 +461,8 @@ export default function ComplianceReportsPage() {
                       <span className="text-xs text-gray-500 mt-1">{report.completionPercentage}%</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {report.deadline}
+                      <div>{formatTimestamp(report.deadline)}</div>
+                      <div className="text-xs text-gray-500">{formatDueIn(report.deadline)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
@@ -353,7 +487,7 @@ export default function ComplianceReportsPage() {
                 <div className="w-3 h-3 bg-orange-500 rounded-full mr-4"></div>
                 <div>
                   <div className="font-medium text-gray-900">Q1 Financial Reconciliation</div>
-                  <div className="text-sm text-gray-600">Due in {metrics?.nextDeadline}</div>
+                  <div className="text-sm text-gray-600">Due in {formatDueIn(metrics?.nextDeadline)}</div>
                 </div>
               </div>
               <TaxPoyntButton variant="outline" size="sm">

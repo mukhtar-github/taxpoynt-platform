@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../../shared_components/layouts/DashboardLayout';
-import { TaxPoyntButton, TaxPoyntInput } from '../../../../../design_system';
+import { TaxPoyntButton } from '../../../../../design_system';
 import { APIResponse } from '../../../../../si_interface/types';
 import apiClient from '../../../../../shared_components/api/client';
 
@@ -32,7 +32,6 @@ export default function NewTransmissionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [transmissionMode, setTransmissionMode] = useState<'batch' | 'upload'>('batch');
-  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadAvailableBatches();
@@ -44,14 +43,12 @@ export default function NewTransmissionPage() {
       const response = await apiClient.get<APIResponse<InvoiceBatch[]>>('/app/transmission/available-batches');
       if (response.success && response.data) {
         setAvailableBatches(response.data);
-        setIsDemo(false);
       } else {
         throw new Error('API response unsuccessful');
       }
     } catch (error) {
       console.error('Failed to load available batches, using demo data:', error);
       // Fallback to demo data
-      setIsDemo(true);
       setAvailableBatches([
         {
           id: 'BATCH-2024-015',

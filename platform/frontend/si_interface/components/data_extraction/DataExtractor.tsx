@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../design_system/components/Button';
+import apiClient from '../../../shared_components/api/client';
 
 interface DataSource {
   id: string;
@@ -302,16 +303,11 @@ export const DataExtractor: React.FC<DataExtractorProps> = ({
   const fetchDataSources = async () => {
     try {
       const params = organizationId ? `?organization_id=${organizationId}` : '';
-      const response = await fetch(`/api/v1/si/data-extraction/sources${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ sources?: DataSource[] }>(
+        `/si/data-extraction/sources${params}`
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setDataSources(data.sources || mockDataSources);
-      }
+      setDataSources(data.sources || mockDataSources);
     } catch (error) {
       console.error('Failed to fetch data sources:', error);
       setDataSources(mockDataSources);
@@ -322,16 +318,11 @@ export const DataExtractor: React.FC<DataExtractorProps> = ({
 
   const fetchExtractionJobs = async () => {
     try {
-      const response = await fetch('/api/v1/si/data-extraction/jobs', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ jobs?: ExtractionJob[] }>(
+        '/si/data-extraction/jobs'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setExtractionJobs(data.jobs || mockJobs);
-      }
+      setExtractionJobs(data.jobs || mockJobs);
     } catch (error) {
       console.error('Failed to fetch extraction jobs:', error);
       setExtractionJobs(mockJobs);
@@ -374,20 +365,13 @@ export const DataExtractor: React.FC<DataExtractorProps> = ({
 
   const handleTestConnection = async (sourceId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/data-extraction/sources/${sourceId}/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.post<{ success: boolean }>(
+        `/si/data-extraction/sources/${sourceId}/test`,
+        {}
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        alert(data.success ? '✅ Connection successful!' : '❌ Connection failed!');
-        fetchDataSources();
-      } else {
-        alert('❌ Connection test failed');
-      }
+      alert(data.success ? '✅ Connection successful!' : '❌ Connection failed!');
+      fetchDataSources();
     } catch (error) {
       console.error('Connection test failed:', error);
       alert('❌ Connection test failed');
@@ -396,35 +380,26 @@ export const DataExtractor: React.FC<DataExtractorProps> = ({
 
   const handleStartExtraction = async (sourceId: string, extractionType: 'real_time' | 'batch') => {
     try {
-      const response = await fetch('/api/v1/si/data-extraction/jobs/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ job: ExtractionJob }>(
+        '/si/data-extraction/jobs/create',
+        {
           source_id: sourceId,
           extraction_type: extractionType,
           extraction_rules: extractionRules.filter(rule => rule.enabled),
           output_format: 'firs_format',
           organization_id: organizationId
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const newJob = data.job;
-        setExtractionJobs(prev => [newJob, ...prev]);
-        alert('✅ Extraction job started successfully!');
-        
-        // Start polling for progress
-        pollJobProgress(newJob.id);
-        
-        if (onExtractionComplete) {
-          onExtractionComplete(newJob.id, 0);
         }
-      } else {
-        alert('❌ Failed to start extraction job');
+      );
+
+      const newJob = data.job;
+      setExtractionJobs(prev => [newJob, ...prev]);
+      alert('✅ Extraction job started successfully!');
+
+      // Start polling for progress
+      pollJobProgress(newJob.id);
+
+      if (onExtractionComplete) {
+        onExtractionComplete(newJob.id, 0);
       }
     } catch (error) {
       console.error('Failed to start extraction:', error);
@@ -435,25 +410,20 @@ export const DataExtractor: React.FC<DataExtractorProps> = ({
   const pollJobProgress = (jobId: string) => {
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/v1/si/data-extraction/jobs/${jobId}/status`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-          }
-        });
+        const data = await apiClient.get<{ job: ExtractionJob }>(
+          `/si/data-extraction/jobs/${jobId}/status`
+        );
 
-        if (response.ok) {
-          const data = await response.json();
-          const updatedJob = data.job;
-          
-          setExtractionJobs(prev => prev.map(job => 
-            job.id === jobId ? updatedJob : job
-          ));
+        const updatedJob = data.job;
 
-          if (['completed', 'failed', 'cancelled'].includes(updatedJob.status)) {
-            clearInterval(pollInterval);
-            if (updatedJob.status === 'completed' && onExtractionComplete) {
-              onExtractionComplete(jobId, updatedJob.recordsExtracted);
-            }
+        setExtractionJobs(prev => prev.map(job =>
+          job.id === jobId ? updatedJob : job
+        ));
+
+        if (['completed', 'failed', 'cancelled'].includes(updatedJob.status)) {
+          clearInterval(pollInterval);
+          if (updatedJob.status === 'completed' && onExtractionComplete) {
+            onExtractionComplete(jobId, updatedJob.recordsExtracted);
           }
         }
       } catch (error) {

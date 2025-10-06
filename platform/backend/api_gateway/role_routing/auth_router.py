@@ -122,6 +122,8 @@ class OAuthTokenResponse(BaseModel):
     token_type: str = "Bearer"
     expires_in: int
     scope: Optional[str] = None
+    consent_summary: Optional[str] = None
+    scope_descriptions: Optional[Dict[str, str]] = None
 
 
 class OAuthIntrospectionResponse(BaseModel):
@@ -275,11 +277,15 @@ def create_auth_router(
                 raise _oauth_error("invalid_scope", status.HTTP_400_BAD_REQUEST, "Requested scope is not permitted for this client")
             raise _oauth_error("invalid_request", status.HTTP_400_BAD_REQUEST, str(exc))
 
+        client_meta = client.client_metadata
+
         return OAuthTokenResponse(
             access_token=token_bundle.access_token,
             token_type=token_bundle.token_type,
             expires_in=token_bundle.expires_in,
             scope=token_bundle.scope or None,
+            consent_summary=client_meta.get("consent_summary"),
+            scope_descriptions=client_meta.get("scope_descriptions"),
         )
 
     @router.post("/oauth/introspect", response_model=OAuthIntrospectionResponse, include_in_schema=False)

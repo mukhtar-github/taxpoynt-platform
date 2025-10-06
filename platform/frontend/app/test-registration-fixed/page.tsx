@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { isAxiosError } from 'axios';
 import { authService, RegisterRequest } from '../../shared_components/services/auth';
 
 export default function TestRegistrationFixedPage() {
@@ -138,11 +139,11 @@ export default function TestRegistrationFixedPage() {
       console.error('❌ Registration error:', err);
       
       // Log additional error details for debugging
-      if (err && typeof err === 'object' && 'response' in err) {
+      if (isAxiosError(err)) {
         console.log('🔍 Error details:', {
-          status: (err as any).response?.status,
-          data: (err as any).response?.data,
-          headers: (err as any).response?.headers
+          status: err.response?.status,
+          data: err.response?.data,
+          headers: err.response?.headers
         });
       }
     } finally {
@@ -241,7 +242,7 @@ export default function TestRegistrationFixedPage() {
                     )}
                     {testScenario === 'invalid_service_package' && (
                       <div>
-                        <p>❌ Invalid service package ('invalid_package')</p>
+                        <p>❌ Invalid service package (&ldquo;invalid_package&rdquo;)</p>
                         <p>✅ All other fields valid</p>
                         <p className="font-medium mt-2">Expected: HTTP 400 - Invalid service package</p>
                       </div>
@@ -333,4 +334,3 @@ export default function TestRegistrationFixedPage() {
     </div>
   );
 }
-

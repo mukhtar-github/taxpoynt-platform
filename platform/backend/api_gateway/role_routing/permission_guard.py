@@ -111,6 +111,45 @@ class APIPermissionGuard(BaseHTTPMiddleware):
             self._pending_rules.clear()
             self._rules_initialized = True
 
+    async def require_permissions(
+        self,
+        request: Request,
+        required_roles: Optional[List[PlatformRole]] = None,
+        required_permission: Optional[str] = None,
+    ) -> HTTPRoutingContext:
+        """Detect routing context and enforce simple role/permission requirements.
+
+        This helper mirrors the enforcement performed inside middleware so that
+        endpoints can explicitly gate hybrid-specific routes without relying on
+        the full dispatch pipeline (e.g., when using dependency injection).
+        """
+
+        context = await self.role_detector.detect_role_context(request)
+        if not context or not context.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for this endpoint",
+            )
+
+        # Normalise primary role metadata
+        primary_role = context.primary_role or context.platform_role
+        if required_roles and primary_role not in required_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient role for this endpoint",
+            )
+
+        if required_permission:
+            permissions = set(context.permissions or [])
+            if required_permission not in permissions:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Required permission missing for this endpoint",
+                )
+
+        request.state.routing_context = context
+        return context
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """
         Main middleware dispatch method that processes all requests.

@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
-import { DashboardCard } from '../../../../shared_components/dashboard/DashboardCard';
 import { TaxPoyntButton } from '../../../../design_system';
+import apiClient from '../../../../shared_components/api/client';
 
 interface ConnectedSystem {
   id: string;
@@ -26,155 +26,133 @@ interface ConnectedSystem {
   businessData: Record<string, string | number>;
 }
 
+const MOCK_SYSTEMS: ConnectedSystem[] = [
+  {
+    id: 'sap-erp-001',
+    name: 'SAP ERP System',
+    category: 'erp',
+    icon: '🏢',
+    status: 'connected',
+    lastSync: '5 minutes ago',
+    nextSync: 'in 10 minutes',
+    healthScore: 98.5,
+    dataMetrics: {
+      totalRecords: 45600,
+      monthlyVolume: 2847,
+      syncFrequency: 'Every 15 minutes',
+      errorRate: 0.2
+    },
+    features: ['Financial Management', 'Supply Chain', 'Customer Data', 'Inventory Tracking'],
+    businessData: {
+      customers: 2847,
+      invoices: 1456,
+      products: 892,
+      transactions: 15600
+    }
+  },
+  {
+    id: 'odoo-erp-002',
+    name: 'Odoo ERP Community',
+    category: 'erp',
+    icon: '🟣',
+    status: 'connected',
+    lastSync: '12 minutes ago',
+    nextSync: 'in 3 minutes',
+    healthScore: 96.8,
+    dataMetrics: {
+      totalRecords: 28400,
+      monthlyVolume: 1203,
+      syncFrequency: 'Every 15 minutes',
+      errorRate: 0.5
+    },
+    features: ['Invoicing', 'CRM', 'Inventory', 'Accounting'],
+    businessData: {
+      customers: 1203,
+      invoices: 758,
+      products: 445,
+      transactions: 9200
+    }
+  },
+  {
+    id: 'salesforce-crm-001',
+    name: 'Salesforce CRM',
+    category: 'crm',
+    icon: '☁️',
+    status: 'connected',
+    lastSync: '8 minutes ago',
+    nextSync: 'in 22 minutes',
+    healthScore: 96.2,
+    dataMetrics: {
+      totalRecords: 12600,
+      monthlyVolume: 5892,
+      syncFrequency: 'Every 30 minutes',
+      errorRate: 0.3
+    },
+    features: ['Customer Data', 'Sales Pipeline', 'Deal Management', 'Analytics'],
+    businessData: {
+      contacts: 5892,
+      deals: 234,
+      accounts: 892,
+      pipelineValue: 125000000
+    }
+  },
+  {
+    id: 'square-pos-001',
+    name: 'Square POS Terminal',
+    category: 'pos',
+    icon: '⬜',
+    status: 'connected',
+    lastSync: '3 minutes ago',
+    nextSync: 'Real-time',
+    healthScore: 99.1,
+    dataMetrics: {
+      totalRecords: 8900,
+      monthlyVolume: 456,
+      syncFrequency: 'Real-time',
+      errorRate: 0.1
+    },
+    features: ['Point of Sale', 'Inventory Tracking', 'Sales Analytics', 'Customer Loyalty'],
+    businessData: {
+      transactions: 456,
+      averageTicket: 24500,
+      topCategory: 'Electronics',
+      locationCount: 14
+    }
+  },
+  {
+    id: 'shopify-store-001',
+    name: 'Shopify Storefront',
+    category: 'ecommerce',
+    icon: '🛒',
+    status: 'connected',
+    lastSync: '4 minutes ago',
+    nextSync: 'in 6 minutes',
+    healthScore: 97.8,
+    dataMetrics: {
+      totalRecords: 15600,
+      monthlyVolume: 342,
+      syncFrequency: 'Every 10 minutes',
+      errorRate: 0.3
+    },
+    features: ['Product Catalog', 'Order Management', 'Customer Data', 'Sales Analytics'],
+    businessData: {
+      orders: 342,
+      products: 156,
+      customers: 1847,
+      revenue: 8900000
+    }
+  }
+];
+
 export default function BusinessSystemsManagementPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [connectedSystems, setConnectedSystems] = useState<ConnectedSystem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isDemo, setIsDemo] = useState(false);
 
-  // Mock comprehensive business systems data
-  const mockSystems: ConnectedSystem[] = [
-    {
-      id: 'sap-erp-001',
-      name: 'SAP ERP System',
-      category: 'erp',
-      icon: '🏢',
-      status: 'connected',
-      lastSync: '5 minutes ago',
-      nextSync: 'in 10 minutes',
-      healthScore: 98.5,
-      dataMetrics: {
-        totalRecords: 45600,
-        monthlyVolume: 2847,
-        syncFrequency: 'Every 15 minutes',
-        errorRate: 0.2
-      },
-      features: ['Financial Management', 'Supply Chain', 'Customer Data', 'Inventory Tracking'],
-      businessData: {
-        customers: 2847,
-        invoices: 1456,
-        products: 892,
-        transactions: 15600
-      }
-    },
-    {
-      id: 'odoo-erp-002',
-      name: 'Odoo ERP Community',
-      category: 'erp',
-      icon: '🟣',
-      status: 'connected',
-      lastSync: '12 minutes ago',
-      nextSync: 'in 3 minutes',
-      healthScore: 96.8,
-      dataMetrics: {
-        totalRecords: 28400,
-        monthlyVolume: 1203,
-        syncFrequency: 'Every 15 minutes',
-        errorRate: 0.5
-      },
-      features: ['Invoicing', 'CRM', 'Inventory', 'Accounting'],
-      businessData: {
-        customers: 1203,
-        invoices: 758,
-        products: 445,
-        transactions: 9200
-      }
-    },
-    {
-      id: 'salesforce-crm-001',
-      name: 'Salesforce CRM',
-      category: 'crm',
-      icon: '☁️',
-      status: 'connected',
-      lastSync: '8 minutes ago',
-      nextSync: 'in 22 minutes',
-      healthScore: 96.2,
-      dataMetrics: {
-        totalRecords: 12600,
-        monthlyVolume: 5892,
-        syncFrequency: 'Every 30 minutes',
-        errorRate: 0.3
-      },
-      features: ['Customer Data', 'Sales Pipeline', 'Deal Management', 'Analytics'],
-      businessData: {
-        contacts: 5892,
-        deals: 234,
-        accounts: 892,
-        pipelineValue: 125000000
-      }
-    },
-    {
-      id: 'square-pos-001',
-      name: 'Square POS Terminal',
-      category: 'pos',
-      icon: '⬜',
-      status: 'connected',
-      lastSync: '3 minutes ago',
-      nextSync: 'Real-time',
-      healthScore: 99.1,
-      dataMetrics: {
-        totalRecords: 8900,
-        monthlyVolume: 456,
-        syncFrequency: 'Real-time',
-        errorRate: 0.1
-      },
-      features: ['Payment Processing', 'Inventory', 'Customer Data', 'Sales Reports'],
-      businessData: {
-        dailySales: 145000,
-        transactions: 89,
-        items: 456,
-        customers: 234
-      }
-    },
-    {
-      id: 'shopify-pos-001',
-      name: 'Shopify POS',
-      category: 'pos',
-      icon: '🛍️',
-      status: 'syncing',
-      lastSync: '7 minutes ago',
-      nextSync: 'in 3 minutes',
-      healthScore: 97.8,
-      dataMetrics: {
-        totalRecords: 6700,
-        monthlyVolume: 234,
-        syncFrequency: 'Every 10 minutes',
-        errorRate: 0.2
-      },
-      features: ['E-commerce Integration', 'Inventory Sync', 'Customer Profiles', 'Analytics'],
-      businessData: {
-        dailySales: 89500,
-        transactions: 56,
-        items: 234,
-        customers: 189
-      }
-    },
-    {
-      id: 'shopify-store-001',
-      name: 'Shopify Online Store',
-      category: 'ecommerce',
-      icon: '🛒',
-      status: 'connected',
-      lastSync: '4 minutes ago',
-      nextSync: 'in 6 minutes',
-      healthScore: 97.8,
-      dataMetrics: {
-        totalRecords: 15600,
-        monthlyVolume: 342,
-        syncFrequency: 'Every 10 minutes',
-        errorRate: 0.3
-      },
-      features: ['Product Catalog', 'Order Management', 'Customer Data', 'Sales Analytics'],
-      businessData: {
-        orders: 342,
-        products: 156,
-        customers: 1847,
-        revenue: 8900000
-      }
-    }
-  ];
+  const mockSystems = MOCK_SYSTEMS;
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -191,26 +169,21 @@ export default function BusinessSystemsManagementPage() {
     
     // Load connected systems
     loadConnectedSystems();
-  }, [router]);
+  }, [loadConnectedSystems, router]);
 
-  const loadConnectedSystems = async () => {
+  const loadConnectedSystems = useCallback(async () => {
     setIsLoading(true);
     try {
-      const authToken = localStorage.getItem('taxpoynt_auth_token');
-      if (!authToken) return;
-
-      // Fetch real data from SI business systems endpoint
-      const response = await fetch('/api/v1/si/integrations/business-systems', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setConnectedSystems(data.systems || mockSystems);
-        setIsDemo(false);
-      } else {
-        throw new Error('API response not successful');
+      if (!authService.isAuthenticated()) {
+        return;
       }
+
+      const data = await apiClient.get<{ systems?: ConnectedSystem[] }>(
+        '/si/integrations/business-systems'
+      );
+
+      setConnectedSystems(data.systems || mockSystems);
+      setIsDemo(false);
     } catch (error) {
       console.error('Failed to load connected systems, using demo data:', error);
       setIsDemo(true);
@@ -218,7 +191,7 @@ export default function BusinessSystemsManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [mockSystems]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -234,16 +207,6 @@ export default function BusinessSystemsManagementPage() {
     if (score >= 95) return 'text-green-600';
     if (score >= 85) return 'text-yellow-600';
     return 'text-red-600';
-  };
-
-  const getCategoryName = (category: string) => {
-    switch (category) {
-      case 'erp': return 'ERP Systems';
-      case 'crm': return 'CRM Systems';
-      case 'pos': return 'POS Systems';
-      case 'ecommerce': return 'E-commerce';
-      default: return 'All Systems';
-    }
   };
 
   const filteredSystems = selectedCategory === 'all' 

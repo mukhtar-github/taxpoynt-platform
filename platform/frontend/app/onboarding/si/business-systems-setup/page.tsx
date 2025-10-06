@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
 
@@ -22,7 +22,7 @@ interface BusinessSystem {
 
 export default function BusinessSystemsSetupPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const [connectingSystem, setConnectingSystem] = useState<string | null>(null);
@@ -284,10 +284,6 @@ export default function BusinessSystemsSetupPage() {
       alert(`✅ Demo: ${system?.name} connected successfully! \n\n🔗 Integration Features:\n${system?.features.join('\n• ')}`);
       setSelectedSystems(prev => [...prev, systemId]);
       
-      // Update system status
-      const updatedSystems = businessSystems.map(s => 
-        s.id === systemId ? { ...s, status: 'demo' as const } : s
-      );
     }, 2000);
   };
 
@@ -497,7 +493,7 @@ export default function BusinessSystemsSetupPage() {
               <h3 className="text-lg font-bold text-slate-800 mb-2">What Happens Next?</h3>
               <div className="space-y-2 text-sm text-slate-600">
                 <p>• <strong>Auto-Reconciliation Setup:</strong> Configure automatic transaction matching rules</p>
-                <p>• <strong>Data Mapping:</strong> Map your business data fields to TaxPoynt's invoice structure</p>
+                <p>• <strong>Data Mapping:</strong> Map your business data fields to TaxPoynt&apos;s invoice structure</p>
                 <p>• <strong>FIRS Integration:</strong> Complete setup for tax-compliant invoice generation</p>
                 <p>• <strong>Dashboard Access:</strong> Monitor all integrations from your SI Dashboard</p>
               </div>

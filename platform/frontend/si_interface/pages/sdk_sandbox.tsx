@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../design_system';
+import apiClient from '../../shared_components/api/client';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
 
 interface SandboxTest {
@@ -72,19 +73,9 @@ export default function SDKSandboxPage() {
     const fetchScenarios = async () => {
       try {
         setLoadingScenarios(true);
-        
-        const response = await fetch('/api/v1/si/sdk/sandbox/scenarios', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch scenarios: ${response.status}`);
-        }
-        
-        const data: SandboxScenariosResponse = await response.json();
+        const data = await apiClient.get<SandboxScenariosResponse>(
+          '/si/sdk/sandbox/scenarios'
+        );
         
         if (data.success) {
           setScenarios(data.data.scenarios);
@@ -159,27 +150,17 @@ export default function SDKSandboxPage() {
       const startTime = Date.now();
       
       // Use backend sandbox test endpoint
-      const response = await fetch('/api/v1/si/sdk/sandbox/test', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const testResult = await apiClient.post<TestResult>(
+        '/si/sdk/sandbox/test',
+        {
           scenario_name: test.id,
           api_key: apiKey,
           custom_headers: {
             'Content-Type': 'application/json'
           },
           custom_body: test.requestBody ? JSON.parse(test.requestBody) : undefined
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Test failed: ${response.status}`);
-      }
-      
-      const testResult: TestResult = await response.json();
+        }
+      );
       const executionTime = Date.now() - startTime;
       
       // Update test results

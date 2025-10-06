@@ -61,8 +61,8 @@ class OnboardingEndpointsV1:
         self.message_router = message_router
         self.router = APIRouter(
             prefix="/onboarding",
-            tags=["SI Onboarding Management"],
-            dependencies=[Depends(self._require_si_role)]
+            tags=["Unified Onboarding Management"],
+            dependencies=[Depends(self._require_onboarding_access)]
         )
         
         # Track endpoints for monitoring
@@ -77,18 +77,52 @@ class OnboardingEndpointsV1:
 
         logger.info("Onboarding Endpoints V1 initialized")
     
-    async def _require_si_role(self, request: Request) -> HTTPRoutingContext:
-        """Ensure System Integrator role access for v1 SI endpoints."""
+    async def _require_onboarding_access(self, request: Request) -> HTTPRoutingContext:
+        """Ensure unified onboarding access for SI, APP, and Hybrid roles."""
+        allowed_roles = {
+            PlatformRole.SYSTEM_INTEGRATOR,
+            PlatformRole.ACCESS_POINT_PROVIDER,
+            PlatformRole.HYBRID,
+        }
+
         context = await self.role_detector.detect_role_context(request)
-        if not context or not context.has_role(PlatformRole.SYSTEM_INTEGRATOR):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System Integrator role required for v1 API")
+        if not context or context.primary_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Onboarding access requires SI, APP, or Hybrid role",
+            )
+
         if not await self.permission_guard.check_endpoint_permission(
             context, f"v1/si{request.url.path}", request.method
         ):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for SI v1 endpoint")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions for onboarding endpoint",
+            )
+
         context.metadata["api_version"] = "v1"
-        context.metadata["endpoint_group"] = "si"
+        context.metadata["endpoint_group"] = "onboarding"
+        context.metadata.setdefault("service_package", self._infer_service_package(context))
         return context
+
+    @staticmethod
+    def _infer_service_package(context: HTTPRoutingContext) -> str:
+        role = context.primary_role
+        if role == PlatformRole.ACCESS_POINT_PROVIDER:
+            return "app"
+        if role == PlatformRole.HYBRID:
+            return "hybrid"
+        return "si"
+
+    @staticmethod
+    def _resolve_service_role(context: HTTPRoutingContext) -> ServiceRole:
+        role = context.primary_role
+        if role == PlatformRole.ACCESS_POINT_PROVIDER:
+            return ServiceRole.ACCESS_POINT_PROVIDER
+        if role == PlatformRole.HYBRID:
+            # Hybrid onboarding currently funnels through the unified service registered under SI
+            return ServiceRole.SYSTEM_INTEGRATOR
+        return ServiceRole.SYSTEM_INTEGRATOR
 
     def _setup_routes(self):
         """Setup onboarding state management routes"""
@@ -157,7 +191,7 @@ class OnboardingEndpointsV1:
     async def get_onboarding_state(self, request: Request):
         """Get current onboarding state for the authenticated user"""
         try:
-            await self._require_si_role(request)
+            context = await self._require_onboarding_access(request)
             self.endpoint_stats["get_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
@@ -177,7 +211,21 @@ class OnboardingEndpointsV1:
                 "next_action": "Complete business information setup"
             }
             
-            return self._create_v1_response(mock_result, "onboarding_state_retrieved")
+            result = await self.message_router.route_message(
+                service_role=self._resolve_service_role(context),
+                operation="get_onboarding_state",
+                payload={
+                    "user_id": context.user_id,
+                    "service_package": context.metadata.get("service_package"),
+                    "api_version": "v1",
+                },
+            )
+
+            # Fall back to mock result if downstream services are unavailable
+            if not result or not isinstance(result, dict) or not result.get("success"):
+                return self._create_v1_response(mock_result, "onboarding_state_retrieved")
+
+            return self._create_v1_response(result, "onboarding_state_retrieved")
         except HTTPException:
             raise
         except Exception as e:
@@ -186,14 +234,13 @@ class OnboardingEndpointsV1:
 
     async def update_onboarding_state(self,
                                       request: Request,
-                                      db: AsyncSession = Depends(get_async_session),
-                                      context: HTTPRoutingContext = Depends(lambda: None)):
+                                      db: AsyncSession = Depends(get_async_session)):
         """Update onboarding state with new progress"""
         try:
             self.endpoint_stats["update_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
-            context = await self._require_si_role(request)
+            context = await self._require_onboarding_access(request)
             body = await request.json()
             
             # Validate required fields
@@ -223,11 +270,12 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_state_updated", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                service_role=self._resolve_service_role(context),
                 operation="update_onboarding_state",
                 payload={
                     "user_id": context.user_id,
                     "onboarding_data": body,
+                    "service_package": context.metadata.get("service_package"),
                     "api_version": "v1"
                 }
             )
@@ -249,11 +297,10 @@ class OnboardingEndpointsV1:
     async def complete_onboarding_step(self,
                                        step_name: str,
                                        request: Request,
-                                       db: AsyncSession = Depends(get_async_session),
-                                       context: HTTPRoutingContext = Depends(lambda: None)):
+                                       db: AsyncSession = Depends(get_async_session)):
         """Mark a specific onboarding step as complete"""
         try:
-            context = await self._require_si_role(request)
+            context = await self._require_onboarding_access(request)
             body = await request.json() if hasattr(request, 'json') else {}
             
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -274,12 +321,13 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_step_completed", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                service_role=self._resolve_service_role(context),
                 operation="complete_onboarding_step",
                 payload={
                     "user_id": context.user_id,
                     "step_name": step_name,
                     "metadata": body.get("metadata", {}),
+                    "service_package": context.metadata.get("service_package"),
                     "api_version": "v1"
                 }
             )
@@ -300,11 +348,10 @@ class OnboardingEndpointsV1:
 
     async def complete_onboarding(self,
                                   request: Request,
-                                  db: AsyncSession = Depends(get_async_session),
-                                  context: HTTPRoutingContext = Depends(lambda: None)):
+                                  db: AsyncSession = Depends(get_async_session)):
         """Mark entire onboarding as complete"""
         try:
-            context = await self._require_si_role(request)
+            context = await self._require_onboarding_access(request)
             body = await request.json() if hasattr(request, 'json') else {}
             
             idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
@@ -324,11 +371,12 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_completed", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                service_role=self._resolve_service_role(context),
                 operation="complete_onboarding",
                 payload={
                     "user_id": context.user_id,
                     "completion_metadata": body.get("metadata", {}),
+                    "service_package": context.metadata.get("service_package"),
                     "api_version": "v1"
                 }
             )
@@ -347,10 +395,10 @@ class OnboardingEndpointsV1:
             logger.error(f"Error completing onboarding in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to complete onboarding")
 
-    async def reset_onboarding_state(self, request: Request, db: AsyncSession = Depends(get_async_session), context: HTTPRoutingContext = Depends(lambda: None)):
+    async def reset_onboarding_state(self, request: Request, db: AsyncSession = Depends(get_async_session)):
         """Reset onboarding state (admin/testing only)"""
         try:
-            context = await self._require_si_role(request)
+            context = await self._require_onboarding_access(request)
             self.endpoint_stats["reset_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
@@ -373,10 +421,11 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_state_reset", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                service_role=self._resolve_service_role(context),
                 operation="reset_onboarding_state",
                 payload={
                     "user_id": context.user_id,
+                    "service_package": context.metadata.get("service_package"),
                     "api_version": "v1"
                 }
             )
@@ -398,12 +447,13 @@ class OnboardingEndpointsV1:
     async def get_onboarding_analytics(self, request: Request):
         """Get onboarding analytics and progress insights"""
         try:
-            context = await self._require_si_role(request)
+            context = await self._require_onboarding_access(request)
             result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                service_role=self._resolve_service_role(context),
                 operation="get_onboarding_analytics",
                 payload={
                     "user_id": context.user_id,
+                    "service_package": context.metadata.get("service_package"),
                     "api_version": "v1"
                 }
             )

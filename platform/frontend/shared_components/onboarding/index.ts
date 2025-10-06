@@ -30,6 +30,10 @@ export {
 export {
   ServiceOnboardingRouter
 } from './ServiceOnboardingRouter';
+export {
+  UnifiedOnboardingWizard,
+  type ServicePackage
+} from './UnifiedOnboardingWizard';
 
 export {
   OnboardingResumeManager

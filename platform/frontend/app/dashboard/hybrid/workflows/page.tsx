@@ -3,10 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
-import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
-import { authService } from '../../../../shared_components/services/auth';
+import { TaxPoyntButton } from '../../../../design_system';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { APIResponse } from '../../../../si_interface/types';
 import apiClient from '../../../../shared_components/api/client';
+
+type WorkflowTab = 'templates' | 'active' | 'designer';
 
 interface WorkflowTemplate {
   id: string;
@@ -32,10 +34,10 @@ interface ActiveWorkflow {
 
 export default function HybridWorkflowsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'templates' | 'active' | 'designer'>('active');
+  const [activeTab, setActiveTab] = useState<WorkflowTab>('active');
   const [workflows, setWorkflows] = useState<ActiveWorkflow[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
 
@@ -227,14 +229,16 @@ export default function HybridWorkflowsPage() {
         {/* Tabs */}
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'active', label: 'Active Workflows', icon: '⚡' },
-              { id: 'templates', label: 'Templates', icon: '📋' },
-              { id: 'designer', label: 'Designer', icon: '🎨' }
-            ].map((tab) => (
+            {(
+              [
+                { id: 'active', label: 'Active Workflows', icon: '⚡' },
+                { id: 'templates', label: 'Templates', icon: '📋' },
+                { id: 'designer', label: 'Designer', icon: '🎨' }
+              ] as Array<{ id: WorkflowTab; label: string; icon: string }>
+            ).map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`
                   py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2
                   ${activeTab === tab.id
@@ -420,7 +424,7 @@ export default function HybridWorkflowsPage() {
               <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12">
                 <p className="text-gray-500 mb-4">Interactive workflow designer coming soon!</p>
                 <p className="text-sm text-gray-400">
-                  You'll be able to visually design workflows that combine SI data processing with APP submission capabilities.
+                  You&apos;ll be able to visually design workflows that combine SI data processing with APP submission capabilities.
                 </p>
               </div>
               

@@ -67,7 +67,7 @@ interface ComplianceWorkflowProps {
   workflowId?: string;
   organizationId: string;
   userRole: 'si' | 'app' | 'hybrid' | 'admin';
-  onWorkflowComplete?: (result: any) => void;
+  onWorkflowComplete?: (result: unknown) => void;
 }
 
 interface WorkflowStep {
@@ -96,7 +96,7 @@ interface ComplianceWorkflow {
   completionDate?: Date;
   steps: WorkflowStep[];
   standards: string[]; // FIRS-mandated standards
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export const ComplianceWorkflow: React.FC<ComplianceWorkflowProps> = ({

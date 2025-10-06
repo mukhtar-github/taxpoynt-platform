@@ -17,6 +17,7 @@ These endpoints exist in backend and work properly:
 
 #### 2. **FIRS Integration** (`/api/v1/app/firs/`)
 - ✅ `GET /api/v1/app/firs/status` - **BACKEND EXISTS**
+- ✅ `GET /api/v1/app/firs/credentials` - **BACKEND EXISTS**
 - ✅ `POST /api/v1/app/firs/test-connection` - **BACKEND EXISTS** 
 - ✅ `POST /api/v1/app/firs/credentials` - **BACKEND EXISTS**
 
@@ -138,4 +139,3 @@ Update API documentation to reflect new endpoints.
 ---
 
 **Next Steps**: Implement missing backend endpoints to achieve full frontend-backend synchronization.
-

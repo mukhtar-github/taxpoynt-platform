@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
@@ -10,12 +10,27 @@ import { TaxPoyntButton } from '../../../../design_system';
 import { OnboardingProgressIndicator } from '../../../../shared_components/onboarding/OnboardingProgressIndicator';
 import { BankingConnectionLoader, OnboardingStepLoader } from '../../../../shared_components/loading/OnboardingLoadingStates';
 import { useOnboardingProgress } from '../../../../shared_components/hooks/useOnboardingProgress';
+import apiClient from '../../../../shared_components/api/client';
+
+interface BankingAccount {
+  id?: string;
+  name?: string;
+  accountNumber?: string;
+  [key: string]: unknown;
+}
+
+interface BankingCallbackResponse {
+  success: boolean;
+  message?: string;
+  data?: { accounts?: BankingAccount[] };
+  token?: string;
+}
 
 export default function BankingCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading } = useUserContext({ requireAuth: true });
-  const { handleError, attemptRecovery, createUserMessage } = useBankingErrorRecovery();
+  const { handleError } = useBankingErrorRecovery();
   const { progressState, completeStep, updateProgress, isUpdating } = useOnboardingProgress();
   const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'retrying'>('processing');
   const [message, setMessage] = useState('Processing your bank connection...');
@@ -24,38 +39,7 @@ export default function BankingCallbackPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [connectionStage, setConnectionStage] = useState<'initializing' | 'connecting' | 'authenticating' | 'verifying' | 'complete'>('initializing');
 
-  useEffect(() => {
-    if (isLoading) return;
-    
-    if (!isAuthenticated) {
-      router.push('/auth/signin');
-      return;
-    }
-    
-    if (user) {
-      // Process the Mono callback
-      processBankingCallback();
-    }
-  }, [isLoading, isAuthenticated, user]);
-
-  const handleAutoRetry = async () => {
-    setIsRetrying(true);
-    setRetryCount(prev => prev + 1);
-    setStatus('processing');
-    setMessage('Retrying connection...');
-    setCurrentError(null);
-    
-    setTimeout(() => {
-      processBankingCallback();
-      setIsRetrying(false);
-    }, 1000);
-  };
-
-  const handleFallback = () => {
-    router.push('/onboarding/si/manual-banking-setup');
-  };
-
-  const processBankingCallback = async () => {
+  const processBankingCallback = useCallback(async () => {
     try {
       // Set initial stage
       setConnectionStage('initializing');
@@ -97,29 +81,15 @@ export default function BankingCallbackPage() {
       setMessage('Authenticating with your bank...');
       
       // Exchange code for access token and account information
-      const response = await fetch('/api/v1/si/banking/open-banking/mono/callback', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          code,
-          state,
-          redirect_url: window.location.origin + '/onboarding/si/banking-callback'
-        })
+      const data = await apiClient.post<BankingCallbackResponse>('/si/banking/open-banking/mono/callback', {
+        code,
+        state,
+        redirect_url: window.location.origin + '/onboarding/si/banking-callback'
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error ${response.status}: ${errorText || 'Banking callback processing failed'}`);
-      }
 
       // Progress to verifying stage
       setConnectionStage('verifying');
       setMessage('Verifying account details...');
-      
-      const data = await response.json();
       
       if (data.success) {
         // Progress to complete stage
@@ -169,6 +139,33 @@ export default function BankingCallbackPage() {
         canRetry: bankingError.retryable && retryCount < 3
       });
     }
+  }, [completeStep, handleError, retryCount, router, searchParams, updateProgress, user]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    
+    if (!isAuthenticated) {
+      router.push('/auth/signin');
+      return;
+    }
+    
+    if (user) {
+      // Process the Mono callback
+      processBankingCallback();
+    }
+  }, [isLoading, isAuthenticated, user, processBankingCallback, router]);
+
+  const handleAutoRetry = async () => {
+    setIsRetrying(true);
+    setRetryCount(prev => prev + 1);
+    setStatus('processing');
+    setMessage('Retrying connection...');
+    setCurrentError(null);
+    
+    setTimeout(() => {
+      processBankingCallback();
+      setIsRetrying(false);
+    }, 1000);
   };
 
 
@@ -176,7 +173,6 @@ export default function BankingCallbackPage() {
   const handleContinue = () => {
     if (user) {
       OnboardingStateManager.updateStep(user.id, 'reconciliation_setup');
-      const { getPostBankingUrl } = require('../../../../shared_components/utils/dashboardRouting');
       router.push(getPostBankingUrl(user));
     }
   };
@@ -299,7 +295,7 @@ export default function BankingCallbackPage() {
           {/* Additional Info for Success */}
           {status === 'success' && (
                           <div className="bg-white border border-green-200 rounded-lg p-4 mb-6 text-left">
-              <h3 className="font-semibold text-gray-900 mb-2">🎉 What's Next?</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">🎉 What&apos;s Next?</h3>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>• Your bank account is now connected via Mono</li>
                 <li>• Transaction monitoring is active</li>

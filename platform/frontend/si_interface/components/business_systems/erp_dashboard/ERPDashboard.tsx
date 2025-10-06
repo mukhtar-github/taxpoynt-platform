@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 interface ERPSystem {
   id: string;
@@ -104,31 +105,24 @@ export const ERPDashboard: React.FC<ERPDashboardProps> = ({
 
   const loadERPConnections = async () => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/erp/connections`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ connections?: ERPConnection[] }>(
+        '/si/business-systems/erp/connections'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        
-        // Update system statuses based on connections
-        const updatedSystems = erpSystems.map(system => {
-          const connection = data.connections?.find((conn: ERPConnection) => conn.systemId === system.id);
-          if (connection) {
-            return {
-              ...system,
-              status: 'connected' as const,
-              lastSync: connection.syncSettings.lastSuccessfulSync,
-              recordCount: Math.floor(Math.random() * 10000) // Mock data
-            };
-          }
-          return system;
-        });
-        setErpSystems(updatedSystems);
-      }
+      setConnections(data.connections || []);
+
+      setErpSystems(prevSystems => prevSystems.map(system => {
+        const connection = data.connections?.find(conn => conn.systemId === system.id);
+        if (connection) {
+          return {
+            ...system,
+            status: 'connected' as const,
+            lastSync: connection.syncSettings.lastSuccessfulSync,
+            recordCount: Math.floor(Math.random() * 10000)
+          };
+        }
+        return system;
+      }));
     } catch (error) {
       console.error('Failed to load ERP connections:', error);
     }
@@ -143,32 +137,24 @@ export const ERPDashboard: React.FC<ERPDashboardProps> = ({
     setIsConnecting(true);
     
     try {
-      const response = await fetch(`/api/v1/si/business-systems/erp/test-connection`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ success: boolean; message?: string }>(
+        '/si/business-systems/erp/test-connection',
+        {
           systemId,
           testData: {
-            // Mock test parameters
             server: 'test.company.com',
             database: 'production'
           }
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          alert('Connection test successful!');
-          if (onConnectionSuccess) {
-            onConnectionSuccess(systemId);
-          }
-        } else {
-          alert('Connection test failed: ' + data.message);
         }
+      );
+
+      if (data.success) {
+        alert('Connection test successful!');
+        if (onConnectionSuccess) {
+          onConnectionSuccess(systemId);
+        }
+      } else {
+        alert('Connection test failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Connection test failed:', error);
@@ -184,28 +170,17 @@ export const ERPDashboard: React.FC<ERPDashboardProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/business-systems/erp/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/erp/disconnect', { systemId });
 
-      if (response.ok) {
-        // Update local state
-        const updatedSystems = erpSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'disconnected' as const, lastSync: undefined, recordCount: undefined }
-            : system
-        );
-        setErpSystems(updatedSystems);
-        
-        setConnections(connections.filter(conn => conn.systemId !== systemId));
-        
-        alert('ERP system disconnected successfully');
-      }
+      setErpSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'disconnected' as const, lastSync: undefined, recordCount: undefined }
+          : system
+      ));
+
+      setConnections(prev => prev.filter(conn => conn.systemId !== systemId));
+
+      alert('ERP system disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect ERP system:', error);
       alert('Failed to disconnect ERP system');

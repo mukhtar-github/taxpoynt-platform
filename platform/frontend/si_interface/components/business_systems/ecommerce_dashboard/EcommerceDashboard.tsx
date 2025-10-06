@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../design_system/components/Button';
+import apiClient from '../../../../shared_components/api/client';
 
 interface EcommerceSystem {
   id: string;
@@ -138,33 +139,26 @@ export const EcommerceDashboard: React.FC<EcommerceDashboardProps> = ({
 
   const loadEcommerceConnections = async () => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/ecommerce/connections`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ connections?: EcommerceConnection[] }>(
+        '/si/business-systems/ecommerce/connections'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
-        
-        // Update system statuses with mock data
-        const updatedSystems = ecommerceSystems.map(system => {
-          const connection = data.connections?.find((conn: EcommerceConnection) => conn.systemId === system.id);
-          if (connection) {
-            return {
-              ...system,
-              status: 'connected' as const,
-              lastSync: connection.syncSettings.lastSuccessfulSync,
-              orderCount: Math.floor(Math.random() * 500) + 50,
-              productCount: Math.floor(Math.random() * 2000) + 100,
-              revenue: Math.floor(Math.random() * 2000000) + 200000 // ₦200k - ₦2.2M
-            };
-          }
-          return system;
-        });
-        setEcommerceSystems(updatedSystems);
-      }
+      setConnections(data.connections || []);
+
+      setEcommerceSystems(prevSystems => prevSystems.map(system => {
+        const connection = data.connections?.find(conn => conn.systemId === system.id);
+        if (connection) {
+          return {
+            ...system,
+            status: 'connected' as const,
+            lastSync: connection.syncSettings.lastSuccessfulSync,
+            orderCount: Math.floor(Math.random() * 500) + 50,
+            productCount: Math.floor(Math.random() * 2000) + 100,
+            revenue: Math.floor(Math.random() * 2000000) + 200000
+          };
+        }
+        return system;
+      }));
     } catch (error) {
       console.error('Failed to load e-commerce connections:', error);
     }
@@ -179,31 +173,24 @@ export const EcommerceDashboard: React.FC<EcommerceDashboardProps> = ({
     setIsConnecting(true);
     
     try {
-      const response = await fetch(`/api/v1/si/business-systems/ecommerce/test-connection`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ success: boolean; message?: string }>(
+        '/si/business-systems/ecommerce/test-connection',
+        {
           systemId,
           testData: {
             storeUrl: 'https://test-store.myshopify.com',
             apiKey: 'test_api_key'
           }
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          alert('E-commerce connection test successful!');
-          if (onConnectionSuccess) {
-            onConnectionSuccess(systemId);
-          }
-        } else {
-          alert('Connection test failed: ' + data.message);
         }
+      );
+
+      if (data.success) {
+        alert('E-commerce connection test successful!');
+        if (onConnectionSuccess) {
+          onConnectionSuccess(systemId);
+        }
+      } else {
+        alert('Connection test failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('E-commerce connection test failed:', error);
@@ -215,36 +202,23 @@ export const EcommerceDashboard: React.FC<EcommerceDashboardProps> = ({
 
   const handleSyncOrders = async (systemId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/business-systems/ecommerce/sync-orders`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/ecommerce/sync-orders', { systemId });
 
-      if (response.ok) {
-        // Update status to syncing
-        const updatedSystems = ecommerceSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'syncing' as const }
+      setEcommerceSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'syncing' as const }
+          : system
+      ));
+
+      setTimeout(() => {
+        setEcommerceSystems(prevSystems => prevSystems.map(system =>
+          system.id === systemId
+            ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
             : system
-        );
-        setEcommerceSystems(updatedSystems);
-        
-        // Simulate sync completion
-        setTimeout(() => {
-          const finalSystems = updatedSystems.map(system => 
-            system.id === systemId 
-              ? { ...system, status: 'connected' as const, lastSync: new Date().toISOString() }
-              : system
-          );
-          setEcommerceSystems(finalSystems);
-        }, 3000);
-        
-        alert('Order sync started successfully');
-      }
+        ));
+      }, 3000);
+
+      alert('Order sync started successfully');
     } catch (error) {
       console.error('Failed to sync orders:', error);
       alert('Failed to sync orders');
@@ -257,27 +231,17 @@ export const EcommerceDashboard: React.FC<EcommerceDashboardProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/si/business-systems/ecommerce/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ systemId })
-      });
+      await apiClient.post('/si/business-systems/ecommerce/disconnect', { systemId });
 
-      if (response.ok) {
-        const updatedSystems = ecommerceSystems.map(system => 
-          system.id === systemId 
-            ? { ...system, status: 'disconnected' as const, lastSync: undefined, orderCount: undefined, productCount: undefined, revenue: undefined }
-            : system
-        );
-        setEcommerceSystems(updatedSystems);
-        
-        setConnections(connections.filter(conn => conn.systemId !== systemId));
-        
-        alert('E-commerce platform disconnected successfully');
-      }
+      setEcommerceSystems(prevSystems => prevSystems.map(system =>
+        system.id === systemId
+          ? { ...system, status: 'disconnected' as const, lastSync: undefined, orderCount: undefined, productCount: undefined, revenue: undefined }
+          : system
+      ));
+
+      setConnections(prev => prev.filter(conn => conn.systemId !== systemId));
+
+      alert('E-commerce platform disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect e-commerce platform:', error);
       alert('Failed to disconnect e-commerce platform');

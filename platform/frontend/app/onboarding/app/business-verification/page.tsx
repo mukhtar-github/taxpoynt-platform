@@ -35,7 +35,7 @@ interface BusinessVerificationData {
 export default function APPBusinessVerificationPage() {
   const router = useRouter();
   const { user, loading: userLoading } = useUserContext();
-  const { isMobile, mobileBreakpoint } = useMobileOptimization();
+  const { isMobile } = useMobileOptimization();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<BusinessVerificationData>({
     business_type: '',
@@ -193,7 +193,7 @@ export default function APPBusinessVerificationPage() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
             <div className="flex items-center justify-center text-green-800 text-sm">
               <span className="mr-2">👋</span>
-              <span>Welcome, {user?.first_name || 'there'}! Let's verify your <strong>Access Point Provider</strong> business details.</span>
+              <span>Welcome, {user?.first_name || 'there'}! Let&apos;s verify your <strong>Access Point Provider</strong> business details.</span>
             </div>
           </div>
         </div>

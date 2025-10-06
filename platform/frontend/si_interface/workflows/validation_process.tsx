@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import apiClient from '../../shared_components/api/client';
 
 interface ValidationTier {
   id: string;
@@ -388,17 +389,12 @@ export const ValidationProcess: React.FC<ValidationProcessProps> = ({
 
   const loadValidationBatch = async () => {
     try {
-      const response = await fetch(`/api/v1/si/validation/batches/${batchId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ batch: ValidationBatch }>(
+        `/si/validation/batches/${batchId}`
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentBatch(data.batch);
-        setValidationResults(data.batch.results || []);
-      }
+      setCurrentBatch(data.batch);
+      setValidationResults(data.batch.results || []);
     } catch (error) {
       console.error('Failed to load validation batch:', error);
     }
@@ -412,32 +408,23 @@ export const ValidationProcess: React.FC<ValidationProcessProps> = ({
 
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/v1/si/validation/process', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ batch: ValidationBatch }>(
+        '/si/validation/process',
+        {
           document_ids: documentIds,
           validation_tiers: validationTiers.filter(tier => tier.enabled),
           auto_fix_enabled: true,
           generate_report: true
-        })
-      });
+        }
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        const newBatch = data.batch;
-        setCurrentBatch(newBatch);
-        
-        // Start polling for progress
-        pollValidationProgress(newBatch.id);
-        
-        alert('✅ Validation process started successfully!');
-      } else {
-        alert('❌ Failed to start validation process');
-      }
+      const newBatch = data.batch;
+      setCurrentBatch(newBatch);
+
+      // Start polling for progress
+      pollValidationProgress(newBatch.id);
+
+      alert('✅ Validation process started successfully!');
     } catch (error) {
       console.error('Failed to start validation:', error);
       alert('❌ Failed to start validation process');
@@ -449,23 +436,18 @@ export const ValidationProcess: React.FC<ValidationProcessProps> = ({
   const pollValidationProgress = (batchId: string) => {
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/v1/si/validation/batches/${batchId}/status`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-          }
-        });
+        const data = await apiClient.get<{ batch: ValidationBatch }>(
+          `/si/validation/batches/${batchId}/status`
+        );
 
-        if (response.ok) {
-          const data = await response.json();
-          const updatedBatch = data.batch;
-          setCurrentBatch(updatedBatch);
-          setValidationResults(updatedBatch.results || []);
+        const updatedBatch = data.batch;
+        setCurrentBatch(updatedBatch);
+        setValidationResults(updatedBatch.results || []);
 
-          if (['completed', 'failed'].includes(updatedBatch.status)) {
-            clearInterval(pollInterval);
-            if (updatedBatch.status === 'completed' && onValidationComplete) {
-              onValidationComplete(updatedBatch.results);
-            }
+        if (['completed', 'failed'].includes(updatedBatch.status)) {
+          clearInterval(pollInterval);
+          if (updatedBatch.status === 'completed' && onValidationComplete) {
+            onValidationComplete(updatedBatch.results);
           }
         }
       } catch (error) {
@@ -478,28 +460,19 @@ export const ValidationProcess: React.FC<ValidationProcessProps> = ({
   const handleAutoFix = async (resultId: string, issueIds: string[]) => {
     try {
       setIsProcessing(true);
-      const response = await fetch('/api/v1/si/validation/auto-fix', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ fixed_count: number }>(
+        '/si/validation/auto-fix',
+        {
           result_id: resultId,
           issue_ids: issueIds
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`✅ Auto-fixed ${data.fixed_count} issues successfully!`);
-        
-        // Refresh validation results
-        if (currentBatch) {
-          loadValidationBatch();
         }
-      } else {
-        alert('❌ Failed to auto-fix issues');
+      );
+
+      alert(`✅ Auto-fixed ${data.fixed_count} issues successfully!`);
+
+      // Refresh validation results
+      if (currentBatch) {
+        loadValidationBatch();
       }
     } catch (error) {
       console.error('Failed to auto-fix:', error);

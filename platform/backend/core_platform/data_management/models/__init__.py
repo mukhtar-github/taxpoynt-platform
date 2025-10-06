@@ -10,6 +10,8 @@ from .user import User, UserRole, UserServiceAccess
 from .organization import Organization, OrganizationUser
 from .integration import Integration, IntegrationCredentials
 from .firs_submission import FIRSSubmission
+from .validation_batch import ValidationBatchResult
+from .onboarding_state import OnboardingStateORM
 from .si_app_correlation import SIAPPCorrelation, CorrelationStatus
 from .oauth_client import OAuthClient, OAuthClientStatus
 from .banking import (
@@ -63,6 +65,8 @@ __all__ = [
     "Integration",
     "IntegrationCredentials",
     "FIRSSubmission",
+    "ValidationBatchResult",
+    "OnboardingStateORM",
     "SIAPPCorrelation",
     "CorrelationStatus",
     "OAuthClient",

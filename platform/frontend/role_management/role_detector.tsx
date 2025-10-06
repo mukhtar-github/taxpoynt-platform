@@ -17,6 +17,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import apiClient, { APIError } from '../shared_components/api/client';
 
 // Types based on backend role management system
 export enum PlatformRole {
@@ -174,28 +175,19 @@ class FrontendRoleDetector {
         return null;
       }
 
-      const response = await fetch('/api/v1/auth/user-roles', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
+      const data = await apiClient.get<any>('/auth/user-roles', {
+        withCredentials: true
       });
 
-      if (!response.ok) {
-        // Don't log 401/403 as errors during registration flow
-        if (response.status === 401 || response.status === 403) {
-          console.log(`Role fetch returned ${response.status}, likely not authenticated yet`);
-          return null;
-        }
-        throw new Error(`API request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
       return this.processAPIRoleResponse(data);
       
     } catch (error) {
+      const status = (error as APIError)?.status;
+      if (status === 401 || status === 403) {
+        console.log(`Role fetch returned ${status}, likely not authenticated yet`);
+        return null;
+      }
+
       console.error('API role fetch failed:', error);
       return null;
     }
@@ -468,15 +460,7 @@ export const RoleDetectorProvider: React.FC<RoleDetectorProviderProps> = ({
       
       // Optionally notify backend about role switch
       try {
-        await fetch('/api/v1/auth/switch-role', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({ target_role: targetRole }),
-          credentials: 'include'
-        });
+        await apiClient.post('/auth/switch-role', { target_role: targetRole }, { withCredentials: true });
       } catch (apiError) {
         console.warn('Backend role switch notification failed:', apiError);
         // Continue anyway as local switch succeeded

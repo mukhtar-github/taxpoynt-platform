@@ -1,32 +1,30 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { authService } from '../../../../shared_components/services/auth';
+import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 import { TaxPoyntButton } from '../../../../design_system';
+import apiClient from '../../../../shared_components/api/client';
+
+interface ConnectedSystemInfo {
+  name: string;
+  type: string;
+  category: string;
+  features: string[];
+  dataTypes: string[];
+}
 
 export default function BusinessSystemsCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'processing' | 'success' | 'error'>('processing');
-  const [systemInfo, setSystemInfo] = useState<any>(null);
+  const [systemInfo, setSystemInfo] = useState<ConnectedSystemInfo | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
-      router.push('/auth/signin');
-      return;
-    }
-
-    setUser(currentUser);
-    processCallback();
-  }, [router]);
-
-  const processCallback = async () => {
+  const processCallback = useCallback(async () => {
     try {
       setIsProcessing(true);
       
@@ -48,27 +46,16 @@ export default function BusinessSystemsCallbackPage() {
       console.log('📋 Processing business system callback:', { code, state, systemType, category });
 
       // Call backend to finalize the connection
-      const response = await fetch('/api/v1/si/integrations/callback', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          code,
-          state,
-          system_type: systemType,
-          category,
-          callback_type: 'business_systems'
-        })
+      const result = await apiClient.post<{
+        data?: { supported_data_types?: string[] };
+      }>('/si/integrations/callback', {
+        code,
+        state,
+        system_type: systemType,
+        category,
+        callback_type: 'business_systems'
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to finalize business system connection');
-      }
-
-      const result = await response.json();
-      
       setSystemInfo({
         name: getSystemDisplayName(systemType),
         type: systemType,
@@ -94,7 +81,18 @@ export default function BusinessSystemsCallbackPage() {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [router, searchParams, user]);
+
+  useEffect(() => {
+    const currentUser = authService.getStoredUser();
+    if (!currentUser || !authService.isAuthenticated()) {
+      router.push('/auth/signin');
+      return;
+    }
+
+    setUser(currentUser);
+    processCallback();
+  }, [processCallback, router]);
 
   const getSystemDisplayName = (systemType: string): string => {
     const names: Record<string, string> = {
@@ -224,9 +222,9 @@ export default function BusinessSystemsCallbackPage() {
           </div>
         )}
 
-        {/* What's Next */}
+        {/* What&apos;s Next */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h4 className="font-medium text-blue-800 mb-2">📋 What's Next?</h4>
+          <h4 className="font-medium text-blue-800 mb-2">📋 What&apos;s Next?</h4>
           <div className="text-left text-sm text-blue-700 space-y-1">
             <p>• Set up automatic transaction matching rules</p>
             <p>• Configure data categorization preferences</p>
@@ -253,7 +251,7 @@ export default function BusinessSystemsCallbackPage() {
         {/* Integration Success Summary */}
         <div className="mt-6 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
           <p className="text-sm text-emerald-700">
-            <strong>🎯 Business System Ready:</strong> Your {systemInfo?.name} data will now feed into TaxPoynt's auto-reconciliation engine for seamless FIRS-compliant invoice generation.
+            <strong>🎯 Business System Ready:</strong> Your {systemInfo?.name} data will now feed into TaxPoynt&apos;s auto-reconciliation engine for seamless FIRS-compliant invoice generation.
           </p>
         </div>
 

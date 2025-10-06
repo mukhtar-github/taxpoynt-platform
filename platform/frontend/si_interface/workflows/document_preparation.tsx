@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
+import apiClient from '../../shared_components/api/client';
 
 interface DocumentSource {
   id: string;
@@ -172,16 +173,11 @@ export const DocumentPreparation: React.FC<DocumentPreparationProps> = ({
   const fetchDocumentSources = async () => {
     try {
       const params = organizationId ? `?organization_id=${organizationId}` : '';
-      const response = await fetch(`/api/v1/si/document-preparation/sources${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ sources?: DocumentSource[] }>(
+        `/si/document-preparation/sources${params}`
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setSources(data.sources || []);
-      }
+      setSources(data.sources || []);
     } catch (error) {
       console.error('Failed to fetch document sources:', error);
     }
@@ -189,16 +185,11 @@ export const DocumentPreparation: React.FC<DocumentPreparationProps> = ({
 
   const fetchProcessingBatches = async () => {
     try {
-      const response = await fetch('/api/v1/si/document-preparation/batches', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.get<{ batches?: DocumentBatch[] }>(
+        '/si/document-preparation/batches'
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setBatches(data.batches || []);
-      }
+      setBatches(data.batches || []);
     } catch (error) {
       console.error('Failed to fetch processing batches:', error);
     }
@@ -220,31 +211,22 @@ export const DocumentPreparation: React.FC<DocumentPreparationProps> = ({
 
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/v1/si/document-preparation/batches/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ batch: DocumentBatch }>(
+        '/si/document-preparation/batches/create',
+        {
           organization_id: organizationId,
           source_ids: selectedSources,
           processing_rules: processingRules.filter(rule => rule.enabled),
           batch_name: `Batch ${new Date().toLocaleDateString()}`,
           auto_fix_enabled: true
-        })
-      });
+        }
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        const newBatch = data.batch;
-        setBatches(prev => [newBatch, ...prev]);
-        setCurrentBatch(newBatch);
-        startBatchProcessing(newBatch.id);
-        alert('✅ Document batch created successfully!');
-      } else {
-        alert('❌ Failed to create document batch');
-      }
+      const newBatch = data.batch;
+      setBatches(prev => [newBatch, ...prev]);
+      setCurrentBatch(newBatch);
+      startBatchProcessing(newBatch.id);
+      alert('✅ Document batch created successfully!');
     } catch (error) {
       console.error('Failed to create batch:', error);
       alert('❌ Failed to create document batch');
@@ -255,40 +237,33 @@ export const DocumentPreparation: React.FC<DocumentPreparationProps> = ({
 
   const startBatchProcessing = async (batchId: string) => {
     try {
-      const response = await fetch(`/api/v1/si/document-preparation/batches/${batchId}/process`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      await apiClient.post(`/si/document-preparation/batches/${batchId}/process`, {});
 
-      if (response.ok) {
-        // Start polling for progress updates
-        const pollInterval = setInterval(async () => {
-          const progressResponse = await fetch(`/api/v1/si/document-preparation/batches/${batchId}/status`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-            }
-          });
+      // Start polling for progress updates
+      const pollInterval = setInterval(async () => {
+        try {
+          const progressData = await apiClient.get<{ batch: DocumentBatch }>(
+            `/si/document-preparation/batches/${batchId}/status`
+          );
 
-          if (progressResponse.ok) {
-            const progressData = await progressResponse.json();
-            const updatedBatch = progressData.batch;
-            
-            setBatches(prev => prev.map(batch => 
-              batch.id === batchId ? updatedBatch : batch
-            ));
-            setCurrentBatch(updatedBatch);
+          const updatedBatch = progressData.batch;
 
-            if (['ready', 'failed', 'submitted'].includes(updatedBatch.status)) {
-              clearInterval(pollInterval);
-              if (updatedBatch.status === 'ready' && onBatchComplete) {
-                onBatchComplete(batchId);
-              }
+          setBatches(prev => prev.map(batch =>
+            batch.id === batchId ? updatedBatch : batch
+          ));
+          setCurrentBatch(updatedBatch);
+
+          if (['ready', 'failed', 'submitted'].includes(updatedBatch.status)) {
+            clearInterval(pollInterval);
+            if (updatedBatch.status === 'ready' && onBatchComplete) {
+              onBatchComplete(batchId);
             }
           }
-        }, 3000);
-      }
+        } catch (error) {
+          console.error('Failed to poll batch progress:', error);
+          clearInterval(pollInterval);
+        }
+      }, 3000);
     } catch (error) {
       console.error('Failed to start batch processing:', error);
     }
@@ -297,20 +272,14 @@ export const DocumentPreparation: React.FC<DocumentPreparationProps> = ({
   const handleValidateBatch = async (batchId: string) => {
     try {
       setIsProcessing(true);
-      const response = await fetch(`/api/v1/si/document-preparation/batches/${batchId}/validate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.post<{
+        validation_results?: FIRSValidationResult[];
+        valid_documents: number;
+        total_documents: number;
+      }>(`/si/document-preparation/batches/${batchId}/validate`, {});
 
-      if (response.ok) {
-        const data = await response.json();
-        setValidationResults(data.validation_results || []);
-        alert(`✅ Batch validation completed. ${data.valid_documents}/${data.total_documents} documents are valid.`);
-      } else {
-        alert('❌ Failed to validate batch');
-      }
+      setValidationResults(data.validation_results || []);
+      alert(`✅ Batch validation completed. ${data.valid_documents}/${data.total_documents} documents are valid.`);
     } catch (error) {
       console.error('Failed to validate batch:', error);
       alert('❌ Failed to validate batch');
@@ -322,20 +291,13 @@ export const DocumentPreparation: React.FC<DocumentPreparationProps> = ({
   const handleSubmitToFIRS = async (batchId: string) => {
     try {
       setIsProcessing(true);
-      const response = await fetch(`/api/v1/si/document-preparation/batches/${batchId}/submit`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('taxpoynt_auth_token')}`
-        }
-      });
+      const data = await apiClient.post<{ firs_reference: string }>(
+        `/si/document-preparation/batches/${batchId}/submit`,
+        {}
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        alert(`🇳🇬 Batch submitted to FIRS successfully! Reference: ${data.firs_reference}`);
-        fetchProcessingBatches();
-      } else {
-        alert('❌ Failed to submit batch to FIRS');
-      }
+      alert(`🇳🇬 Batch submitted to FIRS successfully! Reference: ${data.firs_reference}`);
+      fetchProcessingBatches();
     } catch (error) {
       console.error('Failed to submit to FIRS:', error);
       alert('❌ Failed to submit batch to FIRS');

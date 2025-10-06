@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '../../../shared_components/services/auth';
+import { authService, type User } from '../../../shared_components/services/auth';
 import { EnhancedSIInterface } from '../../../si_interface/EnhancedSIInterface';
 
 export default function SIDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

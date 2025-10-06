@@ -72,10 +72,7 @@ export const ServiceAccessProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshServices = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/v1/service-access/services/available', {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      });
-      const services = await response.json();
+      const services = await apiClient.get('/service-access/services/available');
       setUserServices(services.map(s => ({
         serviceType: s.service_type,
         accessLevel: s.access_level,
@@ -658,7 +655,7 @@ export const TrustSection: React.FC = () => {
 
   useEffect(() => {
     // Fetch public compliance status
-    fetch('/api/v1/public/compliance-status')
+    apiClient.get('/public/compliance-status')
       .then(res => res.json())
       .then(setComplianceStatus);
   }, []);

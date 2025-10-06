@@ -10,7 +10,7 @@ import os
 import asyncio
 import logging
 from typing import Optional, Dict, Any
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import StaticPool
 from alembic import command
@@ -154,6 +154,8 @@ class DatabaseInitializer:
             # Create production indexes for performance (PostgreSQL only)
             if is_postgres:
                 await self._create_production_indexes()
+
+            _ensure_onboarding_table(self.engine)
 
         except Exception as e:
             logger.error(f"❌ Failed to initialize schema: {e}")
@@ -365,6 +367,29 @@ class DatabaseInitializer:
                 logger.info("✅ Database connections cleaned up")
         except Exception as e:
             logger.error(f"❌ Database cleanup failed: {e}")
+
+
+def _ensure_onboarding_table(engine) -> bool:
+    """Ensure onboarding state table exists; create it if migrations were skipped."""
+    try:
+        from core_platform.data_management.models.onboarding_state import (  # noqa: WPS433
+            OnboardingStateORM,
+        )
+
+        inspector = inspect(engine)
+        table_name = OnboardingStateORM.__tablename__
+        if inspector.has_table(table_name):
+            return True
+
+        logger.info("📦 onboarding_states table missing; creating via bootstrap fallback")
+        OnboardingStateORM.__table__.create(bind=engine, checkfirst=True)
+        return True
+    except Exception as ensure_exc:  # pragma: no cover - defensive guard
+        logger.warning(
+            "Could not ensure onboarding_states table exists automatically: %s",
+            ensure_exc,
+        )
+        return False
 
 
 # Global database initializer instance

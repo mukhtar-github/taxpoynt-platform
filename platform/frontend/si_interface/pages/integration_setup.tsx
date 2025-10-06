@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../design_system/components/Button';
-import { secureTokenStorage } from '../../shared_components/utils/secureTokenStorage';
+import apiClient from '../../shared_components/api/client';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
 
 interface BusinessSystem {
@@ -323,20 +323,13 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
   const handleTestConnection = async (systemId: string) => {
     setIsProcessing(true);
     try {
-      // Simulate API call to test connection
-      const response = await fetch(`/api/v1/si/integrations/${systemId}/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': secureTokenStorage.getAuthorizationHeader() || '',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const result = await apiClient.post<{ success: boolean; error?: string }>(
+        `/si/integrations/${systemId}/test`,
+        {
           credentials: credentials[systemId],
           organization_id: organizationId
-        })
-      });
-
-      const result = await response.json();
+        }
+      );
       setTestResults(prev => ({ ...prev, [systemId]: result.success }));
       
       if (result.success) {
@@ -356,21 +349,15 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
   const handleDeployment = async () => {
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/v1/si/integrations/deploy', {
-        method: 'POST',
-        headers: {
-          'Authorization': secureTokenStorage.getAuthorizationHeader() || '',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const result = await apiClient.post<{ success: boolean; error?: string }>(
+        '/si/integrations/deploy',
+        {
           organization_id: organizationId,
           selected_systems: selectedSystems,
           credentials,
           deployment_mode: 'production'
-        })
-      });
-
-      const result = await response.json();
+        }
+      );
       
       if (result.success) {
         alert('🎉 Integration setup completed successfully!');

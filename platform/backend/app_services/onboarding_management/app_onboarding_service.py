@@ -22,16 +22,20 @@ Architecture:
 - Provides database persistence for APP onboarding state
 """
 
-import asyncio
-import json
 import logging
-import os
-from pathlib import Path
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 
 from core_platform.services.analytics_service import OnboardingAnalyticsService
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.repositories.onboarding_state_repo_async import (
+    OnboardingStateRepositoryAsync,
+)
+from core_platform.data_management.models.onboarding_state import (
+    OnboardingStateORM,
+    serialize_completed_steps,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,69 +77,38 @@ class APPOnboardingService:
             ]
         }
         
-        # Persistent storage configuration
-        default_store = os.getenv("APP_ONBOARDING_STATE_STORE", os.path.join("queue_data", "app_onboarding_states.json"))
-        self._store_path = Path(default_store)
-        self._store_lock = asyncio.Lock()
-        self._states_loaded = False
-        self._onboarding_states: Dict[str, APPOnboardingState] = {}
-
         # Analytics integration
         self.analytics_service = OnboardingAnalyticsService()
 
         logger.info(f"{self.service_name} v{self.version} initialized")
         
     async def handle_operation(self, operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Handle APP onboarding-related operations.
-        
-        Args:
-            operation: Operation name
-            payload: Operation payload containing user_id and operation-specific data
-            
-        Returns:
-            Dict with operation results
-        """
+        """Handle APP onboarding-related operations."""
         try:
-            logger.info(f"Handling APP onboarding operation: {operation}")
-            
-            # Extract common payload data
+            logger.info("Handling APP onboarding operation: %s", operation)
+
             user_id = payload.get("user_id")
-            api_version = payload.get("api_version", "v1")
-            
             if not user_id:
                 raise ValueError("User ID is required for APP onboarding operations")
 
-            await self._ensure_store_loaded()
-            
-            # Route to appropriate handler
-            if operation == "get_onboarding_state":
-                return await self._handle_get_onboarding_state(user_id, payload)
-            elif operation == "update_onboarding_state":
-                return await self._handle_update_onboarding_state(user_id, payload)
-            elif operation == "complete_onboarding_step":
-                return await self._handle_complete_onboarding_step(user_id, payload)
-            elif operation == "complete_onboarding":
-                return await self._handle_complete_onboarding(user_id, payload)
-            elif operation == "reset_onboarding_state":
-                return await self._handle_reset_onboarding_state(user_id, payload)
-            elif operation == "get_onboarding_analytics":
-                return await self._handle_get_onboarding_analytics(user_id, payload)
-            elif operation == "get_business_verification_status":
-                return await self._handle_get_business_verification_status(user_id, payload)
-            elif operation == "get_firs_integration_status":
-                return await self._handle_get_firs_integration_status(user_id, payload)
-            else:
-                raise ValueError(f"Unknown APP onboarding operation: {operation}")
-                
+            async for session in get_async_session():
+                repo = OnboardingStateRepositoryAsync(session)
+                return await self._handle_with_repo(repo, operation, payload, user_id)
+
+            raise RuntimeError("Failed to acquire database session for APP onboarding operation")
+
         except Exception as e:
-            logger.error(f"Error handling APP onboarding operation {operation}: {str(e)}", exc_info=True)
+            logger.error("Error handling APP onboarding operation %s: %s", operation, str(e), exc_info=True)
             raise RuntimeError(f"APP onboarding operation failed: {str(e)}")
     
-    async def _handle_get_onboarding_state(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_get_onboarding_state(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
         """Get current onboarding state for APP user"""
         try:
-            state = await self._get_onboarding_state(user_id)
+            state = await self._get_onboarding_state(repo, user_id)
             return {
                 "operation": "get_onboarding_state",
                 "success": True,
@@ -147,7 +120,12 @@ class APPOnboardingService:
             logger.error(f"Error getting APP onboarding state for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_update_onboarding_state(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_update_onboarding_state(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """Update APP onboarding state with new progress"""
         try:
             onboarding_data = payload.get("onboarding_data", {})
@@ -160,10 +138,11 @@ class APPOnboardingService:
                 raise ValueError("Current step is required for state update")
             
             state = await self._update_onboarding_state(
+                repo=repo,
                 user_id=user_id,
                 current_step=current_step,
                 completed_steps=completed_steps,
-                metadata=metadata
+                metadata=metadata,
             )
 
             return {
@@ -177,7 +156,12 @@ class APPOnboardingService:
             logger.error(f"Error updating APP onboarding state for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_complete_onboarding_step(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_complete_onboarding_step(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """Complete a specific APP onboarding step"""
         try:
             step_name = payload.get("step_name")
@@ -186,7 +170,7 @@ class APPOnboardingService:
             if not step_name:
                 raise ValueError("Step name is required")
             
-            state = await self._complete_step(user_id, step_name, metadata)
+            state = await self._complete_step(repo, user_id, step_name, metadata)
 
             return {
                 "operation": "complete_onboarding_step",
@@ -200,12 +184,17 @@ class APPOnboardingService:
             logger.error(f"Error completing APP onboarding step for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_complete_onboarding(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_complete_onboarding(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """Mark entire APP onboarding as complete"""
         try:
             completion_metadata = payload.get("completion_metadata", {})
             
-            state = await self._complete_onboarding(user_id, completion_metadata)
+            state = await self._complete_onboarding(repo, user_id, completion_metadata)
             
             return {
                 "operation": "complete_onboarding",
@@ -219,10 +208,14 @@ class APPOnboardingService:
             logger.error(f"Error completing APP onboarding for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_reset_onboarding_state(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_reset_onboarding_state(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
         """Reset APP onboarding state for user"""
         try:
-            await self._reset_onboarding_state(user_id)
+            await self._reset_onboarding_state(repo, user_id)
             
             return {
                 "operation": "reset_onboarding_state",
@@ -235,10 +228,14 @@ class APPOnboardingService:
             logger.error(f"Error resetting APP onboarding state for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_get_onboarding_analytics(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_get_onboarding_analytics(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
         """Get APP onboarding analytics for user"""
         try:
-            analytics = await self._get_onboarding_analytics(user_id)
+            analytics = await self._get_onboarding_analytics(repo, user_id)
             
             return {
                 "operation": "get_onboarding_analytics",
@@ -251,10 +248,14 @@ class APPOnboardingService:
             logger.error(f"Error getting APP onboarding analytics for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_get_business_verification_status(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_get_business_verification_status(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
         """Get business verification status for APP user"""
         try:
-            status = await self._get_business_verification_status(user_id)
+            status = await self._get_business_verification_status(repo, user_id)
 
             return {
                 "operation": "get_business_verification_status",
@@ -267,10 +268,14 @@ class APPOnboardingService:
             logger.error(f"Error getting business verification status for user {user_id}: {str(e)}")
             raise
 
-    async def _handle_get_firs_integration_status(self, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_get_firs_integration_status(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
         """Get FIRS integration status for APP user"""
         try:
-            status = await self._get_firs_integration_status(user_id)
+            status = await self._get_firs_integration_status(repo, user_id)
             
             return {
                 "operation": "get_firs_integration_status",
@@ -284,43 +289,6 @@ class APPOnboardingService:
             raise
 
     # Core APP onboarding state management methods
-
-    async def _ensure_store_loaded(self) -> None:
-        if self._states_loaded:
-            return
-        async with self._store_lock:
-            if self._states_loaded:
-                return
-            try:
-                self._store_path.parent.mkdir(parents=True, exist_ok=True)
-                if self._store_path.exists():
-                    content = await asyncio.to_thread(self._store_path.read_text)
-                    if content.strip():
-                        raw = json.loads(content)
-                        self._onboarding_states = {
-                            user: APPOnboardingState(**state_dict)
-                            for user, state_dict in raw.items()
-                        }
-            except Exception as exc:
-                logger.warning("Failed to load APP onboarding state store: %s", exc)
-                self._onboarding_states = {}
-            finally:
-                self._states_loaded = True
-
-    async def _persist_states(self) -> None:
-        async with self._store_lock:
-            try:
-                payload = {
-                    user: asdict(state)
-                    for user, state in self._onboarding_states.items()
-                }
-                self._store_path.parent.mkdir(parents=True, exist_ok=True)
-                await asyncio.to_thread(
-                    self._store_path.write_text,
-                    json.dumps(payload, indent=2, sort_keys=True),
-                )
-            except Exception as exc:
-                logger.warning("Failed to persist APP onboarding state store: %s", exc)
 
     def _state_with_progress(self, state: APPOnboardingState) -> Dict[str, Any]:
         data = asdict(state)
@@ -351,12 +319,13 @@ class APPOnboardingService:
         metadata: Dict[str, Any],
     ) -> None:
         try:
+            timestamp = self._isoformat(self._utc_now()).replace("+00:00", "Z")
             event = {
                 "eventType": event_type,
                 "stepId": step_id,
                 "userId": user_id,
                 "userRole": "access_point_provider",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": timestamp,
                 "sessionId": f"app-onboarding-{user_id}",
                 "metadata": metadata,
             }
@@ -370,85 +339,107 @@ class APPOnboardingService:
         except Exception as exc:
             logger.debug("Failed to record onboarding analytics event: %s", exc)
 
-    async def _get_onboarding_state(self, user_id: str) -> Optional[APPOnboardingState]:
-        """Get APP onboarding state from storage"""
+    async def _get_onboarding_state(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Optional[APPOnboardingState]:
+        """Get APP onboarding state from the database."""
         try:
-            await self._ensure_store_loaded()
-            # For now, use in-memory storage (replace with database query)
-            state = self._onboarding_states.get(user_id)
-
-            if not state:
-                # Initialize new APP onboarding state if none exists
-                state = await self._initialize_onboarding_state(user_id)
-            
-            return state
-            
+            record = await self._get_or_create_record(repo, user_id)
+            return self._from_orm(record)
         except Exception as e:
             logger.error(f"Error retrieving APP onboarding state for user {user_id}: {str(e)}")
             return None
 
-    async def _initialize_onboarding_state(self, user_id: str, service_package: str = "app") -> APPOnboardingState:
-        """Initialize new APP onboarding state for user"""
-        now = datetime.utcnow().isoformat()
-        
-        state = APPOnboardingState(
+    async def _get_or_create_record(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> OnboardingStateORM:
+        record = await repo.fetch_state(user_id)
+        if record is None:
+            return await self._create_state_record(repo, user_id, service_package="app")
+
+        if self._ensure_app_metadata(record):
+            record = await repo.persist(record)
+
+        return record
+
+    async def _create_state_record(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        *,
+        service_package: str = "app",
+    ) -> OnboardingStateORM:
+        now = self._utc_now()
+        metadata = {
+            "service_package": service_package,
+            "initialization_date": self._isoformat(now),
+            "expected_steps": self._expected_steps_for(service_package),
+            "business_verification_status": "pending",
+            "firs_integration_status": "pending",
+        }
+
+        record = OnboardingStateORM(
             user_id=user_id,
+            service_package=service_package,
             current_step="service_introduction",
             completed_steps=[],
             has_started=True,
             is_complete=False,
-            last_active_date=now,
-            metadata={
-                "service_package": service_package,
-                "initialization_date": now,
-                "expected_steps": self.default_steps.get(service_package, self.default_steps["app"]),
-                "business_verification_status": "pending",
-                "firs_integration_status": "pending"
-            },
+            state_metadata=metadata,
             created_at=now,
-            updated_at=now
+            updated_at=now,
+            last_active_date=now,
         )
-        
-        # Store in memory (replace with database insert)
-        self._onboarding_states[user_id] = state
-        await self._persist_states()
+
+        persisted = await repo.persist(record)
         await self._record_event(
             user_id=user_id,
             step_id="service_introduction",
             event_type="initialize_onboarding",
             metadata={"service_package": service_package},
         )
-        
-        logger.info(f"Initialized new APP onboarding state for user {user_id}")
-        return state
 
-    async def _update_onboarding_state(self, 
-                                      user_id: str, 
-                                      current_step: str,
-                                      completed_steps: List[str] = None,
-                                      metadata: Dict[str, Any] = None) -> APPOnboardingState:
-        """Update APP onboarding state"""
-        state = await self._get_onboarding_state(user_id)
-        if not state:
-            state = await self._initialize_onboarding_state(user_id)
-        
-        # Update state
-        state.current_step = current_step
-        if completed_steps is not None:
-            state.completed_steps = list(set(state.completed_steps + completed_steps))
+        logger.info("Initialized new APP onboarding state for user %s", user_id)
+        return persisted
+
+    async def _update_onboarding_state(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        *,
+        current_step: str,
+        completed_steps: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> APPOnboardingState:
+        record = await self._get_or_create_record(repo, user_id)
+        now = self._utc_now()
+
+        existing_steps = list(record.completed_steps or [])
+        if completed_steps:
+            record.completed_steps = serialize_completed_steps(existing_steps + completed_steps)
+
+        record.current_step = current_step
+        record.has_started = True
+        record.is_complete = record.is_complete or "onboarding_complete" in record.completed_steps
+
+        metadata_map = dict(record.state_metadata or {})
         if metadata:
-            state.metadata.update(metadata)
-        
-        state.last_active_date = datetime.utcnow().isoformat()
-        state.updated_at = datetime.utcnow().isoformat()
-        
-        # Check if onboarding is complete
-        if "onboarding_complete" in state.completed_steps:
-            state.is_complete = True
-        
-        # Store updated state (replace with database update)
-        self._onboarding_states[user_id] = state
-        await self._persist_states()
+            metadata_map.update(metadata)
+
+        metadata_map.setdefault("service_package", "app")
+        metadata_map.setdefault("expected_steps", self._expected_steps_for(record.service_package))
+        record.state_metadata = metadata_map
+
+        record.last_active_date = now
+        record.updated_at = now
+
+        persisted = await repo.persist(record)
+        state = self._from_orm(persisted)
+
         await self._record_event(
             user_id=user_id,
             step_id=current_step,
@@ -458,40 +449,48 @@ class APPOnboardingService:
                 "metadata": metadata or {},
             },
         )
-        
+
         return state
 
-    async def _complete_step(self, user_id: str, step_name: str, metadata: Dict[str, Any] = None) -> APPOnboardingState:
-        """Mark a specific APP step as complete"""
-        state = await self._get_onboarding_state(user_id)
-        if not state:
-            state = await self._initialize_onboarding_state(user_id)
-        
-        # Add step to completed steps if not already there
-        if step_name not in state.completed_steps:
-            state.completed_steps.append(step_name)
-        
-        # Update metadata
+    async def _complete_step(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        step_name: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> APPOnboardingState:
+        record = await self._get_or_create_record(repo, user_id)
+        now = self._utc_now()
+
+        record.completed_steps = serialize_completed_steps(list(record.completed_steps or []) + [step_name])
+        record.current_step = step_name
+        record.has_started = True
+        record.is_complete = record.is_complete or step_name == "onboarding_complete"
+
+        metadata_map = dict(record.state_metadata or {})
+        step_metadata = dict(metadata_map.get("step_metadata", {}))
+        step_entry = dict(step_metadata.get(step_name, {}))
         if metadata:
-            step_metadata = state.metadata.get("step_metadata", {})
-            step_metadata[step_name] = {
-                **metadata,
-                "completed_at": datetime.utcnow().isoformat()
-            }
-            state.metadata["step_metadata"] = step_metadata
-        
-        # Update specific APP step statuses
+            step_entry.update(metadata)
+        step_entry["completed_at"] = self._isoformat(now)
+        step_metadata[step_name] = step_entry
+        metadata_map["step_metadata"] = step_metadata
+
         if step_name == "business_verification":
-            state.metadata["business_verification_status"] = "completed"
+            metadata_map["business_verification_status"] = "completed"
         elif step_name == "firs_integration_setup":
-            state.metadata["firs_integration_status"] = "completed"
-        
-        state.last_active_date = datetime.utcnow().isoformat()
-        state.updated_at = datetime.utcnow().isoformat()
-        
-        # Store updated state
-        self._onboarding_states[user_id] = state
-        await self._persist_states()
+            metadata_map["firs_integration_status"] = "completed"
+
+        metadata_map.setdefault("service_package", "app")
+        metadata_map.setdefault("expected_steps", self._expected_steps_for(record.service_package))
+        record.state_metadata = metadata_map
+
+        record.last_active_date = now
+        record.updated_at = now
+
+        persisted = await repo.persist(record)
+        state = self._from_orm(persisted)
+
         await self._record_event(
             user_id=user_id,
             step_id=step_name,
@@ -500,42 +499,72 @@ class APPOnboardingService:
                 "step_metadata": metadata or {},
             },
         )
-        
+
         return state
 
-    async def _complete_onboarding(self, user_id: str, completion_metadata: Dict[str, Any] = None) -> APPOnboardingState:
-        """Mark entire APP onboarding as complete"""
-        state = await self._complete_step(user_id, "onboarding_complete", completion_metadata)
-        state.is_complete = True
-        state.current_step = "onboarding_complete"
-        
-        # Add completion metadata
-        state.metadata["completion"] = {
-            **(completion_metadata or {}),
-            "completed_at": datetime.utcnow().isoformat(),
-            "completion_type": "app_onboarding"
-        }
-        
-        # Store updated state
-        self._onboarding_states[user_id] = state
-        await self._persist_states()
+    async def _complete_onboarding(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        completion_metadata: Optional[Dict[str, Any]] = None,
+    ) -> APPOnboardingState:
+        record = await self._get_or_create_record(repo, user_id)
+        now = self._utc_now()
+
+        record.completed_steps = serialize_completed_steps(list(record.completed_steps or []) + ["onboarding_complete"])
+        record.current_step = "onboarding_complete"
+        record.has_started = True
+        record.is_complete = True
+
+        metadata_map = dict(record.state_metadata or {})
+        step_metadata = dict(metadata_map.get("step_metadata", {}))
+        completion_step = dict(step_metadata.get("onboarding_complete", {}))
+        if completion_metadata:
+            completion_step.update(completion_metadata)
+        completion_step["completed_at"] = self._isoformat(now)
+        step_metadata["onboarding_complete"] = completion_step
+        metadata_map["step_metadata"] = step_metadata
+
+        completion_section = dict(metadata_map.get("completion", {}))
+        if completion_metadata:
+            completion_section.update(completion_metadata)
+        completion_section.setdefault("completed_at", self._isoformat(now))
+        completion_section.setdefault("completion_type", "app_onboarding")
+        metadata_map["completion"] = completion_section
+
+        if "business_verification" in record.completed_steps:
+            metadata_map.setdefault("business_verification_status", "completed")
+        if "firs_integration_setup" in record.completed_steps:
+            metadata_map.setdefault("firs_integration_status", "completed")
+
+        metadata_map.setdefault("service_package", "app")
+        metadata_map.setdefault("expected_steps", self._expected_steps_for(record.service_package))
+        record.state_metadata = metadata_map
+
+        record.last_active_date = now
+        record.updated_at = now
+
+        persisted = await repo.persist(record)
+        state = self._from_orm(persisted)
+
         await self._record_event(
             user_id=user_id,
             step_id="onboarding_complete",
             event_type="complete_onboarding",
             metadata=completion_metadata or {},
         )
-        
-        logger.info(f"APP onboarding completed for user {user_id}")
+
+        logger.info("APP onboarding completed for user %s", user_id)
         return state
 
-    async def _reset_onboarding_state(self, user_id: str) -> None:
-        """Reset APP onboarding state for user"""
-        if user_id in self._onboarding_states:
-            del self._onboarding_states[user_id]
-        
-        logger.info(f"APP onboarding state reset for user {user_id}")
-        await self._persist_states()
+    async def _reset_onboarding_state(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> None:
+        await repo.delete_state(user_id)
+
+        logger.info("APP onboarding state reset for user %s", user_id)
         await self._record_event(
             user_id=user_id,
             step_id="reset",
@@ -543,29 +572,31 @@ class APPOnboardingService:
             metadata={},
         )
 
-    async def _get_onboarding_analytics(self, user_id: str) -> Dict[str, Any]:
-        """Get APP onboarding analytics and insights"""
-        state = await self._get_onboarding_state(user_id)
-        
+    async def _get_onboarding_analytics(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
+        state = await self._get_onboarding_state(repo, user_id)
+
         if not state:
             return {
                 "user_id": user_id,
                 "status": "not_started",
-                "analytics": {}
+                "analytics": {},
             }
-        
-        # Calculate analytics
+
         expected_steps = state.metadata.get("expected_steps", [])
         completed_count = len(state.completed_steps)
         total_count = len(expected_steps)
         completion_percentage = (completed_count / total_count * 100) if total_count > 0 else 0
-        
-        # Calculate time metrics
-        created_at = datetime.fromisoformat(state.created_at.replace('Z', '+00:00') if state.created_at.endswith('Z') else state.created_at)
-        last_active = datetime.fromisoformat(state.last_active_date.replace('Z', '+00:00') if state.last_active_date.endswith('Z') else state.last_active_date)
-        days_since_start = (datetime.utcnow().replace(tzinfo=created_at.tzinfo) - created_at).days
-        days_since_last_active = (datetime.utcnow().replace(tzinfo=last_active.tzinfo) - last_active).days
-        
+
+        created_at = self._parse_iso(state.created_at)
+        last_active = self._parse_iso(state.last_active_date)
+        now = self._utc_now()
+        days_since_start = (now - created_at).days
+        days_since_last_active = (now - last_active).days
+
         return {
             "user_id": user_id,
             "status": "complete" if state.is_complete else "in_progress" if state.has_started else "not_started",
@@ -577,35 +608,38 @@ class APPOnboardingService:
                 "current_step": state.current_step,
                 "days_since_start": days_since_start,
                 "days_since_last_active": days_since_last_active,
-                "is_stale": days_since_last_active > 7,  # Consider stale if inactive for 7+ days
+                "is_stale": days_since_last_active > 7,
                 "business_verification_status": state.metadata.get("business_verification_status", "pending"),
                 "firs_integration_status": state.metadata.get("firs_integration_status", "pending"),
                 "expected_completion": {
                     "next_steps": [step for step in expected_steps if step not in state.completed_steps],
-                    "estimated_remaining_time": f"{max(1, total_count - completed_count)} steps remaining"
-                }
+                    "estimated_remaining_time": f"{max(1, total_count - completed_count)} steps remaining",
+                },
             },
             "timeline": {
                 "started_at": state.created_at,
                 "last_active": state.last_active_date,
-                "completed_at": state.metadata.get("completion", {}).get("completed_at") if state.is_complete else None
-            }
+                "completed_at": state.metadata.get("completion", {}).get("completed_at") if state.is_complete else None,
+            },
         }
 
-    async def _get_business_verification_status(self, user_id: str) -> Dict[str, Any]:
-        """Get business verification status for APP user"""
-        state = await self._get_onboarding_state(user_id)
-        
+    async def _get_business_verification_status(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
+        state = await self._get_onboarding_state(repo, user_id)
+
         if not state:
             return {
                 "status": "not_started",
                 "verification_steps": [],
-                "required_documents": ["Business registration", "Tax ID", "Bank statements"]
+                "required_documents": ["Business registration", "Tax ID", "Bank statements"],
             }
-        
+
         verification_status = state.metadata.get("business_verification_status", "pending")
         step_metadata = state.metadata.get("step_metadata", {}).get("business_verification", {})
-        
+
         return {
             "status": verification_status,
             "completed_at": step_metadata.get("completed_at"),
@@ -613,36 +647,39 @@ class APPOnboardingService:
                 {
                     "name": "Business Registration",
                     "status": "completed" if "business_registration" in state.completed_steps else "pending",
-                    "required": True
+                    "required": True,
                 },
                 {
                     "name": "Tax ID Verification",
                     "status": "completed" if "tax_id_verification" in state.completed_steps else "pending",
-                    "required": True
+                    "required": True,
                 },
                 {
                     "name": "Bank Account Verification",
                     "status": "completed" if "bank_verification" in state.completed_steps else "pending",
-                    "required": True
-                }
+                    "required": True,
+                },
             ],
-            "metadata": step_metadata
+            "metadata": step_metadata,
         }
 
-    async def _get_firs_integration_status(self, user_id: str) -> Dict[str, Any]:
-        """Get FIRS integration status for APP user"""
-        state = await self._get_onboarding_state(user_id)
-        
+    async def _get_firs_integration_status(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+    ) -> Dict[str, Any]:
+        state = await self._get_onboarding_state(repo, user_id)
+
         if not state:
             return {
                 "status": "not_started",
                 "integration_steps": [],
-                "firs_connection": "not_configured"
+                "firs_connection": "not_configured",
             }
-        
+
         integration_status = state.metadata.get("firs_integration_status", "pending")
         step_metadata = state.metadata.get("step_metadata", {}).get("firs_integration_setup", {})
-        
+
         return {
             "status": integration_status,
             "completed_at": step_metadata.get("completed_at"),
@@ -651,18 +688,113 @@ class APPOnboardingService:
                 {
                     "name": "FIRS API Configuration",
                     "status": "completed" if "firs_api_config" in state.completed_steps else "pending",
-                    "required": True
+                    "required": True,
                 },
                 {
                     "name": "Certificate Setup",
                     "status": "completed" if "certificate_setup" in state.completed_steps else "pending",
-                    "required": True
+                    "required": True,
                 },
                 {
                     "name": "Test Connection",
                     "status": "completed" if "test_connection" in state.completed_steps else "pending",
-                    "required": True
-                }
+                    "required": True,
+                },
             ],
-            "metadata": step_metadata
+            "metadata": step_metadata,
         }
+
+    def _from_orm(self, record: OnboardingStateORM) -> APPOnboardingState:
+        metadata = dict(record.state_metadata or {})
+        metadata.setdefault("service_package", "app")
+        metadata.setdefault("expected_steps", self._expected_steps_for(record.service_package))
+        metadata.setdefault("business_verification_status", "pending")
+        metadata.setdefault("firs_integration_status", "pending")
+
+        return APPOnboardingState(
+            user_id=record.user_id,
+            current_step=record.current_step,
+            completed_steps=list(record.completed_steps or []),
+            has_started=record.has_started,
+            is_complete=record.is_complete,
+            last_active_date=self._isoformat(record.last_active_date),
+            metadata=metadata,
+            created_at=self._isoformat(record.created_at),
+            updated_at=self._isoformat(record.updated_at),
+        )
+
+    def _expected_steps_for(self, service_package: Optional[str]) -> List[str]:
+        key = service_package or "app"
+        return list(self.default_steps.get(key, self.default_steps["app"]))
+
+    def _ensure_app_metadata(self, record: OnboardingStateORM) -> bool:
+        changed = False
+        metadata = dict(record.state_metadata or {})
+
+        if record.service_package != "app":
+            record.service_package = "app"
+            changed = True
+
+        if "service_package" not in metadata:
+            metadata["service_package"] = "app"
+            changed = True
+
+        if "expected_steps" not in metadata or not isinstance(metadata["expected_steps"], list):
+            metadata["expected_steps"] = self._expected_steps_for(record.service_package)
+            changed = True
+
+        if "business_verification_status" not in metadata:
+            metadata["business_verification_status"] = "pending"
+            changed = True
+
+        if "firs_integration_status" not in metadata:
+            metadata["firs_integration_status"] = "pending"
+            changed = True
+
+        if metadata != record.state_metadata:
+            record.state_metadata = metadata
+
+        return changed
+
+    @staticmethod
+    def _utc_now() -> datetime:
+        return datetime.now(timezone.utc)
+
+    @staticmethod
+    def _isoformat(value: datetime) -> str:
+        if isinstance(value, datetime):
+            return value.astimezone(timezone.utc).isoformat()
+        return str(value)
+
+    @staticmethod
+    def _parse_iso(value: str) -> datetime:
+        if not value:
+            return datetime.now(timezone.utc)
+        normalized = value.replace("Z", "+00:00")
+        return datetime.fromisoformat(normalized)
+
+    async def _handle_with_repo(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        operation: str,
+        payload: Dict[str, Any],
+        user_id: str,
+    ) -> Dict[str, Any]:
+        if operation == "get_onboarding_state":
+            return await self._handle_get_onboarding_state(repo, user_id)
+        if operation == "update_onboarding_state":
+            return await self._handle_update_onboarding_state(repo, user_id, payload)
+        if operation == "complete_onboarding_step":
+            return await self._handle_complete_onboarding_step(repo, user_id, payload)
+        if operation == "complete_onboarding":
+            return await self._handle_complete_onboarding(repo, user_id, payload)
+        if operation == "reset_onboarding_state":
+            return await self._handle_reset_onboarding_state(repo, user_id)
+        if operation == "get_onboarding_analytics":
+            return await self._handle_get_onboarding_analytics(repo, user_id)
+        if operation == "get_business_verification_status":
+            return await self._handle_get_business_verification_status(repo, user_id)
+        if operation == "get_firs_integration_status":
+            return await self._handle_get_firs_integration_status(repo, user_id)
+
+        raise ValueError(f"Unknown APP onboarding operation: {operation}")
