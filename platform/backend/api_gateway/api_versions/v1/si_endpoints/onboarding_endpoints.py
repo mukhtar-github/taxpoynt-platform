@@ -212,7 +212,7 @@ class OnboardingEndpointsV1:
             }
             
             result = await self.message_router.route_message(
-                service_role=self._resolve_service_role(context),
+                self._resolve_service_role(context),
                 operation="get_onboarding_state",
                 payload={
                     "user_id": context.user_id,
@@ -270,7 +270,7 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_state_updated", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=self._resolve_service_role(context),
+                self._resolve_service_role(context),
                 operation="update_onboarding_state",
                 payload={
                     "user_id": context.user_id,
@@ -321,7 +321,7 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_step_completed", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=self._resolve_service_role(context),
+                self._resolve_service_role(context),
                 operation="complete_onboarding_step",
                 payload={
                     "user_id": context.user_id,
@@ -371,7 +371,7 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_completed", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=self._resolve_service_role(context),
+                self._resolve_service_role(context),
                 operation="complete_onboarding",
                 payload={
                     "user_id": context.user_id,
@@ -421,7 +421,7 @@ class OnboardingEndpointsV1:
                     return self._create_v1_response(stored, "onboarding_state_reset", status_code=stored_code or 200)
 
             result = await self.message_router.route_message(
-                service_role=self._resolve_service_role(context),
+                self._resolve_service_role(context),
                 operation="reset_onboarding_state",
                 payload={
                     "user_id": context.user_id,
@@ -449,7 +449,7 @@ class OnboardingEndpointsV1:
         try:
             context = await self._require_onboarding_access(request)
             result = await self.message_router.route_message(
-                service_role=self._resolve_service_role(context),
+                self._resolve_service_role(context),
                 operation="get_onboarding_analytics",
                 payload={
                     "user_id": context.user_id,
