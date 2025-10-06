@@ -448,10 +448,12 @@ def create_firs_invoice_router(
                 generation_stats=stats
             )
 
-            return build_v1_response(
-                data=response_data.dict(),
-                action="generate_firs_invoices"
-            )
+            wrapped = {
+                "success": True,
+                "data": response_data.dict()
+            }
+
+            return build_v1_response(wrapped, "generate_firs_invoices")
 
         except HTTPException:
             raise

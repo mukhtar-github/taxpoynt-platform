@@ -1515,9 +1515,24 @@ class FIRSIntegrationEndpointsV1:
             logger.error(f"Error updating FIRS invoice in v1: {e}")
             raise HTTPException(status_code=500, detail="Failed to update FIRS invoice")
     
-    def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
-        """Create standardized v1 response format using V1ResponseModel"""
-        return build_v1_response(data, action)
+    def _create_v1_response(self, payload: Any, action: str, status_code: int = 200) -> V1ResponseModel:
+        """Create standardized v1 response format using V1ResponseModel.
+
+        For FIRS integration endpoints we retain the full service payload inside the
+        response `data` field so downstream consumers (and guardrail tests) can access
+        metadata the services return (e.g. refreshed resource metadata).
+        """
+
+        success = True
+        if isinstance(payload, dict) and isinstance(payload.get("success"), bool):
+            success = payload["success"]
+
+        wrapper = {
+            "success": success,
+            "data": payload
+        }
+
+        return build_v1_response(wrapper, action)
 
 
 def create_firs_integration_router(role_detector: HTTPRoleDetector,
