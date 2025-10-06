@@ -280,6 +280,18 @@ class OnboardingEndpointsV1:
                 return self._create_v1_response(mock_result, "onboarding_state_retrieved")
 
             return self._create_v1_response(result, "onboarding_state_retrieved")
+        except RuntimeError as service_error:
+            logger.warning(
+                "Onboarding state service unavailable, returning mock state: %s",
+                service_error,
+            )
+            fallback_payload = {
+                "success": True,
+                "data": mock_result,
+                "fallback": True,
+                "error_message": str(service_error),
+            }
+            return self._create_v1_response(fallback_payload, "onboarding_state_retrieved")
         except HTTPException:
             raise
         except Exception as e:
