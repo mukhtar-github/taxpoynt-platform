@@ -21,6 +21,11 @@ from core_platform.messaging.message_router import (
     RoutedMessage,
     MessageType,
 )
+
+try:
+    from core_platform.messaging.redis_message_router import RedisMessageRouter
+except Exception:  # pragma: no cover - optional dependency in some envs
+    RedisMessageRouter = None
 from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
@@ -100,6 +105,9 @@ class OnboardingEndpointsV1:
             if "positional arguments" not in message and "unexpected keyword" not in message:
                 raise
 
+            if RedisMessageRouter is not None and isinstance(self.message_router, RedisMessageRouter):
+                return await MessageRouter.route_message(self.message_router, service_role, operation, payload)
+
             routing_context = RoutingContext(
                 source_service="api_gateway",
                 source_role=ServiceRole.CORE,
@@ -120,7 +128,8 @@ class OnboardingEndpointsV1:
                 timestamp=datetime.now(timezone.utc),
             )
 
-            return await self.message_router.route_message(routed_message)
+            route_msg = getattr(self.message_router, "route_message")
+            return await route_msg(routed_message)
     
     async def _require_onboarding_access(self, request: Request) -> HTTPRoutingContext:
         """Ensure unified onboarding access for SI, APP, and Hybrid roles."""
