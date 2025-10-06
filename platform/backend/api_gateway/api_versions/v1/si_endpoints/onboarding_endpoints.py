@@ -213,7 +213,7 @@ class OnboardingEndpointsV1:
             
             result = await self.message_router.route_message(
                 self._resolve_service_role(context),
-                operation="get_onboarding_state",
+                "get_onboarding_state",
                 payload={
                     "user_id": context.user_id,
                     "service_package": context.metadata.get("service_package"),
@@ -271,7 +271,7 @@ class OnboardingEndpointsV1:
 
             result = await self.message_router.route_message(
                 self._resolve_service_role(context),
-                operation="update_onboarding_state",
+                "update_onboarding_state",
                 payload={
                     "user_id": context.user_id,
                     "onboarding_data": body,
@@ -322,7 +322,7 @@ class OnboardingEndpointsV1:
 
             result = await self.message_router.route_message(
                 self._resolve_service_role(context),
-                operation="complete_onboarding_step",
+                "complete_onboarding_step",
                 payload={
                     "user_id": context.user_id,
                     "step_name": step_name,
@@ -372,7 +372,7 @@ class OnboardingEndpointsV1:
 
             result = await self.message_router.route_message(
                 self._resolve_service_role(context),
-                operation="complete_onboarding",
+                "complete_onboarding",
                 payload={
                     "user_id": context.user_id,
                     "completion_metadata": body.get("metadata", {}),
@@ -422,7 +422,7 @@ class OnboardingEndpointsV1:
 
             result = await self.message_router.route_message(
                 self._resolve_service_role(context),
-                operation="reset_onboarding_state",
+                "reset_onboarding_state",
                 payload={
                     "user_id": context.user_id,
                     "service_package": context.metadata.get("service_package"),
@@ -450,7 +450,7 @@ class OnboardingEndpointsV1:
             context = await self._require_onboarding_access(request)
             result = await self.message_router.route_message(
                 self._resolve_service_role(context),
-                operation="get_onboarding_analytics",
+                "get_onboarding_analytics",
                 payload={
                     "user_id": context.user_id,
                     "service_package": context.metadata.get("service_package"),
