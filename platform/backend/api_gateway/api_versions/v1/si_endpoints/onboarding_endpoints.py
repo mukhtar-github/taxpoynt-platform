@@ -6,14 +6,21 @@ Provides centralized onboarding state synchronization across devices and session
 """
 
 import logging
+import uuid
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core_platform.authentication.role_manager import PlatformRole
-from core_platform.messaging.message_router import ServiceRole, MessageRouter
+from core_platform.messaging.message_router import (
+    ServiceRole,
+    MessageRouter,
+    RoutingContext,
+    RoutedMessage,
+    MessageType,
+)
 from api_gateway.role_routing.models import HTTPRoutingContext
 from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
@@ -76,6 +83,44 @@ class OnboardingEndpointsV1:
         self._setup_routes()
 
         logger.info("Onboarding Endpoints V1 initialized")
+
+    async def _route_onboarding_operation(
+        self,
+        context: HTTPRoutingContext,
+        operation: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Route onboarding operations, compatible with both legacy and updated router signatures."""
+
+        service_role = self._resolve_service_role(context)
+        try:
+            return await self.message_router.route_message(service_role, operation, payload)
+        except TypeError as exc:
+            message = str(exc)
+            if "positional arguments" not in message and "unexpected keyword" not in message:
+                raise
+
+            routing_context = RoutingContext(
+                source_service="api_gateway",
+                source_role=ServiceRole.CORE,
+                target_role=service_role,
+                tenant_id=context.organization_id,
+                routing_metadata={
+                    "operation": operation,
+                    "api_gateway_route": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+
+            routed_message = RoutedMessage(
+                message_id=str(uuid.uuid4()),
+                message_type=MessageType.COMMAND,
+                payload=payload,
+                routing_context=routing_context,
+                timestamp=datetime.now(timezone.utc),
+            )
+
+            return await self.message_router.route_message(routed_message)
     
     async def _require_onboarding_access(self, request: Request) -> HTTPRoutingContext:
         """Ensure unified onboarding access for SI, APP, and Hybrid roles."""
@@ -211,8 +256,8 @@ class OnboardingEndpointsV1:
                 "next_action": "Complete business information setup"
             }
             
-            result = await self.message_router.route_message(
-                self._resolve_service_role(context),
+            result = await self._route_onboarding_operation(
+                context,
                 "get_onboarding_state",
                 {
                     "user_id": context.user_id,
@@ -269,8 +314,8 @@ class OnboardingEndpointsV1:
                 if exists and stored is not None:
                     return self._create_v1_response(stored, "onboarding_state_updated", status_code=stored_code or 200)
 
-            result = await self.message_router.route_message(
-                self._resolve_service_role(context),
+            result = await self._route_onboarding_operation(
+                context,
                 "update_onboarding_state",
                 {
                     "user_id": context.user_id,
@@ -320,8 +365,8 @@ class OnboardingEndpointsV1:
                 if exists and stored is not None:
                     return self._create_v1_response(stored, "onboarding_step_completed", status_code=stored_code or 200)
 
-            result = await self.message_router.route_message(
-                self._resolve_service_role(context),
+            result = await self._route_onboarding_operation(
+                context,
                 "complete_onboarding_step",
                 {
                     "user_id": context.user_id,
@@ -370,8 +415,8 @@ class OnboardingEndpointsV1:
                 if exists and stored is not None:
                     return self._create_v1_response(stored, "onboarding_completed", status_code=stored_code or 200)
 
-            result = await self.message_router.route_message(
-                self._resolve_service_role(context),
+            result = await self._route_onboarding_operation(
+                context,
                 "complete_onboarding",
                 {
                     "user_id": context.user_id,
@@ -420,8 +465,8 @@ class OnboardingEndpointsV1:
                 if exists and stored is not None:
                     return self._create_v1_response(stored, "onboarding_state_reset", status_code=stored_code or 200)
 
-            result = await self.message_router.route_message(
-                self._resolve_service_role(context),
+            result = await self._route_onboarding_operation(
+                context,
                 "reset_onboarding_state",
                 {
                     "user_id": context.user_id,
@@ -448,8 +493,8 @@ class OnboardingEndpointsV1:
         """Get onboarding analytics and progress insights"""
         try:
             context = await self._require_onboarding_access(request)
-            result = await self.message_router.route_message(
-                self._resolve_service_role(context),
+            result = await self._route_onboarding_operation(
+                context,
                 "get_onboarding_analytics",
                 {
                     "user_id": context.user_id,
