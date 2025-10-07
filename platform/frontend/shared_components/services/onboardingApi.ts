@@ -99,10 +99,26 @@ class OnboardingApiClient {
         throw new Error('No authentication token available');
       }
 
-      return {
+      const headers: Record<string, string> = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       };
+
+      const storedUser = authService.getStoredUser();
+      if (storedUser?.id) {
+        headers['X-User-Id'] = storedUser.id;
+      }
+      const orgId = storedUser?.organization?.id;
+      if (orgId) {
+        headers['X-Organization-Id'] = orgId;
+      }
+
+      const servicePackage = storedUser?.service_package;
+      if (servicePackage) {
+        headers['X-Service-Package'] = servicePackage;
+      }
+
+      return headers;
     } catch (error) {
       console.error('Failed to get auth headers:', error);
       throw new Error('Authentication required');
