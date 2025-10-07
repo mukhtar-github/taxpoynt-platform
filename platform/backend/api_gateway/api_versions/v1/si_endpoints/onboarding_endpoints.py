@@ -179,6 +179,18 @@ class OnboardingEndpointsV1:
         context.metadata["api_version"] = "v1"
         context.metadata["endpoint_group"] = "onboarding"
         context.metadata.setdefault("service_package", self._infer_service_package(context))
+
+        if not context.user_id:
+            header_user = request.headers.get("x-user-id") or request.headers.get("X-User-Id")
+            if header_user:
+                context.user_id = header_user
+        if not context.organization_id:
+            header_org = request.headers.get("x-organization-id") or request.headers.get("X-Organization-Id")
+            if header_org:
+                context.organization_id = header_org
+        if context.user_id:
+            context.metadata.setdefault("user_id", context.user_id)
+
         return context
 
     @staticmethod
