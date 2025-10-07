@@ -62,12 +62,12 @@ const toPercentDisplay = (value?: number, digits: number = 1): string | null => 
   return `${value.toFixed(digits)}%`;
 };
 
-const formatNumber = (value?: number): string => {
+function formatNumber(value?: number): string {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return '0';
   }
   return value.toLocaleString();
-};
+}
 
 export interface EnhancedSIInterfaceProps {
   userName?: string;
