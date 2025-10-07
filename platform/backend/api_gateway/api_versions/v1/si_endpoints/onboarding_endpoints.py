@@ -188,9 +188,13 @@ class OnboardingEndpointsV1:
             header_org = request.headers.get("x-organization-id") or request.headers.get("X-Organization-Id")
             if header_org:
                 context.organization_id = header_org
+        header_user_log = request.headers.get("x-user-id") or request.headers.get("X-User-Id")
+        if header_user_log:
+            logger.info("Onboarding request header user id: %s", header_user_log)
         if context.user_id:
             context.metadata.setdefault("user_id", context.user_id)
-
+            logger.info("Resolved onboarding user id: %s", context.user_id)
+        
         return context
 
     @staticmethod
