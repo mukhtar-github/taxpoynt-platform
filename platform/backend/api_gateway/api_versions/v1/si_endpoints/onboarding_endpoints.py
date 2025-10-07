@@ -34,6 +34,7 @@ from api_gateway.utils.v1_response import build_v1_response
 from core_platform.data_management.db_async import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.idempotency.store import IdempotencyStore
+from si_services.onboarding_management.onboarding_service import SIOnboardingService
 
 logger = logging.getLogger(__name__)
 
@@ -98,39 +99,60 @@ class OnboardingEndpointsV1:
         """Route onboarding operations, compatible with both legacy and updated router signatures."""
 
         service_role = self._resolve_service_role(context)
+        result: Optional[Dict[str, Any]] = None
         try:
-            return await self.message_router.route_message(service_role, operation, payload)
+            result = await self.message_router.route_message(service_role, operation, payload)
         except TypeError as exc:
             message = str(exc)
             if "positional arguments" not in message and "unexpected keyword" not in message:
                 raise
 
             if RedisMessageRouter is not None and isinstance(self.message_router, RedisMessageRouter):
-                return await MessageRouter.route_message(self.message_router, service_role, operation, payload)
+                result = await MessageRouter.route_message(self.message_router, service_role, operation, payload)
+            else:
+                routing_context = RoutingContext(
+                    source_service="api_gateway",
+                    source_role=ServiceRole.CORE,
+                    target_role=service_role,
+                    tenant_id=context.organization_id,
+                    routing_metadata={
+                        "operation": operation,
+                        "api_gateway_route": True,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
 
-            routing_context = RoutingContext(
-                source_service="api_gateway",
-                source_role=ServiceRole.CORE,
-                target_role=service_role,
-                tenant_id=context.organization_id,
-                routing_metadata={
-                    "operation": operation,
-                    "api_gateway_route": True,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                },
+                routed_message = RoutedMessage(
+                    message_id=str(uuid.uuid4()),
+                    message_type=MessageType.COMMAND,
+                    payload=payload,
+                    routing_context=routing_context,
+                    timestamp=datetime.now(timezone.utc),
+                )
+
+                route_msg = getattr(self.message_router, "route_message")
+                result = await route_msg(routed_message)
+        except Exception as exc:
+            logger.warning(
+                "Message router dispatch failed for onboarding operation '%s': %s",
+                operation,
+                exc,
             )
 
-            routed_message = RoutedMessage(
-                message_id=str(uuid.uuid4()),
-                message_type=MessageType.COMMAND,
-                payload=payload,
-                routing_context=routing_context,
-                timestamp=datetime.now(timezone.utc),
-            )
+        if result is None:
+            try:
+                result = await self._invoke_onboarding_service_direct(operation, payload)
+            except Exception as direct_error:
+                logger.error(
+                    "Direct onboarding service invocation failed for '%s': %s",
+                    operation,
+                    direct_error,
+                    exc_info=True,
+                )
+                return None
 
-            route_msg = getattr(self.message_router, "route_message")
-            return await route_msg(routed_message)
-    
+        return result
+
     async def _require_onboarding_access(self, request: Request) -> HTTPRoutingContext:
         """Ensure unified onboarding access for SI, APP, and Hybrid roles."""
         allowed_roles = {
@@ -588,6 +610,15 @@ class OnboardingEndpointsV1:
             "created_at": now_iso,
             "updated_at": now_iso,
         }
+
+    async def _invoke_onboarding_service_direct(
+        self,
+        operation: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Invoke SI onboarding service directly when message router is unavailable."""
+        service = SIOnboardingService()
+        return await service.handle_operation(operation, payload)
 
 
 def create_onboarding_router(
