@@ -241,6 +241,17 @@ class OnboardingApiClient {
   async getOnboardingState(): Promise<OnboardingState | null> {
     try {
       const state = await this.makeRequest<OnboardingState>('GET', '/state');
+      const localState = this.getLocalOnboardingState();
+
+      if (localState) {
+        const remoteSteps = Array.isArray(state?.completed_steps) ? state.completed_steps.length : 0;
+        const localSteps = Array.isArray(localState.completed_steps) ? localState.completed_steps.length : 0;
+
+        if (localSteps > remoteSteps || (!state?.has_started && localState.has_started)) {
+          return localState;
+        }
+      }
+
       return state;
     } catch (error) {
       console.error('Failed to get onboarding state:', error);
@@ -266,6 +277,9 @@ class OnboardingApiClient {
       
       // Fallback to localStorage update
       const localState = await this.updateLocalOnboardingStateFallback(request);
+      if (localState) {
+        return localState;
+      }
       throw error; // Still throw error so caller knows sync failed
     }
   }
