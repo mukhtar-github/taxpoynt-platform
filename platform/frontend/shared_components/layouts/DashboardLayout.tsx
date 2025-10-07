@@ -359,10 +359,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* Navigation */}
           <nav className="space-y-2">
-            {filteredNavItems.map((item) => (
+            {filteredNavItems.map((item) => {
+              const targetHref = item.id === 'integrations' && role === 'si' ? '/dashboard/si/integrations/new' : item.href;
+              return (
               <Link
                 key={item.id}
-                href={item.href}
+                href={targetHref}
                 prefetch={item.prefetch !== false}
                 className={`flex items-center space-x-3 rounded-xl border transition-all duration-200 ${
                   activeTab === item.id
@@ -404,7 +406,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   </>
                 )}
               </Link>
-            ))}
+            })}
           </nav>
 
           {/* Sidebar Footer */}

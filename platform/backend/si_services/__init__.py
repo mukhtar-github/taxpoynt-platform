@@ -21,7 +21,10 @@ Services Registered:
 import logging
 import asyncio
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from uuid import uuid4
+from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.config.feature_flags import is_firs_remote_irn_enabled
@@ -35,6 +38,8 @@ from .payment_integration.payment_service import SIPaymentService
 from .reconciliation_management.reconciliation_service import SIReconciliationService
 from .validation_services.validation_service import SIValidationService
 from .reporting_services.reporting_service import SIReportingService
+from .integration_management.connection_manager import ConnectionConfig, SystemType, connection_manager
+from .integration_management.erp_connection_repository import ERPConnectionRepository, ERPConnectionRecord
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +60,7 @@ class SIServiceRegistry:
         self.services: Dict[str, Any] = {}
         self.service_endpoints: Dict[str, str] = {}
         self.is_initialized = False
+        self.erp_connection_repository = ERPConnectionRepository()
         
     async def initialize_services(self) -> Dict[str, str]:
         """
@@ -777,6 +783,9 @@ class SIServiceRegistry:
                         "list_erp_connections",
                         "create_erp_connection",
                         "get_erp_connection",
+                        "update_erp_connection",
+                        "delete_erp_connection",
+                        "test_erp_connection",
                     ]
                 }
             )
@@ -1398,10 +1407,273 @@ class SIServiceRegistry:
         """Create callback for integration management operations"""
         async def integration_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                if operation == "create_erp_connection":
+                    return await self._handle_create_erp_connection(payload)
+                if operation == "list_erp_connections":
+                    return self._handle_list_erp_connections(payload)
+                if operation == "get_erp_connection":
+                    return self._handle_get_erp_connection(payload)
+                if operation == "update_erp_connection":
+                    return await self._handle_update_erp_connection(payload)
+                if operation == "delete_erp_connection":
+                    return await self._handle_delete_erp_connection(payload)
+                if operation == "test_erp_connection":
+                    return await self._handle_test_erp_connection(payload)
+
                 return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return integration_callback
+
+    async def _handle_create_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        connection_data = payload.get("connection_data") or {}
+        required_fields = ["erp_system", "organization_id", "connection_config"]
+        missing = [field for field in required_fields if field not in connection_data]
+        if missing:
+            return {
+                "operation": "create_erp_connection",
+                "success": False,
+                "error": f"Missing required fields: {', '.join(missing)}",
+            }
+
+        connection_id = str(uuid4())
+        record = ERPConnectionRecord(
+            connection_id=connection_id,
+            organization_id=connection_data.get("organization_id"),
+            erp_system=connection_data.get("erp_system"),
+            connection_name=connection_data.get("connection_name")
+            or connection_data.get("name")
+            or "ERP Connection",
+            environment=connection_data.get("environment", "sandbox"),
+            connection_config=dict(connection_data.get("connection_config") or {}),
+            metadata=connection_data.get("metadata") or {},
+        )
+
+        record = self.erp_connection_repository.create(record)
+
+        config = self._build_connection_config(record)
+        registered = await connection_manager.register_system(config)
+        if not registered:
+            self.erp_connection_repository.delete(connection_id)
+            return {
+                "operation": "create_erp_connection",
+                "success": False,
+                "error": "Unable to register connection with connection manager",
+            }
+
+        return {
+            "operation": "create_erp_connection",
+            "success": True,
+            "data": {
+                "connection_id": connection_id,
+                "connection": self._record_to_dict(record),
+            },
+        }
+
+    def _handle_list_erp_connections(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        filters = payload.get("filters") or {}
+        organization_filter = filters.get("organization_id")
+        erp_filter = filters.get("erp_system")
+
+        items = [self._record_to_dict(record) for record in self.erp_connection_repository.list(
+            organization_id=organization_filter,
+            erp_system=erp_filter,
+        )]
+
+        return {
+            "operation": "list_erp_connections",
+            "success": True,
+            "data": {
+                "connections": items,
+                "total_count": len(items),
+            },
+        }
+
+    def _handle_get_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        connection_id = payload.get("connection_id")
+        if not connection_id:
+            return {
+                "operation": "get_erp_connection",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        record = self.erp_connection_repository.get(connection_id)
+        if not record:
+            return {
+                "operation": "get_erp_connection",
+                "success": False,
+                "error": "Connection not found",
+            }
+
+        return {
+            "operation": "get_erp_connection",
+            "success": True,
+            "data": self._record_to_dict(record),
+        }
+
+    async def _handle_update_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        connection_id = payload.get("connection_id")
+        update_data = payload.get("connection_data") or {}
+        if not connection_id:
+            return {
+                "operation": "update_erp_connection",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        existing = self.erp_connection_repository.get(connection_id)
+        if not existing:
+            return {
+                "operation": "update_erp_connection",
+                "success": False,
+                "error": "Connection not found",
+            }
+
+        updated_record = self.erp_connection_repository.update(connection_id, update_data)
+        if not updated_record:
+            return {
+                "operation": "update_erp_connection",
+                "success": False,
+                "error": "Unable to update connection",
+            }
+
+        await connection_manager.unregister_system(connection_id)
+        config = self._build_connection_config(updated_record)
+        registered = await connection_manager.register_system(config)
+        if not registered:
+            return {
+                "operation": "update_erp_connection",
+                "success": False,
+                "error": "Unable to register updated connection",
+            }
+
+        return {
+            "operation": "update_erp_connection",
+            "success": True,
+            "data": self._record_to_dict(updated_record),
+        }
+
+    async def _handle_delete_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        connection_id = payload.get("connection_id")
+        if not connection_id:
+            return {
+                "operation": "delete_erp_connection",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        record = self.erp_connection_repository.delete(connection_id)
+        if not record:
+            return {
+                "operation": "delete_erp_connection",
+                "success": False,
+                "error": "Connection not found",
+            }
+
+        await connection_manager.unregister_system(connection_id)
+
+        return {
+            "operation": "delete_erp_connection",
+            "success": True,
+            "data": {"connection_id": connection_id},
+        }
+
+    async def _handle_test_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        from archive.legacy.backend.app.schemas.integration import (
+            OdooConnectionTestRequest,
+            OdooAuthMethod,
+            FIRSEnvironment,
+        )
+        from .integration_management.integration_service_legacy import test_odoo_connection
+
+        connection_id = payload.get("connection_id")
+        if not connection_id:
+            return {
+                "operation": "test_erp_connection",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        record = self.erp_connection_repository.get(connection_id)
+        if not record:
+            return {
+                "operation": "test_erp_connection",
+                "success": False,
+                "error": "Connection not found",
+            }
+
+        if record.erp_system.lower() != 'odoo':
+            return {
+                "operation": "test_erp_connection",
+                "success": False,
+                "error": "Only Odoo connections are supported for testing",
+            }
+
+        config = dict(record.connection_config or {})
+
+        try:
+            request = OdooConnectionTestRequest(
+                url=config.get("url"),
+                database=config.get("database"),
+                username=config.get("username"),
+                auth_method=OdooAuthMethod(config.get("auth_method", "api_key")),
+                password=config.get("password"),
+                api_key=config.get("api_key"),
+                firs_environment=FIRSEnvironment(config.get("environment", "sandbox")),
+            )
+        except Exception as exc:
+            return {
+                "operation": "test_erp_connection",
+                "success": False,
+                "error": f"Invalid Odoo configuration: {exc}",
+            }
+
+        result = test_odoo_connection(request)
+        return {
+            "operation": "test_erp_connection",
+            "success": result.success,
+            "data": result.dict(),
+        }
+
+    def _record_to_dict(self, record: ERPConnectionRecord) -> Dict[str, Any]:
+        return {
+            "connection_id": record.connection_id,
+            "organization_id": record.organization_id,
+            "erp_system": record.erp_system,
+            "connection_name": record.connection_name,
+            "environment": record.environment,
+            "connection_config": record.connection_config,
+            "metadata": record.metadata,
+            "status": record.status,
+            "created_at": record.created_at.isoformat(),
+            "updated_at": record.updated_at.isoformat(),
+        }
+
+    def _build_connection_config(self, record: ERPConnectionRecord) -> ConnectionConfig:
+        config = record.connection_config or {}
+        base_url = config.get("url") or config.get("base_url")
+        parsed = urlparse(base_url) if base_url else None
+        host = parsed.hostname if parsed and parsed.hostname else base_url or "localhost"
+        port = parsed.port if parsed and parsed.port else (443 if parsed and parsed.scheme == 'https' else 80)
+
+        return ConnectionConfig(
+            system_id=record.connection_id,
+            system_type=SystemType.ODOO,
+            host=host,
+            port=port,
+            database=config.get("database"),
+            username=config.get("username"),
+            password=config.get("password"),
+            api_key=config.get("api_key"),
+            ssl_enabled=bool(parsed and parsed.scheme == 'https'),
+            timeout=config.get("timeout", 30),
+            metadata={
+                "base_url": base_url,
+                "environment": record.environment,
+                "auth_method": config.get("auth_method"),
+            },
+        )
     
     def _create_auth_callback(self, auth_service):
         """Create callback for authentication operations"""

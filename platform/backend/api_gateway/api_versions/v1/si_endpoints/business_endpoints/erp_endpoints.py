@@ -438,16 +438,63 @@ class ERPEndpointsV1:
     
     # Placeholder implementations for remaining endpoints
     async def update_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Update ERP connection - placeholder"""
-        return self._create_v1_response({"connection_id": connection_id}, "erp_connection_updated")
-    
-    async def delete_erp_connection(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Delete ERP connection - placeholder"""
-        return self._create_v1_response({"connection_id": connection_id}, "erp_connection_deleted")
+        try:
+            context = await self._require_si_role(request)
+            body = await request.json()
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="update_erp_connection",
+                payload={
+                    "connection_id": connection_id,
+                    "connection_data": body,
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                },
+            )
+            return self._create_v1_response(result, "erp_connection_updated")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating ERP connection {connection_id} in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to update ERP connection")
+
+    async def delete_erp_connection(self, connection_id: str, request: Request):
+        try:
+            context = await self._require_si_role(request)
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="delete_erp_connection",
+                payload={
+                    "connection_id": connection_id,
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                },
+            )
+            return self._create_v1_response(result, "erp_connection_deleted")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error deleting ERP connection {connection_id} in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to delete ERP connection")
     
     async def test_erp_connection(self, connection_id: str, request: Request, context: HTTPRoutingContext = Depends(lambda: None)):
-        """Test ERP connection - placeholder"""
-        return self._create_v1_response({"connection_id": connection_id, "test_result": "success"}, "erp_connection_tested")
+        try:
+            context = await self._require_si_role(request)
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="test_erp_connection",
+                payload={
+                    "connection_id": connection_id,
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                },
+            )
+            return self._create_v1_response(result, "erp_connection_tested")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error testing ERP connection {connection_id} in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to test ERP connection")
     
     async def get_erp_connection_health(self, connection_id: str, context: HTTPRoutingContext = Depends(lambda: None)):
         """Get ERP connection health - placeholder"""
