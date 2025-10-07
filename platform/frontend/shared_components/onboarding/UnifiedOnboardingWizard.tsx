@@ -6,9 +6,11 @@
  * synchronising progress with the onboarding API.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { onboardingApi } from '../services/onboardingApi';
+import { authService } from '../services/auth';
+import { CrossFormDataManager } from '../utils/formPersistence';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
 
@@ -261,6 +263,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [pendingStepId, setPendingStepId] = useState<string | null>(defaultStep ?? null);
   const [stepDefinitions, setStepDefinitions] = useState<Record<string, StepDefinition>>(FALLBACK_STEP_DEFINITIONS);
   const [serverStepSequence, setServerStepSequence] = useState<string[] | null>(null);
+  const hasPrefilledCompanyProfile = useRef(false);
 
   const connectors = useMemo(
     () => [
@@ -342,8 +345,32 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     const targetIndex = visibleSteps.findIndex((step) => step.id === pendingStepId);
     if (targetIndex >= 0) {
       setCurrentIndex(targetIndex);
+      setPendingStepId(null);
     }
   }, [pendingStepId, visibleSteps]);
+
+  useEffect(() => {
+    if (hasPrefilledCompanyProfile.current) {
+      return;
+    }
+
+    if (companyProfile.companyName.trim()) {
+      hasPrefilledCompanyProfile.current = true;
+      return;
+    }
+
+    const storedUser = authService.getStoredUser();
+    const sharedBusinessName = CrossFormDataManager.getSharedField('business_name');
+    const candidateName =
+      storedUser?.organization?.name?.trim() ||
+      storedUser?.business_name?.trim() ||
+      (typeof sharedBusinessName === 'string' ? sharedBusinessName.trim() : '');
+
+    if (candidateName) {
+      setCompanyProfile((prev) => ({ ...prev, companyName: candidateName }));
+      hasPrefilledCompanyProfile.current = true;
+    }
+  }, [companyProfile.companyName]);
 
   const currentStep = visibleSteps[currentIndex];
   const progress = Math.round(((currentIndex + 1) / visibleSteps.length) * 100);
@@ -534,6 +561,21 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     onComplete?.(selectedService);
   };
 
+  const handleCompanyProfileChange = useCallback(
+    (field: keyof CompanyProfile) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setCompanyProfile((prev) => ({ ...prev, [field]: value }));
+
+      if (field === 'companyName') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          CrossFormDataManager.saveSharedData({ business_name: trimmed });
+        }
+      }
+    },
+    [],
+  );
+
   const toggleConnector = (connectorId: string) => {
     setServiceConfig((prev) => ({
       ...prev,
@@ -590,9 +632,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             </label>
             <TaxPoyntInput
               value={companyProfile.companyName}
-              onChange={(event) =>
-                setCompanyProfile((prev) => ({ ...prev, companyName: event.target.value }))
-              }
+              onChange={handleCompanyProfileChange('companyName')}
               placeholder="e.g. Horizon Payments"
             />
           </div>
@@ -603,9 +643,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             </label>
             <TaxPoyntInput
               value={companyProfile.industry}
-              onChange={(event) =>
-                setCompanyProfile((prev) => ({ ...prev, industry: event.target.value }))
-              }
+              onChange={handleCompanyProfileChange('industry')}
               placeholder="e.g. Financial Services"
             />
           </div>
@@ -618,9 +656,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             </label>
             <TaxPoyntInput
               value={companyProfile.teamSize}
-              onChange={(event) =>
-                setCompanyProfile((prev) => ({ ...prev, teamSize: event.target.value }))
-              }
+              onChange={handleCompanyProfileChange('teamSize')}
               placeholder="e.g. 25"
             />
           </div>
@@ -631,9 +667,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             </label>
             <TaxPoyntInput
               value={companyProfile.country}
-              onChange={(event) =>
-                setCompanyProfile((prev) => ({ ...prev, country: event.target.value }))
-              }
+              onChange={handleCompanyProfileChange('country')}
               placeholder="Nigeria"
             />
           </div>
