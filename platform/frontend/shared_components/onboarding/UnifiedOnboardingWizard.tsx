@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FormField, TaxPoyntButton, TaxPoyntInput } from '../../design_system';
+import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { onboardingApi } from '../services/onboardingApi';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
@@ -582,8 +582,12 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   function renderCompanyProfile() {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField label="Company Name" required>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+              <span>Company Name</span>
+              <span className="text-red-500">*</span>
+            </label>
             <TaxPoyntInput
               value={companyProfile.companyName}
               onChange={(event) =>
@@ -591,8 +595,12 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
               }
               placeholder="e.g. Horizon Payments"
             />
-          </FormField>
-          <FormField label="Industry" hint="Optional">
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+              <span>Industry</span>
+              <span className="text-xs font-normal italic text-gray-400">Optional</span>
+            </label>
             <TaxPoyntInput
               value={companyProfile.industry}
               onChange={(event) =>
@@ -600,10 +608,14 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
               }
               placeholder="e.g. Financial Services"
             />
-          </FormField>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField label="Team Size" hint="Optional">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+              <span>Team Size</span>
+              <span className="text-xs font-normal italic text-gray-400">Optional</span>
+            </label>
             <TaxPoyntInput
               value={companyProfile.teamSize}
               onChange={(event) =>
@@ -611,8 +623,12 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
               }
               placeholder="e.g. 25"
             />
-          </FormField>
-          <FormField label="Country" required>
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+              <span>Country</span>
+              <span className="text-red-500">*</span>
+            </label>
             <TaxPoyntInput
               value={companyProfile.country}
               onChange={(event) =>
@@ -620,7 +636,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
               }
               placeholder="Nigeria"
             />
-          </FormField>
+          </div>
         </div>
         <p className="text-sm text-gray-500">
           We use this information to preconfigure regional settings, currency defaults, and recommended
