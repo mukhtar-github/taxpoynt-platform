@@ -1021,11 +1021,11 @@ class MessageRouter:
         return None
     
     async def _deliver_message(
-        self, 
-        message: RoutedMessage, 
-        endpoint: ServiceEndpoint, 
+        self,
+        message: RoutedMessage,
+        endpoint: ServiceEndpoint,
         payload: Dict[str, Any]
-    ) -> bool:
+    ) -> Any:
         """Deliver message to a specific endpoint"""
         try:
             # Update route history
@@ -1083,8 +1083,8 @@ class MessageRouter:
                 
                 # Update endpoint activity
                 endpoint.last_activity = datetime.now(timezone.utc)
-                
-                return bool(result)
+
+                return result
             
             # Deliver via event bus
             await self.event_bus.emit(
@@ -1097,8 +1097,8 @@ class MessageRouter:
             
             # Update endpoint activity
             endpoint.last_activity = datetime.now(timezone.utc)
-            
-            return True
+
+            return {"success": True, "delivered": True}
             
         except Exception as e:
             self.logger.error(f"Error delivering message to {endpoint.endpoint_id}: {str(e)}")
