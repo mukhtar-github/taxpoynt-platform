@@ -78,19 +78,50 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
 
   const buildEmptyMetrics = useCallback(() => ({
     integrations: {
-      erp: { total: 0, active: 0, systems: [], connectedSystems: [] },
-      crm: { total: 0, active: 0, systems: [], connectedSystems: [] },
-      pos: { total: 0, active: 0, systems: [], connectedSystems: [] },
-      ecommerce: { total: 0, active: 0, systems: [], connectedSystems: [] },
+      erp: {
+        total: 0,
+        active: 0,
+        totalCustomers: 0,
+        totalInvoices: 0,
+        systems: [],
+        connectedSystems: [],
+      },
+      crm: {
+        total: 0,
+        active: 0,
+        totalContacts: 0,
+        pipelineValue: 0,
+        systems: [],
+        connectedSystems: [],
+      },
+      pos: {
+        total: 0,
+        active: 0,
+        dailySales: 0,
+        totalItems: 0,
+        systems: [],
+        connectedSystems: [],
+      },
+      ecommerce: {
+        total: 0,
+        active: 0,
+        totalOrders: 0,
+        totalCustomers: 0,
+        systems: [],
+        connectedSystems: [],
+      },
       overall: {
         totalSystems: 0,
         activeSystems: 0,
         overallHealthScore: 0,
+        totalDataPoints: 0,
+        syncEfficiency: 0,
+        errorRate: 0,
       },
     },
     financial: {
-      banking: { connected: 0, providers: [] },
-      payments: { connected: 0, providers: [] },
+      banking: { connected: 0, totalAccounts: 0, providers: [] },
+      payments: { connected: 0, monthlyVolume: 0, providers: [] },
     },
     reconciliation: {
       autoReconciled: 0,
@@ -264,7 +295,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
               },
               {
                 label: 'Auto-Reconciled',
-                value: metrics.reconciliation.autoReconciled.toLocaleString(),
+                value: Number(metrics.reconciliation.autoReconciled ?? 0).toLocaleString(),
                 color: 'emerald',
                 subtext:
                   toPercentDisplay(metrics.reconciliation.successRate) ?? 'Awaiting reconciliation data',
@@ -277,7 +308,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
               },
               {
                 label: 'FIRS Invoices',
-                value: metrics.compliance.invoicesGenerated.toLocaleString(),
+                value: Number(metrics.compliance.invoicesGenerated ?? 0).toLocaleString(),
                 color: 'blue',
                 subtext: `${metrics.compliance.pendingSubmissions} pending`,
               },
@@ -424,7 +455,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-blue-600">VAT Transactions</span>
-                <span className="font-bold text-blue-700">{metrics.compliance.vatTransactions.toLocaleString()}</span>
+                <span className="font-bold text-blue-700">{Number(metrics.compliance.vatTransactions ?? 0).toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-blue-600">Ready for APP Submission</span>
@@ -551,8 +582,8 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                     <span className="text-xs font-bold text-indigo-600">{metrics.integrations.erp.active}/{metrics.integrations.erp.total}</span>
                   </div>
                   <div className="text-xs text-indigo-600 space-y-1">
-                    <div>📊 {metrics.integrations.erp.totalCustomers.toLocaleString()} customers</div>
-                    <div>📋 {metrics.integrations.erp.totalInvoices.toLocaleString()} invoices</div>
+                    <div>📊 {Number(metrics.integrations.erp.totalCustomers ?? 0).toLocaleString()} customers</div>
+                    <div>📋 {Number(metrics.integrations.erp.totalInvoices ?? 0).toLocaleString()} invoices</div>
                   </div>
                 </div>
                 
@@ -562,7 +593,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                     <span className="text-xs font-bold text-green-600">{metrics.integrations.crm.active}/{metrics.integrations.crm.total}</span>
                   </div>
                   <div className="text-xs text-green-600 space-y-1">
-                    <div>👤 {metrics.integrations.crm.totalContacts.toLocaleString()} contacts</div>
+                    <div>👤 {Number(metrics.integrations.crm.totalContacts ?? 0).toLocaleString()} contacts</div>
                     <div>💰 ₦{(metrics.integrations.crm.pipelineValue / 1000000).toFixed(0)}M pipeline</div>
                   </div>
                 </div>
@@ -585,7 +616,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                   </div>
                   <div className="text-xs text-orange-600 space-y-1">
                     <div>📦 {metrics.integrations.ecommerce.totalOrders} orders</div>
-                    <div>👥 {metrics.integrations.ecommerce.totalCustomers.toLocaleString()} customers</div>
+                    <div>👥 {Number(metrics.integrations.ecommerce.totalCustomers ?? 0).toLocaleString()} customers</div>
                   </div>
                 </div>
               </div>
