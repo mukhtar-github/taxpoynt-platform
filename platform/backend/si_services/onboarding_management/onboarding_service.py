@@ -42,35 +42,62 @@ class SIOnboardingService:
 
     _CACHE_TTL_SECONDS = 60
 
+    STEP_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+        "service-selection": {
+            "title": "Select Your Service Focus",
+            "description": "Choose how you plan to use TaxPoynt so we can tailor the workspace.",
+            "success_criteria": "Primary service package confirmed",
+        },
+        "company-profile": {
+            "title": "Company Profile",
+            "description": "Confirm the organisation details we will use across compliance and billing.",
+            "success_criteria": "Company name and region on file",
+        },
+        "system-connectivity": {
+            "title": "Connect Systems",
+            "description": "Link the ERP, CRM, or banking systems needed for automation.",
+            "success_criteria": "At least one connector configured",
+        },
+        "review": {
+            "title": "Review & Confirm",
+            "description": "Double-check your selections before launch.",
+            "success_criteria": "Launch checklist acknowledged",
+        },
+        "launch": {
+            "title": "Launch Workspace",
+            "description": "Activate the workspace and unlock the SI dashboard.",
+            "success_criteria": "Workspace activated",
+        },
+    }
+
+    PACKAGE_FLOWS: Dict[str, List[str]] = {
+        "si": [
+            "service-selection",
+            "company-profile",
+            "system-connectivity",
+            "review",
+            "launch",
+        ],
+        "app": [
+            "service-selection",
+            "company-profile",
+            "system-connectivity",
+            "launch",
+        ],
+        "hybrid": [
+            "service-selection",
+            "company-profile",
+            "system-connectivity",
+            "review",
+            "launch",
+        ],
+    }
+
     def __init__(self) -> None:
         self.service_name = "SI Onboarding Service"
-        self.version = "2.0.0"
+        self.version = "2.1.0"
 
-        self.default_steps = {
-            "si": [
-                "service_introduction",
-                "integration_choice",
-                "business_systems_setup",
-                "financial_systems_setup",
-                "banking_connected",
-                "reconciliation_setup",
-                "complete_integration_setup",
-                "onboarding_complete",
-            ],
-            "app": [
-                "service_introduction",
-                "business_verification",
-                "firs_integration_setup",
-                "compliance_settings",
-                "onboarding_complete",
-            ],
-            "hybrid": [
-                "service_introduction",
-                "service_selection",
-                "combined_setup",
-                "onboarding_complete",
-            ],
-        }
+        self.default_steps = self.PACKAGE_FLOWS
 
         self._state_cache: Dict[str, Tuple[datetime, OnboardingState]] = {}
         self._cache_ttl = timedelta(seconds=self._CACHE_TTL_SECONDS)
@@ -285,13 +312,16 @@ class SIOnboardingService:
             record.completed_steps or [], additional_completed_steps
         )
         record.has_started = True
-        record.is_complete = record.is_complete or "onboarding_complete" in record.completed_steps
+        record.is_complete = record.is_complete or "launch" in record.completed_steps
         record.service_package = service_package or record.service_package
         merged_metadata = dict(record.state_metadata or {})
         merged_metadata.setdefault("service_package", record.service_package)
         if metadata_updates:
             merged_metadata.update(metadata_updates)
-        record.state_metadata = merged_metadata
+        record.state_metadata = self._ensure_metadata_consistency(
+            merged_metadata,
+            record.service_package,
+        )
 
         now = self._utc_now()
         record.last_active_date = now
@@ -318,7 +348,7 @@ class SIOnboardingService:
         )
         record.current_step = step_name
         record.has_started = True
-        record.is_complete = record.is_complete or step_name == "onboarding_complete"
+        record.is_complete = record.is_complete or step_name == "launch"
 
         metadata = dict(record.state_metadata or {})
         metadata.setdefault("service_package", record.service_package)
@@ -328,7 +358,10 @@ class SIOnboardingService:
                 **metadata_updates,
                 "completed_at": self._isoformat(self._utc_now()),
             }
-        record.state_metadata = metadata
+        record.state_metadata = self._ensure_metadata_consistency(
+            metadata,
+            record.service_package,
+        )
 
         now = self._utc_now()
         record.last_active_date = now
@@ -350,7 +383,7 @@ class SIOnboardingService:
         state = await self._complete_step(
             repo,
             user_id,
-            step_name="onboarding_complete",
+            step_name="launch",
             metadata_updates=completion_metadata,
             service_package=service_package,
         )
@@ -362,9 +395,12 @@ class SIOnboardingService:
         completion_section.update(completion_metadata)
         completion_section.setdefault("completed_at", self._isoformat(self._utc_now()))
 
-        record.state_metadata = metadata
+        record.state_metadata = self._ensure_metadata_consistency(
+            metadata,
+            record.service_package,
+        )
         record.is_complete = True
-        record.current_step = "onboarding_complete"
+        record.current_step = "launch"
         record.last_active_date = self._utc_now()
         record.updated_at = record.last_active_date
 
@@ -435,7 +471,10 @@ class SIOnboardingService:
             metadata = dict(record.state_metadata or {})
             metadata["service_package"] = service_package
             record.service_package = service_package
-            record.state_metadata = metadata
+            record.state_metadata = self._ensure_metadata_consistency(
+                metadata,
+                record.service_package,
+            )
             record = await repo.persist(record)
             self._invalidate_cache(user_id)
         return record
@@ -448,18 +487,24 @@ class SIOnboardingService:
     ) -> OnboardingStateORM:
         package = self._normalize_service_package(service_package)
         now = self._utc_now()
+        expected_steps = self.default_steps.get(package, self.default_steps["si"])
         metadata: Dict[str, Any] = {
             "service_package": package,
             "initialization_date": self._isoformat(now),
-            "expected_steps": self.default_steps.get(package, self.default_steps["si"]),
+            "expected_steps": expected_steps,
+            "step_definitions": {
+                step: self.STEP_DEFINITIONS.get(step, {"title": step, "description": "", "success_criteria": ""})
+                for step in expected_steps
+            },
         }
+        metadata = self._ensure_metadata_consistency(metadata, package)
 
         record = OnboardingStateORM(
             user_id=user_id,
             service_package=package,
-            current_step="service_introduction",
+            current_step=expected_steps[0] if expected_steps else "service-selection",
             completed_steps=[],
-            has_started=True,
+            has_started=False,
             is_complete=False,
             state_metadata=metadata,
             created_at=now,
@@ -477,6 +522,22 @@ class SIOnboardingService:
         data = asdict(state)
         data["progress"] = self._calculate_progress(state)
         return data
+
+    def _ensure_metadata_consistency(
+        self,
+        metadata: Dict[str, Any],
+        service_package: str,
+    ) -> Dict[str, Any]:
+        expected_steps = self.default_steps.get(service_package, self.default_steps["si"])
+        metadata["service_package"] = service_package
+        metadata["expected_steps"] = expected_steps
+        metadata["step_definitions"] = {
+            step: self.STEP_DEFINITIONS.get(
+                step, {"title": step, "description": "", "success_criteria": ""}
+            )
+            for step in expected_steps
+        }
+        return metadata
 
     def _calculate_progress(self, state: OnboardingState) -> Dict[str, Any]:
         expected_steps = state.metadata.get("expected_steps", [])

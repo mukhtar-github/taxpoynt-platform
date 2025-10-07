@@ -549,53 +549,21 @@ class OnboardingEndpointsV1:
         now_iso = datetime.now(timezone.utc).isoformat()
         service_package = context.metadata.get("service_package") or self._infer_service_package(context)
 
-        default_steps_map: Dict[str, List[str]] = {
-            "si": [
-                "service_introduction",
-                "integration_choice",
-                "business_systems_setup",
-                "financial_systems_setup",
-                "banking_connected",
-                "reconciliation_setup",
-                "complete_integration_setup",
-                "onboarding_complete",
-            ],
-            "app": [
-                "service_introduction",
-                "business_verification",
-                "firs_integration_setup",
-                "compliance_settings",
-                "onboarding_complete",
-            ],
-            "hybrid": [
-                "service_introduction",
-                "service_selection",
-                "combined_setup",
-                "onboarding_complete",
-            ],
+        onboarding_service = SIOnboardingService()
+        expected_steps = onboarding_service.PACKAGE_FLOWS.get(
+            service_package,
+            onboarding_service.PACKAGE_FLOWS["si"],
+        )
+        step_definitions = {
+            step: onboarding_service.STEP_DEFINITIONS.get(
+                step, {"title": step, "description": "", "success_criteria": ""}
+            )
+            for step in expected_steps
         }
-
-        step_titles = {
-            "service_introduction": "Welcome to TaxPoynt",
-            "integration_choice": "Select your integration focus",
-            "business_systems_setup": "Connect business systems",
-            "financial_systems_setup": "Configure financial integrations",
-            "banking_connected": "Verify banking connectivity",
-            "reconciliation_setup": "Set up reconciliation rules",
-            "complete_integration_setup": "Finalize configuration",
-            "onboarding_complete": "Launch ready",
-            "business_verification": "Business verification",
-            "firs_integration_setup": "Connect to FIRS",
-            "compliance_settings": "Review compliance settings",
-            "service_selection": "Choose your service mix",
-            "combined_setup": "Hybrid configuration",
-        }
-
-        expected_steps = default_steps_map.get(service_package, default_steps_map["si"])
 
         return {
             "user_id": context.user_id or "",
-            "current_step": "service_introduction",
+            "current_step": expected_steps[0] if expected_steps else "service-selection",
             "completed_steps": [],
             "has_started": False,
             "is_complete": False,
@@ -603,7 +571,7 @@ class OnboardingEndpointsV1:
             "metadata": {
                 "service_package": service_package,
                 "expected_steps": expected_steps,
-                "step_titles": step_titles,
+                "step_definitions": step_definitions,
                 "fallback": True,
                 "fallback_reason": "onboarding_service_unavailable",
             },

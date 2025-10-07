@@ -26,6 +26,12 @@ interface WizardStep {
   isLocked?: boolean;
 }
 
+interface StepDefinition {
+  title: string;
+  description: string;
+  success_criteria?: string;
+}
+
 interface CompanyProfile {
   companyName: string;
   industry: string;
@@ -78,6 +84,37 @@ const INITIAL_SERVICE_CONFIGURATION: ServiceConfiguration = {
   shareHybridInsights: true,
 };
 
+const DEFAULT_STEP_SEQUENCE = [
+  'service-selection',
+  'company-profile',
+  'system-connectivity',
+  'review',
+  'launch',
+] as const;
+
+const FALLBACK_STEP_DEFINITIONS: Record<string, StepDefinition> = {
+  'service-selection': {
+    title: 'Select Your Service Focus',
+    description: 'Choose the workspace configuration that matches how you plan to use TaxPoynt.',
+  },
+  'company-profile': {
+    title: 'Company Profile',
+    description: 'Confirm the organisation details we will use across compliance and billing.',
+  },
+  'system-connectivity': {
+    title: 'Connect Systems',
+    description: 'Link any ERPs, CRMs, or banking systems needed for automation.',
+  },
+  review: {
+    title: 'Review & Confirm',
+    description: 'Double-check your selections before launch.',
+  },
+  launch: {
+    title: 'Launch Workspace',
+    description: 'Activate and head to your dashboard.',
+  },
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -120,13 +157,15 @@ const sanitizeServiceConfiguration = (
     return current;
   }
 
-  const connectorsRaw = Array.isArray(value.connectors) ? value.connectors : [];
+  const source = isRecord(value.system_connectivity) ? value.system_connectivity : value;
+
+  const connectorsRaw = Array.isArray(source.connectors) ? source.connectors : [];
   const connectors = connectorsRaw.filter((item): item is string => typeof item === 'string');
 
   const firsEnvironment =
-    value.firsEnvironment === 'production'
+    source.firsEnvironment === 'production'
       ? 'production'
-      : value.firsEnvironment === 'sandbox'
+      : source.firsEnvironment === 'sandbox'
       ? 'sandbox'
       : current.firsEnvironment;
 
@@ -134,14 +173,14 @@ const sanitizeServiceConfiguration = (
     connectors,
     firsEnvironment,
     enableAutoRetry:
-      typeof value.enableAutoRetry === 'boolean' ? value.enableAutoRetry : current.enableAutoRetry,
+      typeof source.enableAutoRetry === 'boolean' ? source.enableAutoRetry : current.enableAutoRetry,
     enableNotifications:
-      typeof value.enableNotifications === 'boolean'
-        ? value.enableNotifications
+      typeof source.enableNotifications === 'boolean'
+        ? source.enableNotifications
         : current.enableNotifications,
     shareHybridInsights:
-      typeof value.shareHybridInsights === 'boolean'
-        ? value.shareHybridInsights
+      typeof source.shareHybridInsights === 'boolean'
+        ? source.shareHybridInsights
         : current.shareHybridInsights,
   };
 };
@@ -190,15 +229,15 @@ const determineInitialStepId = (
       'reconciliation_setup',
     ].includes(normalized)
   ) {
-    return 'service-configuration';
+    return 'system-connectivity';
   }
 
   if (
-    ['review', 'complete_integration_setup', 'onboarding_complete', 'launch_ready'].includes(
+    ['review', 'complete_integration_setup', 'onboarding_complete', 'launch_ready', 'launch'].includes(
       normalized
     )
   ) {
-    return 'review';
+    return normalized === 'review' ? 'review' : 'launch';
   }
 
   return fallback;
@@ -220,6 +259,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [isFinishing, setIsFinishing] = useState(false);
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [pendingStepId, setPendingStepId] = useState<string | null>(defaultStep ?? null);
+  const [stepDefinitions, setStepDefinitions] = useState<Record<string, StepDefinition>>(FALLBACK_STEP_DEFINITIONS);
+  const [serverStepSequence, setServerStepSequence] = useState<string[] | null>(null);
 
   const connectors = useMemo(
     () => [
@@ -231,45 +272,68 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     [],
   );
 
-  const visibleSteps: WizardStep[] = useMemo(() => {
-    const steps: WizardStep[] = [];
+  const computeIsLocked = useCallback(
+    (stepId: string) => {
+      if (stepId === 'service-selection') {
+        return false;
+      }
+
+      if (stepId === 'company-profile') {
+        return showServiceStep && !selectedService;
+      }
+
+      if (['system-connectivity', 'review', 'launch'].includes(stepId)) {
+        return !selectedService;
+      }
+
+      return false;
+    },
+    [selectedService, showServiceStep],
+  );
+
+  const stepRenderers: Record<string, () => React.ReactNode> = {
+    'service-selection': renderServiceSelection,
+    'company-profile': renderCompanyProfile,
+    'system-connectivity': renderSystemConnectivity,
+    review: renderReview,
+    launch: renderLaunch,
+  };
+
+  const resolvedStepSequence = useMemo(() => {
+    const baseSequence = serverStepSequence && serverStepSequence.length > 0
+      ? serverStepSequence
+      : Array.from(DEFAULT_STEP_SEQUENCE);
 
     if (showServiceStep) {
-      steps.push({
-        id: 'service-selection',
-        label: 'Select Service',
-        description: 'Choose the TaxPoynt service that matches your use case.',
-        render: renderServiceSelection,
-      });
+      return baseSequence;
     }
 
-    steps.push({
-      id: 'company-profile',
-      label: 'Company Details',
-      description: 'Tell us about your organisation so we can tailor defaults.',
-      render: renderCompanyProfile,
-      isLocked: showServiceStep && !selectedService,
-    });
+    return baseSequence.filter((stepId) => stepId !== 'service-selection');
+  }, [serverStepSequence, showServiceStep]);
 
-    steps.push({
-      id: 'service-configuration',
-      label: selectedService ? `Configure ${serviceTitle(selectedService)}` : 'Configure Service',
-      description: 'Confirm the integrations and transmission preferences for launch.',
-      render: renderServiceConfiguration,
-      isLocked: !selectedService,
-    });
+  const visibleSteps: WizardStep[] = useMemo(() => {
+    return resolvedStepSequence
+      .map((stepId) => {
+        const renderer = stepRenderers[stepId];
+        if (!renderer) {
+          return null;
+        }
 
-    steps.push({
-      id: 'review',
-      label: 'Review & Launch',
-      description: 'Verify your selections and complete onboarding.',
-      render: renderReview,
-      isLocked: !selectedService,
-    });
+        const definition = stepDefinitions[stepId] ?? FALLBACK_STEP_DEFINITIONS[stepId] ?? {
+          title: stepId,
+          description: '',
+        };
 
-    return steps;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderCompanyProfile, renderReview, renderServiceConfiguration, renderServiceSelection, selectedService, showServiceStep]);
+        return {
+          id: stepId,
+          label: definition.title,
+          description: definition.description,
+          render: renderer,
+          isLocked: computeIsLocked(stepId),
+        };
+      })
+      .filter((step): step is WizardStep => Boolean(step));
+  }, [computeIsLocked, resolvedStepSequence, stepDefinitions, stepRenderers]);
 
   useEffect(() => {
     if (!pendingStepId) {
@@ -294,11 +358,13 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return !!selectedService;
       case 'company-profile':
         return Boolean(companyProfile.companyName.trim());
-      case 'service-configuration':
+      case 'system-connectivity':
         if (!selectedService) return false;
         if (selectedService === 'si') {
           return serviceConfig.connectors.length > 0;
         }
+        return true;
+      case 'launch':
         return true;
       default:
         return true;
@@ -317,6 +383,34 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         }
 
         const metadata = isRecord(remoteState.metadata) ? remoteState.metadata : {};
+        const expectedStepsRaw = Array.isArray(metadata.expected_steps)
+          ? metadata.expected_steps.filter((step): step is string => typeof step === 'string')
+          : null;
+        if (expectedStepsRaw && expectedStepsRaw.length > 0) {
+          setServerStepSequence(expectedStepsRaw);
+        }
+
+        if (isRecord(metadata.step_definitions)) {
+          const sanitized: Record<string, StepDefinition> = {};
+          Object.entries(metadata.step_definitions).forEach(([stepId, value]) => {
+            if (!isRecord(value)) {
+              return;
+            }
+            sanitized[stepId] = {
+              title: sanitizeString(value.title) || FALLBACK_STEP_DEFINITIONS[stepId]?.title || stepId,
+              description:
+                sanitizeString(value.description) ||
+                FALLBACK_STEP_DEFINITIONS[stepId]?.description ||
+                '',
+              success_criteria: sanitizeString(value.success_criteria ?? value.successCriteria),
+            };
+          });
+          setStepDefinitions((prev) => ({
+            ...prev,
+            ...sanitized,
+          }));
+        }
+
         const inferredPackage =
           normalizeServicePackage(metadata.service_package ?? metadata.servicePackage ?? remoteState.metadata?.service_package) ??
           selectedService;
@@ -340,7 +434,9 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             .filter((step): step is string => typeof step === 'string')
             .map((step) => step);
 
-          const withServiceSelection = inferredPackage ? [...normalizedSteps, 'service-selection'] : normalizedSteps;
+          const withServiceSelection = inferredPackage
+            ? [...normalizedSteps, 'service-selection']
+            : normalizedSteps;
           const uniqueSteps = Array.from(new Set(withServiceSelection));
           setCompletedSteps(uniqueSteps);
         } else if (inferredPackage) {
@@ -387,6 +483,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             service_package: selectedService,
             company_profile: companyProfile,
             service_configuration: serviceConfig,
+            system_connectivity: serviceConfig,
             milestone_complete: markComplete,
           },
         });
@@ -428,9 +525,9 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     if (!selectedService) return;
 
     setIsFinishing(true);
-    const completionList = Array.from(new Set([...completedSteps, currentStep.id, 'onboarding_complete']));
+    const completionList = Array.from(new Set([...completedSteps, currentStep.id, 'launch']));
 
-    await persistState('onboarding_complete', completionList, true);
+    await persistState('launch', completionList, true);
     setCompletedSteps(completionList);
     setIsFinishing(false);
 
@@ -533,7 +630,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     );
   }
 
-  function renderServiceConfiguration() {
+  function renderSystemConnectivity() {
     if (!selectedService) {
       return <p className="text-gray-500">Select a service above to continue.</p>;
     }
@@ -711,6 +808,40 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     );
   }
 
+  function renderLaunch() {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6 text-sm text-blue-900">
+          <h3 className="text-lg font-semibold text-blue-900">Ready for launch</h3>
+          <p className="mt-2">
+            We will apply your configuration, enable workspace analytics, and unlock the SI dashboard. You can revisit these
+            settings from the workspace preferences panel after launch.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h4 className="text-sm font-semibold text-gray-900">Launch checklist</h4>
+          <ul className="mt-3 space-y-2 text-sm text-gray-600">
+            <li className="flex items-start">
+              <span className="mr-2 text-green-500">✓</span>
+              Service package and company profile confirmed
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2 text-green-500">✓</span>
+              Connectivity preferences saved for {selectedService ? serviceTitle(selectedService) : 'your workspace'}
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2 text-green-500">✓</span>
+              Review complete and launch summary archived
+            </li>
+          </ul>
+        </div>
+        <p className="text-xs text-gray-500">
+          Tip: After launch you can invite collaborators from the workspace menu and manage integrations from the connectivity panel.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <header className="space-y-3">
@@ -777,7 +908,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           Back
         </TaxPoyntButton>
         <div className="flex items-center space-x-3">
-          {currentStep?.id !== 'review' ? (
+          {currentStep?.id !== 'launch' ? (
             <TaxPoyntButton
               variant="primary"
               onClick={handleNext}
