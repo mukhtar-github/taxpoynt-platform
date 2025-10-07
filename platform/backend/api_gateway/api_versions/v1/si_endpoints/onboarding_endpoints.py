@@ -249,22 +249,8 @@ class OnboardingEndpointsV1:
             self.endpoint_stats["get_state_requests"] += 1
             self.endpoint_stats["total_requests"] += 1
             
-            # Provide mock onboarding state while message router is being set up
-            mock_result = {
-                "current_step": "welcome",
-                "completed_steps": [],
-                "progress": 0,
-                "total_steps": 5,
-                "steps": {
-                    "welcome": {"status": "current", "title": "Welcome to TaxPoynt"},
-                    "business_info": {"status": "pending", "title": "Business Information"},
-                    "banking_setup": {"status": "pending", "title": "Banking Integration"},
-                    "testing": {"status": "pending", "title": "Test Integration"},
-                    "complete": {"status": "pending", "title": "Go Live"}
-                },
-                "next_action": "Complete business information setup"
-            }
-            
+            mock_state = self._build_fallback_state(context)
+
             result = await self._route_onboarding_operation(
                 context,
                 "get_onboarding_state",
@@ -277,7 +263,8 @@ class OnboardingEndpointsV1:
 
             # Fall back to mock result if downstream services are unavailable
             if not result or not isinstance(result, dict) or not result.get("success"):
-                return self._create_v1_response(mock_result, "onboarding_state_retrieved")
+                fallback_payload = {"success": True, "data": mock_state, "fallback": True}
+                return self._create_v1_response(fallback_payload, "onboarding_state_retrieved")
 
             return self._create_v1_response(result, "onboarding_state_retrieved")
         except RuntimeError as service_error:
@@ -287,7 +274,7 @@ class OnboardingEndpointsV1:
             )
             fallback_payload = {
                 "success": True,
-                "data": mock_result,
+                "data": mock_state,
                 "fallback": True,
                 "error_message": str(service_error),
             }
@@ -534,6 +521,73 @@ class OnboardingEndpointsV1:
     def _create_v1_response(self, data: Any, message: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized V1 response"""
         return build_v1_response(data, action=message)
+
+    def _build_fallback_state(self, context: HTTPRoutingContext) -> Dict[str, Any]:
+        """Construct a minimal onboarding state when downstream services are unavailable."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        service_package = context.metadata.get("service_package") or self._infer_service_package(context)
+
+        default_steps_map: Dict[str, List[str]] = {
+            "si": [
+                "service_introduction",
+                "integration_choice",
+                "business_systems_setup",
+                "financial_systems_setup",
+                "banking_connected",
+                "reconciliation_setup",
+                "complete_integration_setup",
+                "onboarding_complete",
+            ],
+            "app": [
+                "service_introduction",
+                "business_verification",
+                "firs_integration_setup",
+                "compliance_settings",
+                "onboarding_complete",
+            ],
+            "hybrid": [
+                "service_introduction",
+                "service_selection",
+                "combined_setup",
+                "onboarding_complete",
+            ],
+        }
+
+        step_titles = {
+            "service_introduction": "Welcome to TaxPoynt",
+            "integration_choice": "Select your integration focus",
+            "business_systems_setup": "Connect business systems",
+            "financial_systems_setup": "Configure financial integrations",
+            "banking_connected": "Verify banking connectivity",
+            "reconciliation_setup": "Set up reconciliation rules",
+            "complete_integration_setup": "Finalize configuration",
+            "onboarding_complete": "Launch ready",
+            "business_verification": "Business verification",
+            "firs_integration_setup": "Connect to FIRS",
+            "compliance_settings": "Review compliance settings",
+            "service_selection": "Choose your service mix",
+            "combined_setup": "Hybrid configuration",
+        }
+
+        expected_steps = default_steps_map.get(service_package, default_steps_map["si"])
+
+        return {
+            "user_id": context.user_id or "",
+            "current_step": "service_introduction",
+            "completed_steps": [],
+            "has_started": False,
+            "is_complete": False,
+            "last_active_date": now_iso,
+            "metadata": {
+                "service_package": service_package,
+                "expected_steps": expected_steps,
+                "step_titles": step_titles,
+                "fallback": True,
+                "fallback_reason": "onboarding_service_unavailable",
+            },
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
 
 
 def create_onboarding_router(
