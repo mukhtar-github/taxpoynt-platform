@@ -176,13 +176,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   
   const theme = roleThemes[role];
   const filteredNavItems = navigationItems.filter(item => item.roles.includes(role));
+  const isSI = role === 'si';
 
-  const headerStyle = combineStyles(
-    {
-      background: `linear-gradient(135deg, var(--tw-gradient-stops))`,
-      backdropFilter: 'blur(16px)'
-    }
-  );
+  const headerStyle = isSI
+    ? undefined
+    : combineStyles(
+        {
+          background: `linear-gradient(135deg, var(--tw-gradient-stops))`,
+          backdropFilter: 'blur(16px)'
+        }
+      );
 
   const handleSignOut = () => {
     // Handle sign out logic
@@ -194,17 +197,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       
       {/* Top Header */}
       <header 
-        className={`fixed top-0 left-0 right-0 z-40 bg-gradient-to-r ${theme.gradient} shadow-lg`}
+        className={`fixed top-0 left-0 right-0 z-40 ${
+          isSI
+            ? 'bg-white/95 backdrop-blur border-b border-indigo-100 shadow-sm'
+            : `bg-gradient-to-r ${theme.gradient} shadow-lg`
+        }`}
         style={headerStyle}
       >
-        <div className="px-6 py-4">
+        <div className="px-4 py-4 lg:px-6">
           <div className="flex items-center justify-between">
             
             {/* Logo & Branding */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 lg:space-x-4">
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="lg:hidden text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+                className={`p-2 rounded-lg transition-colors lg:hidden ${
+                  isSI ? 'text-indigo-600 hover:bg-indigo-50' : 'text-white hover:bg-white/20'
+                }`}
                 aria-label="Toggle sidebar"
               >
                 ☰
@@ -221,12 +230,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 />
                 <div>
                   <div 
-                    className="text-xl font-bold text-white"
+                    className={`text-xl font-bold ${isSI ? 'text-indigo-700' : 'text-white'}`}
                     style={TYPOGRAPHY_STYLES.optimizedText}
                   >
                     TaxPoynt
                   </div>
-                  <div className="text-xs text-blue-100 font-medium">
+                  <div className={`text-xs font-medium ${isSI ? 'text-indigo-400' : 'text-blue-100'}`}>
                     {theme.name}
                   </div>
                 </div>
@@ -236,16 +245,39 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {/* Header Actions */}
             <div className="flex items-center space-x-4">
               
+              {/* Desktop collapse toggle */}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className={`hidden lg:inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  isSI
+                    ? 'border-indigo-100 text-indigo-600 hover:bg-indigo-50'
+                    : 'border-white/30 text-white hover:bg-white/20'
+                }`}
+                aria-label={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+              >
+                {sidebarCollapsed ? 'Expand' : 'Collapse'}
+              </button>
+
               {/* Notifications */}
-              <button className="relative text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+              <button
+                className={`relative p-2 rounded-lg transition-colors ${
+                  isSI ? 'text-indigo-600 hover:bg-indigo-50' : 'text-white hover:bg-white/20'
+                }`}
+              >
                 <span className="text-xl">🔔</span>
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                <span className={`absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs text-white ${
+                  isSI ? 'bg-indigo-500' : 'bg-red-500'
+                }`}>
                   3
                 </span>
               </button>
 
               {/* Help */}
-              <button className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+              <button
+                className={`p-2 rounded-lg transition-colors ${
+                  isSI ? 'text-indigo-600 hover:bg-indigo-50' : 'text-white hover:bg-white/20'
+                }`}
+              >
                 <span className="text-xl">❓</span>
               </button>
 
@@ -253,15 +285,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-3 text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+                  className={`flex items-center space-x-3 rounded-lg p-2 transition-colors ${
+                    isSI ? 'text-indigo-700 hover:bg-indigo-50' : 'text-white hover:bg-white/20'
+                  }`}
                   style={ACCESSIBILITY_PATTERNS.focusRing}
                 >
-                  <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                    isSI ? 'bg-indigo-100 text-indigo-600' : 'bg-white/30 text-white'
+                  }`}>
+                    <span className="text-sm font-bold uppercase">{userName.charAt(0) || 'U'}</span>
                   </div>
                   <div className="hidden md:block text-left">
                     <div className="text-sm font-medium">{userName}</div>
-                    <div className="text-xs text-blue-100">{userEmail}</div>
+                    <div className={`text-xs ${isSI ? 'text-indigo-300' : 'text-blue-100'}`}>{userEmail}</div>
                   </div>
                   <span className="text-sm">▼</span>
                 </button>
@@ -272,7 +308,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     <div className="px-4 py-3 border-b border-gray-100">
                       <div className="font-medium text-gray-900">{userName}</div>
                       <div className="text-sm text-gray-500">{userEmail}</div>
-                      <div className="text-xs text-blue-600 font-medium mt-1">{theme.name}</div>
+                      <div className={`text-xs font-medium mt-1 ${isSI ? 'text-indigo-500' : 'text-blue-600'}`}>{theme.name}</div>
                     </div>
                     
                     <div className="py-2">
@@ -303,17 +339,21 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
       {/* Sidebar */}
       <aside 
-        className={`fixed left-0 top-20 bottom-0 z-30 bg-white shadow-lg border-r border-gray-200 transition-all duration-300 ${
-          sidebarCollapsed ? 'w-16' : 'w-64'
+        className={`fixed left-0 top-20 bottom-0 z-30 bg-white shadow-lg border-r transition-all duration-300 ${
+          sidebarCollapsed ? 'w-16 border-indigo-50' : 'w-64 border-indigo-100'
         }`}
       >
-        <div className="p-4">
+        <div className="flex h-full flex-col p-4">
           
           {/* Role Badge */}
           {!sidebarCollapsed && (
-            <div className={`mb-6 p-3 bg-gradient-to-r ${theme.gradient} rounded-xl text-white`}>
+            <div className={`mb-6 rounded-xl border px-4 py-3 ${
+              isSI
+                ? 'border-indigo-100 bg-indigo-50 text-indigo-700'
+                : `bg-gradient-to-r ${theme.gradient} text-white`
+            }`}>
               <div className="text-sm font-bold">{theme.name}</div>
-              <div className="text-xs opacity-90">{theme.description}</div>
+              <div className={`text-xs ${isSI ? 'text-indigo-400' : 'opacity-90'}`}>{theme.description}</div>
             </div>
           )}
 
@@ -324,20 +364,37 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 key={item.id}
                 href={item.href}
                 prefetch={item.prefetch !== false}
-                className={`flex items-center p-3 rounded-xl transition-all duration-200 ${
+                className={`flex items-center space-x-3 rounded-xl border transition-all duration-200 ${
                   activeTab === item.id
-                    ? `bg-${theme.accent} text-white shadow-lg`
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
+                    ? isSI
+                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm'
+                      : `bg-${theme.accent} text-white shadow-lg`
+                    : isSI
+                      ? 'border-transparent text-slate-600 hover:border-indigo-100 hover:bg-indigo-50 hover:text-indigo-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                } ${sidebarCollapsed ? 'justify-center px-0 py-3' : 'px-3 py-3'}`}
                 style={ACCESSIBILITY_PATTERNS.focusRing}
               >
-                <span className="text-xl">{item.icon}</span>
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg text-lg ${
+                    activeTab === item.id
+                      ? isSI
+                        ? 'bg-white text-indigo-600'
+                        : 'bg-white/30 text-white'
+                      : isSI
+                        ? 'bg-indigo-50 text-indigo-500'
+                        : 'text-xl'
+                  }`}
+                >
+                  {item.icon}
+                </span>
                 {!sidebarCollapsed && (
                   <>
-                    <span className="ml-3 font-medium">{item.label}</span>
+                    <span className="font-medium text-sm">{item.label}</span>
                     {item.badge && (
-                      <span className={`ml-auto px-2 py-1 text-xs rounded-full ${
-                        activeTab === item.id
+                      <span className={`ml-auto px-2 py-1 text-xs rounded-full ${isSI
+                        ? 'bg-indigo-100 text-indigo-600'
+                        : activeTab === item.id
                           ? 'bg-white/30 text-white'
                           : 'bg-gray-200 text-gray-600'
                       }`}>
@@ -352,12 +409,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* Sidebar Footer */}
           {!sidebarCollapsed && (
-            <div className="absolute bottom-4 left-4 right-4">
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <div className="text-xs text-gray-500 mb-2">System Status</div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs text-gray-600">All Systems Operational</span>
+            <div className="mt-auto">
+              <div className="rounded-xl border border-indigo-50 bg-indigo-50/70 p-3">
+                <div className="text-xs font-medium text-indigo-500 mb-2">System status</div>
+                <div className="flex items-center space-x-2 text-xs text-indigo-600">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                  <span>All systems operational</span>
                 </div>
               </div>
             </div>
@@ -369,7 +426,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       <main 
         className={`transition-all duration-300 pt-20 ${
           sidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}
+        } ${isSI ? 'bg-slate-50/60 min-h-screen' : ''}`}
       >
         <div className="p-6">
           {children}
