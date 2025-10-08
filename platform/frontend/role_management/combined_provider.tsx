@@ -201,7 +201,7 @@ const FeatureFlagDebugInfo: React.FC = () => {
 };
 
 // Main combined provider component
-export const CombinedRoleProvider: React.FC<CombinedRoleProviderProps> = ({
+export function CombinedRoleProvider({
   children,
   authToken,
   fallbackRole,
@@ -213,7 +213,7 @@ export const CombinedRoleProvider: React.FC<CombinedRoleProviderProps> = ({
   loadingComponent,
   enableDevTools = false,
   enableAuditLogging = false
-}) => {
+}: CombinedRoleProviderProps) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
 
@@ -280,7 +280,7 @@ export const CombinedRoleProvider: React.FC<CombinedRoleProviderProps> = ({
       </RoleDetectorProvider>
     </RoleManagementErrorBoundary>
   );
-};
+}
 
 // Quick setup hook for common configurations
 export const useRoleManagementSetup = (config: {

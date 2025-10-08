@@ -422,11 +422,11 @@ interface PermissionProviderProps {
 }
 
 // Provider component
-export const PermissionProvider: React.FC<PermissionProviderProps> = ({
+export function PermissionProvider({
   children,
   customPermissions = [],
   featureFlags = {}
-}) => {
+}: PermissionProviderProps) {
   const { detectionResult, isLoading: roleLoading, error: roleError } = useRoleDetector();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -603,7 +603,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({
       {children}
     </PermissionContext.Provider>
   );
-};
+}
 
 // Export hook and utilities
 export default PermissionProvider;

@@ -360,11 +360,11 @@ interface RoleDetectorProviderProps {
 }
 
 // Provider component
-export const RoleDetectorProvider: React.FC<RoleDetectorProviderProps> = ({
+export function RoleDetectorProvider({
   children,
   authToken,
   fallbackRole = PlatformRole.USER
-}) => {
+}: RoleDetectorProviderProps) {
   const [detectionResult, setDetectionResult] = useState<RoleDetectionResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -517,7 +517,7 @@ export const RoleDetectorProvider: React.FC<RoleDetectorProviderProps> = ({
       {children}
     </RoleDetectorContext.Provider>
   );
-};
+}
 
 // Export hook and utilities
 export default RoleDetectorProvider;

@@ -671,11 +671,11 @@ interface FeatureFlagProviderProps {
 }
 
 // Provider component
-export const FeatureFlagProvider: React.FC<FeatureFlagProviderProps> = ({
+export function FeatureFlagProvider({
   children,
   remoteConfig,
   initialOverrides = {}
-}) => {
+}: FeatureFlagProviderProps) {
   const { detectionResult, isLoading: roleLoading } = useRoleDetector();
   const { getUserPermissions, isLoading: permissionLoading } = usePermissions();
   
@@ -818,7 +818,7 @@ export const FeatureFlagProvider: React.FC<FeatureFlagProviderProps> = ({
       {children}
     </FeatureFlagContext.Provider>
   );
-};
+}
 
 // Utility hook for specific feature checks
 export const useFeature = (flagKey: string, defaultValue: any = false) => {
