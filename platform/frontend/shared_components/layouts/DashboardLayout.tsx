@@ -406,6 +406,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   </>
                 )}
               </Link>
+            );
             })}
           </nav>
 
