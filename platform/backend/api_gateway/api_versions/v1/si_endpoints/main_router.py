@@ -171,7 +171,52 @@ class SIRouterV1:
     
     def _include_sub_routers(self):
         """Include all SI sub-routers"""
-        
+
+        # Business System Integration Routes
+        business_prefix = "/business"
+
+        erp_router = create_erp_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(erp_router, prefix=business_prefix, tags=["ERP Systems V1"])
+
+        crm_router = create_crm_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(crm_router, prefix=business_prefix, tags=["CRM Systems V1"])
+
+        pos_router = create_pos_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(pos_router, prefix=business_prefix, tags=["POS Systems V1"])
+
+        ecommerce_router = create_ecommerce_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(ecommerce_router, prefix=business_prefix, tags=["E-commerce Systems V1"])
+
+        accounting_router = create_accounting_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(accounting_router, prefix=business_prefix, tags=["Accounting Systems V1"])
+
+        inventory_router = create_inventory_router(
+            self.role_detector,
+            self.permission_guard,
+            self.message_router
+        )
+        self.router.include_router(inventory_router, prefix=business_prefix, tags=["Inventory Systems V1"])
+
         # FIRS Invoice Generation Routes
         firs_invoice_router = create_firs_invoice_router(
             self.role_detector,
