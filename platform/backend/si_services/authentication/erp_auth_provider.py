@@ -659,3 +659,185 @@ BaseERPAuthProvider._create_failed_result = _create_failed_result
 def create_erp_auth_provider(erp_system: ERPSystemType) -> Optional[BaseERPAuthProvider]:
     """Factory function to create ERP authentication provider"""
     return ERPAuthProviderFactory.create_provider(erp_system)
+
+
+@dataclass
+class ERPAuthResponse:
+    """Lightweight response wrapper for ERP authentication results"""
+    success: bool
+    auth_data: Dict[str, Any]
+    session_id: Optional[str]
+    expires_at: Optional[datetime]
+    error_message: Optional[str] = None
+    raw_result: Optional[AuthenticationResult] = None
+
+
+class ERPAuthProvider:
+    """
+    Compatibility wrapper that lazily provisions ERP-specific auth providers.
+
+    The legacy SI pipeline expects an object exposing ``authenticate`` that
+    returns an object with ``success``/``auth_data`` semantics.  This wrapper
+    fronts the newer factory-based providers and degrades gracefully when a
+    concrete provider is unavailable in the current environment.
+    """
+
+    def __init__(self) -> None:
+        self._providers: Dict[ERPSystemType, BaseERPAuthProvider] = {}
+        self._lock = asyncio.Lock()
+
+    async def authenticate(
+        self,
+        erp_system: Any,
+        auth_method: Any,
+        credentials: Optional[Dict[str, Any]] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> ERPAuthResponse:
+        """
+        Authenticate against an ERP system using the appropriate provider.
+
+        Args:
+            erp_system: Enum/str describing the ERP system (e.g., ERPSystem.ODOO)
+            auth_method: Enum/str describing the auth method (e.g., AuthMethod.API_KEY)
+            credentials: Plain dict of credential fields expected by the provider
+            context: Optional contextual metadata (session, tenant, etc.)
+        """
+        credentials = credentials or {}
+        normalized_system = self._normalize_erp_system(erp_system)
+        provider = await self._get_or_create_provider(normalized_system)
+        if not provider:
+            return ERPAuthResponse(
+                success=False,
+                auth_data={},
+                session_id=None,
+                expires_at=None,
+                error_message=f"unsupported_erp_system:{self._safe_value(erp_system)}"
+            )
+
+        auth_type = self._map_auth_method(auth_method)
+        credential_id = str(credentials.get("credential_id") or f"{normalized_system.value}_{secrets.token_hex(4)}")
+        service_identifier = str(credentials.get("service_identifier") or normalized_system.value)
+
+        auth_credentials = AuthenticationCredentials(
+            credential_id=credential_id,
+            auth_type=auth_type,
+            service_identifier=service_identifier,
+            username=credentials.get("username"),
+            password=credentials.get("password"),
+            api_key=credentials.get("api_key"),
+            token=credentials.get("token"),
+            oauth_client_id=credentials.get("client_id") or credentials.get("oauth_client_id"),
+            oauth_client_secret=credentials.get("client_secret") or credentials.get("oauth_client_secret"),
+            custom_params={k: v for k, v in credentials.items() if k not in {"password"}}
+        )
+
+        auth_context = self._build_context(auth_method, context)
+
+        try:
+            result = await provider.authenticate(auth_credentials, auth_context)
+        except Exception as exc:
+            logger.error(f"ERP authentication failed for {normalized_system.value}: {exc}")
+            return ERPAuthResponse(
+                success=False,
+                auth_data={},
+                session_id=None,
+                expires_at=None,
+                error_message=str(exc)
+            )
+
+        success = result.status == AuthenticationStatus.AUTHENTICATED
+        auth_data: Dict[str, Any] = {}
+        if isinstance(result.service_metadata, dict):
+            auth_data.update(result.service_metadata)
+        if result.access_token:
+            auth_data.setdefault("access_token", result.access_token)
+        if result.refresh_token:
+            auth_data.setdefault("refresh_token", result.refresh_token)
+
+        return ERPAuthResponse(
+            success=success,
+            auth_data=auth_data,
+            session_id=result.session_id,
+            expires_at=result.expires_at,
+            error_message=None if success else result.error_message,
+            raw_result=result
+        )
+
+    async def _get_or_create_provider(self, erp_system: ERPSystemType) -> Optional[BaseERPAuthProvider]:
+        """Return a cached provider or instantiate a new one for the ERP system."""
+        provider = self._providers.get(erp_system)
+        if provider:
+            return provider
+
+        async with self._lock:
+            provider = self._providers.get(erp_system)
+            if provider:
+                return provider
+
+            try:
+                created = ERPAuthProviderFactory.create_provider(erp_system)
+            except Exception as exc:
+                logger.error(f"Failed to create ERP auth provider for {erp_system.value}: {exc}")
+                return None
+
+            if not created:
+                logger.warning(f"No ERP auth provider available for {erp_system.value}")
+                return None
+
+            try:
+                await created.initialize()
+            except Exception as exc:
+                logger.error(f"Failed to initialize ERP auth provider for {erp_system.value}: {exc}")
+                return None
+
+            self._providers[erp_system] = created
+            return created
+
+    @staticmethod
+    def _normalize_erp_system(erp_system: Any) -> ERPSystemType:
+        """Best-effort conversion of incoming ERP system identifiers to enum values."""
+        if isinstance(erp_system, ERPSystemType):
+            return erp_system
+
+        value = str(getattr(erp_system, "value", erp_system)).lower()
+        for member in ERPAuthProviderFactory.get_supported_systems():
+            if member.value == value:
+                return member
+
+        return ERPSystemType.CUSTOM
+
+    @staticmethod
+    def _map_auth_method(auth_method: Any) -> AuthenticationType:
+        """Map external auth method identifiers to AuthenticationType."""
+        value = str(getattr(auth_method, "value", auth_method)).lower()
+        mapping = {
+            "basic": AuthenticationType.BASIC,
+            "basic_auth": AuthenticationType.BASIC,
+            "username_password": AuthenticationType.BASIC,
+            "password": AuthenticationType.BASIC,
+            "api_key": AuthenticationType.API_KEY,
+            "oauth2": AuthenticationType.OAUTH2,
+            "token": AuthenticationType.TOKEN,
+            "bearer_token": AuthenticationType.TOKEN,
+            "jwt": AuthenticationType.JWT,
+            "certificate": AuthenticationType.CERTIFICATE,
+        }
+        return mapping.get(value, AuthenticationType.CUSTOM)
+
+    @staticmethod
+    def _build_context(auth_method: Any, context: Optional[Dict[str, Any]]) -> AuthenticationContext:
+        """Create an AuthenticationContext with supplied metadata."""
+        metadata = dict(context) if isinstance(context, dict) else {}
+        metadata.setdefault("auth_method", str(getattr(auth_method, "value", auth_method)))
+        return AuthenticationContext(
+            service_type=ServiceType.ERP_SYSTEM,
+            session_metadata=metadata
+        )
+
+    @staticmethod
+    def _safe_value(raw: Any) -> str:
+        """Safely stringify identifiers for logging."""
+        try:
+            return str(getattr(raw, "value", raw))
+        except Exception:
+            return "unknown"

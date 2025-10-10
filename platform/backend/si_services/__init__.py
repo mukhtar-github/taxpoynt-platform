@@ -21,6 +21,8 @@ Services Registered:
 import logging
 import asyncio
 import json
+import sys
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -42,6 +44,13 @@ from .integration_management.connection_manager import ConnectionConfig, SystemT
 from .integration_management.erp_connection_repository import ERPConnectionRepository, ERPConnectionRecord
 
 logger = logging.getLogger(__name__)
+
+# Ensure legacy app package is importable for shims still referencing it
+_archive_backend = Path(__file__).resolve().parents[2] / "archive" / "legacy" / "backend"
+if _archive_backend.exists():
+    archive_path_str = str(_archive_backend)
+    if archive_path_str not in sys.path:
+        sys.path.append(archive_path_str)
 
 
 class SIServiceRegistry:
@@ -419,15 +428,55 @@ class SIServiceRegistry:
         """Register ERP integration services"""
         try:
             # Import ERP services
-            from .erp_integration.erp_integration_service import test_odoo_connection
-            from .erp_integration.erp_data_processor import ERPDataProcessor
-            from .erp_integration.data_sync_coordinator import DataSyncCoordinator
+            try:
+                from .erp_integration.erp_integration_service import test_odoo_connection  # type: ignore
+                _test_connection_fn = test_odoo_connection
+            except Exception as import_err:
+                logger.warning(
+                    "Falling back to stub Odoo connection tester due to import error: %s",
+                    import_err,
+                )
+
+                class _StubIntegrationResult:
+                    def __init__(self, success: bool, message: str, details: Optional[Dict[str, Any]] = None):
+                        self.success = success
+                        self.message = message
+                        self.details = details or {}
+
+                    def dict(self) -> Dict[str, Any]:
+                        return {
+                            "success": self.success,
+                            "message": self.message,
+                            "details": self.details,
+                        }
+
+                def _test_connection_fn(*args: Any, **kwargs: Any) -> _StubIntegrationResult:
+                    return _StubIntegrationResult(
+                        success=False,
+                        message="odoo_connection_test_unavailable",
+                        details={"error": str(import_err)},
+                    )
+
+            from .erp_integration.erp_data_processor import ERPDataProcessor, ProcessingConfig
+            from .erp_integration.data_sync_coordinator import DataSyncCoordinator, CoordinatorConfig
             
             # Create ERP service wrapper
+            try:
+                data_processor = ERPDataProcessor(ProcessingConfig())
+            except Exception as proc_err:
+                logger.warning(f"ERP data processor unavailable, continuing without processor: {proc_err}")
+                data_processor = None
+
+            try:
+                sync_coordinator = DataSyncCoordinator(CoordinatorConfig())
+            except Exception as sync_err:
+                logger.warning(f"ERP sync coordinator unavailable, continuing without coordinator: {sync_err}")
+                sync_coordinator = None
+
             erp_service = {
-                "connection_tester": test_odoo_connection,
-                "data_processor": ERPDataProcessor() if hasattr(ERPDataProcessor, '__init__') else None,
-                "sync_coordinator": DataSyncCoordinator() if hasattr(DataSyncCoordinator, '__init__') else None
+                "connection_tester": _test_connection_fn,
+                "data_processor": data_processor,
+                "sync_coordinator": sync_coordinator
             }
             
             self.services["erp_integration"] = erp_service
@@ -702,18 +751,67 @@ class SIServiceRegistry:
         """Register data extraction services"""
         try:
             from .data_extraction.erp_data_extractor import ERPDataExtractor
-            from .data_extraction.batch_processor import BatchProcessor
-            from .data_extraction.extraction_scheduler import ExtractionScheduler
-            from .data_extraction.data_reconciler import DataReconciler
-            from .data_extraction.incremental_sync import IncrementalSync
-            
+            from .data_extraction.batch_processor import BatchProcessor, BatchConfig
+            from .data_extraction.data_reconciler import DataReconciler, ReconciliationConfig
+            try:
+                from .data_extraction.extraction_scheduler import ExtractionScheduler, SchedulerConfig
+            except Exception as scheduler_import_err:
+                logger.warning(f"Extraction scheduler unavailable, continuing without scheduler: {scheduler_import_err}")
+                ExtractionScheduler = None  # type: ignore
+                SchedulerConfig = None  # type: ignore
+            try:
+                from .data_extraction.incremental_sync import IncrementalSyncService, SyncConfig
+            except Exception as sync_import_err:
+                logger.warning(f"Incremental sync service unavailable, continuing without incremental sync: {sync_import_err}")
+                IncrementalSyncService = None  # type: ignore
+                SyncConfig = None  # type: ignore
+
+            extractor = None
+            try:
+                extractor = ERPDataExtractor()
+            except Exception as extractor_err:
+                logger.warning(f"ERP data extractor unavailable: {extractor_err}")
+
+            batch_processor = None
+            if extractor:
+                try:
+                    batch_processor = BatchProcessor(BatchConfig(), extractor)
+                except Exception as batch_err:
+                    logger.warning(f"Batch processor unavailable, continuing without batch support: {batch_err}")
+
+            reconciler = None
+            if extractor:
+                try:
+                    reconciler = DataReconciler(ReconciliationConfig(), extractor)
+                except Exception as reconcile_err:
+                    logger.warning(f"Data reconciler unavailable, continuing without reconciliation: {reconcile_err}")
+
+            incremental_sync = None
+            if extractor and IncrementalSyncService and SyncConfig:
+                try:
+                    incremental_sync = IncrementalSyncService(SyncConfig(), extractor)
+                except Exception as inc_err:
+                    logger.warning(f"Incremental sync unavailable, continuing without incremental sync: {inc_err}")
+
+            scheduler = None
+            if extractor and ExtractionScheduler and SchedulerConfig:
+                try:
+                    scheduler = ExtractionScheduler(
+                        SchedulerConfig(),
+                        extractor,
+                        batch_processor=batch_processor,
+                        sync_service=incremental_sync
+                    )
+                except Exception as sched_err:
+                    logger.warning(f"Extraction scheduler initialization failed, continuing without scheduler: {sched_err}")
+
             # Create data extraction service wrapper
             extraction_service = {
-                "erp_extractor": ERPDataExtractor() if hasattr(ERPDataExtractor, '__init__') else None,
-                "batch_processor": BatchProcessor() if hasattr(BatchProcessor, '__init__') else None,
-                "scheduler": ExtractionScheduler() if hasattr(ExtractionScheduler, '__init__') else None,
-                "reconciler": DataReconciler() if hasattr(DataReconciler, '__init__') else None,
-                "incremental_sync": IncrementalSync() if hasattr(IncrementalSync, '__init__') else None
+                "erp_extractor": extractor,
+                "batch_processor": batch_processor,
+                "scheduler": scheduler,
+                "reconciler": reconciler,
+                "incremental_sync": incremental_sync
             }
             
             self.services["data_extraction"] = extraction_service
@@ -802,14 +900,38 @@ class SIServiceRegistry:
             from .authentication.auth_manager import AuthManager
             from .authentication.firs_auth_service import FIRSAuthService
             from .authentication.certificate_auth import CertificateAuth
-            from .authentication.token_manager import TokenManager
+            from .authentication.token_manager import TokenManager, TokenConfig
             
             # Create authentication service wrapper
+            auth_manager = None
+            try:
+                auth_manager = AuthManager()
+            except Exception as auth_mgr_err:
+                logger.warning(f"Auth manager unavailable, continuing without manager: {auth_mgr_err}")
+
+            firs_auth = None
+            try:
+                firs_auth = FIRSAuthService()
+            except Exception as firs_err:
+                logger.warning(f"FIRS auth service unavailable, continuing without FIRS auth: {firs_err}")
+
+            cert_auth = None
+            try:
+                cert_auth = CertificateAuth()
+            except Exception as cert_err:
+                logger.warning(f"Certificate auth unavailable, continuing without certificate auth: {cert_err}")
+
+            token_manager = None
+            try:
+                token_manager = TokenManager(TokenConfig())
+            except Exception as token_err:
+                logger.warning(f"Token manager unavailable, continuing without token manager: {token_err}")
+
             auth_service = {
-                "auth_manager": AuthManager() if hasattr(AuthManager, '__init__') else None,
-                "firs_auth": FIRSAuthService() if hasattr(FIRSAuthService, '__init__') else None,
-                "cert_auth": CertificateAuth() if hasattr(CertificateAuth, '__init__') else None,
-                "token_manager": TokenManager() if hasattr(TokenManager, '__init__') else None
+                "auth_manager": auth_manager,
+                "firs_auth": firs_auth,
+                "cert_auth": cert_auth,
+                "token_manager": token_manager
             }
             
             self.services["authentication"] = auth_service
@@ -1410,9 +1532,9 @@ class SIServiceRegistry:
                 if operation == "create_erp_connection":
                     return await self._handle_create_erp_connection(payload)
                 if operation == "list_erp_connections":
-                    return self._handle_list_erp_connections(payload)
+                    return await self._handle_list_erp_connections(payload)
                 if operation == "get_erp_connection":
-                    return self._handle_get_erp_connection(payload)
+                    return await self._handle_get_erp_connection(payload)
                 if operation == "update_erp_connection":
                     return await self._handle_update_erp_connection(payload)
                 if operation == "delete_erp_connection":
@@ -1449,7 +1571,7 @@ class SIServiceRegistry:
             metadata=connection_data.get("metadata") or {},
         )
 
-        record = self.erp_connection_repository.create(record)
+        record = await self.erp_connection_repository.create(record)
 
         config = self._build_connection_config(record)
         registered = await connection_manager.register_system(config)
@@ -1470,15 +1592,16 @@ class SIServiceRegistry:
             },
         }
 
-    def _handle_list_erp_connections(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_list_erp_connections(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         filters = payload.get("filters") or {}
         organization_filter = filters.get("organization_id")
         erp_filter = filters.get("erp_system")
 
-        items = [self._record_to_dict(record) for record in self.erp_connection_repository.list(
+        records = await self.erp_connection_repository.list(
             organization_id=organization_filter,
             erp_system=erp_filter,
-        )]
+        )
+        items = [self._record_to_dict(record) for record in records]
 
         return {
             "operation": "list_erp_connections",
@@ -1489,7 +1612,7 @@ class SIServiceRegistry:
             },
         }
 
-    def _handle_get_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_get_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         connection_id = payload.get("connection_id")
         if not connection_id:
             return {
@@ -1498,7 +1621,7 @@ class SIServiceRegistry:
                 "error": "connection_id is required",
             }
 
-        record = self.erp_connection_repository.get(connection_id)
+        record = await self.erp_connection_repository.get(connection_id)
         if not record:
             return {
                 "operation": "get_erp_connection",
@@ -1522,7 +1645,7 @@ class SIServiceRegistry:
                 "error": "connection_id is required",
             }
 
-        existing = self.erp_connection_repository.get(connection_id)
+        existing = await self.erp_connection_repository.get(connection_id)
         if not existing:
             return {
                 "operation": "update_erp_connection",
@@ -1530,7 +1653,7 @@ class SIServiceRegistry:
                 "error": "Connection not found",
             }
 
-        updated_record = self.erp_connection_repository.update(connection_id, update_data)
+        updated_record = await self.erp_connection_repository.update(connection_id, update_data)
         if not updated_record:
             return {
                 "operation": "update_erp_connection",
@@ -1563,7 +1686,7 @@ class SIServiceRegistry:
                 "error": "connection_id is required",
             }
 
-        record = self.erp_connection_repository.delete(connection_id)
+        record = await self.erp_connection_repository.delete(connection_id)
         if not record:
             return {
                 "operation": "delete_erp_connection",
@@ -1595,7 +1718,7 @@ class SIServiceRegistry:
                 "error": "connection_id is required",
             }
 
-        record = self.erp_connection_repository.get(connection_id)
+        record = await self.erp_connection_repository.get(connection_id)
         if not record:
             return {
                 "operation": "test_erp_connection",
@@ -1646,8 +1769,12 @@ class SIServiceRegistry:
             "connection_config": record.connection_config,
             "metadata": record.metadata,
             "status": record.status,
-            "created_at": record.created_at.isoformat(),
-            "updated_at": record.updated_at.isoformat(),
+            "status_reason": record.status_reason,
+            "owner_user_id": record.owner_user_id,
+            "is_active": record.is_active,
+            "last_status_at": record.last_status_at.isoformat() if record.last_status_at else None,
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+            "updated_at": record.updated_at.isoformat() if record.updated_at else None,
         }
 
     def _build_connection_config(self, record: ERPConnectionRecord) -> ConnectionConfig:

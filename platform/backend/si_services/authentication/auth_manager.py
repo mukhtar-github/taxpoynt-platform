@@ -189,8 +189,9 @@ class AuthenticationManager:
     various authentication providers and manages authentication sessions.
     """
     
-    def __init__(self, config: AuthenticationConfig):
-        self.config = config
+    def __init__(self, config: Optional[AuthenticationConfig] = None):
+        resolved_config = config or AuthenticationConfig()
+        self.config = resolved_config
         self.auth_providers: Dict[str, BaseAuthProvider] = {}
         self.active_sessions: Dict[str, AuthenticationResult] = {}
         self.credential_cache: Dict[str, AuthenticationCredentials] = {}
@@ -205,17 +206,17 @@ class AuthenticationManager:
         self.rate_limit_counters: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         
         # Concurrency control
-        self.auth_semaphore = asyncio.Semaphore(config.max_concurrent_authentications)
+        self.auth_semaphore = asyncio.Semaphore(self.config.max_concurrent_authentications)
         
         # Setup storage paths
-        if config.credential_storage_path:
-            self.storage_path = Path(config.credential_storage_path)
+        if self.config.credential_storage_path:
+            self.storage_path = Path(self.config.credential_storage_path)
             self.storage_path.mkdir(parents=True, exist_ok=True)
         else:
             self.storage_path = None
         
         # Setup audit logging
-        if config.enable_audit_logging:
+        if self.config.enable_audit_logging:
             self._setup_audit_logging()
     
     async def start_auth_manager(self) -> None:
@@ -252,6 +253,16 @@ class AuthenticationManager:
         
         # Save current state
         await self._save_auth_state()
+
+
+class AuthManager(AuthenticationManager):
+    """
+    Backward compatible wrapper that provides a default configuration when none
+    is supplied. Legacy call sites expect a zero-argument constructor.
+    """
+
+    def __init__(self, config: Optional[AuthenticationConfig] = None):
+        super().__init__(config or AuthenticationConfig())
     
     async def register_auth_provider(
         self,

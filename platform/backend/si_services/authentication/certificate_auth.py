@@ -175,6 +175,7 @@ class CertificateValidator:
         except Exception as e:
             logger.error(f"Certificate validation failed: {e}")
             return CertificateStatus.UNKNOWN, [str(e)]
+
     
     async def _validate_certificate_chain(
         self,
@@ -762,3 +763,7 @@ def create_certificate_auth_provider(config: CertificateConfig) -> CertificateAu
     provider = CertificateAuthProvider()
     # Note: initialize() should be called separately
     return provider
+
+
+# Backwards compatibility alias expected by service registry
+CertificateAuth = CertificateAuthProvider

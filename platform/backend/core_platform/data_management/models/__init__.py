@@ -45,6 +45,7 @@ from .business_systems import (
     SyncStatus, CertificateType, CertificateStatus, DocumentType,
     TaxpayerStatus, WebhookEventType, AuditEventType
 )
+from .si_erp_connection import SIERPConnection, SIERPConnectionStatus
 from .idempotency import IdempotencyKey, IdempotencyStatus
 
 # SDK Management Models
@@ -110,6 +111,8 @@ __all__ = [
     "TaxpayerStatus",
     "WebhookEventType",
     "AuditEventType",
+    "SIERPConnection",
+    "SIERPConnectionStatus",
     "IdempotencyKey",
     "IdempotencyStatus",
     # SDK Management Models

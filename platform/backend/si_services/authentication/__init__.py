@@ -32,6 +32,7 @@ from core_platform.authentication import AuthenticationError
 # Core Authentication Components
 from .auth_manager import (
     AuthenticationManager,
+    AuthManager,
     BaseAuthProvider,
     AuthenticationContext,
     AuthenticationCredentials,
@@ -50,12 +51,18 @@ from .erp_auth_provider import (
     OdooAuthProvider,
     SAPAuthProvider,
     QuickBooksAuthProvider,
+    ERPAuthProvider,
     ERPAuthProviderFactory,
     ERPSystemType,
     ERPConnectionConfig,
     ERPSessionData,
-    create_erp_auth_provider
+    create_erp_auth_provider,
+    ERPAuthResponse,
 )
+
+# Integration authentication coordination
+from ..integration_management.auth_coordinator import AuthMethod
+from ..transformation import ERPSystem
 
 # Certificate Authentication
 from .certificate_auth import (
@@ -72,6 +79,13 @@ from .certificate_auth import (
 
 # Backward compatibility alias for legacy imports
 CertificateAuth = CertificateAuthProvider
+
+def _resolve_secure_store():
+    """Lazy alias for SecureCredentialStore to avoid import-order issues."""
+    from .credential_store import SecureCredentialStore as _SecureCredentialStore
+    return _SecureCredentialStore
+
+CredentialStore = _resolve_secure_store()
 
 # FIRS Authentication
 from .firs_auth_service import (
@@ -125,6 +139,7 @@ __all__ = [
     'AuthenticationScope',
     'ServiceType',
     'create_auth_manager',
+    'AuthManager',
     'AuthenticationError',
     
     # ERP Authentication
@@ -132,11 +147,15 @@ __all__ = [
     'OdooAuthProvider',
     'SAPAuthProvider',
     'QuickBooksAuthProvider',
+    'ERPAuthProvider',
     'ERPAuthProviderFactory',
     'ERPSystemType',
     'ERPConnectionConfig',
     'ERPSessionData',
     'create_erp_auth_provider',
+    'ERPAuthResponse',
+    'ERPSystem',
+    'AuthMethod',
     
     # Certificate Authentication
     'CertificateAuthProvider',
@@ -175,6 +194,7 @@ __all__ = [
     
     # Credential Storage
     'SecureCredentialStore',
+    'CredentialStore',
     'StoredCredential',
     'CredentialMetadata',
     'CredentialStoreConfig',
