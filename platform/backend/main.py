@@ -115,6 +115,7 @@ try:
         MessageRouter,
         get_message_router as get_inmemory_message_router,
     )
+    from core_platform.utils.background_task_runner import BackgroundTaskRunner
     
     # Phase 6: Enterprise Fault Tolerance Infrastructure
     from hybrid_services.error_management import (
@@ -434,6 +435,14 @@ async def initialize_services():
         except Exception as e:
             logger.warning(f"⚠️  Dead Letter Queue initialization failed: {e}")
             app.state.dead_letter_handler = None
+
+        # Lightweight background task runner (can be replaced by Phase-6 job orchestrator)
+        if not hasattr(app.state, "background_runner") or app.state.background_runner is None:
+            app.state.background_runner = BackgroundTaskRunner(
+                name="platform_background_tasks",
+                max_concurrency=20,
+            )
+            logger.info("✅ Background task runner initialized (lightweight asyncio)")
         # Initialize production database with optimizations and Phase 6 fault tolerance
         logger.info("🗃️  Initializing production database...")
         
@@ -517,7 +526,6 @@ async def initialize_services():
             app.state.health_check_manager = messaging_infrastructure["health_check_manager"]
             # Register basic operation schemas for core operations
             try:
-                from core_platform.messaging.message_router import MessageRouter
                 mr: MessageRouter = app.state.redis_message_router
                 # Pydantic model for submit_invoice
                 try:
@@ -569,6 +577,15 @@ async def initialize_services():
             logger.info(f"   📊 Scaling Coordinator: Auto-scaling for 1M+ transactions")
             logger.info(f"   🔒 Circuit Breaker: Service failure protection")
             logger.info(f"   💓 Health Monitor: Non-blocking health checks")
+
+            try:
+                from si_services.integration_management import integration_health_monitor, connection_manager
+                await integration_health_monitor.attach_connection_manager(connection_manager)
+                app.state.integration_health_monitor = integration_health_monitor
+                logger.info("✅ Integration health monitor initialized")
+            except Exception as hm_err:
+                logger.warning(f"⚠️ Integration health monitor initialization skipped: {hm_err}")
+                app.state.integration_health_monitor = None
             
         except Exception as e:
             # Phase 6: Enhanced error handling with recovery orchestration
@@ -591,6 +608,7 @@ async def initialize_services():
             
             # Initialize basic messaging as fallback
             app.state.messaging = None
+            app.state.integration_health_monitor = None
             logger.warning("⚠️  Operating with basic messaging functionality")
 
         # Start periodic idempotency cleanup task
@@ -746,7 +764,10 @@ async def initialize_services():
             if enable_si:
                 try:
                     from si_services import initialize_si_services
-                    si_registry = await initialize_si_services(app.state.redis_message_router)
+                    si_registry = await initialize_si_services(
+                        app.state.redis_message_router,
+                        background_runner=getattr(app.state, "background_runner", None),
+                    )
                     logger.info(f"✅ SI Services registered: {len(si_registry.service_endpoints)} services")
                 except Exception as e:
                     # Phase 6: Service registration error handling
@@ -883,6 +904,14 @@ async def cleanup_services():
                 if hasattr(app.state, 'health_check_manager'):
                     await app.state.health_check_manager.stop_all_monitoring()
                     logger.info("✅ Health Check Manager stopped")
+
+                if hasattr(app.state, 'integration_health_monitor') and app.state.integration_health_monitor:
+                    await app.state.integration_health_monitor.stop_all_monitoring()
+                    logger.info("✅ Integration health monitor stopped")
+
+                if hasattr(app.state, 'background_runner') and app.state.background_runner:
+                    await app.state.background_runner.shutdown()
+                    logger.info("✅ Background task runner shutdown")
                 
                 # Shutdown scaling coordinator
                 if hasattr(app.state, 'scaling_coordinator'):

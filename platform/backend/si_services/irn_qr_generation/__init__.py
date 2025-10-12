@@ -12,6 +12,7 @@ from .sequence_manager import SequenceManager
 from .duplicate_detector import DuplicateDetector
 from .irn_validator import IRNValidator
 from .bulk_processor import BulkProcessor
+from .qr_signing_service import QRSigningService, QREncryptionResult
 
 # Services
 from .irn_generation_service import IRNGenerationService
@@ -24,6 +25,8 @@ __all__ = [
     "DuplicateDetector",
     "IRNValidator",
     "BulkProcessor",
+    "QRSigningService",
+    "QREncryptionResult",
     
     # Refactored services
     "IRNGenerationService",

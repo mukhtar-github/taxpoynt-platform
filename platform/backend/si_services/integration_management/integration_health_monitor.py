@@ -7,12 +7,10 @@ Combines functionality from integration_service.py status monitoring and generic
 
 import asyncio
 import logging
-import threading
-import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Set, Callable
+from typing import Dict, Any, List, Optional, Callable
 from enum import Enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from collections import deque, defaultdict
 
 logger = logging.getLogger(__name__)
@@ -74,9 +72,14 @@ class IntegrationHealthMonitor:
     """
     
     def __init__(self):
-        # Integration status monitoring (from integration_service.py)
-        self._monitoring_threads = {}
-        self._status_cache = {}
+        # Integration status monitoring
+        self._monitor_tasks: Dict[str, asyncio.Task] = {}
+        self._monitor_config: Dict[str, Dict[str, Any]] = {}
+        self._status_cache: Dict[str, Dict[str, Any]] = {}
+        self._snapshot_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=50))
+        self._default_interval_minutes = 30
+        self._lock = asyncio.Lock()
+        self.connection_manager = None
         
         # Health monitoring components
         self.health_metrics = deque(maxlen=10000)
@@ -109,8 +112,9 @@ class IntegrationHealthMonitor:
         Get the current status of an integration.
         Extracted from integration_service.py lines 1396-1431
         """
-        status_info = self._status_cache.get(str(integration_id))
-        
+        str_id = str(integration_id)
+        status_info = self._status_cache.get(str_id)
+
         if not status_info:
             # If not in cache, create basic status info
             status_info = {
@@ -119,66 +123,89 @@ class IntegrationHealthMonitor:
                 "message": "Status has not been checked yet",
                 "details": {}
             }
-            self._status_cache[str(integration_id)] = status_info
-        
-        return status_info
+            self._status_cache[str_id] = status_info
+
+        formatted = dict(status_info)
+        last_checked = formatted.get("last_checked")
+        if isinstance(last_checked, datetime):
+            formatted["last_checked"] = last_checked.isoformat()
+        formatted["details"] = self._serialize_value(formatted.get("details", {}))
+        return formatted
     
-    def start_integration_monitoring(
+    async def attach_connection_manager(self, connection_manager, default_interval_minutes: int = 30) -> None:
+        """Attach connection manager and ensure monitoring for registered systems."""
+        async with self._lock:
+            self.connection_manager = connection_manager
+            self._default_interval_minutes = default_interval_minutes
+            system_ids = list(connection_manager.configs.keys())
+
+        for system_id in system_ids:
+            print("attach_monitor ensure", system_id)
+            await self._ensure_monitoring(str(system_id), None, default_interval_minutes)
+        print("attach_monitor done")
+
+    async def start_integration_monitoring(
         self,
         integration_id: str,
         integration_config: Dict[str, Any],
         interval_minutes: int = 30
     ) -> bool:
-        """
-        Start background monitoring for an integration.
-        Extracted from integration_service.py lines 1434-1477
-        """
-        str_id = str(integration_id)
-        if str_id in self._monitoring_threads and self._monitoring_threads[str_id].is_alive():
-            return True
-        
-        # Create and start monitoring thread
-        monitor_thread = threading.Thread(
-            target=self._monitor_integration,
-            args=(integration_id, integration_config, interval_minutes),
-            daemon=True
-        )
-        monitor_thread.start()
-        
-        self._monitoring_threads[str_id] = monitor_thread
-        
+        """Start async monitoring for an integration."""
+        await self._ensure_monitoring(str(integration_id), integration_config, interval_minutes)
         logger.info(f"Started monitoring for integration {integration_id}")
         return True
-    
-    def stop_integration_monitoring(self, integration_id: str) -> bool:
-        """
-        Stop background monitoring for an integration.
-        Extracted from integration_service.py lines 1480-1514
-        """
+
+    async def stop_integration_monitoring(self, integration_id: str) -> bool:
+        """Stop async monitoring for an integration."""
         str_id = str(integration_id)
-        
-        if str_id not in self._monitoring_threads:
-            return False
-        
-        # Thread will terminate on its own (daemon)
-        self._monitoring_threads.pop(str_id, None)
-        
-        logger.info(f"Stopped monitoring for integration {integration_id}")
-        return True
-    
+        async with self._lock:
+            task = self._monitor_tasks.pop(str_id, None)
+            self._monitor_config.pop(str_id, None)
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                logger.info(f"Stopped monitoring for integration {integration_id}")
+                return True
+        return False
+
+    async def stop_all_monitoring(self) -> None:
+        """Stop all monitoring tasks."""
+        async with self._lock:
+            tasks = list(self._monitor_tasks.values())
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            self._monitor_tasks.clear()
+            self._monitor_config.clear()
+
+    async def track_connection(
+        self,
+        integration_id: str,
+        integration_config: Optional[Dict[str, Any]] = None,
+        interval_minutes: Optional[int] = None
+    ) -> None:
+        """Ensure monitoring for a connection using provided configuration."""
+        await self._ensure_monitoring(
+            str(integration_id),
+            integration_config,
+            interval_minutes or self._default_interval_minutes,
+        )
+
+    async def untrack_connection(self, integration_id: str) -> None:
+        """Stop monitoring for a connection if active."""
+        await self.stop_integration_monitoring(integration_id)
+
     def get_all_monitored_integrations(self) -> List[Dict[str, Any]]:
-        """
-        Get a list of all integrations being monitored.
-        Extracted from integration_service.py lines 1299-1329
-        """
+        """Get a list of all integrations being monitored."""
         result = []
-        
-        for integration_id in self._monitoring_threads:
-            thread = self._monitoring_threads[integration_id]
+
+        for integration_id, task in self._monitor_tasks.items():
             status = self._status_cache.get(integration_id, {})
-            
-            # Only include active monitoring threads
-            if thread.is_alive():
+            if not task.done():
                 result.append({
                     "integration_id": integration_id,
                     "name": f"Integration {integration_id}",
@@ -187,80 +214,140 @@ class IntegrationHealthMonitor:
                     "message": status.get("message", ""),
                     "is_monitoring": True
                 })
-        
+
         return result
-    
-    def _monitor_integration(self, integration_id: str, integration_config: Dict[str, Any], interval_minutes: int):
-        """
-        Background task to periodically check integration status.
-        Extracted from integration_service.py lines 1331-1388
-        """
-        str_id = str(integration_id)
-        
-        while str_id in self._monitoring_threads:
+
+    async def _ensure_monitoring(self, integration_id: str, integration_config: Optional[Dict[str, Any]], interval_minutes: int) -> None:
+        async with self._lock:
+            if integration_id in self._monitor_tasks and not self._monitor_tasks[integration_id].done():
+                return
+
+            self._monitor_config[integration_id] = {
+                "config": integration_config or {},
+                "interval_minutes": interval_minutes,
+            }
+
+            task = asyncio.create_task(self._monitor_integration_async(integration_id))
+            self._monitor_tasks[integration_id] = task
+
+    async def _monitor_integration_async(self, integration_id: str):
+        """Async background task to periodically check integration status."""
+        config_entry = self._monitor_config.get(integration_id, {})
+        interval_minutes = config_entry.get("interval_minutes", self._default_interval_minutes)
+
+        while True:
             try:
-                # Test the integration using injected connection tester
-                if self.connection_tester:
-                    test_integration = {
-                        "id": integration_id,
-                        "config": integration_config
-                    }
-                    result = self.connection_tester.test_integration_connection(test_integration)
-                else:
-                    # No connection tester available - mark as active without testing
-                    result = {
-                        "success": True,
-                        "message": "Monitoring active (no connection tester injected)",
-                        "details": {"status": "monitoring_only"}
-                    }
-                
-                # Update status cache
-                status = "active" if result.get("success", False) else "failed"
-                self._status_cache[str_id] = {
-                    "status": status,
-                    "last_checked": datetime.utcnow(),
-                    "message": result.get("message", "Unknown status"),
-                    "details": result.get("details", {})
-                }
-                
-                # Record health metrics
-                self._record_health_metrics(integration_id, result)
-                
-                # Check thresholds and trigger alerts
-                try:
-                    asyncio.run(self._check_health_thresholds(integration_id, result))
-                except Exception as e:
-                    logger.warning(f"Error checking health thresholds: {e}")
-                
-                # Sleep until next check
-                time.sleep(interval_minutes * 60)
-                
+                result = await self._run_health_check(integration_id, config_entry.get("config"))
+                await self._process_health_result(integration_id, result)
+                await asyncio.sleep(max(interval_minutes, 1) * 60)
+            except asyncio.CancelledError:
+                logger.debug(f"Monitoring task cancelled for integration {integration_id}")
+                break
             except Exception as e:
-                logger.error(f"Error monitoring integration {integration_id}: {str(e)}")
-                
-                # Update status cache with error
-                self._status_cache[str_id] = {
+                logger.error(f"Error monitoring integration {integration_id}: {e}")
+                self._status_cache[str(integration_id)] = {
                     "status": "error",
                     "last_checked": datetime.utcnow(),
-                    "message": f"Monitoring error: {str(e)}",
+                    "message": f"Monitoring error: {e}",
                     "details": {"error": "monitoring_error"}
                 }
-                
-                # Sleep before retry
-                time.sleep(300)  # 5 minutes
+                await asyncio.sleep(300)
+
+    async def _run_health_check(self, integration_id: str, integration_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Execute a health check using available dependencies."""
+        str_id = str(integration_id)
+
+        if self.connection_manager:
+            try:
+                status_obj = await self.connection_manager.get_system_status(str_id)
+                status_dict = self._connection_status_to_dict(status_obj)
+                if status_dict is not None:
+                    state_value = status_dict.get("state", "unknown")
+                    success = state_value not in {"failed", "maintenance"}
+                    return {
+                        "success": success,
+                        "message": f"Connection state: {state_value}",
+                        "details": status_dict,
+                    }
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "error": str(exc),
+                    "message": str(exc),
+                    "integration_id": str_id,
+                }
+
+        if self.connection_tester and integration_config is not None:
+            try:
+                test_integration = {
+                    "id": str_id,
+                    "config": integration_config
+                }
+                return self.connection_tester.test_integration_connection(test_integration)
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "error": str(exc),
+                    "message": str(exc),
+                    "integration_id": str_id,
+                }
+
+        return {
+            "success": False,
+            "message": "Health monitor not fully configured",
+            "details": {"reason": "no_connection_manager" if not self.connection_manager else "no_connection_tester"},
+            "integration_id": str_id,
+        }
+
+    async def _process_health_result(self, integration_id: str, test_result: Dict[str, Any]) -> None:
+        """Update caches, metrics, and alerts for a health result."""
+        str_id = str(integration_id)
+        checked_at = datetime.utcnow()
+        success = bool(test_result.get("success", False))
+        status = "active" if success else "failed"
+        message = test_result.get("message") or test_result.get("error") or "Unknown status"
+        details = test_result.get("details") or test_result.get("test_result") or {}
+
+        snapshot = {
+            "integration_id": str_id,
+            "status": status,
+            "success": success,
+            "checked_at": checked_at,
+            "message": message,
+            "details": self._serialize_value(details),
+        }
+
+        connection_status_dict = None
+        if self.connection_manager:
+            status_obj = await self.connection_manager.get_system_status(str_id)
+            connection_status_dict = self._connection_status_to_dict(status_obj)
+            if connection_status_dict:
+                snapshot["connection_status"] = connection_status_dict
+
+        self._status_cache[str_id] = {
+            "status": status,
+            "last_checked": checked_at,
+            "message": message,
+            "details": details,
+        }
+
+        history = self._snapshot_history[str_id]
+        history.appendleft(snapshot)
+
+        self._record_health_metrics(integration_id, test_result)
+        await self._check_health_thresholds(integration_id, test_result)
     
     # === Health Monitoring and Metrics ===
     
     def _record_health_metrics(self, integration_id: str, test_result: Dict[str, Any]):
         """Record health metrics from test results"""
         timestamp = datetime.utcnow()
-        
-        # Record response time if available
-        if "details" in test_result and "latency_ms" in test_result["details"]:
+        details = test_result.get("details") or test_result.get("test_result") or {}
+        if isinstance(details, dict) and "latency_ms" in details:
             metric = HealthMetric(
                 integration_id=integration_id,
                 metric_name="response_time",
-                value=test_result["details"]["latency_ms"],
+                value=details["latency_ms"],
                 timestamp=timestamp
             )
             self.health_metrics.append(metric)
@@ -390,6 +477,66 @@ class IntegrationHealthMonitor:
             metric for metric in self.health_metrics
             if metric.integration_id == integration_id and metric.timestamp >= cutoff_time
         ]
+
+    def get_health_snapshot(
+        self,
+        integration_id: str,
+        *,
+        include_history: bool = False,
+        history_limit: int = 5
+    ) -> Optional[Dict[str, Any]]:
+        """Return the latest health snapshot for an integration."""
+        str_id = str(integration_id)
+        status_info = self._status_cache.get(str_id)
+        if not status_info:
+            return None
+
+        snapshot = {
+            "integration_id": str_id,
+            "status": status_info.get("status", "unknown"),
+            "last_checked": status_info.get("last_checked").isoformat() if isinstance(status_info.get("last_checked"), datetime) else status_info.get("last_checked"),
+            "message": status_info.get("message"),
+            "details": self._serialize_value(status_info.get("details", {})),
+        }
+
+        if include_history:
+            history_entries = list(self._snapshot_history.get(str_id, []))[:history_limit]
+            serialized_history = []
+            for entry in history_entries:
+                serialized_history.append({
+                    "status": entry.get("status"),
+                    "success": entry.get("success"),
+                    "message": entry.get("message"),
+                    "details": entry.get("details"),
+                    "checked_at": entry.get("checked_at").isoformat() if isinstance(entry.get("checked_at"), datetime) else entry.get("checked_at"),
+                    "connection_status": entry.get("connection_status"),
+                })
+            snapshot["recent_history"] = serialized_history
+
+        return snapshot
+
+    def _connection_status_to_dict(self, status_obj) -> Optional[Dict[str, Any]]:
+        if not status_obj:
+            return None
+        data = asdict(status_obj)
+        state = data.get("state")
+        if isinstance(state, Enum):
+            data["state"] = state.value
+        for dt_key in ("connected_at", "last_activity", "last_checked"):
+            if data.get(dt_key) is not None and isinstance(data[dt_key], datetime):
+                data[dt_key] = data[dt_key].isoformat()
+        return data
+
+    def _serialize_value(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, dict):
+            return {k: self._serialize_value(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [self._serialize_value(v) for v in value]
+        return value
     
     # === FIRS API Status Monitoring (from integration_status_service.py) ===
     
@@ -540,7 +687,7 @@ class IntegrationHealthMonitor:
             "current_status": status["status"],
             "last_checked": status.get("last_checked"),
             "message": status.get("message", ""),
-            "is_monitored": str(integration_id) in self._monitoring_threads,
+            "is_monitored": str(integration_id) in self._monitor_tasks,
             "active_alerts": len(integration_alerts),
             "metrics_count": len(recent_metrics),
             "recommendations": self._get_health_recommendations(health_score, status)
@@ -615,9 +762,7 @@ class IntegrationHealthMonitor:
     
     async def shutdown(self):
         """Shutdown health monitor and cleanup resources"""
-        # Stop all monitoring threads
-        for integration_id in list(self._monitoring_threads.keys()):
-            self.stop_integration_monitoring(integration_id)
+        await self.stop_all_monitoring()
         
         # Clear data
         self._status_cache.clear()

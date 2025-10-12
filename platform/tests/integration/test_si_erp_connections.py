@@ -29,6 +29,9 @@ from api_gateway.role_routing.models import (  # noqa: E402
 )
 from core_platform.messaging.message_router import MessageRouter, ServiceRole  # noqa: E402
 from si_services import SIServiceRegistry  # noqa: E402
+from si_services.integration_management.connection_manager import connection_manager  # noqa: E402
+from si_services.integration_management.metrics_collector import MetricsCollector  # noqa: E402
+from si_services.integration_management.sync_orchestrator import SyncOrchestrator  # noqa: E402
 
 
 class _InMemoryERPRepository:
@@ -92,7 +95,12 @@ def _provide_context() -> HTTPRoutingContext:
 
 class _StubRoleDetector:
     async def detect_role_context(self, request):
-        return _provide_context()
+        context = _provide_context()
+        try:
+            request.state.routing_context = context
+        except Exception:
+            pass
+        return context
 
 
 class _AllowAllPermissionGuard:
@@ -155,11 +163,19 @@ def erp_test_client(monkeypatch):
     app.include_router(router, prefix="/api/v1/si/business")
 
     async def setup_services():
-        integration_callback = registry._create_integration_callback({})
+        print("setup_services start")
+        integration_service = {
+            "connection_manager": connection_manager,
+            "health_monitor": None,
+            "metrics_collector": MetricsCollector(),
+            "sync_orchestrator": SyncOrchestrator(),
+        }
+        integration_callback = registry._create_integration_callback(integration_service)
         await message_router.register_service(
             service_name="integration_management",
             service_role=ServiceRole.SYSTEM_INTEGRATOR,
             callback=integration_callback,
+            priority=1,
             metadata={
                 "operations": [
                     "create_erp_connection",
@@ -168,6 +184,9 @@ def erp_test_client(monkeypatch):
                     "update_erp_connection",
                     "delete_erp_connection",
                     "test_erp_connection",
+                    "get_erp_connection_health",
+                    "bulk_test_erp_connections",
+                    "bulk_sync_erp_data",
                 ]
             },
         )
@@ -176,6 +195,7 @@ def erp_test_client(monkeypatch):
             service_name="erp_integration",
             service_role=ServiceRole.SYSTEM_INTEGRATOR,
             callback=erp_callback,
+            priority=5,
             metadata={
                 "operations": [
                     "fetch_odoo_invoices_for_firs",
@@ -183,6 +203,7 @@ def erp_test_client(monkeypatch):
                 ]
             },
         )
+        print("setup_services end")
 
     asyncio.run(setup_services())
 
@@ -207,6 +228,7 @@ def test_create_get_and_list_connections_flow(erp_test_client):
         "/api/v1/si/business/erp/connections",
         json=create_payload,
     )
+    print("after create", create_response.status_code)
     assert create_response.status_code == 201
     create_body = create_response.json()
     connection = create_body["data"]["connection"]
@@ -220,9 +242,17 @@ def test_create_get_and_list_connections_flow(erp_test_client):
     assert list_body["data"]["connections"][0]["connection_id"] == connection_id
 
     detail_response = client.get(f"/api/v1/si/business/erp/connections/{connection_id}")
+    print("after detail", detail_response.status_code)
     assert detail_response.status_code == 200
     detail_body = detail_response.json()
     assert detail_body["data"]["connection_id"] == connection_id
+
+    health_response = client.get(f"/api/v1/si/business/erp/connections/{connection_id}/health")
+    print("after health", health_response.status_code)
+    assert health_response.status_code == 200
+    health_body = health_response.json()
+    assert health_body["data"]["connection_id"] == connection_id
+    assert "status" in health_body["data"]
 
 
 def test_test_fetch_invoices_endpoint_uses_mocked_odoo(erp_test_client):
@@ -271,3 +301,67 @@ def test_test_fetch_invoice_batch_endpoint_uses_mocked_odoo(erp_test_client):
     assert len(body["data"]["invoices"]) == 2
     assert all("invoice" in invoice for invoice in body["data"]["invoices"])
     assert body["data"]["errors"] == []
+
+
+def test_bulk_test_connections_records_metrics(erp_test_client):
+    client, _repo = erp_test_client
+
+    create_payload = {
+        "erp_system": "odoo",
+        "organization_id": "org-1",
+        "connection_config": {"url": "http://odoo.local"},
+        "connection_name": "Bulk Test Connection",
+    }
+
+    create_response = client.post(
+        "/api/v1/si/business/erp/connections",
+        json=create_payload,
+    )
+    assert create_response.status_code == 201
+    connection_id = create_response.json()["data"]["connection"]["connection_id"]
+
+    response = client.post(
+        "/api/v1/si/business/erp/bulk/test-connections",
+        json={"connection_ids": [connection_id]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    summary = body["data"]["summary"]
+    assert summary["total"] == 1
+    assert summary["successful"] == 1
+    assert body["data"]["results"][0]["connection_id"] == connection_id
+    activity = body["data"]["connection_activity"][connection_id]
+    assert activity["tests"]["total"] >= 1
+
+
+def test_bulk_sync_connections_records_jobs(erp_test_client):
+    client, _repo = erp_test_client
+
+    create_payload = {
+        "erp_system": "odoo",
+        "organization_id": "org-1",
+        "connection_config": {"url": "http://odoo.local"},
+        "connection_name": "Bulk Sync Connection",
+    }
+
+    create_response = client.post(
+        "/api/v1/si/business/erp/connections",
+        json=create_payload,
+    )
+    assert create_response.status_code == 201
+    connection_id = create_response.json()["data"]["connection"]["connection_id"]
+
+    response = client.post(
+        "/api/v1/si/business/erp/bulk/sync-data",
+        json={"connection_ids": [connection_id], "data_type": "invoices"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    summary = body["data"]["summary"]
+    assert summary["total"] == 1
+    assert summary["queued"] == 1
+    assert body["data"]["jobs"][0]["connection_id"] == connection_id
+    activity = body["data"]["connection_activity"][connection_id]
+    assert activity["syncs"]["total"] >= 1

@@ -19,6 +19,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from uuid import UUID, uuid4
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
@@ -33,6 +34,10 @@ from core_platform.data_management.models.organization import Organization
 from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import (
     FIRSFormatter, FormattingResult
 )
+from core_platform.utils.irn_helper import (
+    IRNGenerationError,
+    generate_canonical_irn,
+)
 from si_services.schema_compliance.schema_transformer import schema_transformer
 from si_services.schema_compliance.ubl_validator import ubl_validator
 from si_services.certificate_management.digital_certificate_service import DigitalCertificateService
@@ -41,6 +46,7 @@ from si_services.transformation import (
     TransformationOrchestrator,
     ERPSystem,
 )
+from si_services.irn_qr_generation.qr_signing_service import QRSigningService, QREncryptionResult
 # Conditional import for unified Odoo connector (org-scoped support)
 try:
     from external_integrations.business_systems.odoo.unified_connector import OdooUnifiedConnector
@@ -218,6 +224,10 @@ class ComprehensiveFIRSInvoiceGenerator:
         # Org-scoped connector cache
         self._odoo_by_org: Dict[str, Any] = {}
         self.certificate_service = DigitalCertificateService()
+        key_path_env = os.getenv("FIRS_CRYPTO_KEYS_PATH")
+        self.qr_signing_service = QRSigningService(
+            key_path=Path(key_path_env).expanduser() if key_path_env else None
+        )
         self._organization_cache: Dict[str, Organization] = {}
         self._signing_certificate_cache: Dict[str, Optional[str]] = {}
 
@@ -1545,6 +1555,36 @@ class ComprehensiveFIRSInvoiceGenerator:
                 'processing_time': transformation_summary.get('processing_time'),
             }
 
+        qr_signature = self._generate_qr_signature_metadata(
+            irn,
+            invoice_data,
+            invoice_data.get('verification_code', ''),
+        )
+
+        if qr_signature:
+            invoice_data.setdefault('qr_signature', {
+                'qr_string': qr_signature.qr_string,
+                'encrypted_payload': qr_signature.encrypted_payload,
+                'encryption_metadata': qr_signature.encryption_metadata,
+            })
+            invoice_data['qr_signature']['qr_data'] = qr_signature.qr_data
+            invoice_data['verification_code'] = qr_signature.qr_data.get('verification_code', '')
+
+        qr_signature = self._generate_qr_signature_metadata(
+            irn,
+            invoice_data,
+            invoice_data.get('verification_code', ''),
+        )
+
+        if qr_signature:
+            invoice_data.setdefault('qr_signature', {
+                'qr_string': qr_signature.qr_string,
+                'encrypted_payload': qr_signature.encrypted_payload,
+                'encryption_metadata': qr_signature.encryption_metadata,
+            })
+            invoice_data['qr_signature']['qr_data'] = qr_signature.qr_data
+            invoice_data['verification_code'] = qr_signature.qr_data.get('verification_code', '')
+
         submission_payload = {
             'source_invoice': invoice_data,
             'ubl_document': ubl_invoice,
@@ -1552,6 +1592,20 @@ class ComprehensiveFIRSInvoiceGenerator:
             'signature': signature_info,
             'transformation_pipeline': response_payload.get('transformation_pipeline'),
         }
+
+        if qr_signature:
+            submission_payload['pre_submission_signature'] = {
+                'encrypted_payload': qr_signature.encrypted_payload,
+                'encryption_metadata': qr_signature.encryption_metadata,
+                'qr_data': qr_signature.qr_data,
+            }
+
+        if qr_signature:
+            submission_payload['pre_submission_signature'] = {
+                'encrypted_payload': qr_signature.encrypted_payload,
+                'encryption_metadata': qr_signature.encryption_metadata,
+                'qr_data': qr_signature.qr_data,
+            }
 
         validation_status = ValidationStatus.VALID if is_valid else ValidationStatus.INVALID
 
@@ -1804,13 +1858,45 @@ class ComprehensiveFIRSInvoiceGenerator:
         else:
             service_id = "94ND90NR"  # Fallback to default
             logger.warning(f"Organization {organization_id} not found, using default service ID")
-        
-        # IRN Format: InvoiceNumber-ServiceID-YYYYMMDD
-        base_number = f"TXP-{transaction.transaction_id}" if not is_consolidated else f"TXP-CONS-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        date_part = transaction.date.strftime('%Y%m%d')
-        
-        irn = f"{base_number}-{service_id}-{date_part}"
-        return irn
+
+        if not service_id:
+            service_id = "94ND90NR"
+
+        invoice_number = (
+            (transaction.raw_data or {}).get("invoice_number")
+            or (transaction.raw_data or {}).get("invoiceNumber")
+            or transaction.transaction_id
+            or "0001"
+        )
+
+        if is_consolidated:
+            invoice_number = f"CONS-{datetime.utcnow().strftime('%H%M%S')}"
+
+        issued_on = transaction.date if isinstance(transaction.date, datetime) else datetime.utcnow()
+
+        try:
+            return generate_canonical_irn(invoice_number, service_id, issued_on)
+        except IRNGenerationError:
+            fallback_invoice = transaction.transaction_id or "0001"
+            return generate_canonical_irn(fallback_invoice, service_id or "94ND90NR", issued_on)
+
+    def _generate_qr_signature_metadata(
+        self,
+        irn: Optional[str],
+        invoice_data: Dict[str, Any],
+        verification_code: str = "",
+    ) -> Optional[QREncryptionResult]:
+        if not irn or not self.qr_signing_service:
+            return None
+        try:
+            return self.qr_signing_service.generate_signed_qr(
+                irn=irn,
+                verification_code=verification_code,
+                invoice_data=invoice_data,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("QR signing failed for IRN %s: %s", irn, exc)
+            return None
 
     async def get_generation_statistics(self) -> Dict[str, Any]:
         """Get invoice generation statistics."""

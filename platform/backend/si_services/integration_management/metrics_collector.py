@@ -6,6 +6,7 @@ Extracted from integration_status_service.py - provides granular metrics analysi
 """
 
 import logging
+from collections import deque
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
@@ -25,6 +26,10 @@ class MetricsCollector:
             "error_rate_warning": 5.0,  # 5%
             "error_rate_critical": 10.0  # 10%
         }
+        self._connection_stats: Dict[str, Dict[str, Any]] = {}
+        self._recent_test_runs: deque = deque(maxlen=200)
+        self._recent_sync_runs: deque = deque(maxlen=200)
+        self._bulk_test_runs: Dict[str, Dict[str, Any]] = {}
     
     def get_integration_performance_metrics(
         self, 
@@ -308,6 +313,149 @@ class MetricsCollector:
             "comparison_data": comparison_data,
             "rankings": rankings,
             "insights": self._generate_comparison_insights(comparison_data)
+        }
+
+    def record_test_result(
+        self,
+        connection_id: str,
+        success: bool,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Track individual connection test result with timestamp."""
+        stats = self._ensure_connection_stats(connection_id)
+        tests = stats["tests"]
+        now = datetime.utcnow()
+
+        tests["total"] += 1
+        tests["last_run"] = now
+        if success:
+            tests["success"] += 1
+            tests["last_success_at"] = now
+        else:
+            tests["failure"] += 1
+
+        entry = {
+            "connection_id": connection_id,
+            "success": success,
+            "timestamp": now.isoformat(),
+            "metadata": metadata or {},
+        }
+        tests["history"].append(entry)
+        self._recent_test_runs.appendleft(entry)
+        return self._serialize_test_stats(tests)
+
+    def record_sync_execution(
+        self,
+        connection_id: str,
+        success: bool,
+        records_synced: int = 0,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Track ad-hoc sync executions for a connection."""
+        stats = self._ensure_connection_stats(connection_id)
+        syncs = stats["syncs"]
+        now = datetime.utcnow()
+
+        syncs["total"] += 1
+        syncs["records_synced"] += max(records_synced, 0)
+        syncs["last_run"] = now
+        if success:
+            syncs["success"] += 1
+            syncs["last_success_at"] = now
+        else:
+            syncs["failure"] += 1
+
+        entry = {
+            "connection_id": connection_id,
+            "success": success,
+            "records_synced": max(records_synced, 0),
+            "timestamp": now.isoformat(),
+            "metadata": metadata or {},
+        }
+        syncs["history"].append(entry)
+        self._recent_sync_runs.appendleft(entry)
+        return self._serialize_sync_stats(syncs)
+
+    def record_bulk_test_run(
+        self,
+        test_id: str,
+        summary: Dict[str, Any],
+        results: List[Dict[str, Any]],
+    ) -> None:
+        """Persist aggregate information about a bulk test run."""
+        self._bulk_test_runs[test_id] = {
+            "summary": summary,
+            "results": results,
+            "recorded_at": datetime.utcnow().isoformat(),
+        }
+
+    def get_bulk_test_run(self, test_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve previously recorded bulk test run details."""
+        return self._bulk_test_runs.get(test_id)
+
+    def get_recent_test_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Return the most recent connection test entries."""
+        return list(self._recent_test_runs)[:limit]
+
+    def get_recent_sync_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Return the most recent sync execution entries."""
+        return list(self._recent_sync_runs)[:limit]
+
+    def get_connection_activity(self, connection_id: str) -> Dict[str, Any]:
+        """Return summary of tests and syncs for a connection."""
+        stats = self._ensure_connection_stats(connection_id)
+        return {
+            "tests": self._serialize_test_stats(stats["tests"]),
+            "syncs": self._serialize_sync_stats(stats["syncs"]),
+        }
+
+    def _ensure_connection_stats(self, connection_id: str) -> Dict[str, Any]:
+        """Ensure stats containers exist for a connection."""
+        stats = self._connection_stats.get(connection_id)
+        if stats is None:
+            stats = {
+                "tests": {
+                    "total": 0,
+                    "success": 0,
+                    "failure": 0,
+                    "last_run": None,
+                    "last_success_at": None,
+                    "history": deque(maxlen=20),
+                },
+                "syncs": {
+                    "total": 0,
+                    "success": 0,
+                    "failure": 0,
+                    "records_synced": 0,
+                    "last_run": None,
+                    "last_success_at": None,
+                    "history": deque(maxlen=20),
+                },
+            }
+            self._connection_stats[connection_id] = stats
+        return stats
+
+    def _serialize_test_stats(self, tests: Dict[str, Any]) -> Dict[str, Any]:
+        """Serialize test statistics with ISO timestamps."""
+        return {
+            "total": tests["total"],
+            "success": tests["success"],
+            "failure": tests["failure"],
+            "last_run": tests["last_run"].isoformat() if tests["last_run"] else None,
+            "last_success_at": tests["last_success_at"].isoformat() if tests["last_success_at"] else None,
+            "history": list(tests["history"]),
+        }
+
+    def _serialize_sync_stats(self, syncs: Dict[str, Any]) -> Dict[str, Any]:
+        """Serialize sync statistics with ISO timestamps."""
+        return {
+            "total": syncs["total"],
+            "success": syncs["success"],
+            "failure": syncs["failure"],
+            "records_synced": syncs["records_synced"],
+            "last_run": syncs["last_run"].isoformat() if syncs["last_run"] else None,
+            "last_success_at": syncs["last_success_at"].isoformat() if syncs["last_success_at"] else None,
+            "history": list(syncs["history"]),
         }
     
     def _get_mock_submissions(self, integration_id: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:

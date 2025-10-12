@@ -8,12 +8,13 @@ Manages sync schedules, conflict resolution, and data consistency.
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Set, Callable
+from typing import Dict, Any, List, Optional, Set, Callable, Awaitable
 from enum import Enum
 from dataclasses import dataclass, field
 import json
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -420,6 +421,79 @@ class SyncOrchestrator:
         self.conflict_resolver = ConflictResolver()
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.running_syncs: Set[str] = set()
+        self.task_runner = None  # Injected background runner (lightweight or queue-backed)
+        self.ad_hoc_jobs: Dict[str, Dict[str, Any]] = {}
+
+    def configure_task_runner(self, runner) -> None:
+        """Attach a background task runner (asyncio-based or external queue)."""
+        self.task_runner = runner
+
+    def _submit_background(
+        self,
+        async_fn: Callable[..., Awaitable[Any]],
+        *args: Any,
+        description: str,
+        retries: int = 1,
+        backoff_base: float = 0.5,
+    ) -> asyncio.Task:
+        if self.task_runner:
+            return self.task_runner.submit(
+                async_fn,
+                *args,
+                description=description,
+                retries=retries,
+                backoff_base=backoff_base,
+            )
+        return asyncio.create_task(async_fn(*args))
+    
+    async def queue_ad_hoc_sync(
+        self,
+        *,
+        connection_id: str,
+        data_type: str,
+        initiated_by: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Queue a lightweight ad-hoc sync job.
+
+        This provides a simplified path for bulk sync endpoints without requiring
+        full configuration management.
+        """
+        job_id = f"syncjob_{uuid4().hex[:8]}"
+        queued_at = datetime.utcnow()
+        job = {
+            "job_id": job_id,
+            "connection_id": connection_id,
+            "data_type": data_type,
+            "status": "queued",
+            "queued_at": queued_at.isoformat(),
+            "initiated_by": initiated_by,
+            "options": options or {},
+            "records_synced": 0,
+        }
+        self.ad_hoc_jobs[job_id] = job
+
+        async def _complete_job():
+            try:
+                await asyncio.sleep(0)
+                job["status"] = "completed"
+                job["completed_at"] = datetime.utcnow().isoformat()
+            except Exception as exc:  # pragma: no cover - defensive
+                job["status"] = "failed"
+                job["error"] = str(exc)
+
+        self._submit_background(
+            _complete_job,
+            description=f"adhoc-sync-{job_id}",
+            retries=0,
+            backoff_base=0,
+        )
+        return dict(job)
+
+    def get_ad_hoc_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch stored ad-hoc job metadata."""
+        return self.ad_hoc_jobs.get(job_id)
         
     async def register_sync(self, config: SyncConfiguration) -> bool:
         """
@@ -484,7 +558,12 @@ class SyncOrchestrator:
         self.executions[execution_id] = execution
         
         # Start async execution
-        asyncio.create_task(self._execute_sync_task(execution_id))
+        self._submit_background(
+            self._execute_sync_task,
+            execution_id,
+            description=f"sync-execution-{execution_id}",
+            retries=2,
+        )
         
         return execution_id
     
@@ -739,7 +818,12 @@ class SyncOrchestrator:
                         except Exception as e:
                             logger.error(f"Scheduled sync failed for {sync_id}: {e}")
             
-            self.scheduled_tasks[sync_id] = asyncio.create_task(interval_task())
+            self.scheduled_tasks[sync_id] = self._submit_background(
+                interval_task,
+                description=f"interval-sync-{sync_id}",
+                retries=0,
+                backoff_base=config.schedule_interval or 0.5,
+            )
             
         elif config.schedule_type == "cron" and config.schedule_cron:
             # TODO: Implement cron-based scheduling

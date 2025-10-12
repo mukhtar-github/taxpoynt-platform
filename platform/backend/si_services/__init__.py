@@ -18,15 +18,19 @@ Services Registered:
 - Subscription Management Service
 """
 
+import base64
 import logging
 import asyncio
 import json
 import sys
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from uuid import uuid4
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+from dataclasses import asdict
+from enum import Enum
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.config.feature_flags import is_firs_remote_irn_enabled
@@ -58,7 +62,12 @@ class SIServiceRegistry:
     Registry for all SI services that handles initialization and message router registration.
     """
     
-    def __init__(self, message_router: MessageRouter):
+    def __init__(
+        self,
+        message_router: MessageRouter,
+        *,
+        background_runner: Optional[Any] = None,
+    ):
         """
         Initialize SI service registry.
         
@@ -70,7 +79,13 @@ class SIServiceRegistry:
         self.service_endpoints: Dict[str, str] = {}
         self.is_initialized = False
         self.erp_connection_repository = ERPConnectionRepository()
-        
+        self.integration_health_monitor = None
+        self.background_runner = background_runner
+
+    def configure_background_runner(self, runner: Any) -> None:
+        """Inject or update the background task runner."""
+        self.background_runner = runner
+
     async def initialize_services(self) -> Dict[str, str]:
         """
         Initialize and register all SI services.
@@ -710,12 +725,26 @@ class SIServiceRegistry:
             from .irn_qr_generation.irn_generation_service import IRNGenerationService
             from .irn_qr_generation.irn_generator import IRNGenerator
             from .irn_qr_generation.qr_code_generator import QRCodeGenerator
+            from .irn_qr_generation.qr_signing_service import QRSigningService
             
             # Create IRN service wrapper
+            key_path_env = os.getenv("FIRS_CRYPTO_KEYS_PATH")
+            inline_key_env = os.getenv("FIRS_CRYPTO_KEYS_B64")
+            inline_public_key = None
+            if inline_key_env:
+                try:
+                    inline_public_key = base64.b64decode(inline_key_env).decode("utf-8")
+                except Exception as decode_err:
+                    logger.warning(f"Failed to decode FIRS_CRYPTO_KEYS_B64: {decode_err}")
+
             irn_service = {
                 "generation_service": IRNGenerationService(),
                 "irn_generator": IRNGenerator() if hasattr(IRNGenerator, '__init__') else None,
-                "qr_generator": QRCodeGenerator() if hasattr(QRCodeGenerator, '__init__') else None
+                "qr_generator": QRCodeGenerator() if hasattr(QRCodeGenerator, '__init__') else None,
+                "qr_signing_service": QRSigningService(
+                    key_path=Path(key_path_env).expanduser() if key_path_env else None,
+                    public_key_pem=inline_public_key,
+                ),
             }
             
             self.services["irn_generation"] = irn_service
@@ -733,7 +762,8 @@ class SIServiceRegistry:
                         "request_irn_from_firs",
                         "submit_irn_to_firs",
                         "generate_irn",
-                        "generate_qr_code",
+                    "generate_qr_code",
+                    "sign_qr_payload",
                         "validate_irn",
                         "bulk_generate_irn",
                         "get_irn_status"
@@ -846,18 +876,38 @@ class SIServiceRegistry:
     async def _register_integration_management_services(self):
         """Register integration management services"""
         try:
-            from .integration_management.connection_manager import ConnectionManager
-            from .integration_management.integration_health_monitor import IntegrationHealthMonitor
-            from .integration_management.metrics_collector import MetricsCollector
-            from .integration_management.sync_orchestrator import SyncOrchestrator
+            from .integration_management.connection_manager import connection_manager
+            from .integration_management.integration_health_monitor import integration_health_monitor
+            from .integration_management.metrics_collector import metrics_collector
+            from .integration_management.sync_orchestrator import sync_orchestrator
+            from .integration_management.dependency_injector import configure_integration_dependencies
             
             # Create integration management service wrapper
             integration_service = {
-                "connection_manager": ConnectionManager() if hasattr(ConnectionManager, '__init__') else None,
-                "health_monitor": IntegrationHealthMonitor() if hasattr(IntegrationHealthMonitor, '__init__') else None,
-                "metrics_collector": MetricsCollector() if hasattr(MetricsCollector, '__init__') else None,
-                "sync_orchestrator": SyncOrchestrator() if hasattr(SyncOrchestrator, '__init__') else None
+                "connection_manager": connection_manager,
+                "health_monitor": integration_health_monitor,
+                "metrics_collector": metrics_collector,
+                "sync_orchestrator": sync_orchestrator,
             }
+
+            try:
+                configure_integration_dependencies()
+            except Exception as dep_err:
+                logger.warning(f"Failed to configure integration dependencies: {dep_err}")
+
+            orchestrator = integration_service.get("sync_orchestrator")
+            if orchestrator and self.background_runner:
+                try:
+                    orchestrator.configure_task_runner(self.background_runner)
+                except Exception as runner_err:
+                    logger.warning(f"Failed to configure background runner for orchestrator: {runner_err}")
+
+            self.integration_health_monitor = integration_service.get("health_monitor")
+            if self.integration_health_monitor and integration_service["connection_manager"]:
+                try:
+                    await self.integration_health_monitor.attach_connection_manager(integration_service["connection_manager"])
+                except Exception as attach_err:
+                    logger.warning(f"Integration health monitor attach failed: {attach_err}")
             
             self.services["integration_management"] = integration_service
             
@@ -884,6 +934,9 @@ class SIServiceRegistry:
                         "update_erp_connection",
                         "delete_erp_connection",
                         "test_erp_connection",
+                        "get_erp_connection_health",
+                        "bulk_test_erp_connections",
+                        "bulk_sync_erp_data",
                     ]
                 }
             )
@@ -1081,7 +1134,11 @@ class SIServiceRegistry:
                                 invoices.append(out)
                             else:
                                 invoices.append(raw)
-                        return {"operation": operation, "success": len(invoices) > 0, "data": {"invoices": invoices}}
+                        return {
+                            "operation": operation,
+                            "success": len(invoices) > 0,
+                            "data": {"invoices": invoices, "errors": []},
+                        }
                     except Exception as e:
                         return {"operation": operation, "success": False, "error": str(e)}
 
@@ -1121,7 +1178,7 @@ class SIServiceRegistry:
                     }
                     return {"operation": operation, "success": True, "data": data}
                 else:
-                    return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                    return None
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return erp_callback
@@ -1220,6 +1277,7 @@ class SIServiceRegistry:
         generation_service = irn_service.get("generation_service")
         irn_generator = irn_service.get("irn_generator")
         qr_generator = irn_service.get("qr_generator")
+        qr_signer = irn_service.get("qr_signing_service")
 
         async def irn_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
@@ -1295,6 +1353,39 @@ class SIServiceRegistry:
                         "operation": operation,
                         "success": True,
                         "data": qr_payload,
+                    }
+
+                if operation == "sign_qr_payload":
+                    if not qr_signer:
+                        return {"operation": operation, "success": False, "error": "qr_signing_unavailable"}
+
+                    irn_value = payload.get("irn")
+                    verification_code = payload.get("verification_code") or payload.get("verificationCode") or ""
+                    invoice_data = payload.get("invoice_data") or {}
+                    format_type = payload.get("format_type", "json")
+
+                    if not irn_value:
+                        return {"operation": operation, "success": False, "error": "missing_irn"}
+
+                    signed = qr_signer.generate_signed_qr(
+                        irn=irn_value,
+                        verification_code=verification_code,
+                        invoice_data=invoice_data,
+                        qr_format=format_type,
+                    )
+
+                    if signed is None:
+                        return {"operation": operation, "success": False, "error": "public_key_unavailable"}
+
+                    return {
+                        "operation": operation,
+                        "success": True,
+                        "data": {
+                            "qr_data": signed.qr_data,
+                            "qr_string": signed.qr_string,
+                            "encrypted_payload": signed.encrypted_payload,
+                            "encryption_metadata": signed.encryption_metadata,
+                        },
                     }
 
                 if operation == "validate_irn":
@@ -1529,6 +1620,7 @@ class SIServiceRegistry:
         """Create callback for integration management operations"""
         async def integration_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
+                health_monitor = integration_service.get("health_monitor")
                 if operation == "create_erp_connection":
                     return await self._handle_create_erp_connection(payload)
                 if operation == "list_erp_connections":
@@ -1541,13 +1633,20 @@ class SIServiceRegistry:
                     return await self._handle_delete_erp_connection(payload)
                 if operation == "test_erp_connection":
                     return await self._handle_test_erp_connection(payload)
+                if operation == "get_erp_connection_health":
+                    return await self._handle_get_erp_connection_health(payload, health_monitor)
+                if operation == "bulk_test_erp_connections":
+                    return await self._handle_bulk_test_erp_connections(payload, integration_service)
+                if operation == "bulk_sync_erp_data":
+                    return await self._handle_bulk_sync_erp_data(payload, integration_service)
 
-                return {"operation": operation, "success": True, "data": {"status": "placeholder"}}
+                return None
             except Exception as e:
                 return {"operation": operation, "success": False, "error": str(e)}
         return integration_callback
 
     async def _handle_create_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        print("_handle_create_erp_connection start")
         connection_data = payload.get("connection_data") or {}
         required_fields = ["erp_system", "organization_id", "connection_config"]
         missing = [field for field in required_fields if field not in connection_data]
@@ -1583,13 +1682,68 @@ class SIServiceRegistry:
                 "error": "Unable to register connection with connection manager",
             }
 
-        return {
+        if self.integration_health_monitor:
+            try:
+                await self.integration_health_monitor.track_connection(
+                    connection_id,
+                    {
+                        "erp_system": record.erp_system,
+                        "connection_config": dict(record.connection_config or {}),
+                        "environment": record.environment,
+                    },
+                )
+            except Exception as monitor_err:
+                logger.warning(f"Failed to start health monitoring for {connection_id}: {monitor_err}")
+
+        result = {
             "operation": "create_erp_connection",
             "success": True,
             "data": {
                 "connection_id": connection_id,
                 "connection": self._record_to_dict(record),
             },
+        }
+        print("_handle_create_erp_connection end")
+        return result
+
+    async def _handle_get_erp_connection_health(self, payload: Dict[str, Any], health_monitor) -> Dict[str, Any]:
+        connection_id = payload.get("connection_id")
+        if not connection_id:
+            return {
+                "operation": "get_erp_connection_health",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        snapshot = None
+        if health_monitor:
+            try:
+                snapshot = health_monitor.get_health_snapshot(connection_id, include_history=True, history_limit=5)
+            except Exception as hm_err:
+                logger.warning(f"Health monitor snapshot error for {connection_id}: {hm_err}")
+
+        status_obj = await connection_manager.get_system_status(connection_id)
+        status_dict = self._connection_status_to_dict(status_obj)
+
+        data = {
+            "connection_id": connection_id,
+            "status": (snapshot or {}).get("status") or (status_dict.get("state") if status_dict else "unknown"),
+            "last_checked": (snapshot or {}).get("last_checked"),
+            "message": (snapshot or {}).get("message"),
+            "details": (snapshot or {}).get("details", {}) if snapshot else {},
+            "health_score": status_dict.get("health_score") if status_dict else None,
+            "state": status_dict.get("state") if status_dict else None,
+            "connection_status": status_dict,
+            "recent_history": (snapshot or {}).get("recent_history", []) if snapshot else [],
+        }
+
+        if not data.get("message"):
+            data["message"] = "Health data not available yet"
+
+        return {
+            "operation": "get_erp_connection_health",
+            "success": True,
+            "data": data,
         }
 
     async def _handle_list_erp_connections(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1671,6 +1825,19 @@ class SIServiceRegistry:
                 "error": "Unable to register updated connection",
             }
 
+        if self.integration_health_monitor:
+            try:
+                await self.integration_health_monitor.track_connection(
+                    connection_id,
+                    {
+                        "erp_system": updated_record.erp_system,
+                        "connection_config": dict(updated_record.connection_config or {}),
+                        "environment": updated_record.environment,
+                    },
+                )
+            except Exception as monitor_err:
+                logger.warning(f"Failed to update health monitoring for {connection_id}: {monitor_err}")
+
         return {
             "operation": "update_erp_connection",
             "success": True,
@@ -1696,10 +1863,180 @@ class SIServiceRegistry:
 
         await connection_manager.unregister_system(connection_id)
 
+        if self.integration_health_monitor:
+            try:
+                await self.integration_health_monitor.untrack_connection(connection_id)
+            except Exception as monitor_err:
+                logger.warning(f"Failed to stop health monitoring for {connection_id}: {monitor_err}")
+
         return {
             "operation": "delete_erp_connection",
             "success": True,
             "data": {"connection_id": connection_id},
+        }
+
+    async def _handle_bulk_test_erp_connections(
+        self,
+        payload: Dict[str, Any],
+        integration_service: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        connection_ids = payload.get("connection_ids") or []
+        options = payload.get("options") or {}
+        metrics_collector = (integration_service or {}).get("metrics_collector")
+
+        if not connection_ids:
+            records = await self.erp_connection_repository.list()
+            connection_ids = [record.connection_id for record in records]
+
+        test_id = f"bulk_test_{uuid4().hex[:8]}"
+        results: List[Dict[str, Any]] = []
+        success_count = 0
+        failure_count = 0
+
+        for connection_id in connection_ids:
+            record = await self.erp_connection_repository.get(connection_id)
+            if not record:
+                outcome = {
+                    "connection_id": connection_id,
+                    "success": False,
+                    "status": "not_found",
+                }
+                failure_count += 1
+                if metrics_collector:
+                    metrics_collector.record_test_result(
+                        connection_id,
+                        False,
+                        {"reason": "not_found"},
+                    )
+                results.append(outcome)
+                continue
+
+            details = {
+                "message": "Connection test queued",
+                "options": options,
+            }
+            outcome = {
+                "connection_id": connection_id,
+                "success": True,
+                "status": "queued",
+                "details": details,
+            }
+            success_count += 1
+            if metrics_collector:
+                metrics_collector.record_test_result(connection_id, True, details)
+            results.append(outcome)
+
+        summary = {
+            "total": len(connection_ids),
+            "successful": success_count,
+            "failed": failure_count,
+        }
+
+        response_data: Dict[str, Any] = {
+            "test_id": test_id,
+            "results": results,
+            "summary": summary,
+        }
+
+        if metrics_collector:
+            metrics_collector.record_bulk_test_run(test_id, summary, results)
+            response_data["connection_activity"] = {
+                cid: metrics_collector.get_connection_activity(cid)
+                for cid in connection_ids
+            }
+
+        return {
+            "operation": "bulk_test_erp_connections",
+            "success": True,
+            "data": response_data,
+        }
+
+    async def _handle_bulk_sync_erp_data(
+        self,
+        payload: Dict[str, Any],
+        integration_service: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        connection_ids = payload.get("connection_ids") or []
+        data_type = payload.get("data_type", "invoices")
+        options = payload.get("options") or {}
+        initiated_by = payload.get("si_id")
+        metrics_collector = (integration_service or {}).get("metrics_collector")
+        orchestrator = (integration_service or {}).get("sync_orchestrator")
+
+        if not orchestrator:
+            return {
+                "operation": "bulk_sync_erp_data",
+                "success": False,
+                "error": "sync_orchestrator_unavailable",
+            }
+
+        if not connection_ids:
+            records = await self.erp_connection_repository.list()
+            connection_ids = [record.connection_id for record in records]
+
+        batch_id = f"sync_batch_{uuid4().hex[:8]}"
+        jobs: List[Dict[str, Any]] = []
+        success_count = 0
+        failure_count = 0
+
+        for connection_id in connection_ids:
+            record = await self.erp_connection_repository.get(connection_id)
+            if not record:
+                job = {
+                    "job_id": f"syncjob_{uuid4().hex[:8]}",
+                    "connection_id": connection_id,
+                    "data_type": data_type,
+                    "status": "not_found",
+                }
+                failure_count += 1
+                if metrics_collector:
+                    metrics_collector.record_sync_execution(
+                        connection_id,
+                        False,
+                        0,
+                        {"reason": "not_found"},
+                    )
+                jobs.append(job)
+                continue
+
+            job = await orchestrator.queue_ad_hoc_sync(
+                connection_id=connection_id,
+                data_type=data_type,
+                initiated_by=initiated_by,
+                options=options,
+            )
+            success_count += 1
+            if metrics_collector:
+                metrics_collector.record_sync_execution(
+                    connection_id,
+                    True,
+                    job.get("records_synced", 0),
+                    {"job_id": job.get("job_id"), "data_type": data_type},
+                )
+            jobs.append(job)
+
+        summary = {
+            "total": len(connection_ids),
+            "queued": success_count,
+            "failed": failure_count,
+        }
+
+        response_data: Dict[str, Any] = {
+            "sync_batch_id": batch_id,
+            "jobs": jobs,
+            "summary": summary,
+        }
+
+        if metrics_collector:
+            response_data["connection_activity"] = {
+                cid: metrics_collector.get_connection_activity(cid)
+                for cid in connection_ids
+            }
+
+        return {
+            "operation": "bulk_sync_erp_data",
+            "success": True,
+            "data": response_data,
         }
 
     async def _handle_test_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1801,6 +2138,21 @@ class SIServiceRegistry:
                 "auth_method": config.get("auth_method"),
             },
         )
+
+    def _connection_status_to_dict(self, status) -> Optional[Dict[str, Any]]:
+        if not status:
+            return None
+
+        data = asdict(status)
+        state = data.get("state")
+        if isinstance(state, Enum):
+            data["state"] = state.value
+
+        for key in ("connected_at", "last_activity", "last_status_at"):
+            if data.get(key) and isinstance(data[key], datetime):
+                data[key] = data[key].isoformat()
+
+        return data
     
     def _create_auth_callback(self, auth_service):
         """Create callback for authentication operations"""
@@ -1894,7 +2246,11 @@ class SIServiceRegistry:
 _service_registry: Optional[SIServiceRegistry] = None
 
 
-async def initialize_si_services(message_router: MessageRouter) -> SIServiceRegistry:
+async def initialize_si_services(
+    message_router: MessageRouter,
+    *,
+    background_runner: Optional[Any] = None,
+) -> SIServiceRegistry:
     """
     Initialize SI services with message router.
     
@@ -1907,7 +2263,15 @@ async def initialize_si_services(message_router: MessageRouter) -> SIServiceRegi
     global _service_registry
     
     if _service_registry is None:
-        _service_registry = SIServiceRegistry(message_router)
+        _service_registry = SIServiceRegistry(
+            message_router,
+            background_runner=background_runner,
+        )
+
+    if background_runner is not None:
+        _service_registry.configure_background_runner(background_runner)
+
+    if not _service_registry.is_initialized:
         await _service_registry.initialize_services()
     
     return _service_registry

@@ -19,6 +19,10 @@ from core_platform.data_management.models.onboarding_state import OnboardingStat
 from core_platform.data_management.repositories.onboarding_state_repo_async import (
     OnboardingStateRepositoryAsync,
 )
+from core_platform.utils.irn_helper import (
+    IRNGenerationError,
+    generate_canonical_irn,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -537,6 +541,45 @@ class SIOnboardingService:
             )
             for step in expected_steps
         }
+        return self._attach_irn_preview(metadata)
+
+    def _attach_irn_preview(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Augment metadata with a canonical IRN preview for onboarding UI."""
+        invoice_sources = [
+            metadata.get("invoice_preview", {}).get("invoice_number"),
+            metadata.get("invoice_preview", {}).get("invoiceNumber"),
+            metadata.get("draft_invoice", {}).get("invoice_number") if isinstance(metadata.get("draft_invoice"), dict) else None,
+            metadata.get("last_invoice_number"),
+            "0001",
+        ]
+        service_sources = [
+            metadata.get("company_profile", {}).get("firs_service_id") if isinstance(metadata.get("company_profile"), dict) else None,
+            metadata.get("company_profile", {}).get("service_id") if isinstance(metadata.get("company_profile"), dict) else None,
+            metadata.get("service_id"),
+            metadata.get("service_package"),
+            "SERVICE",
+        ]
+        issued_sources = [
+            metadata.get("invoice_preview", {}).get("issued_on"),
+            metadata.get("invoice_preview", {}).get("issuedOn"),
+            metadata.get("completion", {}).get("completed_at") if isinstance(metadata.get("completion"), dict) else None,
+            metadata.get("last_active_date"),
+            self._isoformat(self._utc_now()),
+        ]
+
+        invoice_number = next((value for value in invoice_sources if value), "0001")
+        service_id = next((value for value in service_sources if value), "SERVICE")
+        issued_on = next((value for value in issued_sources if value), self._utc_now())
+
+        try:
+            metadata["irn_preview"] = generate_canonical_irn(
+                invoice_number=invoice_number,
+                service_id=service_id,
+                issued_on=issued_on,
+            )
+        except IRNGenerationError:
+            metadata["irn_preview"] = generate_canonical_irn("0001", "SERVICE", self._utc_now())
+
         return metadata
 
     def _calculate_progress(self, state: OnboardingState) -> Dict[str, Any]:

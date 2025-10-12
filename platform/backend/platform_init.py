@@ -36,6 +36,7 @@ sys.path.append(str(project_root))
 
 # Core platform imports
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
+from core_platform.utils.background_task_runner import BackgroundTaskRunner
 from core_platform.authentication.role_manager import RoleManager
 
 # Service registries
@@ -79,6 +80,7 @@ class TaxPoyntPlatformInitializer:
         self.hybrid_registry = None
         self.is_initialized = False
         self.initialization_time: Optional[datetime] = None
+        self.background_runner = BackgroundTaskRunner(name="platform_init_background_tasks")
         
         # Service endpoint tracking
         self.service_endpoints: Dict[str, Dict[str, str]] = {
@@ -217,7 +219,10 @@ class TaxPoyntPlatformInitializer:
         try:
             logger.info("🔄 Registering SI services...")
             
-            self.si_registry = await initialize_si_services(self.message_router)
+            self.si_registry = await initialize_si_services(
+                self.message_router,
+                background_runner=self.background_runner,
+            )
             self.service_endpoints["si"] = self.si_registry.service_endpoints
             
             logger.info(f"✅ SI Services registered: {len(self.si_registry.service_endpoints)} services")
@@ -404,6 +409,10 @@ class TaxPoyntPlatformInitializer:
             if self.role_manager:
                 await self.role_manager.cleanup()
                 logger.info("✅ Role manager cleaned up")
+
+            if self.background_runner:
+                await self.background_runner.shutdown()
+                logger.info("✅ Background task runner shutdown")
             
             self.is_initialized = False
             self.health_status["overall"] = "shutdown"
