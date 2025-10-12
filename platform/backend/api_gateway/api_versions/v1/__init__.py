@@ -50,5 +50,5 @@ if SI_ENDPOINTS_AVAILABLE:
         "create_crm_router",
         "create_pos_router",
         "create_transaction_router",
-        "create_compliance_router"
-    ])
+        "create_compliance_router",
+            ])

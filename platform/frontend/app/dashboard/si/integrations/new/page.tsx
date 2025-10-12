@@ -155,8 +155,26 @@ export default function NewIntegrationPage(): JSX.Element | null {
 
     try {
       setStatus({ state: 'testing', message: 'Running test from the gateway…' });
-      await apiClient.post(`/si/business/erp/connections/${connectionId}/test`, {});
-      setStatus({ state: 'success', message: 'Connection test queued. Monitor integration health for detailed results.' });
+      const response = await apiClient.post<{
+        success?: boolean;
+        data?: { message?: string; details?: string; [key: string]: any };
+        detail?: string;
+      }>(`/si/business/erp/connections/${connectionId}/test`, {});
+
+      const success = response?.success ?? true;
+      if (success) {
+        const payload = response?.data ?? {};
+        const message =
+          typeof payload.message === 'string'
+            ? payload.message
+            : typeof payload.details === 'string'
+            ? payload.details
+            : 'Connection test completed successfully. Monitor integration health for results.';
+        setStatus({ state: 'success', message });
+      } else {
+        const detail = response?.detail || response?.data?.error || 'Connection test failed.';
+        setStatus({ state: 'error', message: detail });
+      }
     } catch (error: unknown) {
       const message = error instanceof Error
         ? error.message

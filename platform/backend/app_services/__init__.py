@@ -834,6 +834,7 @@ class APPServiceRegistry:
             "firs_validator": firs_validator,
             "format_validator": format_validator,
             "submission_validator": submission_validator,
+            "schema_validator": InvoiceValidationService(),
             "recent_results": deque(maxlen=recent_limit),
             "validation_store": {},
             "batch_results": {},
@@ -2069,6 +2070,13 @@ class APPServiceRegistry:
                     validation_id = str(uuid.uuid4())
                     started_at = _utc_now()
 
+                    schema_validator: Optional[InvoiceValidationService] = validation_service.get("schema_validator")
+                    schema_result: Optional[Dict[str, Any]] = None
+
+                    if schema_validator:
+                        schema_result = await schema_validator.validate_invoice({"invoice_data": document})
+                        document = schema_result.get("invoice") or document
+
                     format_report = None
                     firs_report = None
                     submission_report = None
@@ -2129,7 +2137,17 @@ class APPServiceRegistry:
 
                     duration_ms = (_utc_now() - started_at).total_seconds() * 1000
 
+                    schema_summary = None
+                    if schema_result:
+                        schema_summary = {
+                            "validated": schema_result.get("validated", True),
+                            "irn": schema_result.get("irn"),
+                            "qr_signature": schema_result.get("qr_signature"),
+                        }
+
                     success = True
+                    if schema_summary is not None:
+                        success = success and bool(schema_summary.get("validated", False))
                     if format_payload is not None:
                         success = success and bool(format_payload.get("is_valid", False))
                     if firs_payload is not None:
@@ -2173,12 +2191,15 @@ class APPServiceRegistry:
                         "issues": issues,
                         "reports": {},
                         "summary": {
+                            "schema": schema_summary,
                             "format": format_payload,
                             "compliance": firs_payload,
                             "submission": submission_payload,
                         },
                     }
 
+                    if schema_summary and schema_summary.get("irn"):
+                        record.setdefault("irn", schema_summary.get("irn"))
                     reports_container = record["reports"]
                     if format_payload is not None:
                         reports_container["format_report"] = format_payload

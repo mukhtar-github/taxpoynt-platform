@@ -32,6 +32,8 @@ from urllib.parse import urlparse
 from dataclasses import asdict
 from enum import Enum
 
+from pydantic import ValidationError
+
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
 from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
@@ -46,6 +48,7 @@ from .validation_services.validation_service import SIValidationService
 from .reporting_services.reporting_service import SIReportingService
 from .integration_management.connection_manager import ConnectionConfig, SystemType, connection_manager
 from .integration_management.erp_connection_repository import ERPConnectionRepository, ERPConnectionRecord
+from .invoice_validation import InvoiceValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +111,7 @@ class SIServiceRegistry:
             await self._register_certificate_services()
             await self._register_document_services()
             await self._register_irn_services()
+            await self._register_invoice_validation_services()
             await self._register_data_extraction_services()
             await self._register_integration_management_services()
             await self._register_authentication_services()
@@ -776,6 +780,32 @@ class SIServiceRegistry:
             
         except Exception as e:
             logger.error(f"Failed to register IRN services: {str(e)}")
+
+    async def _register_invoice_validation_services(self):
+        """Register invoice validation services"""
+        try:
+            validation_service = InvoiceValidationService()
+            self.services["invoice_validation"] = validation_service
+
+            endpoint_id = await self.message_router.register_service(
+                service_name="invoice_validation",
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                callback=self._create_invoice_validation_callback(validation_service),
+                priority=4,
+                tags=["validation", "firs", "invoice", "qr"],
+                metadata={
+                    "service_type": "invoice_validation",
+                    "operations": [
+                        "validate_invoice_proxy",
+                    ],
+                },
+            )
+
+            self.service_endpoints["invoice_validation"] = endpoint_id
+            logger.info(f"Invoice validation service registered: {endpoint_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to register invoice validation services: {str(e)}")
     
     async def _register_data_extraction_services(self):
         """Register data extraction services"""
@@ -1448,6 +1478,30 @@ class SIServiceRegistry:
                 return {"operation": operation, "success": False, "error": str(e)}
 
         return irn_callback
+
+    def _create_invoice_validation_callback(self, validation_service: InvoiceValidationService):
+        async def callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                if operation == "validate_invoice_proxy":
+                    try:
+                        result = await validation_service.validate_invoice(payload)
+                        return {
+                            "operation": operation,
+                            "success": True,
+                            "data": result,
+                        }
+                    except ValidationError as exc:
+                        return {
+                            "operation": operation,
+                            "success": False,
+                            "error": "validation_failed",
+                            "details": exc.errors(),
+                        }
+                return {"operation": operation, "success": False, "error": "unsupported_operation"}
+            except Exception as exc:
+                return {"operation": operation, "success": False, "error": str(exc)}
+
+        return callback
     
     def _create_extraction_callback(self, extraction_service):
         """Create callback for data extraction operations"""

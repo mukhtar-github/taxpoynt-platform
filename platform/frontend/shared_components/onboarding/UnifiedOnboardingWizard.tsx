@@ -187,6 +187,138 @@ const sanitizeServiceConfiguration = (
   };
 };
 
+interface RuntimeConnectionItem {
+  id: string;
+  name: string;
+  status: string;
+  lastSync?: string | null;
+  error?: string | null;
+  needsAttention?: boolean;
+}
+
+interface RuntimeConnectionsSnapshot {
+  total: number;
+  active: number;
+  failing: number;
+  needsAttention: number;
+  items: RuntimeConnectionItem[];
+}
+
+interface RuntimeIrnSnapshot {
+  totalGenerated: number;
+  pending: number;
+  recent: Array<{
+    irn?: string | null;
+    status?: string;
+    createdAt?: string | null;
+  }>;
+}
+
+interface RuntimeInsights {
+  loginCount: number;
+  connections: RuntimeConnectionsSnapshot | null;
+  irnProgress: RuntimeIrnSnapshot | null;
+}
+
+const EMPTY_RUNTIME_INSIGHTS: RuntimeInsights = {
+  loginCount: 0,
+  connections: null,
+  irnProgress: null,
+};
+
+const toNumber = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const parseRuntimeInsights = (value: unknown): RuntimeInsights => {
+  if (!isRecord(value)) {
+    return EMPTY_RUNTIME_INSIGHTS;
+  }
+
+  const loginCount = toNumber(value.login_count ?? value.loginCount);
+
+  let connections: RuntimeConnectionsSnapshot | null = null;
+  if (isRecord(value.connections)) {
+    const itemsRaw = Array.isArray(value.connections.items) ? value.connections.items : [];
+    const items = itemsRaw
+      .filter((item): item is Record<string, any> => isRecord(item))
+      .map((item, index) => ({
+        id:
+          typeof item.id === 'string'
+            ? item.id
+            : typeof item.name === 'string'
+            ? `${item.name}-${index}`
+            : `connection-${index}`,
+        name: typeof item.name === 'string' ? item.name : 'Integration',
+        status: typeof item.status === 'string' ? item.status : 'unknown',
+        lastSync:
+          typeof item.lastSync === 'string'
+            ? item.lastSync
+            : typeof item.last_sync === 'string'
+            ? item.last_sync
+            : undefined,
+        error: typeof item.error === 'string' ? item.error : undefined,
+        needsAttention: Boolean(item.needsAttention ?? item.needs_attention),
+      }));
+
+    const needsAttention =
+      typeof value.connections.needsAttention === 'number'
+        ? value.connections.needsAttention
+        : items.filter((item) => item.needsAttention).length;
+
+    connections = {
+      total: toNumber(value.connections.total ?? items.length),
+      active: toNumber(value.connections.active),
+      failing: toNumber(value.connections.failing),
+      needsAttention,
+      items,
+    };
+  }
+
+  let irnProgress: RuntimeIrnSnapshot | null = null;
+  const irnRaw = value.irn_progress ?? value.irnProgress;
+  if (isRecord(irnRaw)) {
+    const recentRaw = Array.isArray(irnRaw.recent) ? irnRaw.recent : [];
+    const recent = recentRaw
+      .filter((item): item is Record<string, any> => isRecord(item))
+      .map((item) => ({
+        irn: typeof item.irn === 'string' ? item.irn : undefined,
+        status: typeof item.status === 'string' ? item.status : undefined,
+        createdAt:
+          typeof item.createdAt === 'string'
+            ? item.createdAt
+            : typeof item.created_at === 'string'
+            ? item.created_at
+            : undefined,
+      }));
+
+    irnProgress = {
+      totalGenerated: toNumber(irnRaw.total_generated ?? irnRaw.totalGenerated),
+      pending: toNumber(irnRaw.pending),
+      recent,
+    };
+  }
+
+  return {
+    loginCount,
+    connections,
+    irnProgress,
+  };
+};
+
+const formatRuntimeTimestamp = (value?: string | null): string => {
+  if (!value) {
+    return 'N/A';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat('en-NG', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsed);
+};
+
 const determineInitialStepId = (
   stepId: string | undefined,
   hasServiceSelectionStep: boolean
@@ -264,6 +396,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [stepDefinitions, setStepDefinitions] = useState<Record<string, StepDefinition>>(FALLBACK_STEP_DEFINITIONS);
   const [serverStepSequence, setServerStepSequence] = useState<string[] | null>(null);
   const hasPrefilledCompanyProfile = useRef(false);
+  const [runtimeInsights, setRuntimeInsights] = useState<RuntimeInsights>(EMPTY_RUNTIME_INSIGHTS);
 
   const connectors = useMemo(
     () => [
@@ -454,6 +587,12 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           setServiceConfig((prev) =>
             sanitizeServiceConfiguration(metadata.service_configuration ?? metadata.serviceConfiguration, prev)
           );
+        }
+
+        if (isRecord(metadata.runtime)) {
+          setRuntimeInsights(parseRuntimeInsights(metadata.runtime));
+        } else {
+          setRuntimeInsights(EMPTY_RUNTIME_INSIGHTS);
         }
 
         if (Array.isArray(remoteState.completed_steps)) {
@@ -837,6 +976,27 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       },
     ];
 
+    if (runtimeInsights.loginCount > 0) {
+      summaryItems.push({
+        label: 'Recent sign-ins',
+        value: runtimeInsights.loginCount.toLocaleString(),
+      });
+    }
+
+    if (runtimeInsights.connections) {
+      summaryItems.push({
+        label: 'Connections',
+        value: `${runtimeInsights.connections.active}/${runtimeInsights.connections.total} active (${runtimeInsights.connections.needsAttention} attention)`,
+      });
+    }
+
+    if (runtimeInsights.irnProgress) {
+      summaryItems.push({
+        label: 'IRN progress',
+        value: `${runtimeInsights.irnProgress.totalGenerated} generated · ${runtimeInsights.irnProgress.pending} pending`,
+      });
+    }
+
     return (
       <div className="space-y-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -892,6 +1052,13 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     );
   }
 
+  const runtimeConnectionItems = runtimeInsights.connections?.items ?? [];
+  const runtimeIrnItems = runtimeInsights.irnProgress?.recent ?? [];
+  const runtimeHasSignals =
+    runtimeInsights.loginCount > 0 ||
+    Boolean(runtimeInsights.connections) ||
+    Boolean(runtimeInsights.irnProgress);
+
   return (
     <div className="space-y-6">
       <header className="space-y-3">
@@ -913,6 +1080,86 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           />
         </div>
       </header>
+
+      {runtimeHasSignals && (
+        <section className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-blue-900">Live workspace signals</h2>
+              <p className="text-sm text-slate-600">
+                Real-time insight into logins, connections, and IRN activity tied to your onboarding progress.
+              </p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
+              {runtimeInsights.loginCount.toLocaleString()} sign-ins
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Connections</p>
+              <p className="mt-1 text-lg font-semibold text-blue-900">
+                {runtimeInsights.connections
+                  ? `${runtimeInsights.connections.active}/${runtimeInsights.connections.total}`
+                  : '0/0'}
+              </p>
+              <p className="text-xs text-blue-600">
+                {runtimeInsights.connections
+                  ? `${runtimeInsights.connections.needsAttention} need attention`
+                  : 'Connect your first system to unlock metrics'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">IRN progress</p>
+              <p className="mt-1 text-lg font-semibold text-blue-900">
+                {runtimeIrnProgress
+                  ? `${runtimeIrnProgress.totalGenerated} generated`
+                  : '0 generated'}
+              </p>
+              <p className="text-xs text-blue-600">
+                Pending: {runtimeIrnProgress ? runtimeIrnProgress.pending : 0}
+              </p>
+            </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Next milestone</p>
+              <p className="mt-1 text-lg font-semibold text-blue-900">
+                {currentStep?.label ?? 'Awaiting kickoff'}
+              </p>
+              <p className="text-xs text-blue-600">{progress}% complete</p>
+            </div>
+          </div>
+
+          {runtimeConnectionItems.length > 0 && (
+            <div className="mt-4 rounded-lg border border-blue-100 bg-white px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Recent connections</p>
+              <ul className="mt-2 space-y-2 text-xs text-blue-700">
+                {runtimeConnectionItems.slice(0, 3).map((item) => (
+                  <li key={item.id} className="flex items-center justify-between">
+                    <span className="font-semibold text-blue-800">{item.name}</span>
+                    <span>{formatRuntimeTimestamp(item.lastSync)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {runtimeIrnItems.length > 0 && (
+            <div className="mt-4 rounded-lg border border-blue-100 bg-white px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Latest IRNs</p>
+              <ul className="mt-2 space-y-2 text-xs text-blue-700">
+                {runtimeIrnItems.slice(0, 3).map((entry, index) => (
+                  <li key={entry.irn ?? `irn-${index}`} className="flex items-center justify-between">
+                    <span className="font-semibold text-blue-800">
+                      {entry.irn ? `IRN ${entry.irn}` : 'IRN submission'}
+                    </span>
+                    <span>{formatRuntimeTimestamp(entry.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
 
       <nav className="flex flex-wrap gap-3">
         {visibleSteps.map((step, index) => {

@@ -6,6 +6,139 @@ import { authService, type User } from '../../../../shared_components/services/a
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../../../design_system';
 import { onboardingApi } from '../../../../shared_components/services/onboardingApi';
+import apiClient from '../../../../shared_components/api/client';
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const toNumber = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const formatDateTime = (value?: string | null): string => {
+  if (!value) {
+    return 'N/A';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat('en-NG', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsed);
+};
+
+interface ConnectionSystem {
+  id: string;
+  name: string;
+  status: string;
+  lastSync?: string | null;
+  error?: string | null;
+  needsAttention?: boolean;
+}
+
+interface RuntimeConnections {
+  total: number;
+  active: number;
+  failing: number;
+  needsAttention: number;
+  items: ConnectionSystem[];
+}
+
+interface RuntimeIrnProgress {
+  totalGenerated: number;
+  pending: number;
+  recent: Array<{
+    irn?: string | null;
+    status?: string;
+    createdAt?: string | null;
+  }>;
+}
+
+interface RuntimeSnapshot {
+  loginCount: number;
+  connections: RuntimeConnections | null;
+  irnProgress: RuntimeIrnProgress | null;
+}
+
+const EMPTY_RUNTIME: RuntimeSnapshot = {
+  loginCount: 0,
+  connections: null,
+  irnProgress: null,
+};
+
+function parseRuntimeSnapshot(input: unknown): RuntimeSnapshot {
+  if (!isRecord(input)) {
+    return EMPTY_RUNTIME;
+  }
+
+  const loginCount = toNumber(input.login_count ?? input.loginCount);
+
+  let connections: RuntimeConnections | null = null;
+  if (isRecord(input.connections)) {
+    const itemsRaw = Array.isArray(input.connections.items) ? input.connections.items : [];
+    const items = itemsRaw
+      .filter((item): item is Record<string, any> => isRecord(item))
+      .map((item, index) => ({
+        id:
+          typeof item.id === 'string'
+            ? item.id
+            : typeof item.name === 'string'
+            ? `${item.name}-${index}`
+            : `connection-${index}`,
+        name: typeof item.name === 'string' ? item.name : 'Integration',
+        status: typeof item.status === 'string' ? item.status : 'unknown',
+        lastSync:
+          typeof item.lastSync === 'string'
+            ? item.lastSync
+            : typeof item.last_sync === 'string'
+            ? item.last_sync
+            : undefined,
+        error: typeof item.error === 'string' ? item.error : undefined,
+        needsAttention: Boolean(item.needsAttention ?? item.needs_attention),
+      }));
+    const needsAttention =
+      typeof input.connections.needsAttention === 'number'
+        ? input.connections.needsAttention
+        : items.filter((item) => item.needsAttention).length;
+    connections = {
+      total: toNumber(input.connections.total ?? items.length),
+      active: toNumber(input.connections.active),
+      failing: toNumber(input.connections.failing),
+      needsAttention,
+      items,
+    };
+  }
+
+  let irnProgress: RuntimeIrnProgress | null = null;
+  const irnRaw = input.irn_progress ?? input.irnProgress;
+  if (isRecord(irnRaw)) {
+    const recentRaw = Array.isArray(irnRaw.recent) ? irnRaw.recent : [];
+    const recent = recentRaw
+      .filter((item): item is Record<string, any> => isRecord(item))
+      .map((item) => ({
+        irn: typeof item.irn === 'string' ? item.irn : undefined,
+        status: typeof item.status === 'string' ? item.status : undefined,
+        createdAt:
+          typeof item.createdAt === 'string'
+            ? item.createdAt
+            : typeof item.created_at === 'string'
+            ? item.created_at
+            : undefined,
+      }));
+    irnProgress = {
+      totalGenerated: toNumber(irnRaw.total_generated ?? irnRaw.totalGenerated),
+      pending: toNumber(irnRaw.pending),
+      recent,
+    };
+  }
+
+  return {
+    loginCount,
+    connections,
+    irnProgress,
+  };
+}
 
 interface WizardProgress {
   current_step: string;
@@ -20,6 +153,9 @@ export default function SISSetupPage(): JSX.Element | null {
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState<WizardProgress | null>(null);
   const [progressStatus, setProgressStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [runtimeSnapshot, setRuntimeSnapshot] = useState<RuntimeSnapshot>(EMPTY_RUNTIME);
+  const [dashboardMetrics, setDashboardMetrics] = useState<Record<string, any> | null>(null);
+  const [metricsStatus, setMetricsStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -50,6 +186,12 @@ export default function SISSetupPage(): JSX.Element | null {
             is_complete: response.is_complete,
             has_started: response.has_started,
           });
+
+          const runtimeRaw =
+            isRecord(response.metadata) && isRecord(response.metadata.runtime)
+              ? response.metadata.runtime
+              : null;
+          setRuntimeSnapshot(runtimeRaw ? parseRuntimeSnapshot(runtimeRaw) : EMPTY_RUNTIME);
         }
         setProgressStatus('idle');
       } catch (error) {
@@ -59,6 +201,30 @@ export default function SISSetupPage(): JSX.Element | null {
     };
 
     fetchProgress();
+  }, []);
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      setMetricsStatus('loading');
+      try {
+        const result = await apiClient.get<any>('/si/dashboard/metrics');
+        if (result && typeof result === 'object') {
+          if ('success' in result) {
+            setDashboardMetrics(result.success ? (result.data ?? null) : null);
+          } else {
+            setDashboardMetrics(result as Record<string, any>);
+          }
+        } else {
+          setDashboardMetrics(null);
+        }
+        setMetricsStatus('idle');
+      } catch (error) {
+        console.error('Unable to load dashboard metrics', error);
+        setMetricsStatus('error');
+      }
+    };
+
+    fetchMetrics();
   }, []);
 
   const navigateTo = (path: string) => () => router.push(path);
@@ -83,6 +249,149 @@ export default function SISSetupPage(): JSX.Element | null {
       </span>
     );
   };
+
+  const connectionSummary =
+    (isRecord(dashboardMetrics?.connectionHealth) && isRecord(dashboardMetrics.connectionHealth.summary)
+      ? {
+          total: toNumber(dashboardMetrics.connectionHealth.summary.total),
+          active: toNumber(dashboardMetrics.connectionHealth.summary.active),
+          failing: toNumber(dashboardMetrics.connectionHealth.summary.failing),
+          needsAttention: toNumber(dashboardMetrics.connectionHealth.summary.needsAttention),
+        }
+      : runtimeSnapshot.connections
+      ? {
+          total: runtimeSnapshot.connections.total,
+          active: runtimeSnapshot.connections.active,
+          failing: runtimeSnapshot.connections.failing,
+          needsAttention: runtimeSnapshot.connections.needsAttention,
+        }
+      : null) || null;
+
+  const connectionSystems: ConnectionSystem[] = (() => {
+    if (isRecord(dashboardMetrics?.connectionHealth) && Array.isArray(dashboardMetrics.connectionHealth.systems)) {
+      return dashboardMetrics.connectionHealth.systems
+        .filter((item): item is Record<string, any> => isRecord(item))
+        .map((item, index) => ({
+          id:
+            typeof item.id === 'string'
+              ? item.id
+              : typeof item.name === 'string'
+              ? `${item.name}-${index}`
+              : `connection-${index}`,
+          name: typeof item.name === 'string' ? item.name : 'Integration',
+          status: typeof item.status === 'string' ? item.status : 'unknown',
+          lastSync:
+            typeof item.lastSync === 'string'
+              ? item.lastSync
+              : typeof item.last_sync === 'string'
+              ? item.last_sync
+              : undefined,
+          error: typeof item.error === 'string' ? item.error : undefined,
+          needsAttention: Boolean(item.needsAttention ?? item.needs_attention),
+        }));
+    }
+    return runtimeSnapshot.connections?.items ?? [];
+  })();
+
+  const irnStatus = (() => {
+    if (isRecord(dashboardMetrics?.irnStatus)) {
+      return {
+        totalGenerated: toNumber(dashboardMetrics.irnStatus.totalGenerated ?? dashboardMetrics.irnStatus.total_generated),
+        pending: toNumber(dashboardMetrics.irnStatus.pending),
+        total: toNumber(dashboardMetrics.irnStatus.total),
+        lastGeneratedAt:
+          typeof dashboardMetrics.irnStatus.lastGeneratedAt === 'string'
+            ? dashboardMetrics.irnStatus.lastGeneratedAt
+            : typeof dashboardMetrics.irnStatus.last_generated_at === 'string'
+            ? dashboardMetrics.irnStatus.last_generated_at
+            : undefined,
+        recent: Array.isArray(dashboardMetrics.irnStatus.recent) ? dashboardMetrics.irnStatus.recent : [],
+      };
+    }
+    if (runtimeSnapshot.irnProgress) {
+      return {
+        totalGenerated: runtimeSnapshot.irnProgress.totalGenerated,
+        pending: runtimeSnapshot.irnProgress.pending,
+        total: runtimeSnapshot.irnProgress.totalGenerated + runtimeSnapshot.irnProgress.pending,
+        lastGeneratedAt: runtimeSnapshot.irnProgress.recent[0]?.createdAt,
+        recent: runtimeSnapshot.irnProgress.recent,
+      };
+    }
+    return null;
+  })();
+
+  const irnRecent = (irnStatus?.recent ?? [])
+    .filter((item): item is Record<string, any> => isRecord(item))
+    .map((item, index) => ({
+      id:
+        typeof item.irn === 'string'
+          ? item.irn
+          : typeof item.id === 'string'
+          ? item.id
+          : `irn-${index}`,
+      status: typeof item.status === 'string' ? item.status : 'unknown',
+      createdAt:
+        typeof item.createdAt === 'string'
+          ? item.createdAt
+          : typeof item.created_at === 'string'
+          ? item.created_at
+          : undefined,
+      qrReady: Boolean(item.qrReady ?? item.qr_ready),
+      qrSigned: Boolean(item.qrSigned ?? item.qr_signed),
+      firsStamp: Boolean(item.firsStamp ?? item.firs_stamp),
+    }));
+
+  const validationLogs = (() => {
+    if (Array.isArray(dashboardMetrics?.validationLogs)) {
+      return dashboardMetrics.validationLogs;
+    }
+    if (isRecord(dashboardMetrics?.validation) && Array.isArray(dashboardMetrics.validation.recentBatches)) {
+      return dashboardMetrics.validation.recentBatches;
+    }
+    return [];
+  })();
+
+  const validationEntries = validationLogs
+    .filter((item): item is Record<string, any> => isRecord(item))
+    .map((item, index) => {
+      const batchId =
+        typeof item.batchId === 'string'
+          ? item.batchId
+          : typeof item.batch_id === 'string'
+          ? item.batch_id
+          : typeof item.id === 'string'
+          ? item.id
+          : `batch-${index}`;
+      const status = typeof item.status === 'string' ? item.status : 'unknown';
+      const created =
+        typeof item.createdAt === 'string'
+          ? item.createdAt
+          : typeof item.created_at === 'string'
+          ? item.created_at
+          : typeof item.updated_at === 'string'
+          ? item.updated_at
+          : undefined;
+      const totals = isRecord(item.totals) ? item.totals : {};
+      const totalInvoices =
+        typeof item.total === 'number'
+          ? item.total
+          : typeof totals.total === 'number'
+          ? totals.total
+          : typeof item.totalInvoices === 'number'
+          ? item.totalInvoices
+          : undefined;
+
+      return {
+        id: batchId,
+        status,
+        createdAt: created,
+        totalInvoices,
+      };
+    })
+    .slice(0, 4);
+
+  const metricsLoading = metricsStatus === 'loading';
+  const metricsErrored = metricsStatus === 'error';
 
   if (isLoading) {
     return (
@@ -115,6 +424,164 @@ export default function SISSetupPage(): JSX.Element | null {
             {renderProgressBadge()}
           </div>
         </header>
+
+        <section className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Workspace activity</h2>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {runtimeSnapshot.loginCount.toLocaleString()} sign-ins
+              </span>
+            </div>
+            <p className="mt-3 text-sm text-slate-600">
+              Live onboarding insights from your current workspace usage.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+              <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Onboarding status</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {progress?.is_complete ? 'Complete' : `${progress?.completed_steps.length ?? 0} steps`}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Next: {progress?.current_step ? progress.current_step.replace(/-/g, ' ') : 'service-selection'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">IRN ready</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {irnStatus ? irnStatus.totalGenerated.toLocaleString() : '0'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Pending: {irnStatus ? irnStatus.pending.toLocaleString() : '0'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-indigo-900">Connection health</h2>
+              {connectionSummary ? (
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">
+                  {connectionSummary.active}/{connectionSummary.total} active
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-3 text-sm text-slate-600">
+              Monitor integration status and identify systems needing attention.
+            </p>
+            {metricsLoading ? (
+              <p className="mt-4 text-sm text-slate-500">Loading connection metrics…</p>
+            ) : connectionSummary ? (
+              <>
+                <div className="mt-4 grid grid-cols-3 gap-3 text-xs text-indigo-700">
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-center">
+                    <p className="font-semibold text-indigo-800">{connectionSummary.active.toLocaleString()}</p>
+                    <p className="mt-1 uppercase tracking-wide">Active</p>
+                  </div>
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-center">
+                    <p className="font-semibold text-indigo-800">{connectionSummary.failing.toLocaleString()}</p>
+                    <p className="mt-1 uppercase tracking-wide">Failing</p>
+                  </div>
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-center">
+                    <p className="font-semibold text-indigo-800">{connectionSummary.needsAttention.toLocaleString()}</p>
+                    <p className="mt-1 uppercase tracking-wide">Attention</p>
+                  </div>
+                </div>
+                <ul className="mt-4 space-y-2">
+                  {connectionSystems.slice(0, 4).map((system) => (
+                    <li
+                      key={system.id}
+                      className="rounded-lg border border-slate-100 bg-white px-4 py-3 text-sm text-slate-700"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">{system.name}</span>
+                        <span className="text-xs uppercase tracking-wide text-slate-500">{system.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Last sync: {system.lastSync ? formatDateTime(system.lastSync) : 'Not synced yet'}
+                      </p>
+                      {system.needsAttention && (
+                        <p className="mt-1 text-xs font-semibold text-amber-600">
+                          ⚠️ {system.error || 'Requires follow-up'}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                  {connectionSystems.length === 0 && (
+                    <li className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                      Connect an ERP to populate live health metrics.
+                    </li>
+                  )}
+                </ul>
+              </>
+            ) : metricsErrored ? (
+              <p className="mt-4 text-sm text-red-500">Unable to load connection metrics right now.</p>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">No connections detected yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-emerald-900">IRN & validation timeline</h2>
+              {irnStatus?.lastGeneratedAt && (
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+                  Last IRN: {formatDateTime(irnStatus.lastGeneratedAt)}
+                </span>
+              )}
+            </div>
+            <p className="mt-3 text-sm text-slate-600">
+              Track recent IRN generations alongside validation batches.
+            </p>
+            {metricsLoading ? (
+              <p className="mt-4 text-sm text-slate-500">Loading timeline…</p>
+            ) : (
+              <>
+                <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                  {irnRecent.slice(0, 3).map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-emerald-900">
+                          {entry.id.startsWith('irn-') ? 'IRN submission' : `IRN ${entry.id}`}
+                        </span>
+                        <span className="text-xs uppercase tracking-wide text-emerald-600">{entry.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-emerald-700">
+                        {entry.createdAt ? formatDateTime(entry.createdAt) : 'Awaiting acknowledgement'}
+                      </p>
+                    </li>
+                  ))}
+                  {irnRecent.length === 0 && (
+                    <li className="rounded-lg border border-dashed border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
+                      Generate your first IRN to populate the timeline.
+                    </li>
+                  )}
+                </ul>
+                <div className="mt-4 rounded-lg border border-emerald-100 bg-white px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Validation logs</p>
+                  <ul className="mt-2 space-y-2 text-xs text-emerald-700">
+                    {validationEntries.length > 0 ? (
+                      validationEntries.map((log) => (
+                        <li key={log.id} className="flex items-center justify-between">
+                          <span className="font-semibold">{log.status}</span>
+                          <span>{log.createdAt ? formatDateTime(log.createdAt) : 'Pending'}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-emerald-600">
+                        Validation logs will appear after your first batch.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
 
         <section className="grid gap-6 lg:grid-cols-3">
           <div className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">

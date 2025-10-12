@@ -180,10 +180,13 @@ class SIDashboardEndpointsV1:
             integration_rows_stmt = integration_rows_stmt.where(
                 Integration.organization_id == org_uuid
             )
-        integration_rows = await session.execute(integration_rows_stmt)
+        integration_rows_result = await session.execute(integration_rows_stmt)
+        integration_row_objects = list(integration_rows_result.scalars())
 
+        integration_count_rows = integration_counts.fetchall()
         integration_stats = self._summarize_integrations(
-            integration_counts.fetchall(), integration_rows.scalars()
+            integration_count_rows,
+            integration_row_objects,
         )
 
         submission_counts_stmt = (
@@ -195,7 +198,8 @@ class SIDashboardEndpointsV1:
                 FIRSSubmission.organization_id == org_uuid
             )
         submission_counts = await session.execute(submission_counts_stmt)
-        submission_stats = self._summarize_submissions(submission_counts.fetchall())
+        submission_count_rows = submission_counts.fetchall()
+        submission_stats = self._summarize_submissions(submission_count_rows)
 
         validation_payload = None
         if org_uuid:
@@ -233,17 +237,47 @@ class SIDashboardEndpointsV1:
                     "slaHours": sla_hours,
                 }
 
+        connection_details = [
+            {
+                "id": str(integration.id),
+                "name": integration.name,
+                "type": self._map_integration_type(integration.integration_type),
+                "status": integration.status.value,
+                "isActive": bool(integration.is_active),
+                "lastSync": self._format_datetime(integration.last_sync_at),
+                "error": integration.last_error,
+                "errorCount": integration.error_count,
+                "needsAttention": integration.needs_attention,
+            }
+            for integration in integration_row_objects
+        ]
+
+        connection_summary = {
+            "total": len(connection_details),
+            "active": sum(1 for item in connection_details if item["status"] == IntegrationStatus.ACTIVE.value),
+            "failing": sum(1 for item in connection_details if item["status"] == IntegrationStatus.FAILED.value),
+            "needsAttention": sum(1 for item in connection_details if item["needsAttention"]),
+        }
+
+        irn_status = self._summarize_irn_status(session, org_uuid, submission_count_rows)
+
         metrics: Dict[str, Any] = {
             "integrations": integration_stats["categories"],
             "financial": integration_stats["financial"],
             "transactions": submission_stats["transactions"],
             "reconciliation": submission_stats["reconciliation"],
             "compliance": submission_stats["compliance"],
+            "connectionHealth": {
+                "summary": connection_summary,
+                "systems": connection_details[:10],
+            },
+            "irnStatus": irn_status,
             "lastUpdated": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         }
 
         if validation_payload:
             metrics["validation"] = validation_payload
+            metrics.setdefault("validationLogs", validation_payload.get("recentBatches", []))
 
         return metrics
 
@@ -396,6 +430,58 @@ class SIDashboardEndpointsV1:
         if total <= 0:
             return 100.0
         return round((active / total) * 100, 1)
+
+    def _summarize_irn_status(
+        self,
+        session: AsyncSession,
+        organization_id: Optional[uuid.UUID],
+        submission_counts: Iterable[Tuple[SubmissionStatus, int]],
+    ) -> Dict[str, Any]:
+        total = sum(count for _status, count in submission_counts)
+        generated = sum(
+            count
+            for status, count in submission_counts
+            if status in (SubmissionStatus.SUBMITTED, SubmissionStatus.ACCEPTED)
+        )
+        pending = sum(
+            count
+            for status, count in submission_counts
+            if status in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING)
+        )
+
+        query = select(FIRSSubmission).order_by(FIRSSubmission.created_at.desc()).limit(10)
+        if organization_id:
+            query = query.where(FIRSSubmission.organization_id == organization_id)
+
+        recent: List[Dict[str, Any]] = []
+        try:
+            recent_rows = await session.execute(query)
+            for submission in recent_rows.scalars():
+                invoice_payload = submission.invoice_data or {}
+                pre_signature = invoice_payload.get("pre_submission_signature") or {}
+                qr_data = pre_signature.get("qr_data")
+                recent.append(
+                    {
+                        "irn": submission.irn,
+                        "status": submission.status.value,
+                        "qrReady": bool(qr_data or submission.qr_payload),
+                        "qrSigned": bool(pre_signature),
+                        "createdAt": self._format_datetime(submission.created_at),
+                        "firsStamp": bool(submission.firs_stamp_metadata),
+                    }
+                )
+        except Exception:
+            recent = []
+
+        last_generated_at = recent[0]["createdAt"] if recent else None
+
+        return {
+            "totalGenerated": generated,
+            "pending": pending,
+            "total": total,
+            "lastGeneratedAt": last_generated_at,
+            "recent": recent,
+        }
 
     def _create_v1_response(self, data: Dict[str, Any], action: str) -> V1ResponseModel:
         return build_v1_response(self._make_json_safe(data), action)

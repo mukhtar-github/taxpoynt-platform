@@ -163,6 +163,23 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       recentBatches: [],
       slaHours: 4,
     },
+    validationLogs: [],
+    connectionHealth: {
+      summary: {
+        total: 0,
+        active: 0,
+        failing: 0,
+        needsAttention: 0,
+      },
+      systems: [],
+    },
+    irnStatus: {
+      totalGenerated: 0,
+      pending: 0,
+      total: 0,
+      lastGeneratedAt: undefined,
+      recent: [],
+    },
     lastUpdated: undefined,
     processing: {
       rate: 0,
@@ -219,24 +236,49 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
     }).format(parsed);
   };
 
+  const connectionSummary =
+    metrics.connectionHealth?.summary ?? {
+      total: 0,
+      active: 0,
+      failing: 0,
+      needsAttention: 0,
+    };
+  const connectionSystems = Array.isArray(metrics.connectionHealth?.systems)
+    ? (metrics.connectionHealth?.systems as Array<Record<string, any>>)
+    : [];
+
+  const irnStatus =
+    metrics.irnStatus ?? {
+      totalGenerated: 0,
+      pending: 0,
+      total: 0,
+      lastGeneratedAt: undefined,
+      recent: [],
+    };
+  const irnRecent = Array.isArray(irnStatus.recent) ? irnStatus.recent : [];
+
   const validationSummary = metrics.validation?.summary ?? { totals: { total: 0, passed: 0, failed: 0 } };
   const validationTotals = validationSummary.totals ?? { total: 0, passed: 0, failed: 0 };
   const validationPassRate = validationTotals.total
     ? Math.round(((validationTotals.passed ?? 0) / validationTotals.total) * 100)
     : 0;
   const validationRecent = metrics.validation?.recentBatches ?? [];
+  const validationLogs = Array.isArray(metrics.validationLogs) ? metrics.validationLogs : [];
+  const combinedValidationActivity = validationLogs.length > 0 ? validationLogs : validationRecent;
 
   const quickStats = [
     {
       label: 'Active systems',
       value:
-        metrics.integrations.overall.totalSystems > 0
-          ? `${metrics.integrations.overall.activeSystems}/${metrics.integrations.overall.totalSystems}`
-          : formatNumber(metrics.integrations.overall.activeSystems),
+        connectionSummary.total > 0
+          ? `${connectionSummary.active}/${connectionSummary.total}`
+          : formatNumber(connectionSummary.active),
       helper:
-        metrics.integrations.overall.totalSystems > 0
-          ? `${toPercentDisplay(metrics.integrations.overall.overallHealthScore) ?? '--'} health`
-          : 'No systems connected yet',
+        connectionSummary.total > 0
+          ? connectionSummary.needsAttention > 0
+            ? `${formatNumber(connectionSummary.needsAttention)} flagged`
+            : 'All systems clear'
+          : 'Connect a system to start tracking health',
       textClass: 'text-indigo-600',
       borderClass: 'border-indigo-100',
     },
@@ -248,9 +290,14 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       borderClass: 'border-emerald-100',
     },
     {
-      label: 'FIRS invoices ready',
-      value: formatNumber(metrics.compliance.invoicesGenerated),
-      helper: `${formatNumber(metrics.compliance.pendingSubmissions)} pending submissions`,
+      label: 'IRNs generated',
+      value: formatNumber(irnStatus.totalGenerated),
+      helper:
+        irnStatus.pending > 0
+          ? `${formatNumber(irnStatus.pending)} pending`
+          : irnStatus.lastGeneratedAt
+          ? `Last: ${formatDateTime(irnStatus.lastGeneratedAt)}`
+          : 'Awaiting first IRN',
       textClass: 'text-blue-600',
       borderClass: 'border-blue-100',
     },
@@ -334,22 +381,63 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
 
   const complianceSnapshot = [
     {
-      label: 'VAT transactions',
-      value: formatNumber(metrics.compliance.vatTransactions),
-    },
-    {
-      label: 'Pending submissions',
-      value: formatNumber(metrics.compliance.pendingSubmissions),
+      label: 'IRNs pending',
+      value: formatNumber(irnStatus.pending),
     },
     {
       label: 'Validation pass rate',
       value: `${validationPassRate}%`,
     },
+    {
+      label: 'Pending submissions',
+      value: formatNumber(metrics.compliance.pendingSubmissions),
+    },
   ];
 
-  const lastSubmission = metrics.compliance.lastSubmission
+  const lastSubmission = irnStatus.lastGeneratedAt
+    ? formatDateTime(irnStatus.lastGeneratedAt)
+    : metrics.compliance.lastSubmission
     ? formatDateTime(metrics.compliance.lastSubmission)
     : 'Not submitted yet';
+
+  const latestValidationLogs = combinedValidationActivity
+    .filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'))
+    .slice(0, 3)
+    .map((item, index) => {
+      const batchId =
+        typeof item.batchId === 'string'
+          ? item.batchId
+          : typeof item.batch_id === 'string'
+          ? item.batch_id
+          : typeof item.id === 'string'
+          ? item.id
+          : undefined;
+      const status = typeof item.status === 'string' ? item.status : 'unknown';
+      const created =
+        typeof item.createdAt === 'string'
+          ? item.createdAt
+          : typeof item.created_at === 'string'
+          ? item.created_at
+          : undefined;
+      const totalsRecord = isPlainObject(item.totals) ? (item.totals as Record<string, unknown>) : {};
+      const totalInvoices =
+        typeof item.total === 'number'
+          ? item.total
+          : typeof totalsRecord.total === 'number'
+          ? totalsRecord.total
+          : typeof item.totalInvoices === 'number'
+          ? item.totalInvoices
+          : typeof item.invoiceCount === 'number'
+          ? item.invoiceCount
+          : undefined;
+
+      return {
+        id: batchId ?? `validation-${index}`,
+        status,
+        createdAt: created,
+        totalInvoices,
+      };
+    });
 
   const hasCashFlow = Boolean(
     metrics.cashFlow &&
@@ -383,53 +471,92 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
   ];
 
   const activityFeed = useMemo(() => {
-    const normalized = (Array.isArray(validationRecent) ? validationRecent : [])
+    const events: Array<{ title: string; description: string; meta: string; amount?: string }> = [];
+
+    const irnEvents = irnRecent
+      .filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'))
       .slice(0, 3)
       .map((item) => {
-        if (!item || typeof item !== 'object') {
-          return null;
+        const irn = typeof item.irn === 'string' ? item.irn : undefined;
+        const status = typeof item.status === 'string' ? item.status : 'unknown';
+        const created =
+          typeof item.createdAt === 'string'
+            ? item.createdAt
+            : typeof item.created_at === 'string'
+            ? item.created_at
+            : undefined;
+        const qrReady = Boolean(item.qrReady ?? item.qr_ready);
+        const qrSigned = Boolean(item.qrSigned ?? item.qr_signed);
+        const firsStamped = Boolean(item.firsStamp ?? item.firs_stamp);
+        let amount: string | undefined;
+        if (firsStamped) {
+          amount = 'Stamped';
+        } else if (qrSigned) {
+          amount = 'QR signed';
+        } else if (qrReady) {
+          amount = 'QR ready';
         }
-        const record = item as Record<string, unknown>;
-        const title =
-          typeof record.title === 'string'
-            ? record.title
-            : typeof record.status === 'string'
-            ? `Batch ${record.status}`
-            : 'Validation batch';
-        const description =
-          typeof record.description === 'string'
-            ? record.description
-            : typeof record.notes === 'string'
-            ? record.notes
-            : 'Validation batch status update';
-        const timestamp =
-          typeof record.updated_at === 'string'
-            ? record.updated_at
-            : typeof record.created_at === 'string'
-            ? record.created_at
+
+        return {
+          title: irn ? `IRN ${irn}` : 'IRN submission',
+          description: `Status: ${status}`,
+          meta: created ? formatDateTime(created) : 'Awaiting acknowledgement',
+          amount,
+        };
+      })
+      .filter((entry) => Boolean(entry.title));
+
+    events.push(...irnEvents);
+
+    const validationEvents = combinedValidationActivity
+      .filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'))
+      .slice(0, 3)
+      .map((item) => {
+        const status = typeof item.status === 'string' ? item.status : 'validation';
+        const batchId =
+          typeof item.batchId === 'string'
+            ? item.batchId
+            : typeof item.batch_id === 'string'
+            ? item.batch_id
             : undefined;
+        const title = batchId ? `Batch ${batchId}` : `Batch ${status}`;
+        const created =
+          typeof item.updated_at === 'string'
+            ? item.updated_at
+            : typeof item.createdAt === 'string'
+            ? item.createdAt
+            : typeof item.created_at === 'string'
+            ? item.created_at
+            : undefined;
+        const totalsRecord = isPlainObject(item.totals) ? (item.totals as Record<string, unknown>) : {};
         const invoiceCount =
-          typeof record.total_invoices === 'number'
-            ? record.total_invoices
-            : typeof record.totalInvoices === 'number'
-            ? record.totalInvoices
+          typeof item.total === 'number'
+            ? item.total
+            : typeof totalsRecord.total === 'number'
+            ? totalsRecord.total
+            : typeof item.totalInvoices === 'number'
+            ? item.totalInvoices
             : undefined;
+        const description =
+          typeof item.description === 'string'
+            ? item.description
+            : typeof item.notes === 'string'
+            ? item.notes
+            : `Validation ${status}`;
 
         return {
           title,
           description,
-          meta: timestamp ? formatDateTime(timestamp) : 'Awaiting schedule',
+          meta: created ? formatDateTime(created) : 'Awaiting schedule',
           amount: typeof invoiceCount === 'number' ? `${invoiceCount.toLocaleString()} invoices` : undefined,
         };
       })
-      .filter(
-        (
-          entry,
-        ): entry is { title: string; description: string; meta: string; amount?: string } => Boolean(entry && entry.title)
-      );
+      .filter((entry) => Boolean(entry.title));
 
-    if (normalized.length > 0) {
-      return normalized;
+    events.push(...validationEvents);
+
+    if (events.length > 0) {
+      return events.slice(0, 5);
     }
 
     return [
@@ -449,7 +576,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
         meta: 'Collaboration',
       },
     ];
-  }, [validationRecent]);
+  }, [combinedValidationActivity, irnRecent]);
 
   const quickToolCards = [
     {
@@ -573,6 +700,10 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
             badgeColor="indigo"
           >
             <div className="space-y-3">
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                Active {formatNumber(connectionSummary.active)} of {formatNumber(connectionSummary.total)} systems ·{' '}
+                {formatNumber(connectionSummary.failing)} failing · {formatNumber(connectionSummary.needsAttention)} flagged
+              </div>
               {integrationCategories.map((category) => (
                 <div
                   key={category.label}
@@ -587,6 +718,53 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                   </span>
                 </div>
               ))}
+              {connectionSystems.length > 0 ? (
+                <div className="rounded-lg border border-slate-100 bg-white px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent updates</p>
+                  <ul className="mt-2 space-y-2">
+                    {connectionSystems.slice(0, 3).map((system, index) => {
+                      const record = system as Record<string, any>;
+                      const systemId =
+                        typeof record.id === 'string'
+                          ? record.id
+                          : typeof record.name === 'string'
+                          ? `${record.name}-${index}`
+                          : `system-${index}`;
+                      const name = typeof record.name === 'string' ? record.name : 'Integration';
+                      const status = typeof record.status === 'string' ? record.status : 'unknown';
+                      const lastSyncValue =
+                        typeof record.lastSync === 'string'
+                          ? record.lastSync
+                          : typeof record.last_sync === 'string'
+                          ? record.last_sync
+                          : undefined;
+                      const needsAttention = Boolean(record.needsAttention ?? record.needs_attention);
+                      const error = typeof record.error === 'string' ? record.error : undefined;
+
+                      return (
+                        <li key={systemId} className="flex flex-col rounded-md border border-slate-100 px-3 py-2">
+                          <div className="flex items-center justify-between text-sm font-semibold text-slate-800">
+                            <span>{name}</span>
+                            <span className="text-xs uppercase tracking-wide text-slate-500">{status}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Last sync: {lastSyncValue ? formatDateTime(lastSyncValue) : 'No sync recorded'}
+                          </div>
+                          {needsAttention && (
+                            <div className="mt-1 text-xs font-semibold text-amber-600">
+                              ⚠️ {error ? error : 'Needs attention'}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                  Run a connection test to populate recent integration updates.
+                </div>
+              )}
               <TaxPoyntButton
                 variant="outline"
                 size="sm"
@@ -615,6 +793,30 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                   <span className="font-semibold text-slate-900">{item.value}</span>
                 </div>
               ))}
+              {latestValidationLogs.length > 0 ? (
+                <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Validation logs</p>
+                  <ul className="mt-2 space-y-2 text-xs text-emerald-700">
+                    {latestValidationLogs.map((log) => (
+                      <li key={log.id} className="flex flex-col rounded-md border border-emerald-50 px-2 py-1">
+                        <span className="font-semibold text-emerald-700">{log.status}</span>
+                        <span className="text-emerald-500">
+                          {log.createdAt ? formatDateTime(log.createdAt) : 'Awaiting schedule'}
+                        </span>
+                        {typeof log.totalInvoices === 'number' && (
+                          <span className="text-emerald-500">
+                            {log.totalInvoices.toLocaleString()} invoices
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-emerald-100 bg-white px-3 py-2 text-xs text-emerald-600">
+                  Validation logs will surface here once batches are processed.
+                </div>
+              )}
               <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                 Last submission: {lastSubmission}
               </div>

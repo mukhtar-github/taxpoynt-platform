@@ -10,12 +10,18 @@ cache to avoid repeated queries during rapid wizard interactions.
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import func, select
+
 from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.models.onboarding_state import OnboardingStateORM
+from core_platform.data_management.models.firs_submission import FIRSSubmission, SubmissionStatus
+from core_platform.data_management.models.integration import Integration, IntegrationStatus
+from core_platform.data_management.models.user import User
 from core_platform.data_management.repositories.onboarding_state_repo_async import (
     OnboardingStateRepositoryAsync,
 )
@@ -163,10 +169,18 @@ class SIOnboardingService:
         service_package: str,
     ) -> Dict[str, Any]:
         state = await self._get_onboarding_state(repo, user_id, service_package)
+        payload = self._state_with_progress(state)
+
+        runtime = await self._build_runtime_metadata(repo, state, service_package)
+        if runtime:
+            metadata = payload.get("metadata") or {}
+            metadata.update(runtime)
+            payload["metadata"] = metadata
+
         return {
             "operation": "get_onboarding_state",
             "success": True,
-            "data": self._state_with_progress(state),
+            "data": payload,
             "user_id": user_id,
         }
 
@@ -526,6 +540,94 @@ class SIOnboardingService:
         data = asdict(state)
         data["progress"] = self._calculate_progress(state)
         return data
+
+    async def _build_runtime_metadata(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        state: OnboardingState,
+        service_package: str,
+    ) -> Dict[str, Any]:
+        session = getattr(repo, "_session", None)
+        if session is None:
+            return {}
+
+        runtime: Dict[str, Any] = {}
+
+        user = await session.get(User, uuid.UUID(state.user_id)) if self._is_uuid(state.user_id) else None
+        if user:
+            runtime["login_count"] = user.login_count or 0
+
+        organization_id = getattr(user, "organization_id", None) if user else None
+        if organization_id:
+            connections = await session.execute(
+                select(Integration).where(Integration.organization_id == organization_id).order_by(Integration.last_sync_at.desc().nullslast())
+            )
+            integration_rows = list(connections.scalars())
+
+            runtime["connections"] = {
+                "total": len(integration_rows),
+                "active": sum(1 for item in integration_rows if item.status == IntegrationStatus.ACTIVE),
+                "failing": sum(1 for item in integration_rows if item.status == IntegrationStatus.FAILED),
+                "items": [
+                    {
+                        "id": str(item.id),
+                        "name": item.name,
+                        "type": item.integration_type.value,
+                        "status": item.status.value,
+                        "lastSync": self._format_optional_datetime(item.last_sync_at),
+                        "error": item.last_error,
+                        "needsAttention": item.needs_attention,
+                    }
+                    for item in integration_rows[:5]
+                ],
+            }
+
+            submissions_stmt = (
+                select(FIRSSubmission)
+                .where(FIRSSubmission.organization_id == organization_id)
+                .order_by(FIRSSubmission.created_at.desc())
+                .limit(5)
+            )
+            submission_rows = await session.execute(submissions_stmt)
+            submissions = list(submission_rows.scalars())
+            runtime["irn_progress"] = {
+                "total_generated": sum(
+                    1
+                    for item in submissions
+                    if item.status in (SubmissionStatus.SUBMITTED, SubmissionStatus.ACCEPTED)
+                ),
+                "pending": sum(
+                    1
+                    for item in submissions
+                    if item.status in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING)
+                ),
+                "recent": [
+                    {
+                        "irn": item.irn,
+                        "status": item.status.value,
+                        "created_at": self._format_optional_datetime(item.created_at),
+                    }
+                    for item in submissions
+                ],
+            }
+
+        if runtime:
+            return {"runtime": runtime}
+        return {}
+
+    @staticmethod
+    def _is_uuid(value: str) -> bool:
+        try:
+            uuid.UUID(str(value))
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _format_optional_datetime(value: Optional[datetime]) -> Optional[str]:
+        if not value:
+            return None
+        return value.replace(microsecond=0).isoformat() + "Z"
 
     def _ensure_metadata_consistency(
         self,

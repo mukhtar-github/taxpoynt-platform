@@ -126,6 +126,7 @@ class MainGatewayRouter:
                 self.message_router
             )
             version_router.include_router(hybrid_router)
+
         
         # Future versions can be added here
         elif version == "v2":
