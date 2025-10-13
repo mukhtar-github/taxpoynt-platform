@@ -259,7 +259,7 @@ class SIDashboardEndpointsV1:
             "needsAttention": sum(1 for item in connection_details if item["needsAttention"]),
         }
 
-        irn_status = self._summarize_irn_status(session, org_uuid, submission_count_rows)
+        irn_status = await self._summarize_irn_status(session, org_uuid, submission_count_rows)
 
         metrics: Dict[str, Any] = {
             "integrations": integration_stats["categories"],
@@ -431,7 +431,7 @@ class SIDashboardEndpointsV1:
             return 100.0
         return round((active / total) * 100, 1)
 
-    def _summarize_irn_status(
+    async def _summarize_irn_status(
         self,
         session: AsyncSession,
         organization_id: Optional[uuid.UUID],
