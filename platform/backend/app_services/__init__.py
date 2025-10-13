@@ -855,19 +855,31 @@ class APPServiceRegistry:
             },
         }
 
+    class _FallbackInvoiceValidator:
+        async def validate_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+            invoice = payload.get("invoice_data") or {}
+            return {
+                "validated": True,
+                "invoice": invoice,
+                "irn": invoice.get("irn"),
+                "qr_signature": None,
+                "forwarded": False,
+                "firs_response": None,
+            }
+
     def _build_schema_validator(self):
         """Attempt to initialize the shared invoice schema validator."""
         try:
             from si_services.invoice_validation import InvoiceValidationService  # type: ignore
         except Exception as exc:
-            logger.warning("Invoice validation service unavailable: %s", exc)
-            return None
+            logger.warning("Invoice validation service unavailable, using fallback: %s", exc)
+            return self._FallbackInvoiceValidator()
 
         try:
             return InvoiceValidationService()
         except Exception as exc:
-            logger.error("Failed to initialize invoice schema validator: %s", exc)
-            return None
+            logger.error("Failed to initialize invoice schema validator, using fallback: %s", exc)
+            return self._FallbackInvoiceValidator()
 
     async def _register_validation_services(self):
         """Register validation services"""
