@@ -659,7 +659,7 @@ class SIOnboardingService:
             metadata.get("company_profile", {}).get("service_id") if isinstance(metadata.get("company_profile"), dict) else None,
             metadata.get("service_id"),
             metadata.get("service_package"),
-            "SERVICE",
+            "SERVICE00",
         ]
         issued_sources = [
             metadata.get("invoice_preview", {}).get("issued_on"),
@@ -670,7 +670,7 @@ class SIOnboardingService:
         ]
 
         invoice_number = next((value for value in invoice_sources if value), "0001")
-        service_id = next((value for value in service_sources if value), "SERVICE")
+        service_id = next((value for value in service_sources if value), "SERVICE00")
         issued_on = next((value for value in issued_sources if value), self._utc_now())
 
         try:

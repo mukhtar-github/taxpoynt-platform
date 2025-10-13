@@ -77,8 +77,13 @@ def _normalize_service_id(raw: str) -> str:
     value = str(raw).strip().upper()
     value = _SERVICE_ID_PATTERN.sub("", value)
 
-    if len(value) != 8:
-        raise IRNGenerationError("service_id must be 8 alphanumeric characters")
+    if not value:
+        raise IRNGenerationError("service_id must contain alphanumeric characters")
+
+    if len(value) < 8:
+        value = value.ljust(8, "0")
+    elif len(value) > 8:
+        value = value[:8]
 
     return value
 
