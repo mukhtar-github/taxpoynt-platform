@@ -680,7 +680,7 @@ class SIOnboardingService:
                 issued_on=issued_on,
             )
         except IRNGenerationError:
-            metadata["irn_preview"] = generate_canonical_irn("0001", "SERVICE", self._utc_now())
+            metadata["irn_preview"] = generate_canonical_irn("0001", "SERVICE00", self._utc_now())
 
         return metadata
 

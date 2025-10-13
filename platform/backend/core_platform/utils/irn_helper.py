@@ -57,11 +57,6 @@ def _normalize_invoice_number(raw: str) -> str:
         raise IRNGenerationError("invoice_number is required")
 
     value = str(raw).strip().upper()
-    if value.startswith("INV-"):
-        value = value[4:]
-    elif value == "INV":
-        value = ""
-
     value = re.sub(r"[^A-Z0-9]", "", value)
 
     if not value:

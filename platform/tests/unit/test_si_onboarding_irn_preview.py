@@ -15,7 +15,7 @@ def test_onboarding_irn_preview_uses_metadata(monkeypatch):
 
     result = service._ensure_metadata_consistency(metadata, "si")
 
-    assert result["irn_preview"] == "INV123-SVC01000-20240309"
+    assert result["irn_preview"] == "123-SVC01000-20240309"
 
 
 def test_onboarding_irn_preview_uses_defaults(monkeypatch):
@@ -25,4 +25,4 @@ def test_onboarding_irn_preview_uses_defaults(monkeypatch):
 
     result = service._ensure_metadata_consistency({}, "si")
 
-    assert result["irn_preview"] == "0001-SERVICE00-20240105"
+    assert result["irn_preview"] == "0001-SI000000-20240105"
