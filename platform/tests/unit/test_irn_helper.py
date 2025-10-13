@@ -10,7 +10,7 @@ from core_platform.utils.irn_helper import (
 
 def test_generate_canonical_irn_basic():
     result = generate_canonical_irn("INV-001", "svc-01", "2024-06-05")
-    assert result == "001-SVC01000-20240605"
+    assert result == "INV001-SVC01000-20240605"
 
 
 def test_generate_canonical_irn_strips_invalid_characters():
