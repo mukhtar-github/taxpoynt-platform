@@ -2102,14 +2102,25 @@ class APPServiceRegistry:
 
                     schema_validator: Optional[Any] = validation_service.get("schema_validator")
                     schema_result: Optional[Dict[str, Any]] = None
+                    base_document = dict(document)
                     is_fallback_validator = False
 
                     if schema_validator:
-                        schema_result = await schema_validator.validate_invoice({"invoice_data": document})
-                        document = schema_result.get("invoice") or document
+                        try:
+                            schema_result = await schema_validator.validate_invoice({"invoice_data": document})
+                        except Exception as exc:
+                            logger.debug("Schema validator failed, using original document: %s", exc)
+                            schema_result = None
                         is_fallback_validator = bool(
                             getattr(schema_validator, "is_fallback_validator", False)
                         )
+                        if schema_result and not is_fallback_validator:
+                            schema_document = schema_result.get("invoice")
+                            if isinstance(schema_document, dict):
+                                # Preserve schema-normalized payload separately while keeping original structure for other checks
+                                schema_result["normalized_invoice"] = schema_document
+                            else:
+                                schema_result = schema_result or {}
 
                     format_report = None
                     firs_report = None
@@ -2117,15 +2128,23 @@ class APPServiceRegistry:
 
                     if not is_fallback_validator:
                         if run_format and format_validator:
-                            format_report = await format_validator.validate_document_format(document)
+                            try:
+                                format_report = await format_validator.validate_document_format(base_document)
+                            except Exception as exc:
+                                logger.debug("Format validation failed, continuing with fallback: %s", exc)
+                                format_report = None
 
                         if run_firs and firs_validator:
-                            firs_report = await firs_validator.validate_document(document)
+                            try:
+                                firs_report = await firs_validator.validate_document(base_document)
+                            except Exception as exc:
+                                logger.debug("FIRS validation failed, continuing with fallback: %s", exc)
+                                firs_report = None
 
                         if run_submission and submission_validator:
                             submission_options = options.get("submission", {})
                             submission_context = SubmissionContext(
-                                document_data=document,
+                                document_data=base_document,
                                 submission_endpoint=submission_options.get(
                                     "submission_endpoint", "https://firs.sandbox/api"
                                 ),
@@ -2159,7 +2178,11 @@ class APPServiceRegistry:
                                     None,
                                 )
                                 submission_validator._cache_expiry[cache_key] = datetime.utcnow() + timedelta(minutes=10)
-                            submission_report = await submission_validator.validate_submission(submission_context)
+                            try:
+                                submission_report = await submission_validator.validate_submission(submission_context)
+                            except Exception as exc:
+                                logger.debug("Submission validation failed, continuing with fallback: %s", exc)
+                                submission_report = None
 
                     format_payload, format_issues = _serialize_format_report(format_report)
                     firs_payload, firs_issues = _serialize_firs_report(firs_report)
@@ -2179,6 +2202,9 @@ class APPServiceRegistry:
                             "irn": schema_result.get("irn"),
                             "qr_signature": schema_result.get("qr_signature"),
                         }
+                        normalized_invoice = schema_result.get("normalized_invoice")
+                        if normalized_invoice:
+                            schema_summary["normalizedInvoice"] = normalized_invoice
 
                     success = True
                     if schema_summary is not None:
@@ -2195,6 +2221,9 @@ class APPServiceRegistry:
                         }
                     if is_fallback_validator:
                         success = True
+                        format_payload = None
+                        firs_payload = None
+                        submission_payload = None
 
                     metrics.setdefault("total_requests", 0)
                     metrics.setdefault("single_validations", 0)
