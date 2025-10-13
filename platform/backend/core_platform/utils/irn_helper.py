@@ -1,13 +1,13 @@
 """
 Canonical IRN helper utilities.
 
-Provides a lightweight, reusable helper for producing the platform's
-canonical Invoice Reference Number (IRN) format:
+Produces the platform's canonical Invoice Reference Number (IRN) using the
+FIRS-mandated structure:
 
-    INV-{SERVICE_ID}-{INVOICE_NUMBER}-{YYYYMMDD}
+    {InvoiceNumber}-{ServiceID}-{YYYYMMDD}
 
-The helper focuses on local formatting only – remote IRN assignment from
-FIRS remains the source of truth when `FIRS_REMOTE_IRN` is enabled.
+This helper enforces the latest requirements where the SI generates the IRN
+locally before forwarding invoices to FIRS for clearance.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from typing import Union
 __all__ = ["generate_canonical_irn", "IRNGenerationError"]
 
 _SERVICE_ID_PATTERN = re.compile(r"[^A-Z0-9]")
-_INVOICE_SANITIZER = re.compile(r"[^A-Z0-9\-]")
 
 
 class IRNGenerationError(ValueError):
@@ -40,7 +39,7 @@ def generate_canonical_irn(
         issued_on: Invoice issue date (`datetime`, `date`, or ISO string).
 
     Returns:
-        Canonical IRN string in the form `INV-{SERVICE}-{NUMBER}-{YYYYMMDD}`.
+        Canonical IRN string in the form `{InvoiceNumber}-{ServiceID}-{YYYYMMDD}`.
 
     Raises:
         IRNGenerationError: If any input cannot be normalised.
@@ -50,7 +49,7 @@ def generate_canonical_irn(
     normalized_service = _normalize_service_id(service_id)
     issued_date = _normalize_issue_date(issued_on)
 
-    return f"INV-{normalized_service}-{normalized_invoice}-{issued_date.strftime('%Y%m%d')}"
+    return f"{normalized_invoice}-{normalized_service}-{issued_date.strftime('%Y%m%d')}"
 
 
 def _normalize_invoice_number(raw: str) -> str:
@@ -63,18 +62,12 @@ def _normalize_invoice_number(raw: str) -> str:
     elif value == "INV":
         value = ""
 
-    value = value.replace("_", "-").replace("/", "-").replace(" ", "-")
-    value = _INVOICE_SANITIZER.sub("", value)
-    value = re.sub(r"-{2,}", "-", value).strip("-")
+    value = re.sub(r"[^A-Z0-9]", "", value)
 
     if not value:
-        value = "0001"
+        raise IRNGenerationError("invoice_number must contain alphanumeric characters")
 
-    # Preserve leading zeros for numeric references by padding to at least 3 digits.
-    if value.isdigit():
-        value = value.zfill(3)
-
-    return value[:32]
+    return value[:48]
 
 
 def _normalize_service_id(raw: str) -> str:
@@ -84,10 +77,10 @@ def _normalize_service_id(raw: str) -> str:
     value = str(raw).strip().upper()
     value = _SERVICE_ID_PATTERN.sub("", value)
 
-    if not value:
-        value = "SERVICE"
+    if len(value) != 8:
+        raise IRNGenerationError("service_id must be 8 alphanumeric characters")
 
-    return value[:16]
+    return value
 
 
 def _normalize_issue_date(raw: Union[datetime, date, str]) -> datetime:

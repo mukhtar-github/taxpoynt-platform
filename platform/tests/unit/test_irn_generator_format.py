@@ -48,7 +48,7 @@ def test_generate_irn_uses_firs_format(local_irn_mode):
     generator = IRNGenerator(secret_key="test-secret")
     invoice_data = {
         "invoice_number": "INV-001",
-        "service_id": "SRV123",
+        "service_id": "94ND90NR",
         "invoice_date": "2024-11-05",
         "total_amount": "150.00",
     }
@@ -56,8 +56,8 @@ def test_generate_irn_uses_firs_format(local_irn_mode):
     irn_value, verification_code, final_hash = generator.generate_irn(invoice_data)
 
     prefix, service_id, date_part = irn_value.rsplit('-', 2)
-    assert prefix == "INV-001"
-    assert service_id == "SRV123"
+    assert prefix == "INV001"
+    assert service_id == "94ND90NR"
     assert date_part == "20241105"
     assert len(verification_code) == 8
     assert len(final_hash) == 64
@@ -72,17 +72,21 @@ def test_generate_simple_irn_respects_format(local_irn_mode):
     irn_value = generator.generate_simple_irn("ORD-42")
 
     prefix, service_id, date_part = irn_value.rsplit('-', 2)
-    assert prefix == "ORD-42"
-    assert service_id == "SERVICE"
+    assert prefix == "ORD42"
+    assert service_id == "SVC00001"
     datetime.strptime(date_part, "%Y%m%d")
 
 
-def test_generate_irn_raises_when_remote_enabled(monkeypatch):
+def test_generate_irn_ignores_remote_flag(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("FIRS_REMOTE_IRN", "true")
     feature_flags.get_feature_flags.cache_clear()
 
     generator = IRNGenerator(secret_key="test-secret")
 
-    with pytest.raises(RuntimeError):
-        generator.generate_irn({"invoice_number": "INV-1001"})
+    irn_value, verification_code, _ = generator.generate_irn(
+        {"invoice_number": "INV1001", "service_id": "ABCDEFGH", "invoice_date": "2024-02-10"}
+    )
+
+    assert irn_value.startswith("INV1001-ABCDEFGH-")
+    assert len(verification_code) == 8

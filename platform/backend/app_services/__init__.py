@@ -30,7 +30,6 @@ from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from sqlalchemy import select
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 from core_platform.utils.firs_response import extract_firs_identifiers, merge_identifiers_into_payload
 from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.repositories import invoice_repo_async as invoice_repo
@@ -105,7 +104,6 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_CERTIFICATE_LIST_LIMIT = 25
-FIRS_REMOTE_IRN_ENABLED = is_firs_remote_irn_enabled()
 
 
 def _normalize_days_until_expiry(not_after: Optional[str]) -> Optional[int]:
@@ -661,7 +659,6 @@ class APPServiceRegistry:
                 "certificate_store": certificate_store,
                 "certificate_provider": certificate_provider,
                 "operations": firs_operations,
-                "remote_irn_enabled": FIRS_REMOTE_IRN_ENABLED,
             }
             
             self.services["firs_communication"] = firs_service
@@ -676,16 +673,11 @@ class APPServiceRegistry:
                 metadata={
                     "service_type": "firs_communication",
                     "operations": firs_operations,
-                    "remote_irn_enabled": FIRS_REMOTE_IRN_ENABLED,
                 }
             )
             
             self.service_endpoints["firs_communication"] = endpoint_id
-            logger.info(
-                "FIRS communication service registered: %s (remote_irn=%s)",
-                endpoint_id,
-                FIRS_REMOTE_IRN_ENABLED,
-            )
+            logger.info("FIRS communication service registered: %s", endpoint_id)
             
         except Exception as e:
             logger.error(f"Failed to register FIRS services: {str(e)}")

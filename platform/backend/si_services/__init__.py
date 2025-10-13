@@ -35,7 +35,6 @@ from enum import Enum
 from pydantic import ValidationError
 
 from core_platform.messaging.message_router import MessageRouter, ServiceRole
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
 # Import SI services
 from .banking_integration.banking_service import SIBankingService
@@ -1311,8 +1310,6 @@ class SIServiceRegistry:
 
         async def irn_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                remote_mode = is_firs_remote_irn_enabled()
-
                 if operation in {"request_irn_from_firs", "submit_irn_to_firs"}:
                     if not generation_service:
                         return {"operation": operation, "success": False, "error": "irn_service_unavailable"}
@@ -1335,12 +1332,6 @@ class SIServiceRegistry:
                     }
 
                 if operation == "generate_irn":
-                    if remote_mode:
-                        return {
-                            "operation": operation,
-                            "success": False,
-                            "error": "remote_irn_enabled",
-                        }
                     if not irn_generator:
                         return {"operation": operation, "success": False, "error": "irn_generator_unavailable"}
 
@@ -1469,7 +1460,7 @@ class SIServiceRegistry:
                         "operation": operation,
                         "success": True,
                         "data": {
-                            "remote_irn_enabled": remote_mode,
+                            "remote_irn_enabled": False,
                         },
                     }
 

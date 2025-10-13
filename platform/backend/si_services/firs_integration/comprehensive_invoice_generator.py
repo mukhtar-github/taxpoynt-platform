@@ -12,7 +12,6 @@ import asyncio
 import copy
 import logging
 import os
-import warnings
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any, Optional, Tuple
@@ -25,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
 # Fixed imports - use relative imports instead of platform.backend
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 from core_platform.data_management.models.firs_submission import (
     FIRSSubmission, SubmissionStatus, ValidationStatus
 )
@@ -183,7 +181,6 @@ class ComprehensiveFIRSInvoiceGenerator:
         self.db = db_session
         self.firs_formatter = firs_formatter
         self.correlation_service = SIAPPCorrelationService(db_session)
-        self._remote_irn_warning_emitted = False
         self.transformation_orchestrator = TransformationOrchestrator()
         
         # Initialize connectors for all supported systems (graceful handling of missing connectors)
@@ -1833,17 +1830,6 @@ class ComprehensiveFIRSInvoiceGenerator:
         is_consolidated: bool = False
     ) -> Optional[str]:
         """Generate FIRS-compliant Invoice Reference Number (IRN)."""
-
-        if is_firs_remote_irn_enabled():
-            if not self._remote_irn_warning_emitted:
-                warning_msg = (
-                    "FIRS_REMOTE_IRN enabled; skipping local IRN generation in SI invoice builder. "
-                    "FIRS will supply the IRN after submission."
-                )
-                warnings.warn(warning_msg, RuntimeWarning, stacklevel=3)
-                logger.warning(warning_msg)
-                self._remote_irn_warning_emitted = True
-            return None
 
         # Get organization-specific service ID
         from core_platform.data_management.models.organization import Organization

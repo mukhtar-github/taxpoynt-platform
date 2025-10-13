@@ -12,7 +12,6 @@ SI Role Responsibilities:
 """
 
 import logging
-import warnings
 from typing import Dict, Any, List, Optional, Tuple, Union
 import json
 from datetime import datetime
@@ -22,7 +21,6 @@ from app.services.firs_si.odoo_ubl_mapper import odoo_ubl_mapper
 from app.services.firs_si.odoo_ubl_validator import odoo_ubl_validator
 from app.services.firs_si.odoo_ubl_transformer import odoo_ubl_transformer
 from app.services.firs_si.odoo_service import generate_irn_for_odoo_invoice, test_odoo_connection
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +42,6 @@ class OdooInvoiceService:
             connector: An OdooConnector instance, or None to create on demand
         """
         self.connector = connector
-        self._remote_irn_warning_emitted = False
     
     def process_invoice(
         self,
@@ -155,24 +152,6 @@ class OdooInvoiceService:
                 # Here we just log it as completed
                 logger.info(f"UBL XML saved for invoice {invoice['name']}")
             
-            remote_irn_enabled = is_firs_remote_irn_enabled()
-
-            if remote_irn_enabled:
-                if not self._remote_irn_warning_emitted:
-                    warning_msg = (
-                        "FIRS_REMOTE_IRN enabled; skipping local IRN generation for Odoo invoices. "
-                        "IRN will be supplied after FIRS submission."
-                    )
-                    warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
-                    logger.warning(warning_msg)
-                    self._remote_irn_warning_emitted = True
-                result["success"] = True
-                result["warnings"].append({
-                    "code": "REMOTE_IRN_MODE",
-                    "message": "FIRS remote IRN mode active; IRN will be assigned after FIRS response"
-                })
-                return result
-
             # Step 6: Generate IRN using the existing service
             logger.info(f"Generating IRN for invoice {invoice['name']}")
             irn_result = generate_irn_for_odoo_invoice(

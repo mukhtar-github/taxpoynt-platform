@@ -7,8 +7,8 @@ fallback now mirrors the FIRS-compliant structure:
 
     {InvoiceRef}-{ServiceID}-{YYYYMMDD}
 
-The generator is bypassed entirely when `FIRS_REMOTE_IRN` is enabled (normal
-production behaviour) so that IRNs always originate from FIRS.
+The generator now reflects the latest FIRS guidance where System Integrators
+produce IRNs locally before submitting invoices for clearance.
 """
 
 import base64
@@ -17,11 +17,8 @@ import hmac
 import logging
 import re
 import secrets
-import warnings
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
-
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -29,25 +26,13 @@ logger = logging.getLogger(__name__)
 class IRNGenerator:
     """Generate FIRS-style Invoice Reference Numbers when remote IRNs are disabled."""
 
-    _DEFAULT_SERVICE_ID = "SERVICE"
+    _DEFAULT_SERVICE_ID = "SVC00001"
 
     def __init__(self, secret_key: Optional[str] = None):
         self.secret_key = secret_key or secrets.token_hex(32)
-        self._remote_irn_warning_emitted = False
 
     def generate_irn(self, invoice_data: Dict[str, Any]) -> Tuple[str, str, str]:
         """Generate a deterministic IRN using the FIRS-compliant structure."""
-
-        if is_firs_remote_irn_enabled():
-            if not self._remote_irn_warning_emitted:
-                warning_msg = (
-                    "FIRS_REMOTE_IRN enabled; IRNGenerator.generate_irn is bypassed. "
-                    "Live flows should retrieve IRNs from FIRS instead of generating locally."
-                )
-                warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
-                logger.warning(warning_msg)
-                self._remote_irn_warning_emitted = True
-            raise RuntimeError("FIRS remote IRN mode enabled; local IRN generation is unavailable.")
 
         invoice_reference = self._resolve_invoice_reference(invoice_data)
         service_id = self._resolve_service_id(invoice_data)
@@ -63,15 +48,6 @@ class IRNGenerator:
 
     def generate_simple_irn(self, invoice_id: str) -> str:
         """Generate simple IRN for basic use cases"""
-        if is_firs_remote_irn_enabled():
-            if not self._remote_irn_warning_emitted:
-                warning_msg = (
-                    "FIRS_REMOTE_IRN enabled; IRNGenerator.generate_simple_irn is bypassed."
-                )
-                warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
-                logger.warning(warning_msg)
-                self._remote_irn_warning_emitted = True
-            raise RuntimeError("FIRS remote IRN mode enabled; simple IRN generation is unavailable.")
         invoice_reference = self._sanitize_reference(str(invoice_id) or "INV")
         service_id = self._DEFAULT_SERVICE_ID
         invoice_date = datetime.utcnow()
@@ -151,12 +127,17 @@ class IRNGenerator:
             return None
 
     def _sanitize_reference(self, value: str) -> str:
-        cleaned = re.sub(r'[^A-Za-z0-9\-]', '', value.upper())
+        cleaned = re.sub(r'[^A-Za-z0-9]', '', value.upper())
         return cleaned[:48] or 'INV'
 
     def _sanitize_service_id(self, value: str) -> str:
         cleaned = re.sub(r'[^A-Za-z0-9]', '', value.upper())
-        return cleaned[:16] or self._DEFAULT_SERVICE_ID
+        if not cleaned:
+            return self._DEFAULT_SERVICE_ID
+        cleaned = cleaned[:8]
+        if len(cleaned) < 8:
+            cleaned = cleaned.ljust(8, '0')
+        return cleaned
 
     def _generate_verification_code(self, irn_value: str, invoice_hash: str) -> str:
         """Generate verification code using HMAC"""

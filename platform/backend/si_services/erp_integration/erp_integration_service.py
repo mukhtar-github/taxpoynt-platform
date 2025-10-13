@@ -18,7 +18,6 @@ responsibility of ERP system integration and data extraction.
 import json
 import logging
 import ssl
-import warnings
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
@@ -26,7 +25,6 @@ import odoorpc
 
 from app.services.firs_si.odoo_connector import OdooConnector, OdooConnectionError, OdooAuthenticationError, OdooDataError
 from app.schemas.integration import OdooAuthMethod, OdooConnectionTestRequest, OdooConfig, IntegrationTestResult
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -262,19 +260,6 @@ def generate_irn_for_odoo_invoice(
     Returns:
         Dictionary with IRN details
     """
-    if is_firs_remote_irn_enabled():
-        warning_msg = (
-            "FIRS_REMOTE_IRN enabled; generate_irn_for_odoo_invoice should not be invoked. "
-            "Returning without generating a local IRN."
-        )
-        warnings.warn(warning_msg, RuntimeWarning, stacklevel=2)
-        logger.warning(warning_msg)
-        return {
-            "success": True,
-            "message": "FIRS remote IRN mode active; IRN will be provided after FIRS submission",
-            "details": {"irn": None}
-        }
-
     from app.models.irn import IRNRecord, InvoiceData, IRNStatus
     from app.db.session import SessionLocal
     import hashlib

@@ -15,7 +15,6 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from core_platform.config.feature_flags import is_firs_remote_irn_enabled
 
 # Import integrated services
 from si_services.authentication import (
@@ -186,30 +185,19 @@ class AuthenticationIntegrationDemo:
                 qr_code = None
                 verification_code = None
 
-                remote_mode = is_firs_remote_irn_enabled()
-
-                if not remote_mode:
-                    # Step 4: Generate IRN locally (legacy path)
-                    logger.info("Step 4: Generating IRN locally...")
-                    irn, qr_code, verification_code = self.irn_service.generate_irn(invoice_data)
-                    workflow_result['steps'].append({
-                        'step': 'irn_generation',
-                        'success': bool(irn),
-                        'mode': 'local',
-                        'irn': irn,
-                        'timestamp': datetime.now().isoformat()
-                    })
-                    if not irn:
-                        workflow_result['error'] = 'IRN generation failed'
-                        return workflow_result
-                else:
-                    logger.info("Step 4: Remote IRN mode enabled; deferring to FIRS submission response")
-                    workflow_result['steps'].append({
-                        'step': 'irn_generation',
-                        'success': True,
-                        'mode': 'remote',
-                        'timestamp': datetime.now().isoformat()
-                    })
+                # Step 4: Generate IRN locally
+                logger.info("Step 4: Generating IRN locally...")
+                irn, qr_code, verification_code = self.irn_service.generate_irn(invoice_data)
+                workflow_result['steps'].append({
+                    'step': 'irn_generation',
+                    'success': bool(irn),
+                    'mode': 'local',
+                    'irn': irn,
+                    'timestamp': datetime.now().isoformat()
+                })
+                if not irn:
+                    workflow_result['error'] = 'IRN generation failed'
+                    return workflow_result
                 
                 # Step 5: Authenticate with FIRS
                 logger.info("Step 5: Authenticating with FIRS...")
