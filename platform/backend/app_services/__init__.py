@@ -830,11 +830,13 @@ class APPServiceRegistry:
                 "severity": getattr(check.get("severity"), "value", None),
             }
 
+        schema_validator = self._build_schema_validator()
+
         return {
             "firs_validator": firs_validator,
             "format_validator": format_validator,
             "submission_validator": submission_validator,
-            "schema_validator": InvoiceValidationService(),
+            "schema_validator": schema_validator,
             "recent_results": deque(maxlen=recent_limit),
             "validation_store": {},
             "batch_results": {},
@@ -852,6 +854,20 @@ class APPServiceRegistry:
                 "last_validation_at": None,
             },
         }
+
+    def _build_schema_validator(self):
+        """Attempt to initialize the shared invoice schema validator."""
+        try:
+            from si_services.invoice_validation import InvoiceValidationService  # type: ignore
+        except Exception as exc:
+            logger.warning("Invoice validation service unavailable: %s", exc)
+            return None
+
+        try:
+            return InvoiceValidationService()
+        except Exception as exc:
+            logger.error("Failed to initialize invoice schema validator: %s", exc)
+            return None
 
     async def _register_validation_services(self):
         """Register validation services"""
@@ -2070,7 +2086,7 @@ class APPServiceRegistry:
                     validation_id = str(uuid.uuid4())
                     started_at = _utc_now()
 
-                    schema_validator: Optional[InvoiceValidationService] = validation_service.get("schema_validator")
+                    schema_validator: Optional[Any] = validation_service.get("schema_validator")
                     schema_result: Optional[Dict[str, Any]] = None
 
                     if schema_validator:
