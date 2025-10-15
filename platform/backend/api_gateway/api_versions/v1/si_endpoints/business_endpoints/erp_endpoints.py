@@ -553,12 +553,59 @@ class ERPEndpointsV1:
             raise HTTPException(status_code=502, detail="Failed to get ERP connection health")
     
     async def sync_erp_data(self, connection_id: str, request: Request, context: Optional[HTTPRoutingContext] = Depends(lambda: None)):
-        """Sync ERP data - placeholder"""
-        return self._create_v1_response({"sync_id": "sync_123"}, "erp_data_sync_initiated")
-    
-    async def get_erp_sync_status(self, connection_id: str, context: Optional[HTTPRoutingContext] = Depends(lambda: None)):
-        """Get ERP sync status - placeholder"""
-        return self._create_v1_response({"connection_id": connection_id, "sync_status": "completed"}, "erp_sync_status_retrieved")
+        try:
+            context = context or await self._get_si_context(request)
+            body = await request.json()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Failed to parse sync payload for {connection_id}: {exc}")
+            body = {}
+
+        payload = {
+            "connection_id": connection_id,
+            "data_type": body.get("data_type", "invoices"),
+            "options": body.get("options") or {},
+            "force": bool(body.get("force", False)),
+            "si_id": context.user_id if context else None,
+        }
+
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="sync_erp_data",
+                payload=payload,
+            )
+            return self._create_v1_response(result, "erp_data_sync_initiated")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error syncing ERP data for {connection_id}: {e}")
+            raise HTTPException(status_code=502, detail="Failed to queue ERP data sync")
+
+    async def get_erp_sync_status(self, connection_id: str, request: Request, context: Optional[HTTPRoutingContext] = Depends(lambda: None)):
+        try:
+            context = context or await self._get_si_context(request)
+        except HTTPException:
+            raise
+        except Exception:
+            context = None
+
+        try:
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="get_erp_sync_status",
+                payload={
+                    "connection_id": connection_id,
+                    "si_id": context.user_id if context else None,
+                },
+            )
+            return self._create_v1_response(result, "erp_sync_status_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error retrieving ERP sync status for {connection_id}: {e}")
+            raise HTTPException(status_code=502, detail="Failed to retrieve ERP sync status")
     
     async def get_erp_invoices(self, connection_id: str, request: Request, context: Optional[HTTPRoutingContext] = Depends(lambda: None)):
         """Get ERP invoices - placeholder"""

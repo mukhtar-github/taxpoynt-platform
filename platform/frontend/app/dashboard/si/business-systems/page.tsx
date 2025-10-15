@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
@@ -152,8 +152,6 @@ export default function BusinessSystemsManagementPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isDemo, setIsDemo] = useState(false);
 
-  const mockSystems = MOCK_SYSTEMS;
-
   useEffect(() => {
     const currentUser = authService.getStoredUser();
     if (!currentUser || !authService.isAuthenticated()) {
@@ -167,31 +165,30 @@ export default function BusinessSystemsManagementPage() {
 
     setUser(currentUser);
     
-    // Load connected systems
-    loadConnectedSystems();
-  }, [loadConnectedSystems, router]);
+    const loadConnectedSystems = async () => {
+      setIsLoading(true);
+      try {
+        if (!authService.isAuthenticated()) {
+          return;
+        }
 
-  const loadConnectedSystems = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      if (!authService.isAuthenticated()) {
-        return;
+        const data = await apiClient.get<{ systems?: ConnectedSystem[] }>(
+          '/si/integrations/business-systems'
+        );
+
+        setConnectedSystems(data.systems || MOCK_SYSTEMS);
+        setIsDemo(false);
+      } catch (error) {
+        console.error('Failed to load connected systems, using demo data:', error);
+        setIsDemo(true);
+        setConnectedSystems(MOCK_SYSTEMS);
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const data = await apiClient.get<{ systems?: ConnectedSystem[] }>(
-        '/si/integrations/business-systems'
-      );
-
-      setConnectedSystems(data.systems || mockSystems);
-      setIsDemo(false);
-    } catch (error) {
-      console.error('Failed to load connected systems, using demo data:', error);
-      setIsDemo(true);
-      setConnectedSystems(mockSystems);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [mockSystems]);
+    loadConnectedSystems();
+  }, [router]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

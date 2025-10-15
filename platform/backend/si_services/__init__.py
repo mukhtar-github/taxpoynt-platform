@@ -46,6 +46,12 @@ from .reconciliation_management.reconciliation_service import SIReconciliationSe
 from .validation_services.validation_service import SIValidationService
 from .reporting_services.reporting_service import SIReportingService
 from .integration_management.connection_manager import ConnectionConfig, SystemType, connection_manager
+from .integration_management import (
+    SyncConfiguration,
+    SyncDirection,
+    register_sync_configuration,
+    sync_orchestrator,
+)
 from .integration_management.erp_connection_repository import ERPConnectionRepository, ERPConnectionRecord
 from .invoice_validation import InvoiceValidationService
 
@@ -512,6 +518,7 @@ class SIServiceRegistry:
                         "test_erp_connection",
                         "extract_erp_data",
                         "sync_erp_data",
+                        "get_erp_sync_status",
                         "process_erp_invoices",
                         "validate_erp_mapping",
                         # Bridge operations used by APP to fetch/transform invoices
@@ -1211,6 +1218,10 @@ class SIServiceRegistry:
                         "processing_duration": result.processing_duration,
                     }
                     return {"operation": operation, "success": True, "data": data}
+                elif operation == "sync_erp_data":
+                    return await self._handle_sync_erp_data(payload)
+                elif operation == "get_erp_sync_status":
+                    return await self._handle_get_erp_sync_status(payload)
                 else:
                     return None
             except Exception as e:
@@ -1721,10 +1732,12 @@ class SIServiceRegistry:
         )
 
         record = await self.erp_connection_repository.create(record)
+        record = await self._configure_sync_for_connection(record)
 
         config = self._build_connection_config(record)
         registered = await connection_manager.register_system(config)
         if not registered:
+            await self._teardown_sync_for_connection(record)
             self.erp_connection_repository.delete(connection_id)
             return {
                 "operation": "create_erp_connection",
@@ -1865,10 +1878,13 @@ class SIServiceRegistry:
                 "error": "Unable to update connection",
             }
 
+        updated_record = await self._configure_sync_for_connection(updated_record)
+
         await connection_manager.unregister_system(connection_id)
         config = self._build_connection_config(updated_record)
         registered = await connection_manager.register_system(config)
         if not registered:
+            await self._teardown_sync_for_connection(updated_record)
             return {
                 "operation": "update_erp_connection",
                 "success": False,
@@ -2089,6 +2105,112 @@ class SIServiceRegistry:
             "data": response_data,
         }
 
+    async def _handle_sync_erp_data(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        connection_id = payload.get("connection_id")
+        if not connection_id:
+            return {
+                "operation": "sync_erp_data",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        record = await self.erp_connection_repository.get(connection_id)
+        if not record:
+            return {
+                "operation": "sync_erp_data",
+                "success": False,
+                "error": "connection_not_found",
+            }
+
+        # Ensure configuration is up to date (sanitizes interval + registers sync)
+        record = await self._configure_sync_for_connection(record)
+        metadata = dict(record.metadata or {})
+        sync_id = metadata.get("sync_id")
+        if not sync_id:
+            return {
+                "operation": "sync_erp_data",
+                "success": False,
+                "error": "sync_configuration_unavailable",
+            }
+
+        force = bool(payload.get("force", False))
+
+        try:
+            execution_id = await sync_orchestrator.execute_sync(sync_id, force=force)
+        except Exception as exc:
+            return {
+                "operation": "sync_erp_data",
+                "success": False,
+                "error": str(exc),
+            }
+
+        status = await sync_orchestrator.get_sync_status(sync_id)
+
+        response_data: Dict[str, Any] = {
+            "connection_id": connection_id,
+            "sync_id": sync_id,
+            "execution_id": execution_id,
+            "auto_sync": metadata.get("auto_sync", False),
+            "polling_interval_minutes": metadata.get("polling_interval_minutes"),
+            "status": status,
+        }
+
+        await self.erp_connection_repository.update(
+            connection_id,
+            {"metadata": {"last_manual_sync_at": datetime.utcnow().isoformat()}},
+        )
+
+        return {
+            "operation": "sync_erp_data",
+            "success": True,
+            "data": response_data,
+        }
+
+    async def _handle_get_erp_sync_status(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        connection_id = payload.get("connection_id")
+        if not connection_id:
+            return {
+                "operation": "get_erp_sync_status",
+                "success": False,
+                "error": "connection_id is required",
+            }
+
+        record = await self.erp_connection_repository.get(connection_id)
+        if not record:
+            return {
+                "operation": "get_erp_sync_status",
+                "success": False,
+                "error": "connection_not_found",
+            }
+
+        metadata = dict(record.metadata or {})
+        sync_id = metadata.get("sync_id")
+        if not sync_id:
+            return {
+                "operation": "get_erp_sync_status",
+                "success": True,
+                "data": {
+                    "connection_id": connection_id,
+                    "sync_available": False,
+                    "auto_sync": metadata.get("auto_sync", False),
+                },
+            }
+
+        status = await sync_orchestrator.get_sync_status(sync_id)
+
+        return {
+            "operation": "get_erp_sync_status",
+            "success": True,
+            "data": {
+                "connection_id": connection_id,
+                "sync_available": True,
+                "sync_id": sync_id,
+                "auto_sync": metadata.get("auto_sync", False),
+                "polling_interval_minutes": metadata.get("polling_interval_minutes"),
+                "status": status,
+            },
+        }
+
     async def _handle_test_erp_connection(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         from archive.legacy.backend.app.schemas.integration import (
             OdooConnectionTestRequest,
@@ -2164,12 +2286,98 @@ class SIServiceRegistry:
             "updated_at": record.updated_at.isoformat() if record.updated_at else None,
         }
 
+    @staticmethod
+    def _normalize_polling_interval(connection_config: Dict[str, Any], metadata: Dict[str, Any]) -> int:
+        raw_value = (
+            connection_config.get("polling_interval")
+            or metadata.get("polling_interval_minutes")
+            or 15
+        )
+        try:
+            minutes = int(raw_value)
+        except (TypeError, ValueError):
+            minutes = 15
+        return max(5, minutes)
+
+    async def _configure_sync_for_connection(self, record: ERPConnectionRecord) -> ERPConnectionRecord:
+        connection_config = dict(record.connection_config or {})
+        metadata = dict(record.metadata or {})
+
+        interval_minutes = self._normalize_polling_interval(connection_config, metadata)
+        auto_sync_enabled = bool(connection_config.get("auto_sync", metadata.get("auto_sync", False)))
+        sync_id = metadata.get("sync_id") or f"erp-sync-{record.connection_id}"
+        schedule_type = "interval" if auto_sync_enabled else "manual"
+        schedule_interval = interval_minutes * 60 if auto_sync_enabled else None
+
+        try:
+            existing = sync_orchestrator.configurations.get(sync_id)
+            if existing:
+                await sync_orchestrator.pause_sync(sync_id)
+                sync_orchestrator.configurations.pop(sync_id, None)
+        except Exception as exc:
+            logger.warning("Failed to pause existing sync %s: %s", sync_id, exc)
+
+        try:
+            sync_config = SyncConfiguration(
+                sync_id=sync_id,
+                name=f"{record.connection_name or record.erp_system} Invoice Sync",
+                source_system=record.connection_id,
+                target_system="taxpoynt_core",
+                direction=SyncDirection.PULL,
+                data_type="invoices",
+                schedule_type=schedule_type,
+                schedule_interval=schedule_interval,
+                enabled=True,
+            )
+            await register_sync_configuration(sync_config)
+        except Exception as exc:
+            logger.warning("Unable to register sync configuration for %s: %s", record.connection_id, exc)
+
+        metadata_updates = {
+            "sync_id": sync_id,
+            "auto_sync": auto_sync_enabled,
+            "polling_interval_minutes": interval_minutes,
+            "schedule_type": schedule_type,
+        }
+        config_updates = {
+            "auto_sync": auto_sync_enabled,
+            "polling_interval": interval_minutes,
+        }
+
+        updated = await self.erp_connection_repository.update(
+            record.connection_id,
+            {
+                "metadata": metadata_updates,
+                "connection_config": config_updates,
+            },
+        )
+        return updated or record
+
+    async def _teardown_sync_for_connection(self, record: ERPConnectionRecord) -> None:
+        metadata = dict(record.metadata or {})
+        sync_id = metadata.get("sync_id")
+        if not sync_id:
+            return
+        try:
+            if sync_id in getattr(sync_orchestrator, "configurations", {}):
+                await sync_orchestrator.pause_sync(sync_id)
+                sync_orchestrator.configurations.pop(sync_id, None)
+            scheduled_tasks = getattr(sync_orchestrator, "scheduled_tasks", {})
+            task = scheduled_tasks.pop(sync_id, None)
+            if task:
+                task.cancel()
+        except Exception as exc:
+            logger.warning("Failed to tear down sync %s for connection %s: %s", sync_id, record.connection_id, exc)
+
     def _build_connection_config(self, record: ERPConnectionRecord) -> ConnectionConfig:
         config = record.connection_config or {}
+        metadata = record.metadata or {}
         base_url = config.get("url") or config.get("base_url")
         parsed = urlparse(base_url) if base_url else None
         host = parsed.hostname if parsed and parsed.hostname else base_url or "localhost"
         port = parsed.port if parsed and parsed.port else (443 if parsed and parsed.scheme == 'https' else 80)
+        interval_minutes = self._normalize_polling_interval(config, metadata)
+        interval_seconds = max(300, interval_minutes * 60)
 
         return ConnectionConfig(
             system_id=record.connection_id,
@@ -2182,10 +2390,15 @@ class SIServiceRegistry:
             api_key=config.get("api_key"),
             ssl_enabled=bool(parsed and parsed.scheme == 'https'),
             timeout=config.get("timeout", 30),
+            health_check_interval=max(60, interval_seconds // 3),
+            auto_sync_enabled=bool(config.get("auto_sync")),
+            polling_interval_seconds=interval_seconds,
             metadata={
                 "base_url": base_url,
                 "environment": record.environment,
                 "auth_method": config.get("auth_method"),
+                "auto_sync": bool(config.get("auto_sync")),
+                "polling_interval_minutes": interval_minutes,
             },
         )
 

@@ -57,6 +57,8 @@ class ConnectionConfig:
     pool_size: int = 5
     pool_max_overflow: int = 10
     health_check_interval: int = 60
+    auto_sync_enabled: bool = False
+    polling_interval_seconds: int = 900
     connection_ttl: int = 3600
     metadata: Dict[str, Any] = field(default_factory=dict)
 
