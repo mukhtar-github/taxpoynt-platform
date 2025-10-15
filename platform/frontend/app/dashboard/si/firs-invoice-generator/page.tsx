@@ -1,24 +1,96 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../../../design_system';
 import apiClient from '../../../../shared_components/api/client';
 
-interface InvoiceSource {
+type V1Response<T> = {
+  success: boolean;
+  action: string;
+  data: T;
+  meta?: Record<string, any> | null;
+};
+
+interface ApiTransaction {
   id: string;
-  type: 'erp' | 'crm' | 'pos' | 'ecommerce' | 'banking' | 'payment';
-  name: string;
-  status: 'connected' | 'disconnected';
-  lastSync: string;
-  recordCount: number;
+  source_type: string;
+  source_name: string;
+  transaction_id: string;
+  date: string;
+  customer_name: string;
+  customer_email?: string | null;
+  amount: number;
+  currency: string;
+  description: string;
+  tax_amount: number;
+  payment_status: string;
+  payment_method?: string | null;
+  firs_status: string;
+  confidence: number;
+  irn?: string | null;
+}
+
+interface SearchTransactionsResponse {
+  transactions: ApiTransaction[];
+  total_count: number;
+  filters_applied: Record<string, any>;
+}
+
+interface ErpConnectionRecord {
+  connection_id: string;
+  erp_system: string;
+  connection_name?: string;
+  environment: string;
+  status?: string;
+  connection_config?: {
+    auto_sync?: boolean;
+    polling_interval?: number;
+    [key: string]: any;
+  };
+  metadata?: Record<string, any>;
+  last_status_at?: string | null;
+}
+
+interface ListErpConnectionsResponse {
+  connections: ErpConnectionRecord[];
+  total_count: number;
+}
+
+interface GenerationStats {
+  invoices_generated?: number;
+  consolidation_used?: boolean;
+  total_transactions?: number;
+  processing_time_seconds?: number;
+  [key: string]: any;
+}
+
+interface GeneratedInvoice {
+  irn: string;
+  invoice_number: string;
+  customer_name: string;
+  total_amount: number;
+  tax_amount: number;
+  currency: string;
+  invoice_date: string;
+  status: string;
+}
+
+interface GenerationResult {
+  success: boolean;
+  invoices: GeneratedInvoice[];
+  total_amount: number;
+  errors: string[];
+  warnings: string[];
+  generation_stats: GenerationStats;
 }
 
 interface BusinessTransaction {
   id: string;
-  source: InvoiceSource;
+  sourceType: string;
+  sourceName: string;
   transactionId: string;
   date: string;
   customerName: string;
@@ -26,164 +98,74 @@ interface BusinessTransaction {
   amount: number;
   currency: string;
   description: string;
-  lineItems: LineItem[];
   taxAmount: number;
-  vatRate: number;
-  paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
+  paymentStatus: string;
   paymentMethod?: string;
-  firsStatus: 'not_generated' | 'generated' | 'submitted' | 'accepted' | 'rejected';
-  irn?: string;
-  confidence: number; // Auto-reconciliation confidence
+  firsStatus: string;
+  confidence: number;
+  irn?: string | null;
 }
 
-interface LineItem {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  taxRate: number;
-  taxAmount: number;
-}
+const statusClasses: Record<string, string> = {
+  not_generated: 'text-orange-600 bg-orange-50 border border-orange-200',
+  generated: 'text-blue-600 bg-blue-50 border border-blue-200',
+  submitted: 'text-purple-600 bg-purple-50 border border-purple-200',
+  accepted: 'text-green-600 bg-green-50 border border-green-200',
+  rejected: 'text-red-600 bg-red-50 border border-red-200',
+};
 
-interface GeneratedInvoice {
-  irn?: string;
-  invoiceNumber?: string;
-  totalAmount?: number;
-}
+const paymentStatusClasses: Record<string, string> = {
+  paid: 'text-green-600 bg-green-50 border border-green-200',
+  pending: 'text-orange-600 bg-orange-50 border border-orange-200',
+  partial: 'text-blue-600 bg-blue-50 border border-blue-200',
+  failed: 'text-red-600 bg-red-50 border border-red-200',
+};
 
-interface GenerationResult {
-  invoices?: GeneratedInvoice[];
-}
+const formatCurrency = (amount: number, currency: string) => {
+  try {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: currency || 'NGN',
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+};
 
-export default function FIRSInvoiceGeneratorPage() {
+const formatDate = (iso: string) => {
+  try {
+    const date = new Date(iso);
+    return new Intl.DateTimeFormat('en-NG', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
+  } catch {
+    return iso;
+  }
+};
+
+const statusBadge = (status: string, classes: Record<string, string>) => {
+  const key = status?.toLowerCase();
+  const base = classes[key] || 'text-slate-600 bg-slate-100 border border-slate-200';
+  const label = status.replace(/_/g, ' ');
+  return (
+    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${base}`}>
+      {label}
+    </span>
+  );
+};
+
+export default function FIRSInvoiceGeneratorPage(): JSX.Element | null {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectedSources, setConnectedSources] = useState<InvoiceSource[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<BusinessTransaction[]>([]);
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
-  const [filterSource, setFilterSource] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('not_generated');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
-
-  // Mock data for comprehensive business and financial system integration
-  const mockSources = useMemo<InvoiceSource[]>(() => ([
-    { id: 'sap-erp', type: 'erp', name: 'SAP ERP', status: 'connected', lastSync: '5 minutes ago', recordCount: 1456 },
-    { id: 'odoo-erp', type: 'erp', name: 'Odoo ERP', status: 'connected', lastSync: '12 minutes ago', recordCount: 758 },
-    { id: 'salesforce-crm', type: 'crm', name: 'Salesforce CRM', status: 'connected', lastSync: '8 minutes ago', recordCount: 234 },
-    { id: 'square-pos', type: 'pos', name: 'Square POS', status: 'connected', lastSync: '3 minutes ago', recordCount: 89 },
-    { id: 'shopify-pos', type: 'pos', name: 'Shopify POS', status: 'connected', lastSync: '7 minutes ago', recordCount: 56 },
-    { id: 'shopify-store', type: 'ecommerce', name: 'Shopify Store', status: 'connected', lastSync: '4 minutes ago', recordCount: 342 },
-    { id: 'mono-banking', type: 'banking', name: 'Mono Banking', status: 'connected', lastSync: '2 minutes ago', recordCount: 2456 },
-    { id: 'paystack', type: 'payment', name: 'Paystack', status: 'connected', lastSync: '1 minute ago', recordCount: 1234 },
-    { id: 'flutterwave', type: 'payment', name: 'Flutterwave', status: 'connected', lastSync: '6 minutes ago', recordCount: 567 }
-  ]), []);
-
-  const mockTransactions = useMemo<BusinessTransaction[]>(() => ([
-    {
-      id: 'txn-001',
-      source: mockSources[0], // SAP ERP
-      transactionId: 'SAP-INV-2024-1456',
-      date: '2024-01-15T10:30:00Z',
-      customerName: 'Acme Corporation Ltd',
-      customerEmail: 'finance@acmecorp.ng',
-      amount: 2500000,
-      currency: 'NGN',
-      description: 'Software License and Support Services',
-      lineItems: [
-        { description: 'Software License (Annual)', quantity: 1, unitPrice: 2000000, total: 2000000, taxRate: 7.5, taxAmount: 150000 },
-        { description: 'Support Services', quantity: 1, unitPrice: 350000, total: 350000, taxRate: 7.5, taxAmount: 26250 }
-      ],
-      taxAmount: 176250,
-      vatRate: 7.5,
-      paymentStatus: 'paid',
-      paymentMethod: 'Bank Transfer',
-      firsStatus: 'not_generated',
-      confidence: 98.7
-    },
-    {
-      id: 'txn-002',
-      source: mockSources[2], // Salesforce CRM
-      transactionId: 'SF-DEAL-789',
-      date: '2024-01-15T14:45:00Z',
-      customerName: 'Lagos Business Solutions',
-      customerEmail: 'procurement@lbs.ng',
-      amount: 1800000,
-      currency: 'NGN',
-      description: 'Business Consulting Services',
-      lineItems: [
-        { description: 'Strategy Consulting', quantity: 40, unitPrice: 35000, total: 1400000, taxRate: 7.5, taxAmount: 105000 },
-        { description: 'Implementation Support', quantity: 8, unitPrice: 50000, total: 400000, taxRate: 7.5, taxAmount: 30000 }
-      ],
-      taxAmount: 135000,
-      vatRate: 7.5,
-      paymentStatus: 'paid',
-      paymentMethod: 'Paystack',
-      firsStatus: 'not_generated',
-      confidence: 96.8
-    },
-    {
-      id: 'txn-003',
-      source: mockSources[3], // Square POS
-      transactionId: 'SQ-SALE-456',
-      date: '2024-01-15T16:20:00Z',
-      customerName: 'Walk-in Customer',
-      amount: 125000,
-      currency: 'NGN',
-      description: 'Retail Sale - Electronics',
-      lineItems: [
-        { description: 'Wireless Headphones', quantity: 2, unitPrice: 45000, total: 90000, taxRate: 7.5, taxAmount: 6750 },
-        { description: 'Phone Case', quantity: 1, unitPrice: 35000, total: 35000, taxRate: 7.5, taxAmount: 2625 }
-      ],
-      taxAmount: 9375,
-      vatRate: 7.5,
-      paymentStatus: 'paid',
-      paymentMethod: 'Card Payment',
-      firsStatus: 'not_generated',
-      confidence: 99.2
-    },
-    {
-      id: 'txn-004',
-      source: mockSources[5], // Shopify Store
-      transactionId: 'SHOP-ORD-123',
-      date: '2024-01-15T11:15:00Z',
-      customerName: 'Online Customer',
-      customerEmail: 'customer@email.com',
-      amount: 89500,
-      currency: 'NGN',
-      description: 'E-commerce Order',
-      lineItems: [
-        { description: 'Product Bundle', quantity: 1, unitPrice: 75000, total: 75000, taxRate: 7.5, taxAmount: 5625 },
-        { description: 'Shipping Fee', quantity: 1, unitPrice: 14500, total: 14500, taxRate: 7.5, taxAmount: 1087.5 }
-      ],
-      taxAmount: 6712.5,
-      vatRate: 7.5,
-      paymentStatus: 'paid',
-      paymentMethod: 'Flutterwave',
-      firsStatus: 'not_generated',
-      confidence: 94.5
-    },
-    {
-      id: 'txn-005',
-      source: mockSources[6], // Mono Banking
-      transactionId: 'MONO-TXN-890',
-      date: '2024-01-15T09:30:00Z',
-      customerName: 'Direct Bank Transfer Customer',
-      amount: 450000,
-      currency: 'NGN',
-      description: 'Service Payment via Bank Transfer',
-      lineItems: [
-        { description: 'Professional Services', quantity: 1, unitPrice: 419000, total: 419000, taxRate: 7.5, taxAmount: 31425 }
-      ],
-      taxAmount: 31425,
-      vatRate: 7.5,
-      paymentStatus: 'paid',
-      paymentMethod: 'Bank Transfer',
-      firsStatus: 'not_generated',
-      confidence: 87.3
-    }
-  ]), [mockSources]);
+  const [connections, setConnections] = useState<ErpConnectionRecord[]>([]);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -197,405 +179,425 @@ export default function FIRSInvoiceGeneratorPage() {
     }
 
     setUser(currentUser);
+    loadInitialData(currentUser);
+  }, [router]);
 
-    const fetchBusinessData = async () => {
-      setIsLoading(true);
-      try {
-        // In real implementation, fetch from APIs
-        setConnectedSources(mockSources);
-        setTransactions(mockTransactions);
-      } catch (error) {
-        console.error('Failed to load business data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadInitialData = async (currentUser: User) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const transactionPromise = apiClient.post<V1Response<SearchTransactionsResponse>>(
+        '/si/firs/invoices/transactions/search',
+        {}
+      );
+      const connectionPromise = currentUser.organization?.id
+        ? apiClient.get<V1Response<ListErpConnectionsResponse>>(
+            `/si/business/erp/connections?organization_id=${encodeURIComponent(
+              currentUser.organization.id
+            )}`
+          )
+        : Promise.resolve<V1Response<ListErpConnectionsResponse>>({
+            success: true,
+            action: 'erp_connections_listed',
+            data: { connections: [], total_count: 0 },
+            meta: null,
+          });
 
-    fetchBusinessData();
-  }, [mockSources, mockTransactions, router]);
+      const [transactionsResponse, connectionsResponse] = await Promise.all([
+        transactionPromise,
+        connectionPromise,
+      ]);
 
-  const getSourceIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      'erp': '🏢',
-      'crm': '👥',
-      'pos': '🛒',
-      'ecommerce': '🌐',
-      'banking': '🏦',
-      'payment': '💳'
-    };
-    return icons[type] || '🔗';
-  };
+      const txItems = transactionsResponse.data?.transactions ?? [];
+      const mappedTransactions: BusinessTransaction[] = txItems.map((item) => ({
+        id: item.id,
+        sourceType: item.source_type,
+        sourceName: item.source_name,
+        transactionId: item.transaction_id,
+        date: item.date,
+        customerName: item.customer_name,
+        customerEmail: item.customer_email || undefined,
+        amount: item.amount,
+        currency: item.currency || 'NGN',
+        description: item.description,
+        taxAmount: item.tax_amount,
+        paymentStatus: item.payment_status,
+        paymentMethod: item.payment_method || undefined,
+        firsStatus: item.firs_status,
+        confidence: item.confidence,
+        irn: item.irn,
+      }));
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'not_generated': return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'generated': return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'submitted': return 'text-purple-600 bg-purple-50 border-purple-200';
-      case 'accepted': return 'text-green-600 bg-green-50 border-green-200';
-      case 'rejected': return 'text-red-600 bg-red-50 border-red-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+      setTransactions(mappedTransactions);
+      setConnections(connectionsResponse.data?.connections ?? []);
+    } catch (err: any) {
+      console.error('Failed to load invoice generator data:', err);
+      const message =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Unable to load business transactions. Try refreshing the page.';
+      setError(message);
+      setTransactions([]);
+    } finally {
+      setIsLoading(false);
+      setSelectedTransactions([]);
     }
   };
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'text-green-600 bg-green-50';
-      case 'pending': return 'text-yellow-600 bg-yellow-50';
-      case 'partial': return 'text-orange-600 bg-orange-50';
-      case 'failed': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const filteredTransactions = transactions.filter(txn => {
-    const sourceMatch = filterSource === 'all' || txn.source.type === filterSource;
-    const statusMatch = filterStatus === 'all' || txn.firsStatus === filterStatus;
-    return sourceMatch && statusMatch;
-  });
-
-  const handleTransactionSelect = (txnId: string) => {
-    setSelectedTransactions(prev => 
-      prev.includes(txnId) 
-        ? prev.filter(id => id !== txnId)
-        : [...prev, txnId]
+  const toggleTransactionSelection = (transactionId: string) => {
+    setSelectedTransactions((prev) =>
+      prev.includes(transactionId) ? prev.filter((id) => id !== transactionId) : [...prev, transactionId]
     );
   };
 
-  const generateFIRSInvoices = async () => {
-    if (selectedTransactions.length === 0) {
-      alert('Please select at least one transaction to generate FIRS invoice');
+  const toggleAllTransactions = () => {
+    if (selectedTransactions.length === transactions.length) {
+      setSelectedTransactions([]);
+    } else {
+      setSelectedTransactions(transactions.map((transaction) => transaction.id));
+    }
+  };
+
+  const handleGenerateInvoices = async () => {
+    if (!selectedTransactions.length) {
+      setGenerationResult({
+        success: false,
+        invoices: [],
+        total_amount: 0,
+        errors: ['Select at least one transaction before generating.'],
+        warnings: [],
+        generation_stats: {},
+      });
       return;
     }
 
     setIsGenerating(true);
+    setGenerationResult(null);
     try {
-      const selectedTxns = transactions.filter(txn => selectedTransactions.includes(txn.id));
-      
-      // Call FIRS invoice generation API
-      const result = await apiClient.post<{
-        invoices?: Array<{ irn?: string }>;
-      }>('/si/firs/invoices/generate', {
-        transactionIds: selectedTransactions,
-        invoiceType: 'standard',
-        consolidate: selectedTransactions.length > 1,
-        generateCompliant: true,
-        includeDigitalSignature: true,
-        sources: selectedTxns.map(txn => ({
-          sourceId: txn.source.id,
-          sourceType: txn.source.type,
-          transactionId: txn.transactionId
-        }))
+      const response = await apiClient.post<V1Response<GenerationResult>>('/si/firs/invoices/generate', {
+        transaction_ids: selectedTransactions,
+        include_digital_signature: true,
+        consolidate: false,
       });
-      setGenerationResult(result);
-
-      // Update transaction statuses
-      setTransactions(prev => prev.map(txn => 
-        selectedTransactions.includes(txn.id) 
-          ? { ...txn, firsStatus: 'generated' as const, irn: result.invoices?.[0]?.irn }
-          : txn
-      ));
-
-      setSelectedTransactions([]);
-      alert(`✅ Successfully generated ${result.invoices?.length || 1} FIRS-compliant invoice(s)!`);
-
-    } catch (error) {
-      console.error('FIRS invoice generation failed:', error);
-      alert('❌ Failed to generate FIRS invoice. Please try again.');
+      setGenerationResult(response.data);
+      await loadInitialData(user!);
+    } catch (err: any) {
+      console.error('Invoice generation failed:', err);
+      setGenerationResult({
+        success: false,
+        invoices: [],
+        total_amount: 0,
+        errors: [
+          err?.response?.data?.detail ||
+            err?.message ||
+            'Unable to generate invoices. Please try again later.',
+        ],
+        warnings: [],
+        generation_stats: {},
+      });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const totalSelectedAmount = transactions
-    .filter(txn => selectedTransactions.includes(txn.id))
-    .reduce((sum, txn) => sum + txn.amount, 0);
+  const summary = useMemo(() => {
+    const totals = {
+      total: transactions.length,
+      pending: transactions.filter((t) => t.firsStatus === 'not_generated').length,
+      amountPending: transactions
+        .filter((t) => t.firsStatus === 'not_generated')
+        .reduce((sum, t) => sum + t.amount, 0),
+      selectedAmount: transactions
+        .filter((t) => selectedTransactions.includes(t.id))
+        .reduce((sum, t) => sum + t.amount, 0),
+    };
+    return totals;
+  }, [transactions, selectedTransactions]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+  if (!user) {
+    return null;
   }
-
-  if (!user) return null;
 
   return (
     <DashboardLayout
       role="si"
       userName={`${user.first_name} ${user.last_name}`}
       userEmail={user.email}
-      activeTab="firs-invoicing"
+      activeTab="firs-invoice-generator"
     >
-      <div className="min-h-full bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-        
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+      <div className="space-y-8">
+        <header className="rounded-3xl border border-indigo-100 bg-white/80 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-4xl font-black text-slate-800 mb-2">
-                📋 FIRS Invoice Generator
-              </h1>
-              <p className="text-xl text-slate-600">
-                Generate FIRS-compliant invoices from aggregated business and financial system data
+              <h1 className="text-2xl font-bold text-indigo-900">FIRS Invoice Generator</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Review synced transactions, select the invoices you want to clear, and generate IRNs
+                with a single workflow.
               </p>
             </div>
-            
-            <div className="flex space-x-4">
-              <TaxPoyntButton
-                variant="outline"
-                onClick={() => router.push('/dashboard/si')}
-                className="border-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-              >
-                ← Back to Dashboard
+            <div className="flex gap-3">
+              <TaxPoyntButton variant="outline" onClick={() => router.push('/dashboard/si/business-systems')}>
+                Manage integrations
               </TaxPoyntButton>
               <TaxPoyntButton
                 variant="primary"
-                onClick={generateFIRSInvoices}
-                disabled={selectedTransactions.length === 0 || isGenerating}
-                className={`${
-                  selectedTransactions.length > 0 
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700' 
-                    : 'bg-gray-400 cursor-not-allowed'
-                }`}
+                onClick={handleGenerateInvoices}
+                disabled={!transactions.length || !selectedTransactions.length || isGenerating}
               >
-                {isGenerating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                    Generating...
-                  </>
-                ) : (
-                  `🏛️ Generate FIRS Invoice${selectedTransactions.length > 1 ? 's' : ''} (${selectedTransactions.length})`
-                )}
+                {isGenerating ? 'Generating…' : `Generate IRNs (${selectedTransactions.length})`}
+              </TaxPoyntButton>
+            </div>
+          </div>
+        </header>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Transactions loaded</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{summary.total}</p>
+            <p className="mt-1 text-sm text-slate-600">Across all connected ERP sources.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Pending IRN</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{summary.pending}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              {formatCurrency(summary.amountPending, 'NGN')} awaiting generation.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Selected amount</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {formatCurrency(summary.selectedAmount, 'NGN')}
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              {selectedTransactions.length} transaction{selectedTransactions.length === 1 ? '' : 's'} ready.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Auto-sync connections</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {
+                connections.filter(
+                  (conn) =>
+                    conn.connection_config?.auto_sync ||
+                    conn.metadata?.auto_sync ||
+                    conn.connection_config?.enable_auto_sync
+                ).length
+              }
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Out of {connections.length} total ERP connections.
+            </p>
+          </div>
+        </section>
+
+        {generationResult && (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Latest generation result</h2>
+            <div
+              className={`mt-4 rounded-xl border p-4 text-sm ${
+                generationResult.success
+                  ? 'border-green-200 bg-green-50 text-green-700'
+                  : 'border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              {generationResult.success ? (
+                <>
+                  <p className="font-medium">
+                    Generated {generationResult.invoices.length} invoice
+                    {generationResult.invoices.length === 1 ? '' : 's'} worth{' '}
+                    {formatCurrency(generationResult.total_amount, 'NGN')}.
+                  </p>
+                  {generationResult.generation_stats?.processing_time_seconds && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      Processing time:{' '}
+                      {generationResult.generation_stats.processing_time_seconds.toFixed(1)}s
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">Generation failed.</p>
+                  {generationResult.errors.map((error, idx) => (
+                    <p key={idx} className="mt-1">
+                      • {error}
+                    </p>
+                  ))}
+                </>
+              )}
+              {generationResult.warnings?.length > 0 && (
+                <div className="mt-2 text-xs text-amber-700">
+                  <p className="font-medium">Warnings:</p>
+                  {generationResult.warnings.map((warning, idx) => (
+                    <p key={idx}>• {warning}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+            {generationResult.invoices.length > 0 && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Invoice #
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        IRN
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Customer
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Amount
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-700">
+                    {generationResult.invoices.map((invoice) => (
+                      <tr key={invoice.irn}>
+                        <td className="px-4 py-2 font-medium text-slate-900">{invoice.invoice_number}</td>
+                        <td className="px-4 py-2 text-xs text-slate-600 break-all">{invoice.irn}</td>
+                        <td className="px-4 py-2">{invoice.customer_name}</td>
+                        <td className="px-4 py-2">
+                          {formatCurrency(invoice.total_amount, invoice.currency)}
+                        </td>
+                        <td className="px-4 py-2">
+                          {statusBadge(invoice.status || 'generated', statusClasses)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Business transactions</h2>
+              <p className="text-sm text-slate-600">
+                Select the transactions you want to clear today. You can filter by status or payment method.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <TaxPoyntButton variant="outline" size="sm" onClick={toggleAllTransactions}>
+                {selectedTransactions.length === transactions.length && transactions.length > 0
+                  ? 'Clear selection'
+                  : 'Select all'}
+              </TaxPoyntButton>
+              <TaxPoyntButton
+                variant="outline"
+                size="sm"
+                onClick={() => user && loadInitialData(user)}
+              >
+                Refresh data
               </TaxPoyntButton>
             </div>
           </div>
 
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-xl shadow-md border border-blue-100">
-              <div className="text-2xl font-bold text-blue-600">{connectedSources.length}</div>
-              <div className="text-sm text-blue-700">Data Sources</div>
+          {isLoading ? (
+            <div className="flex min-h-[200px] items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-md border border-green-100">
-              <div className="text-2xl font-bold text-green-600">{filteredTransactions.length}</div>
-              <div className="text-sm text-green-700">Available Transactions</div>
+          ) : error ? (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
+              {error}
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-md border border-purple-100">
-              <div className="text-2xl font-bold text-purple-600">{selectedTransactions.length}</div>
-              <div className="text-sm text-purple-700">Selected</div>
+          ) : transactions.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-600">
+              <p className="font-medium text-slate-800">No synced transactions yet.</p>
+              <p className="mt-2 text-sm">
+                Connect an ERP system and run a sync from the Business Systems dashboard to populate
+                transactions here.
+              </p>
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-md border border-orange-100">
-              <div className="text-2xl font-bold text-orange-600">
-                ₦{(totalSelectedAmount / 1000000).toFixed(1)}M
-              </div>
-              <div className="text-sm text-orange-700">Total Value</div>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-md border border-indigo-100">
-              <div className="text-2xl font-bold text-indigo-600">
-                {transactions.filter(t => t.firsStatus === 'not_generated').length}
-              </div>
-              <div className="text-sm text-indigo-700">Pending FIRS</div>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex space-x-4 mb-6">
-            <select 
-              value={filterSource} 
-              onChange={(e) => setFilterSource(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Sources</option>
-              <option value="erp">ERP Systems</option>
-              <option value="crm">CRM Systems</option>
-              <option value="pos">POS Systems</option>
-              <option value="ecommerce">E-commerce</option>
-              <option value="banking">Banking</option>
-              <option value="payment">Payment Processors</option>
-            </select>
-            
-            <select 
-              value={filterStatus} 
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All FIRS Status</option>
-              <option value="not_generated">Not Generated</option>
-              <option value="generated">Generated</option>
-              <option value="submitted">Submitted</option>
-              <option value="accepted">Accepted</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Connected Sources Overview */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">🔗 Connected Data Sources</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {connectedSources.map((source) => (
-              <div key={source.id} className="text-center p-3 bg-gray-50 rounded-lg border">
-                <div className="text-2xl mb-2">{getSourceIcon(source.type)}</div>
-                <div className="text-sm font-medium text-slate-800">{source.name}</div>
-                <div className="text-xs text-slate-600">{source.recordCount} records</div>
-                <div className="text-xs text-green-600">{source.lastSync}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Transactions Table */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-slate-800">💼 Business Transactions Ready for FIRS</h3>
-            <p className="text-sm text-slate-600">Select transactions to generate FIRS-compliant invoices</p>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedTransactions.length === filteredTransactions.length && filteredTransactions.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedTransactions(filteredTransactions.map(t => t.id));
-                        } else {
-                          setSelectedTransactions([]);
-                        }
-                      }}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">FIRS Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTransactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedTransactions.includes(transaction.id)}
-                        onChange={() => handleTransactionSelect(transaction.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          ) : (
+            <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedTransactions.length === transactions.length && transactions.length > 0}
+                        onChange={toggleAllTransactions}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <span className="text-lg mr-2">{getSourceIcon(transaction.source.type)}</span>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{transaction.source.name}</div>
-                          <div className="text-xs text-gray-500 capitalize">{transaction.source.type}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{transaction.transactionId}</div>
-                        <div className="text-xs text-gray-500">{new Date(transaction.date).toLocaleDateString()}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{transaction.customerName}</div>
-                        {transaction.customerEmail && (
-                          <div className="text-xs text-gray-500">{transaction.customerEmail}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">₦{transaction.amount.toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">VAT: ₦{transaction.taxAmount.toLocaleString()}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getPaymentStatusColor(transaction.paymentStatus)}`}>
-                        {transaction.paymentStatus}
-                      </span>
-                      {transaction.paymentMethod && (
-                        <div className="text-xs text-gray-500 mt-1">{transaction.paymentMethod}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(transaction.firsStatus)}`}>
-                        {transaction.firsStatus.replace('_', ' ')}
-                      </span>
-                      {transaction.irn && (
-                        <div className="text-xs text-gray-500 mt-1">IRN: {transaction.irn}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{transaction.confidence}%</div>
-                      <div className={`w-full bg-gray-200 rounded-full h-1 mt-1`}>
-                        <div 
-                          className={`h-1 rounded-full ${
-                            transaction.confidence >= 95 ? 'bg-green-500' : 
-                            transaction.confidence >= 85 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${transaction.confidence}%` }}
-                        ></div>
-                      </div>
-                    </td>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Transaction
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Source
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Amount
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Payment
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      FIRS status
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Confidence
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Generation Result Modal */}
-        {generationResult && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full mx-4">
-              <h3 className="text-2xl font-bold text-green-600 mb-4">✅ FIRS Invoice Generation Successful!</h3>
-              
-              <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-medium text-green-800 mb-2">Generated Invoices</h4>
-                  {generationResult.invoices?.map((invoice, index) => (
-                    <div key={index} className="text-sm text-green-700">
-                      <div>IRN: <span className="font-mono">{invoice.irn}</span></div>
-                      <div>Invoice Number: {invoice.invoiceNumber}</div>
-                      <div>Amount: ₦{invoice.totalAmount?.toLocaleString()}</div>
-                    </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-700">
+                  {transactions.map((transaction) => (
+                    <tr key={transaction.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedTransactions.includes(transaction.id)}
+                          onChange={() => toggleTransactionSelection(transaction.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-900">{transaction.transactionId}</div>
+                        <div className="text-xs text-slate-500">
+                          {transaction.customerName} • {formatDate(transaction.date)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{transaction.sourceName}</div>
+                        <div className="text-xs uppercase text-slate-500">{transaction.sourceType}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                        {formatCurrency(transaction.amount, transaction.currency)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {statusBadge(transaction.paymentStatus, paymentStatusClasses)}
+                        {transaction.paymentMethod && (
+                          <div className="mt-1 text-xs text-slate-500">{transaction.paymentMethod}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {statusBadge(transaction.firsStatus, statusClasses)}
+                        {transaction.irn && (
+                          <div className="mt-1 text-xs text-slate-500 break-all">IRN: {transaction.irn}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-slate-900">
+                          {transaction.confidence.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-slate-500">Data confidence</div>
+                      </td>
+                    </tr>
                   ))}
-                </div>
-                
-                <div className="flex space-x-4">
-                  <TaxPoyntButton
-                    variant="primary"
-                    onClick={() => setGenerationResult(null)}
-                    className="flex-1"
-                  >
-                    Continue
-                  </TaxPoyntButton>
-                  <TaxPoyntButton
-                    variant="outline"
-                    onClick={() => {
-                      // Download invoice logic
-                      setGenerationResult(null);
-                    }}
-                    className="flex-1"
-                  >
-                    Download Invoice
-                  </TaxPoyntButton>
-                </div>
-              </div>
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-
+          )}
+        </section>
       </div>
     </DashboardLayout>
   );

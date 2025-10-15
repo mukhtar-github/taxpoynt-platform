@@ -1,156 +1,93 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../../../design_system';
 import apiClient from '../../../../shared_components/api/client';
 
-interface ConnectedSystem {
-  id: string;
-  name: string;
-  category: 'erp' | 'crm' | 'pos' | 'ecommerce';
-  icon: string;
-  status: 'connected' | 'syncing' | 'error' | 'paused';
-  lastSync: string;
-  nextSync: string;
-  healthScore: number;
-  dataMetrics: {
-    totalRecords: number;
-    monthlyVolume: number;
-    syncFrequency: string;
-    errorRate: number;
+type V1Response<T> = {
+  success: boolean;
+  action: string;
+  data: T;
+  meta?: Record<string, any> | null;
+};
+
+interface ErpConnectionRecord {
+  connection_id: string;
+  organization_id: string;
+  erp_system: string;
+  connection_name?: string;
+  environment: string;
+  connection_config?: {
+    auth_method?: string;
+    url?: string;
+    database?: string;
+    username?: string;
+    auto_sync?: boolean;
+    polling_interval?: number;
+    [key: string]: any;
   };
-  features: string[];
-  businessData: Record<string, string | number>;
+  metadata?: Record<string, any>;
+  status?: string;
+  status_reason?: string;
+  owner_user_id?: string | null;
+  is_active?: boolean;
+  last_status_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
-const MOCK_SYSTEMS: ConnectedSystem[] = [
-  {
-    id: 'sap-erp-001',
-    name: 'SAP ERP System',
-    category: 'erp',
-    icon: '🏢',
-    status: 'connected',
-    lastSync: '5 minutes ago',
-    nextSync: 'in 10 minutes',
-    healthScore: 98.5,
-    dataMetrics: {
-      totalRecords: 45600,
-      monthlyVolume: 2847,
-      syncFrequency: 'Every 15 minutes',
-      errorRate: 0.2
-    },
-    features: ['Financial Management', 'Supply Chain', 'Customer Data', 'Inventory Tracking'],
-    businessData: {
-      customers: 2847,
-      invoices: 1456,
-      products: 892,
-      transactions: 15600
-    }
-  },
-  {
-    id: 'odoo-erp-002',
-    name: 'Odoo ERP Community',
-    category: 'erp',
-    icon: '🟣',
-    status: 'connected',
-    lastSync: '12 minutes ago',
-    nextSync: 'in 3 minutes',
-    healthScore: 96.8,
-    dataMetrics: {
-      totalRecords: 28400,
-      monthlyVolume: 1203,
-      syncFrequency: 'Every 15 minutes',
-      errorRate: 0.5
-    },
-    features: ['Invoicing', 'CRM', 'Inventory', 'Accounting'],
-    businessData: {
-      customers: 1203,
-      invoices: 758,
-      products: 445,
-      transactions: 9200
-    }
-  },
-  {
-    id: 'salesforce-crm-001',
-    name: 'Salesforce CRM',
-    category: 'crm',
-    icon: '☁️',
-    status: 'connected',
-    lastSync: '8 minutes ago',
-    nextSync: 'in 22 minutes',
-    healthScore: 96.2,
-    dataMetrics: {
-      totalRecords: 12600,
-      monthlyVolume: 5892,
-      syncFrequency: 'Every 30 minutes',
-      errorRate: 0.3
-    },
-    features: ['Customer Data', 'Sales Pipeline', 'Deal Management', 'Analytics'],
-    businessData: {
-      contacts: 5892,
-      deals: 234,
-      accounts: 892,
-      pipelineValue: 125000000
-    }
-  },
-  {
-    id: 'square-pos-001',
-    name: 'Square POS Terminal',
-    category: 'pos',
-    icon: '⬜',
-    status: 'connected',
-    lastSync: '3 minutes ago',
-    nextSync: 'Real-time',
-    healthScore: 99.1,
-    dataMetrics: {
-      totalRecords: 8900,
-      monthlyVolume: 456,
-      syncFrequency: 'Real-time',
-      errorRate: 0.1
-    },
-    features: ['Point of Sale', 'Inventory Tracking', 'Sales Analytics', 'Customer Loyalty'],
-    businessData: {
-      transactions: 456,
-      averageTicket: 24500,
-      topCategory: 'Electronics',
-      locationCount: 14
-    }
-  },
-  {
-    id: 'shopify-store-001',
-    name: 'Shopify Storefront',
-    category: 'ecommerce',
-    icon: '🛒',
-    status: 'connected',
-    lastSync: '4 minutes ago',
-    nextSync: 'in 6 minutes',
-    healthScore: 97.8,
-    dataMetrics: {
-      totalRecords: 15600,
-      monthlyVolume: 342,
-      syncFrequency: 'Every 10 minutes',
-      errorRate: 0.3
-    },
-    features: ['Product Catalog', 'Order Management', 'Customer Data', 'Sales Analytics'],
-    businessData: {
-      orders: 342,
-      products: 156,
-      customers: 1847,
-      revenue: 8900000
-    }
-  }
-];
+interface ListErpConnectionsResponse {
+  connections: ErpConnectionRecord[];
+  total_count: number;
+}
 
-export default function BusinessSystemsManagementPage() {
+const statusStyles: Record<string, string> = {
+  active: 'text-green-600 bg-green-50 border border-green-200',
+  configured: 'text-indigo-600 bg-indigo-50 border border-indigo-200',
+  syncing: 'text-blue-600 bg-blue-50 border border-blue-200',
+  failed: 'text-red-600 bg-red-50 border border-red-200',
+  paused: 'text-yellow-600 bg-yellow-50 border border-yellow-200',
+};
+
+const formatDateTime = (iso?: string | null): string => {
+  if (!iso) return 'Not available';
+  try {
+    const date = new Date(iso);
+    return new Intl.DateTimeFormat('en-NG', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
+  } catch {
+    return iso;
+  }
+};
+
+const formatInterval = (minutes?: number): string => {
+  if (!minutes || Number.isNaN(minutes)) return 'Not configured';
+  if (minutes < 60) return `${minutes} min`;
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins ? `${hrs}h ${mins}m` : `${hrs}h`;
+};
+
+const getStatusBadgeClass = (status?: string): string => {
+  if (!status) return 'text-slate-600 bg-slate-100 border border-slate-200';
+  const key = status.toLowerCase();
+  return statusStyles[key] || 'text-slate-600 bg-slate-100 border border-slate-200';
+};
+
+const BusinessSystemsManagementPage = (): JSX.Element | null => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectedSystems, setConnectedSystems] = useState<ConnectedSystem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [isDemo, setIsDemo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [connections, setConnections] = useState<ErpConnectionRecord[]>([]);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<'success' | 'error'>('success');
+  const [pendingAction, setPendingAction] = useState<{ type: 'test' | 'sync'; connectionId: string } | null>(null);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -164,73 +101,119 @@ export default function BusinessSystemsManagementPage() {
     }
 
     setUser(currentUser);
-    
-    const loadConnectedSystems = async () => {
-      setIsLoading(true);
-      try {
-        if (!authService.isAuthenticated()) {
-          return;
-        }
-
-        const data = await apiClient.get<{ systems?: ConnectedSystem[] }>(
-          '/si/integrations/business-systems'
-        );
-
-        setConnectedSystems(data.systems || MOCK_SYSTEMS);
-        setIsDemo(false);
-      } catch (error) {
-        console.error('Failed to load connected systems, using demo data:', error);
-        setIsDemo(true);
-        setConnectedSystems(MOCK_SYSTEMS);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadConnectedSystems();
+    fetchConnections(currentUser);
   }, [router]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'connected': return 'text-green-600 bg-green-50 border-green-200';
-      case 'syncing': return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'error': return 'text-red-600 bg-red-50 border-red-200';
-      case 'paused': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+  const fetchConnections = async (currentUser: User) => {
+    const organizationId = currentUser.organization?.id;
+    if (!organizationId) {
+      setConnections([]);
+      setIsLoading(false);
+      setError('No organization context found. Add an organization before managing integrations.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const query = `?organization_id=${encodeURIComponent(organizationId)}`;
+      const response = await apiClient.get<V1Response<ListErpConnectionsResponse>>(
+        `/si/business/erp/connections${query}`
+      );
+      setConnections(response.data?.connections ?? []);
+    } catch (err: any) {
+      console.error('Failed to load ERP connections:', err);
+      const message =
+        err?.message ||
+        err?.response?.data?.detail ||
+        'Unable to load ERP connections. Please try again.';
+      setError(message);
+      setConnections([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const getHealthScoreColor = (score: number) => {
-    if (score >= 95) return 'text-green-600';
-    if (score >= 85) return 'text-yellow-600';
-    return 'text-red-600';
+  const handleTestConnection = async (connectionId: string) => {
+    setPendingAction({ type: 'test', connectionId });
+    setActionMessage(null);
+    try {
+      const response = await apiClient.post<V1Response<any>>(
+        `/si/business/erp/connections/${connectionId}/test`,
+        {}
+      );
+      const message =
+        response.data?.data?.message ||
+        response.data?.message ||
+        'Connection test completed successfully.';
+      setActionType('success');
+      setActionMessage(message);
+    } catch (err: any) {
+      console.error('Connection test failed:', err);
+      setActionType('error');
+      setActionMessage(
+        err?.response?.data?.detail ||
+          err?.message ||
+          'Connection test failed. Please review your credentials.'
+      );
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const filteredSystems = selectedCategory === 'all' 
-    ? connectedSystems 
-    : connectedSystems.filter(system => system.category === selectedCategory);
-
-  const categoryStats = {
-    erp: connectedSystems.filter(s => s.category === 'erp').length,
-    crm: connectedSystems.filter(s => s.category === 'crm').length,
-    pos: connectedSystems.filter(s => s.category === 'pos').length,
-    ecommerce: connectedSystems.filter(s => s.category === 'ecommerce').length
+  const handleSyncConnection = async (connectionId: string) => {
+    setPendingAction({ type: 'sync', connectionId });
+    setActionMessage(null);
+    try {
+      const response = await apiClient.post<V1Response<any>>(
+        `/si/business/erp/connections/${connectionId}/sync`,
+        { force: true }
+      );
+      const message =
+        response.data?.status?.latest_execution?.status ||
+        response.data?.message ||
+        'Sync has been queued. Check sync status for progress.';
+      setActionType('success');
+      setActionMessage(typeof message === 'string' ? message : 'Sync request accepted.');
+    } catch (err: any) {
+      console.error('Failed to queue sync:', err);
+      setActionType('error');
+      setActionMessage(
+        err?.response?.data?.detail ||
+          err?.message ||
+          'Unable to queue sync. Please retry later.'
+      );
+    } finally {
+      setPendingAction(null);
+      await fetchConnections(user!);
+    }
   };
 
-  const handleSystemAction = (systemId: string, action: 'sync' | 'pause' | 'disconnect' | 'configure') => {
-    console.log(`Performing ${action} on system ${systemId}`);
-    // Implement system actions
-  };
+  const summary = useMemo(() => {
+    if (!connections.length) {
+      return {
+        total: 0,
+        autoSync: 0,
+        active: 0,
+      };
+    }
+    const autoSync = connections.filter(
+      (conn) =>
+        conn.connection_config?.auto_sync ||
+        conn.metadata?.auto_sync ||
+        conn.connection_config?.enable_auto_sync
+    ).length;
+    const active = connections.filter((conn) => (conn.status || '').toLowerCase() === 'active').length;
+    return {
+      total: connections.length,
+      autoSync,
+      active,
+    };
+  }, [connections]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+  if (!user) {
+    return null;
   }
-
-  if (!user) return null;
 
   return (
     <DashboardLayout
@@ -239,209 +222,214 @@ export default function BusinessSystemsManagementPage() {
       userEmail={user.email}
       activeTab="business-systems"
     >
-      <div className="min-h-full bg-gradient-to-br from-indigo-50 to-blue-50 p-6">
-        
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+      <div className="space-y-8">
+        <header className="rounded-3xl border border-indigo-100 bg-white/80 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-4xl font-black text-slate-800 mb-2">
-                🏢 Business Systems Management
-              </h1>
-              <p className="text-xl text-slate-600">
-                Monitor and manage all your connected business system integrations
-                {isDemo && (
-                  <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
-                    Demo Data
-                  </span>
-                )}
+              <h1 className="text-2xl font-bold text-indigo-900">Business Systems Management</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Monitor your connected ERP environments, run ad-hoc syncs, and keep auto-sync schedules
+                aligned with FIRS invoice generation.
               </p>
             </div>
-            
-            <div className="flex space-x-4">
-              <TaxPoyntButton
-                variant="outline"
-                onClick={() => router.push('/dashboard/si')}
-                className="border-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-              >
-                ← Back to Dashboard
+            <div className="flex gap-3">
+              <TaxPoyntButton variant="outline" onClick={() => router.push('/dashboard/si/integrations/new')}>
+                + Add integration
               </TaxPoyntButton>
               <TaxPoyntButton
                 variant="primary"
-                onClick={() => router.push('/onboarding/si/business-systems-setup')}
-                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
+                onClick={() => router.push('/dashboard/si/firs-invoice-generator')}
               >
-                + Add New System
+                Open FIRS Invoice Generator
+              </TaxPoyntButton>
+            </div>
+          </div>
+        </header>
+
+        {actionMessage && (
+          <div
+            className={`rounded-xl border p-4 text-sm ${
+              actionType === 'success'
+                ? 'border-green-200 bg-green-50 text-green-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            {actionMessage}
+          </div>
+        )}
+
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Connected ERP systems</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{summary.total}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Manage connections to Odoo, SAP, and other ERP platforms from one place.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Auto-sync enabled</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{summary.autoSync}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Connections pushing updates automatically to the FIRS pipeline.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Active status</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{summary.active}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Connections currently marked active by the integration health monitor.
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">ERP connections</h2>
+              <p className="text-sm text-slate-600">
+                View connection status, scheduling details, and run immediate syncs.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <TaxPoyntButton variant="outline" size="sm" onClick={() => user && fetchConnections(user)}>
+                Refresh list
+              </TaxPoyntButton>
+              <TaxPoyntButton
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/dashboard/si/setup')}
+              >
+                System Integrator setup guide
               </TaxPoyntButton>
             </div>
           </div>
 
-          {/* Category Filter & Stats */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex space-x-4">
-              {[
-                { id: 'all', name: 'All Systems', count: connectedSystems.length },
-                { id: 'erp', name: 'ERP', count: categoryStats.erp },
-                { id: 'crm', name: 'CRM', count: categoryStats.crm },
-                { id: 'pos', name: 'POS', count: categoryStats.pos },
-                { id: 'ecommerce', name: 'E-commerce', count: categoryStats.ecommerce }
-              ].map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    selectedCategory === category.id
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 border'
-                  }`}
-                >
-                  {category.name} ({category.count})
-                </button>
-              ))}
+          {isLoading ? (
+            <div className="flex min-h-[200px] items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
             </div>
-          </div>
-        </div>
+          ) : error ? (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
+              {error}
+            </div>
+          ) : connections.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-600">
+              <p className="font-medium text-slate-800">No ERP integrations yet.</p>
+              <p className="mt-2 text-sm">
+                Create your first connection to start pulling business transactions into the FIRS workflow.
+                Use the “Add integration” button above to begin.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {connections.map((connection) => {
+                const statusLabel = connection.status?.replace(/_/g, ' ').toLowerCase() ?? 'configured';
+                const autoSync =
+                  connection.connection_config?.auto_sync ||
+                  connection.metadata?.auto_sync ||
+                  connection.connection_config?.enable_auto_sync ||
+                  false;
+                const polling =
+                  connection.metadata?.polling_interval_minutes ??
+                  connection.connection_config?.polling_interval;
 
-        {/* Systems Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredSystems.map((system) => (
-            <div key={system.id} className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-              
-              {/* System Header */}
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">{system.icon}</span>
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-800">{system.name}</h3>
-                      <p className="text-sm text-slate-600 capitalize">{system.category} System</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(system.status)}`}>
-                      {system.status.charAt(0).toUpperCase() + system.status.slice(1)}
-                    </span>
-                    <span className={`text-sm font-bold ${getHealthScoreColor(system.healthScore)}`}>
-                      {system.healthScore}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Sync Information */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-500">Last Sync:</span>
-                    <span className="font-medium text-slate-800 ml-2">{system.lastSync}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Next Sync:</span>
-                    <span className="font-medium text-slate-800 ml-2">{system.nextSync}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Business Data Metrics */}
-              <div className="p-6">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">📊 Business Data</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(system.businessData).map(([key, value]) => {
-                    const displayValue = typeof value === 'number' && value > 1000000 
-                      ? `₦${(value / 1000000).toFixed(1)}M`
-                      : typeof value === 'number' 
-                      ? value.toLocaleString()
-                      : String(value);
-                    
-                    return (
-                      <div key={key} className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="text-lg font-bold text-slate-800">
-                          {displayValue}
-                        </div>
-                        <div className="text-xs text-slate-500 capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
-                        </div>
+                return (
+                  <div
+                    key={connection.connection_id}
+                    className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-5 transition hover:border-indigo-200 hover:bg-white"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          {connection.erp_system.toUpperCase()}
+                        </p>
+                        <h3 className="mt-1 text-lg font-semibold text-slate-900">
+                          {connection.connection_name || connection.connection_config?.url || 'ERP Connection'}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Environment: {connection.environment}
+                        </p>
+                        {connection.connection_config?.url && (
+                          <p className="mt-1 text-xs text-slate-500 break-all">
+                            {connection.connection_config.url}
+                          </p>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* System Features */}
-              <div className="p-6 bg-gray-50">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">🔧 Features</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {system.features.map((feature, index) => (
-                    <div key={index} className="flex items-center text-xs text-slate-600">
-                      <span className="w-1 h-1 bg-slate-400 rounded-full mr-2"></span>
-                      {feature}
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusBadgeClass(connection.status)}`}>
+                        {statusLabel}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="p-6 border-t border-gray-100">
-                <div className="flex space-x-2">
-                  <TaxPoyntButton
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSystemAction(system.id, 'sync')}
-                    className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
-                  >
-                    🔄 Sync Now
-                  </TaxPoyntButton>
-                  <TaxPoyntButton
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSystemAction(system.id, 'configure')}
-                    className="flex-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                  >
-                    ⚙️ Configure
-                  </TaxPoyntButton>
-                  <TaxPoyntButton
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSystemAction(system.id, 'pause')}
-                    className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                  >
-                    ⏸️
-                  </TaxPoyntButton>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                    <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                      <div className="rounded-lg border border-slate-200 bg-white/60 p-3">
+                        <p className="text-xs uppercase tracking-wide text-slate-500">Auto-sync</p>
+                        <p className="mt-1 font-medium text-slate-800">
+                          {autoSync ? 'Enabled' : 'Disabled'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Polling: {formatInterval(polling)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white/60 p-3">
+                        <p className="text-xs uppercase tracking-wide text-slate-500">Last update</p>
+                        <p className="mt-1 font-medium text-slate-800">
+                          {formatDateTime(connection.last_status_at || connection.updated_at)}
+                        </p>
+                        {connection.status_reason && (
+                          <p className="text-xs text-red-500 mt-1">{connection.status_reason}</p>
+                        )}
+                      </div>
+                    </div>
 
-        {/* Summary Information */}
-        <div className="mt-8 bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">📈 Integration Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-indigo-600">{connectedSystems.length}</div>
-              <div className="text-sm text-slate-600">Total Systems</div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <TaxPoyntButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleTestConnection(connection.connection_id)}
+                        disabled={
+                          pendingAction?.connectionId === connection.connection_id &&
+                          pendingAction.type === 'test'
+                        }
+                      >
+                        {pendingAction?.connectionId === connection.connection_id &&
+                        pendingAction.type === 'test'
+                          ? 'Testing…'
+                          : 'Test connection'}
+                      </TaxPoyntButton>
+                      <TaxPoyntButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSyncConnection(connection.connection_id)}
+                        disabled={
+                          pendingAction?.connectionId === connection.connection_id &&
+                          pendingAction.type === 'sync'
+                        }
+                      >
+                        {pendingAction?.connectionId === connection.connection_id &&
+                        pendingAction.type === 'sync'
+                          ? 'Queueing sync…'
+                          : 'Run manual sync'}
+                      </TaxPoyntButton>
+                      <TaxPoyntButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          router.push(`/dashboard/si/integrations/new?connectionId=${connection.connection_id}`)
+                        }
+                      >
+                        Edit settings
+                      </TaxPoyntButton>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {connectedSystems.reduce((sum, s) => sum + s.dataMetrics.totalRecords, 0).toLocaleString()}
-              </div>
-              <div className="text-sm text-slate-600">Total Records</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {(connectedSystems.reduce((sum, s) => sum + s.healthScore, 0) / connectedSystems.length).toFixed(1)}%
-              </div>
-              <div className="text-sm text-slate-600">Avg Health Score</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {(connectedSystems.reduce((sum, s) => sum + s.dataMetrics.errorRate, 0) / connectedSystems.length).toFixed(1)}%
-              </div>
-              <div className="text-sm text-slate-600">Avg Error Rate</div>
-            </div>
-          </div>
-        </div>
-
+          )}
+        </section>
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default BusinessSystemsManagementPage;
+
