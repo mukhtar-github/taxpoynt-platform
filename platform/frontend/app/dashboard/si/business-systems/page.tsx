@@ -233,8 +233,8 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
               </p>
             </div>
             <div className="flex gap-3">
-              <TaxPoyntButton variant="outline" onClick={() => router.push('/dashboard/si/integrations/new')}>
-                + Add integration
+              <TaxPoyntButton variant="outline" onClick={() => router.push('/dashboard/si/integrations')}>
+                Manage integrations
               </TaxPoyntButton>
               <TaxPoyntButton
                 variant="primary"
@@ -317,7 +317,7 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
               <p className="font-medium text-slate-800">No ERP integrations yet.</p>
               <p className="mt-2 text-sm">
                 Create your first connection to start pulling business transactions into the FIRS workflow.
-                Use the “Add integration” button above to begin.
+                Use the integrations manager to create your first connection and start feeding transactions into the FIRS workflow.
               </p>
             </div>
           ) : (

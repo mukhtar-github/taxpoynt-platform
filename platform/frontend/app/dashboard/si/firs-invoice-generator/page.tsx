@@ -337,7 +337,7 @@ export default function FIRSInvoiceGeneratorPage(): JSX.Element | null {
             </div>
             <div className="flex gap-3">
               <TaxPoyntButton variant="outline" onClick={() => router.push('/dashboard/si/business-systems')}>
-                Manage integrations
+                View integrations
               </TaxPoyntButton>
               <TaxPoyntButton
                 variant="primary"

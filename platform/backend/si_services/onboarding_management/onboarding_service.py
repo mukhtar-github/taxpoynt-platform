@@ -582,34 +582,44 @@ class SIOnboardingService:
                 ],
             }
 
-            submissions_stmt = (
-                select(FIRSSubmission)
-                .where(FIRSSubmission.organization_id == organization_id)
-                .order_by(FIRSSubmission.created_at.desc())
-                .limit(5)
-            )
-            submission_rows = await session.execute(submissions_stmt)
-            submissions = list(submission_rows.scalars())
-            runtime["irn_progress"] = {
-                "total_generated": sum(
-                    1
-                    for item in submissions
-                    if item.status in (SubmissionStatus.SUBMITTED, SubmissionStatus.ACCEPTED)
-                ),
-                "pending": sum(
-                    1
-                    for item in submissions
-                    if item.status in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING)
-                ),
-                "recent": [
-                    {
-                        "irn": item.irn,
-                        "status": item.status.value,
-                        "created_at": self._format_optional_datetime(item.created_at),
-                    }
-                    for item in submissions
-                ],
-            }
+            try:
+                submissions_stmt = (
+                    select(
+                        FIRSSubmission.irn,
+                        FIRSSubmission.status,
+                        FIRSSubmission.created_at,
+                    )
+                    .where(FIRSSubmission.organization_id == organization_id)
+                    .order_by(FIRSSubmission.created_at.desc())
+                    .limit(5)
+                )
+                submission_rows = await session.execute(submissions_stmt)
+                submissions = list(submission_rows)
+
+                runtime["irn_progress"] = {
+                    "total_generated": sum(
+                        1
+                        for row in submissions
+                        if row.status in (SubmissionStatus.SUBMITTED, SubmissionStatus.ACCEPTED)
+                    ),
+                    "pending": sum(
+                        1
+                        for row in submissions
+                        if row.status in (SubmissionStatus.PENDING, SubmissionStatus.PROCESSING)
+                    ),
+                    "recent": [
+                        {
+                            "irn": row.irn,
+                            "status": row.status.value if hasattr(row.status, "value") else str(row.status),
+                            "created_at": self._format_optional_datetime(row.created_at),
+                        }
+                        for row in submissions
+                    ],
+                }
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(
+                    "Unable to build IRN progress snapshot for org %s: %s", organization_id, exc
+                )
 
         if runtime:
             return {"runtime": runtime}
