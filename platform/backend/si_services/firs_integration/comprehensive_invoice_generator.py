@@ -8,17 +8,18 @@ This service implements the complete data convergence strategy for
 SI (System Integrator) role invoice generation.
 """
 
+import base64
 import asyncio
 import copy
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Any, Optional, Tuple
-from uuid import UUID, uuid4
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
@@ -29,6 +30,12 @@ from core_platform.data_management.models.firs_submission import (
 )
 from hybrid_services.correlation_management.si_app_correlation_service import SIAPPCorrelationService
 from core_platform.data_management.models.organization import Organization
+from core_platform.security.irn_signing import (
+    CryptoBundle,
+    SignedIRNResult,
+    generate_signed_irn,
+    load_crypto_bundle,
+)
 from external_integrations.financial_systems.banking.open_banking.invoice_automation.firs_formatter import (
     FIRSFormatter, FormattingResult
 )
@@ -153,6 +160,7 @@ class FIRSInvoiceGenerationRequest:
     invoice_type: str = "standard"
     consolidate: bool = False
     include_digital_signature: bool = True
+    include_irn_qr: bool = False
     customer_overrides: Optional[Dict[str, str]] = None
 
 
@@ -222,9 +230,16 @@ class ComprehensiveFIRSInvoiceGenerator:
         self._odoo_by_org: Dict[str, Any] = {}
         self.certificate_service = DigitalCertificateService()
         key_path_env = os.getenv("FIRS_CRYPTO_KEYS_PATH")
-        self.qr_signing_service = QRSigningService(
-            key_path=Path(key_path_env).expanduser() if key_path_env else None
-        )
+        bundle_path: Optional[Path] = None
+        if key_path_env:
+            try:
+                bundle_path = Path(key_path_env).expanduser()
+            except Exception as exc:
+                logger.warning("Invalid FIRS_CRYPTO_KEYS_PATH (%s): %s", key_path_env, exc)
+                bundle_path = None
+        self.qr_signing_service = QRSigningService(key_path=bundle_path)
+        self._irn_bundle_path = bundle_path
+        self._irn_crypto_bundle: Optional[CryptoBundle] = None
         self._organization_cache: Dict[str, Organization] = {}
         self._signing_certificate_cache: Dict[str, Optional[str]] = {}
 
@@ -1510,8 +1525,22 @@ class ComprehensiveFIRSInvoiceGenerator:
             }
         }
 
+        irn_signature_payload: Optional[Dict[str, Any]] = None
         if irn:
             invoice_data['irn'] = irn
+            service_id = self._extract_service_id_from_irn(irn)
+            if service_id:
+                signing_result = self._generate_irn_signing_metadata(
+                    invoice_number=invoice_data['invoice_number'],
+                    service_id=service_id,
+                    issued_on=invoice_data['invoice_date'],
+                    include_qr=request.include_irn_qr,
+                )
+                if signing_result:
+                    irn_signature_payload = self._serialize_irn_signature(signing_result)
+                    invoice_data['irn_signature'] = irn_signature_payload
+            else:
+                logger.debug("Unable to derive service ID from IRN %s; skipping IRN signing payload", irn)
 
         organization = await self._get_organization_profile(request.organization_id)
         (
@@ -1541,6 +1570,9 @@ class ComprehensiveFIRSInvoiceGenerator:
                 'validation_status': 'valid' if is_valid else 'invalid',
             }
         )
+
+        if irn_signature_payload:
+            response_payload['irn_signature'] = irn_signature_payload
 
         if transformation_summary:
             response_payload['transformation_pipeline'] = {
@@ -1589,6 +1621,9 @@ class ComprehensiveFIRSInvoiceGenerator:
             'signature': signature_info,
             'transformation_pipeline': response_payload.get('transformation_pipeline'),
         }
+
+        if irn_signature_payload:
+            submission_payload['irn_signature'] = irn_signature_payload
 
         if qr_signature:
             submission_payload['pre_submission_signature'] = {
@@ -1713,8 +1748,22 @@ class ComprehensiveFIRSInvoiceGenerator:
             }
         }
 
+        irn_signature_payload: Optional[Dict[str, Any]] = None
         if irn:
             invoice_data['irn'] = irn
+            service_id = self._extract_service_id_from_irn(irn)
+            if service_id:
+                signing_result = self._generate_irn_signing_metadata(
+                    invoice_number=invoice_data['invoice_number'],
+                    service_id=service_id,
+                    issued_on=invoice_data['invoice_date'],
+                    include_qr=request.include_irn_qr,
+                )
+                if signing_result:
+                    irn_signature_payload = self._serialize_irn_signature(signing_result)
+                    invoice_data['irn_signature'] = irn_signature_payload
+            else:
+                logger.debug("Unable to derive service ID from IRN %s; skipping IRN signing payload", irn)
 
         organization = await self._get_organization_profile(request.organization_id)
         (
@@ -1745,6 +1794,9 @@ class ComprehensiveFIRSInvoiceGenerator:
             }
         )
 
+        if irn_signature_payload:
+            response_payload['irn_signature'] = irn_signature_payload
+
         if transformation_summary:
             response_payload['transformation_pipeline'] = {
                 'success': transformation_summary.get('success'),
@@ -1762,6 +1814,9 @@ class ComprehensiveFIRSInvoiceGenerator:
             'signature': signature_info,
             'transformation_pipeline': response_payload.get('transformation_pipeline'),
         }
+
+        if irn_signature_payload:
+            submission_payload['irn_signature'] = irn_signature_payload
 
         validation_status = ValidationStatus.VALID if is_valid else ValidationStatus.INVALID
 
@@ -1883,6 +1938,62 @@ class ComprehensiveFIRSInvoiceGenerator:
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.warning("QR signing failed for IRN %s: %s", irn, exc)
             return None
+
+    def _get_irn_crypto_bundle(self) -> Optional[CryptoBundle]:
+        if self._irn_bundle_path is None:
+            return None
+        if self._irn_crypto_bundle is None:
+            try:
+                self._irn_crypto_bundle = load_crypto_bundle(self._irn_bundle_path)
+            except Exception as exc:
+                logger.warning("Unable to load IRN signing bundle from %s: %s", self._irn_bundle_path, exc)
+                self._irn_crypto_bundle = None
+        return self._irn_crypto_bundle
+
+    def _generate_irn_signing_metadata(
+        self,
+        *,
+        invoice_number: str,
+        service_id: str,
+        issued_on: str,
+        include_qr: bool = False,
+    ) -> Optional[SignedIRNResult]:
+        bundle = self._get_irn_crypto_bundle()
+        if not bundle:
+            return None
+        try:
+            return generate_signed_irn(
+                bundle=bundle,
+                invoice_number=invoice_number,
+                service_id=service_id,
+                issued_on=issued_on,
+                include_qr=include_qr,
+            )
+        except Exception as exc:
+            logger.warning("IRN signing failed for invoice %s: %s", invoice_number, exc)
+            return None
+
+    @staticmethod
+    def _extract_service_id_from_irn(irn: Optional[str]) -> Optional[str]:
+        if not irn:
+            return None
+        parts = irn.split("-")
+        if len(parts) != 3:
+            return None
+        return parts[1]
+
+    @staticmethod
+    def _serialize_irn_signature(result: SignedIRNResult) -> Dict[str, Any]:
+        payload = {
+            "irn_with_timestamp": result.irn_with_timestamp,
+            "timestamp": result.timestamp,
+            "encrypted_payload": result.encrypted_base64,
+            "certificate": result.bundle.certificate_b64,
+            "metadata": result.metadata,
+        }
+        if result.qr_png_bytes:
+            payload["qr_png_base64"] = base64.b64encode(result.qr_png_bytes).decode("utf-8")
+        return payload
 
     async def get_generation_statistics(self) -> Dict[str, Any]:
         """Get invoice generation statistics."""

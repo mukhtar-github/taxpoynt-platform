@@ -72,6 +72,7 @@ class FIRSInvoiceGenerationRequestAPI(BaseModel):
     invoice_type: str = "standard"
     consolidate: bool = False
     include_digital_signature: bool = True
+    include_irn_qr: bool = False
     customer_overrides: Optional[Dict[str, str]] = None
 
     @validator('invoice_type')
@@ -405,6 +406,7 @@ def create_firs_invoice_router(
                 invoice_type=request.invoice_type,
                 consolidate=request.consolidate,
                 include_digital_signature=request.include_digital_signature,
+                include_irn_qr=request.include_irn_qr,
                 customer_overrides=request.customer_overrides
             )
 

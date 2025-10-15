@@ -712,7 +712,12 @@ class SIServiceRegistry:
                         "validate_document",
                         "convert_format"
                     ],
-                    "supported_formats": ["ubl", "json", "xml", "pdf"]
+                    "supported_formats": ["ubl", "json", "xml", "pdf"],
+                    "response_fields": {
+                        "generate_invoice": {
+                            "irn_signature": "Encrypted IRN payload packaged with metadata and optional qr_png_base64 when requested"
+                        }
+                    }
                 }
             )
             
