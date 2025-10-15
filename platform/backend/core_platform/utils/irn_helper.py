@@ -77,8 +77,6 @@ def _normalize_service_id(raw: str) -> str:
 
     if len(value) < 8:
         value = value.ljust(8, "0")
-    elif len(value) > 8:
-        value = value[:8]
 
     return value
 
