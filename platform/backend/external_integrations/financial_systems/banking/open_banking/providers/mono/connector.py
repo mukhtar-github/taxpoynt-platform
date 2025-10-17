@@ -337,6 +337,81 @@ class MonoConnector:
         except MonoBaseException:
             self.stats["errors_encountered"] += 1
             raise
+
+    async def get_transactions_by_date_range(
+        self,
+        organization_id: str,
+        start_datetime: datetime,
+        end_datetime: datetime
+    ) -> List[Dict[str, Any]]:
+        """
+        Aggregate transactions for all connected accounts within a date range.
+
+        This helper keeps backward compatibility with legacy callers that expect
+        a flattened list of transaction dictionaries.
+        """
+
+        if start_datetime is None or end_datetime is None:
+            logger.debug(
+                "Date range not provided for Mono aggregation; defaulting to last 30 days for organization %s",
+                organization_id,
+            )
+            end_datetime = datetime.utcnow()
+            start_datetime = end_datetime - timedelta(days=30)
+
+        if not self.connected_accounts:
+            logger.info(
+                "No connected Mono accounts found for organization %s; skipping transaction aggregation",
+                organization_id
+            )
+            return []
+
+        start_date = start_datetime.date() if isinstance(start_datetime, datetime) else start_datetime
+        end_date = end_datetime.date() if isinstance(end_datetime, datetime) else end_datetime
+
+        aggregated: List[Dict[str, Any]] = []
+
+        for account_id, account in self.connected_accounts.items():
+            try:
+                batch = await self.get_account_transactions(
+                    account_id=account_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=self.config.default_transaction_limit
+                )
+            except Exception as exc:
+                logger.debug(
+                    "Mono transaction fetch failed for account %s within organization %s: %s",
+                    account_id,
+                    organization_id,
+                    exc
+                )
+                continue
+
+            for txn in batch.transactions:
+                tx_datetime = datetime.combine(txn.date, datetime.min.time())
+                aggregated.append(
+                    {
+                        "_id": txn.id,
+                        "type": txn.type.value if hasattr(txn.type, "value") else txn.type,
+                        "amount": float(txn.amount_naira),
+                        "balance": float(txn.balance_naira),
+                        "date": tx_datetime,
+                        "narration": txn.narration,
+                        "account_id": account_id,
+                        "account_name": getattr(account, "name", account_id),
+                        "institution": getattr(getattr(account, "institution", None), "name", None),
+                    }
+                )
+
+        if not aggregated:
+            logger.debug(
+                "Mono transaction aggregation returned no records for organization %s between %s and %s",
+                organization_id,
+                start_date,
+                end_date,
+            )
+        return aggregated
     
     async def get_transaction_summary(
         self,

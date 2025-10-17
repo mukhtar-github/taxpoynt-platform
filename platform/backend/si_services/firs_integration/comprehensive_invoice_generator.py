@@ -77,20 +77,22 @@ except Exception:
 # Purged US-centric connectors (Salesforce, Square, Shopify) for Nigerian deployments
 
 try:
-    from external_integrations.financial_systems.banking.mono_connector import MonoConnector  # legacy path
+    from external_integrations.financial_systems.banking.mono_connector import MonoConnector, MonoConfig  # legacy path
 except Exception:
     try:
-        from external_integrations.financial_systems.banking.open_banking.providers.mono.connector import MonoConnector
+        from external_integrations.financial_systems.banking.open_banking.providers.mono.connector import MonoConnector, MonoConfig
     except Exception:
-        MonoConnector = None
+        MonoConnector = None  # type: ignore
+        MonoConfig = None  # type: ignore
 
 try:
-    from external_integrations.financial_systems.payments.paystack_connector import PaystackConnector  # legacy path
+    from external_integrations.financial_systems.payments.paystack_connector import PaystackConnector, PaystackConfig  # legacy path
 except Exception:
     try:
-        from external_integrations.financial_systems.payments.nigerian_processors.paystack.connector import PaystackConnector
+        from external_integrations.financial_systems.payments.nigerian_processors.paystack.connector import PaystackConnector, PaystackConfig
     except Exception:
-        PaystackConnector = None
+        PaystackConnector = None  # type: ignore
+        PaystackConfig = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +192,10 @@ class ComprehensiveFIRSInvoiceGenerator:
         self.firs_formatter = firs_formatter
         self.correlation_service = SIAPPCorrelationService(db_session)
         self.transformation_orchestrator = TransformationOrchestrator()
-        
+
+        mono_connector = self._initialize_mono_connector()
+        paystack_connector = self._initialize_paystack_connector()
+
         # Initialize connectors for all supported systems (graceful handling of missing connectors)
         self.connectors = {
             DataSourceType.ERP: {
@@ -201,10 +206,10 @@ class ComprehensiveFIRSInvoiceGenerator:
             DataSourceType.POS: {},
             DataSourceType.ECOMMERCE: {},
             DataSourceType.BANKING: {
-                'mono': MonoConnector() if MonoConnector else None
+                'mono': mono_connector
             },
             DataSourceType.PAYMENT: {
-                'paystack': PaystackConnector() if PaystackConnector else None,
+                'paystack': paystack_connector,
                 'flutterwave': None  # To be implemented
             }
         }
@@ -242,6 +247,155 @@ class ComprehensiveFIRSInvoiceGenerator:
         self._irn_crypto_bundle: Optional[CryptoBundle] = None
         self._organization_cache: Dict[str, Organization] = {}
         self._signing_certificate_cache: Dict[str, Optional[str]] = {}
+
+    def _initialize_mono_connector(self):
+        """Safely initialize Mono connector from environment configuration."""
+        if not MonoConnector or not MonoConfig:
+            return None
+
+        try:
+            config = self._build_mono_config_from_env()
+            if not config:
+                logger.debug("Mono configuration not available; banking aggregation disabled")
+                return None
+            return MonoConnector(config)
+        except TypeError as exc:
+            logger.debug("Mono connector requires explicit configuration; skipping initialization: %s", exc)
+            return None
+        except Exception as exc:
+            logger.debug("Mono connector initialization failed; skipping: %s", exc)
+            return None
+
+    def _build_mono_config_from_env(self):
+        """Construct Mono configuration from environment variables."""
+        if not MonoConfig:
+            return None
+
+        secret_key = os.getenv("MONO_SECRET_KEY") or os.getenv("MONO_SEC_KEY")
+        app_id = os.getenv("MONO_APP_ID") or os.getenv("MONO_APPLICATION_ID")
+        if not secret_key or not app_id:
+            return None
+
+        def is_truthy(value: Optional[str], default: bool = False) -> bool:
+            if value is None:
+                return default
+            return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+        def parse_int(value: Optional[str], default: int) -> int:
+            if value is None:
+                return default
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
+        enable_webhook_verification = os.getenv("MONO_ENABLE_WEBHOOK_VERIFICATION")
+        if enable_webhook_verification is None:
+            enable_webhook_verification = os.getenv("MONO_VERIFY_WEBHOOKS")
+
+        auto_invoice_generation = os.getenv("MONO_AUTO_INVOICE_GENERATION")
+        if auto_invoice_generation is None:
+            auto_invoice_generation = os.getenv("MONO_AUTO_INVOICE")
+
+        config = MonoConfig(
+            secret_key=secret_key,
+            app_id=app_id,
+            environment=os.getenv("MONO_ENVIRONMENT") or os.getenv("MONO_ENV") or "sandbox",
+            public_key=os.getenv("MONO_PUBLIC_KEY"),
+            webhook_url=os.getenv("MONO_WEBHOOK_URL"),
+            webhook_secret=os.getenv("MONO_WEBHOOK_SECRET"),
+            enable_webhook_verification=is_truthy(enable_webhook_verification, default=True),
+            max_concurrent_requests=parse_int(os.getenv("MONO_MAX_CONCURRENT_REQUESTS"), default=3),
+            default_transaction_limit=parse_int(os.getenv("MONO_DEFAULT_TRANSACTION_LIMIT"), default=50),
+            auto_invoice_generation=is_truthy(auto_invoice_generation)
+        )
+
+        invoice_min_amount = os.getenv("MONO_INVOICE_MIN_AMOUNT") or os.getenv("MONO_MIN_INVOICE_AMOUNT")
+        if invoice_min_amount:
+            try:
+                config.invoice_min_amount = Decimal(str(invoice_min_amount))
+            except (ArithmeticError, ValueError):
+                logger.debug("Invalid MONO_INVOICE_MIN_AMOUNT value: %s", invoice_min_amount)
+
+        return config
+
+    def _initialize_paystack_connector(self):
+        """Safely initialize Paystack connector from environment configuration."""
+        if not PaystackConnector or not PaystackConfig:
+            return None
+
+        try:
+            config = self._build_paystack_config_from_env()
+            if not config:
+                logger.debug("Paystack configuration not available; payment aggregation disabled")
+                return None
+            return PaystackConnector(config)
+        except TypeError as exc:
+            logger.debug("Paystack connector requires explicit configuration; skipping initialization: %s", exc)
+            return None
+        except Exception as exc:
+            logger.debug("Paystack connector initialization failed; skipping: %s", exc)
+            return None
+
+    def _build_paystack_config_from_env(self):
+        """Construct Paystack configuration from environment variables."""
+        if not PaystackConfig:
+            return None
+
+        secret_key = os.getenv("PAYSTACK_SECRET_KEY")
+        public_key = os.getenv("PAYSTACK_PUBLIC_KEY")
+        webhook_secret = os.getenv("PAYSTACK_WEBHOOK_SECRET")
+        if not secret_key or not public_key or not webhook_secret:
+            return None
+
+        def is_truthy(value: Optional[str], default: bool = False) -> bool:
+            if value is None:
+                return default
+            return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+        config = PaystackConfig(
+            secret_key=secret_key,
+            public_key=public_key,
+            webhook_secret=webhook_secret,
+            test_mode=is_truthy(os.getenv("PAYSTACK_TEST_MODE"), default=True),
+            merchant_email=os.getenv("PAYSTACK_MERCHANT_EMAIL", "")
+        )
+
+        config.firs_integration_enabled = is_truthy(os.getenv("PAYSTACK_FIRS_INTEGRATION_ENABLED"), default=True)
+        config.auto_invoice_generation = is_truthy(os.getenv("PAYSTACK_AUTO_INVOICE_GENERATION"), default=True)
+        config.enable_ai_classification = is_truthy(os.getenv("PAYSTACK_ENABLE_AI_CLASSIFICATION"), default=True)
+        config.openai_api_key = os.getenv("PAYSTACK_OPENAI_API_KEY")
+
+        privacy_level = os.getenv("PAYSTACK_PRIVACY_LEVEL")
+        if privacy_level:
+            try:
+                from external_integrations.connector_framework.classification_engine.nigerian_classifier import PrivacyLevel
+                config.privacy_level = PrivacyLevel[privacy_level.upper()]
+            except Exception:
+                logger.debug("Invalid PAYSTACK_PRIVACY_LEVEL value: %s", privacy_level)
+
+        max_requests = os.getenv("PAYSTACK_MAX_REQUESTS_PER_MINUTE")
+        if max_requests:
+            try:
+                config.max_requests_per_minute = int(max_requests)
+            except (TypeError, ValueError):
+                logger.debug("Invalid PAYSTACK_MAX_REQUESTS_PER_MINUTE value: %s", max_requests)
+
+        batch_size = os.getenv("PAYSTACK_BATCH_SIZE")
+        if batch_size:
+            try:
+                config.batch_size = int(batch_size)
+            except (TypeError, ValueError):
+                logger.debug("Invalid PAYSTACK_BATCH_SIZE value: %s", batch_size)
+
+        invoice_min_amount = os.getenv("PAYSTACK_INVOICE_MIN_AMOUNT")
+        if invoice_min_amount:
+            try:
+                config.invoice_min_amount = Decimal(str(invoice_min_amount))
+            except (ArithmeticError, ValueError):
+                logger.debug("Invalid PAYSTACK_INVOICE_MIN_AMOUNT value: %s", invoice_min_amount)
+
+        return config
 
     async def _get_odoo_unified(self, organization_id: UUID):
         """Return an OdooUnifiedConnector for the given organization, preferring org config over env.
@@ -935,7 +1089,7 @@ class ComprehensiveFIRSInvoiceGenerator:
 
         # Salesforce CRM Data
         try:
-            sf_connector = self.connectors[DataSourceType.CRM]['salesforce']
+            sf_connector = self.connectors.get(DataSourceType.CRM, {}).get('salesforce')
             if sf_connector is not None:
                 sf_deals = await sf_connector.get_closed_deals_by_date_range(
                     organization_id, date_range[0], date_range[1]
@@ -1139,7 +1293,7 @@ class ComprehensiveFIRSInvoiceGenerator:
 
         # Mono Banking Data
         try:
-            mono_connector = self.connectors[DataSourceType.BANKING]['mono']
+            mono_connector = self.connectors.get(DataSourceType.BANKING, {}).get('mono')
             if mono_connector is not None:
                 mono_transactions = await mono_connector.get_transactions_by_date_range(
                     organization_id, date_range[0], date_range[1]

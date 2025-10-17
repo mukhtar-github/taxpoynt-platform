@@ -238,7 +238,7 @@ def create_firs_invoice_router(
             ]
 
             return build_v1_response(
-                data={"sources": sources},
+                {"sources": sources},
                 action="get_connected_sources"
             )
 
@@ -321,7 +321,7 @@ def create_firs_invoice_router(
                 filtered_transactions.append(transaction_response)
 
             return build_v1_response(
-                data={
+                {
                     "transactions": [txn.dict() for txn in filtered_transactions],
                     "total_count": len(filtered_transactions),
                     "filters_applied": filters.dict()
@@ -646,7 +646,7 @@ def create_firs_invoice_router(
             ]
 
             return build_v1_response(
-                data={
+                {
                     "sample_transactions": sample_transactions,
                     "total_count": len(sample_transactions),
                     "total_amount": sum(txn["amount"] for txn in sample_transactions),
