@@ -39,6 +39,17 @@ interface IntegrationStep {
   completed: boolean;
 }
 
+interface TestConnectionResponse {
+  success: boolean;
+  data?: {
+    success?: boolean;
+    error?: string;
+    message?: string;
+    [key: string]: any;
+  };
+  meta?: Record<string, any>;
+}
+
 const businessSystems: BusinessSystem[] = [
   // ERP Systems
   {
@@ -323,19 +334,22 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
   const handleTestConnection = async (systemId: string) => {
     setIsProcessing(true);
     try {
-      const result = await apiClient.post<{ success: boolean; error?: string }>(
-        `/si/integrations/${systemId}/test`,
+      const result = await apiClient.post<TestConnectionResponse>(
+        '/si/business/erp/test-credentials',
         {
+          erp_system: systemId,
           credentials: credentials[systemId],
           organization_id: organizationId
         }
       );
-      setTestResults(prev => ({ ...prev, [systemId]: result.success }));
+      const isSuccessful = Boolean(result.success);
+      setTestResults(prev => ({ ...prev, [systemId]: isSuccessful }));
       
-      if (result.success) {
+      if (isSuccessful) {
         alert(`✅ ${businessSystems.find(s => s.id === systemId)?.name} connection successful!`);
       } else {
-        alert(`❌ Connection failed: ${result.error}`);
+        const errorMessage = result.data?.error || result.meta?.error || 'Connection failed';
+        alert(`❌ Connection failed: ${errorMessage}`);
       }
     } catch (error) {
       secureLogger.error('Connection test failed', error);

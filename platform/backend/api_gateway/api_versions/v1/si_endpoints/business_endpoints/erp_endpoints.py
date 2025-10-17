@@ -135,6 +135,16 @@ class ERPEndpointsV1:
         )
         
         self.router.add_api_route(
+            "/test-credentials",
+            self.test_erp_connection_credentials,
+            methods=["POST"],
+            summary="Test ERP connection credentials",
+            description="Validate ERP credentials without creating a persistent connection",
+            response_model=V1ResponseModel,
+            dependencies=guard_deps,
+        )
+        
+        self.router.add_api_route(
             "/connections/{connection_id}",
             self.get_erp_connection,
             methods=["GET"],
@@ -443,6 +453,43 @@ class ERPEndpointsV1:
         except Exception as e:
             logger.error(f"Error creating ERP connection in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to create ERP connection")
+    
+    async def test_erp_connection_credentials(
+        self,
+        request: Request,
+        context: Optional[HTTPRoutingContext] = Depends(lambda: None),
+    ):
+        """Test ERP credentials without persisting a connection record."""
+        try:
+            context = context or await self._get_si_context(request)
+            body = await request.json()
+            
+            erp_system = (body.get("erp_system") or "").lower()
+            credentials = body.get("credentials")
+            
+            if not erp_system:
+                raise HTTPException(status_code=400, detail="erp_system is required")
+            if not isinstance(credentials, dict) or not credentials:
+                raise HTTPException(status_code=400, detail="credentials payload is required")
+            
+            result = await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation="test_erp_connection_credentials",
+                payload={
+                    "erp_system": erp_system,
+                    "credentials": credentials,
+                    "organization_id": body.get("organization_id"),
+                    "si_id": context.user_id,
+                    "api_version": "v1",
+                },
+            )
+            
+            return self._create_v1_response(result, "erp_connection_credentials_tested")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error testing ERP credentials in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to test ERP credentials")
     
     async def get_erp_connection(self, 
                                 connection_id: str,

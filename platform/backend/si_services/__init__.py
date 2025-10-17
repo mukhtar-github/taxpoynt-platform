@@ -46,6 +46,7 @@ from .reconciliation_management.reconciliation_service import SIReconciliationSe
 from .validation_services.validation_service import SIValidationService
 from .reporting_services.reporting_service import SIReportingService
 from .integration_management.connection_manager import ConnectionConfig, SystemType, connection_manager
+from .integration_management.connection_tester import connection_tester
 from .integration_management import (
     SyncConfiguration,
     SyncDirection,
@@ -929,6 +930,7 @@ class SIServiceRegistry:
                 "health_monitor": integration_health_monitor,
                 "metrics_collector": metrics_collector,
                 "sync_orchestrator": sync_orchestrator,
+                "connection_tester": connection_tester,
             }
 
             try:
@@ -975,6 +977,7 @@ class SIServiceRegistry:
                         "update_erp_connection",
                         "delete_erp_connection",
                         "test_erp_connection",
+                        "test_erp_connection_credentials",
                         "get_erp_connection_health",
                         "bulk_test_erp_connections",
                         "bulk_sync_erp_data",
@@ -1682,6 +1685,7 @@ class SIServiceRegistry:
         async def integration_callback(operation: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 health_monitor = integration_service.get("health_monitor")
+                connection_tester = integration_service.get("connection_tester")
                 if operation == "create_erp_connection":
                     return await self._handle_create_erp_connection(payload)
                 if operation == "list_erp_connections":
@@ -1694,6 +1698,8 @@ class SIServiceRegistry:
                     return await self._handle_delete_erp_connection(payload)
                 if operation == "test_erp_connection":
                     return await self._handle_test_erp_connection(payload)
+                if operation == "test_erp_connection_credentials":
+                    return await self._handle_test_erp_connection_credentials(payload, connection_tester)
                 if operation == "get_erp_connection_health":
                     return await self._handle_get_erp_connection_health(payload, health_monitor)
                 if operation == "bulk_test_erp_connections":
@@ -2268,6 +2274,68 @@ class SIServiceRegistry:
             "data": result.dict(),
         }
 
+    async def _handle_test_erp_connection_credentials(
+        self,
+        payload: Dict[str, Any],
+        connection_tester_instance: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        erp_system = (payload.get("erp_system") or "").lower()
+        credentials = payload.get("credentials") or {}
+
+        if not erp_system:
+            return {
+                "operation": "test_erp_connection_credentials",
+                "success": False,
+                "error": "erp_system is required",
+            }
+
+        if not isinstance(credentials, dict) or not credentials:
+            return {
+                "operation": "test_erp_connection_credentials",
+                "success": False,
+                "error": "credentials payload is required",
+            }
+
+        if erp_system != "odoo":
+            return {
+                "operation": "test_erp_connection_credentials",
+                "success": False,
+                "error": f"Credential testing not supported for ERP system '{erp_system}'",
+            }
+
+        tester = connection_tester_instance or connection_tester
+        test_fn = getattr(tester, "test_odoo_connection_params", None)
+        if not callable(test_fn):
+            return {
+                "operation": "test_erp_connection_credentials",
+                "success": False,
+                "error": "Odoo connection tester is unavailable",
+            }
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        try:
+            if loop and loop.is_running():
+                result = await loop.run_in_executor(None, test_fn, credentials)
+            else:
+                result = test_fn(credentials)
+        except Exception as exc:
+            return {
+                "operation": "test_erp_connection_credentials",
+                "success": False,
+                "error": f"Odoo credential test failed: {exc}",
+            }
+
+        success = bool(result.get("success", True)) if isinstance(result, dict) else True
+        return {
+            "operation": "test_erp_connection_credentials",
+            "success": success,
+            "data": result,
+        }
+
     def _record_to_dict(self, record: ERPConnectionRecord) -> Dict[str, Any]:
         return {
             "connection_id": record.connection_id,
@@ -2525,6 +2593,14 @@ async def initialize_si_services(
     """
     global _service_registry
     
+    if _service_registry is not None and _service_registry.message_router is not message_router:
+        try:
+            await _service_registry.cleanup_services()
+        except Exception as cleanup_err:
+            logger.warning(f"Previous SI registry cleanup failed during router swap: {cleanup_err}")
+        logger.info("Reinitializing SI service registry with new message router instance")
+        _service_registry = None
+
     if _service_registry is None:
         _service_registry = SIServiceRegistry(
             message_router,
