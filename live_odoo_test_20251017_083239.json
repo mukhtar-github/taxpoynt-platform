@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-10-17T08:32:39.945572",
+  "test_type": "live_odoo_integration",
+  "odoo_host": "mt-garba-global-ventures.odoo.com",
+  "success_rate": 40.0,
+  "passed_tests": 2,
+  "total_tests": 5,
+  "results": {
+    "odoo_connection": false,
+    "invoice_retrieval": false,
+    "company_info": false,
+    "ubl_service": true,
+    "end_to_end": true
+  },
+  "integration_readiness": {
+    "odoo_functional": false,
+    "ubl_service_available": true,
+    "end_to_end_ready": false
+  }
+}
