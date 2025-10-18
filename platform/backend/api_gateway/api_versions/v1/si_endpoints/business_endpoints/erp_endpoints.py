@@ -260,7 +260,8 @@ class ERPEndpointsV1:
     
     def _setup_routes(self):
         """Setup ERP system integration routes"""
-        guard_deps: List[Any] = [Depends(self._ensure_context)]
+        guard_deps: List[Any] = []
+        protected_guard_deps: List[Any] = [Depends(self._ensure_context)]
         
         # ERP System Discovery
         self.router.add_api_route(
@@ -281,7 +282,7 @@ class ERPEndpointsV1:
             summary="List ERP connections",
             description="Get all ERP system connections for the SI",
             response_model=V1ResponseModel,
-            dependencies=guard_deps,
+            dependencies=protected_guard_deps,
         )
         
         self.router.add_api_route(
@@ -292,7 +293,7 @@ class ERPEndpointsV1:
             description="Create new ERP system connection",
             response_model=V1ResponseModel,
             status_code=201,
-            dependencies=guard_deps,
+            dependencies=protected_guard_deps,
         )
         
         self.router.add_api_route(
@@ -302,7 +303,7 @@ class ERPEndpointsV1:
             summary="Test ERP connection credentials",
             description="Validate ERP credentials without creating a persistent connection",
             response_model=V1ResponseModel,
-            dependencies=guard_deps,
+            dependencies=protected_guard_deps,
         )
         
         self.router.add_api_route(
