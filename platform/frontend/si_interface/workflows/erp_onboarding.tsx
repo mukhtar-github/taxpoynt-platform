@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
@@ -193,6 +194,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   onSkip,
   isLoading = false
 }) => {
+  const router = useRouter();
   // Form persistence setup for ERP onboarding
   const erpFormPersistence = useFormPersistence({
     storageKey: `taxpoynt_erp_onboarding_${organizationId || 'temp'}`,
@@ -769,7 +771,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
             <div className="text-4xl mb-4">⚙️</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">ERP Configuration</h3>
             <p className="text-gray-600 mb-6">Set up ERP system credentials and connection parameters</p>
-            <Button onClick={() => window.location.href = '/si/integration-setup'}>
+            <Button onClick={() => router.push('/dashboard/si/integrations/new')}>
               Open Integration Setup
             </Button>
           </div>
