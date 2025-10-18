@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Integration Setup Page
  * =====================
@@ -14,6 +16,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
@@ -284,6 +287,7 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
   organizationId,
   onSetupComplete
 }) => {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const [steps, setSteps] = useState<IntegrationStep[]>(integrationSteps);
@@ -567,7 +571,7 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
             <p className="text-gray-600 mb-6">
               Configure how your business data maps to FIRS-compliant invoice format
             </p>
-            <Button onClick={() => window.location.href = '/si/data-mapping'}>
+            <Button onClick={() => router.push('/onboarding/si/data-mapping')}>
               Open Data Mapping Tool
             </Button>
           </div>

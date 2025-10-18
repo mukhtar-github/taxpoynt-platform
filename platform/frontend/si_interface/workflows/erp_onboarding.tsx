@@ -936,7 +936,7 @@ const renderERPSelection = () => (
             <div className="text-4xl mb-4">🔄</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Data Mapping</h3>
             <p className="text-gray-600 mb-6">Configure data field mapping for FIRS compliance</p>
-            <Button onClick={() => window.location.href = '/si/data-mapping'}>
+            <Button onClick={() => router.push('/onboarding/si/data-mapping')}>
               Open Data Mapping Tool
             </Button>
           </div>

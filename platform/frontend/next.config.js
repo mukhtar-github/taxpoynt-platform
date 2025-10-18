@@ -7,7 +7,13 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async redirects() {
-    return [];
+    return [
+      {
+        source: '/si/data-mapping',
+        destination: '/onboarding/si/data-mapping',
+        permanent: false,
+      },
+    ];
   },
   async headers() {
     return [
