@@ -235,19 +235,29 @@ def create_taxpoynt_app() -> FastAPI:
     logger.info("🚀 Initializing TaxPoynt Platform with Production Architecture")
     
     # Create gateway configuration
+    base_cors_origins = [
+        "https://web-production-ea5ad.up.railway.app",  # Railway production
+        "https://app-staging.taxpoynt.com",
+        "https://app.taxpoynt.com",
+        "https://taxpoynt.com",  # Main domain
+        "https://www.taxpoynt.com",  # WWW subdomain - Vercel frontend
+        "http://localhost:3000",
+        "http://localhost:3001"  # Frontend dev port
+    ]
+
+    required_frontend_origins = [
+        "https://taxpoynt.com",
+        "https://www.taxpoynt.com",
+    ]
+
+    # Ensure required production domains are always present (deduplicated, order preserved)
+    cors_origins = list(dict.fromkeys(base_cors_origins + required_frontend_origins))
+
     config = APIGatewayConfig(
         host="0.0.0.0",
         port=PORT,
         cors_enabled=True,
-        cors_origins=[
-            "https://web-production-ea5ad.up.railway.app",  # Railway production
-            "https://app-staging.taxpoynt.com",
-            "https://app.taxpoynt.com",
-            "https://taxpoynt.com",  # Main domain
-            "https://www.taxpoynt.com",  # WWW subdomain - Vercel frontend
-            "http://localhost:3000",
-            "http://localhost:3001"  # Frontend dev port
-        ] if not DEBUG else ["*"],
+        cors_origins=cors_origins if not DEBUG else ["*"],
         trusted_hosts=None,
         security=RoutingSecurityLevel.STANDARD,
         jwt_secret_key="SECURE_JWT_MANAGED_BY_JWT_MANAGER",

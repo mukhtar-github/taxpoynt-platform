@@ -151,7 +151,7 @@ class APIVersionCoordinator:
                 "hybrid": "taxpoynt_platform.api_gateway.api_versions.v1.hybrid_endpoints"
             },
             rate_limits={
-                "system_integrator": 1000,  # requests per hour
+                "system_integrator": 3600,  # allow ~60 req/min for SI flows
                 "access_point_provider": 2000,
                 "administrator": 5000
             }
