@@ -686,8 +686,8 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     </div>
   );
 
-  const renderERPSelection = () => (
-    <div className="space-y-6">
+const renderERPSelection = () => (
+  <div className="space-y-6">
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
         <h3 className="font-semibold text-purple-900 mb-2">🔧 ERP System Selection</h3>
         <p className="text-purple-800 text-sm">
@@ -754,6 +754,169 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
           </div>
         </div>
       )}
+  </div>
+);
+
+  const renderERPConfiguration = () => (
+    <div className="space-y-6">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold text-indigo-900 mb-2">⚙️ ERP Configuration</h3>
+        <p className="text-indigo-800 text-sm">
+          Provide connection details for your primary ERP system. These settings are stored securely and power the
+          automated integration workflow once onboarding is complete.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            ERP Version / Edition
+          </label>
+          <input
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={erpConfiguration.version || ''}
+            onChange={(e) =>
+              setErpConfiguration((prev) => ({
+                ...prev,
+                version: e.target.value,
+              }))
+            }
+            placeholder="e.g. Odoo 16 Enterprise"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Server URL / Endpoint
+          </label>
+          <input
+            type="url"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={erpConfiguration.credentials.server || ''}
+            onChange={(e) =>
+              setErpConfiguration((prev) => ({
+                ...prev,
+                credentials: { ...prev.credentials, server: e.target.value },
+              }))
+            }
+            placeholder="https://erp.company.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Database / Company ID
+          </label>
+          <input
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={erpConfiguration.credentials.database || ''}
+            onChange={(e) =>
+              setErpConfiguration((prev) => ({
+                ...prev,
+                credentials: { ...prev.credentials, database: e.target.value },
+              }))
+            }
+            placeholder="Internal database or tenant identifier"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Integration Username
+          </label>
+          <input
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={erpConfiguration.credentials.username || ''}
+            onChange={(e) =>
+              setErpConfiguration((prev) => ({
+                ...prev,
+                credentials: { ...prev.credentials, username: e.target.value },
+              }))
+            }
+            placeholder="svc_taxpoynt"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            API Key / Password
+          </label>
+          <input
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={erpConfiguration.credentials.apiKey || ''}
+            onChange={(e) =>
+              setErpConfiguration((prev) => ({
+                ...prev,
+                credentials: { ...prev.credentials, apiKey: e.target.value },
+              }))
+            }
+            placeholder="Secure API key or password"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            OAuth Token (optional)
+          </label>
+          <input
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={erpConfiguration.credentials.oauthToken || ''}
+            onChange={(e) =>
+              setErpConfiguration((prev) => ({
+                ...prev,
+                credentials: { ...prev.credentials, oauthToken: e.target.value },
+              }))
+            }
+            placeholder="Paste OAuth access token if required"
+          />
+        </div>
+      </div>
+
+      <div className="border rounded-lg p-4">
+        <h4 className="font-semibold text-gray-900 mb-3">Data Sources to Synchronize</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {Object.entries(erpConfiguration.dataSources).map(([key, value]) => (
+            <label key={key} className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                checked={value}
+                onChange={(e) =>
+                  setErpConfiguration((prev) => ({
+                    ...prev,
+                    dataSources: { ...prev.dataSources, [key]: e.target.checked },
+                  }))
+                }
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="capitalize text-gray-700">{key.replace(/_/g, ' ')}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
+        <p className="mb-2">
+          Need to reference connector specifics? Review the{' '}
+          <a
+            href="https://docs.taxpoynt.com/integrations/erp"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-600 hover:underline"
+          >
+            ERP integration checklist
+          </a>{' '}
+          to confirm required scopes and field mappings.
+        </p>
+        <p>
+          Credentials are encrypted before transmission. Only provide service accounts with the minimum permissions
+          required for invoice synchronization.
+        </p>
+      </div>
     </div>
   );
 
@@ -766,16 +929,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       case 'erp_selection':
         return renderERPSelection();
       case 'erp_configuration':
-        return (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">⚙️</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">ERP Configuration</h3>
-            <p className="text-gray-600 mb-6">Set up ERP system credentials and connection parameters</p>
-            <Button onClick={() => router.push('/dashboard/si/integrations/new')}>
-              Open Integration Setup
-            </Button>
-          </div>
-        );
+        return renderERPConfiguration();
       case 'data_mapping':
         return (
           <div className="text-center py-12">
