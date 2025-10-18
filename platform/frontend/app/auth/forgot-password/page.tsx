@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { secureLogger } from '../../../shared_components/utils/secureLogger';
 import apiClient from '../../../shared_components/api/client';
-import { Button } from '../../../shared_components/design_system/components/Button';
+import { Button } from '../../../design_system/components/Button';
 
 interface ForgotPasswordResponse {
   /** optional message for the user */
@@ -126,4 +126,3 @@ export default function ForgotPasswordPage(): JSX.Element {
     </div>
   );
 }
-
