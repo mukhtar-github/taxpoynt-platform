@@ -18,15 +18,16 @@ export default function SignInPageWrapper() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
-  const handleSignIn = async (credentials: { email: string; password: string }) => {
+  const handleSignIn = async (credentials: { email: string; password: string; rememberMe?: boolean }) => {
     setIsLoading(true);
     setError('');
 
     try {
+      const rememberPreference = Boolean(credentials.rememberMe);
       const response = await authService.login({
         email: credentials.email,
         password: credentials.password,
-        remember_me: false
+        remember_me: rememberPreference
       });
 
       // Get user role and redirect to appropriate dashboard

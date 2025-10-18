@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { onboardingApi } from '../../../../shared_components/services/onboardingApi';
 import { TaxPoyntButton } from '../../../../design_system';
 import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';
 
@@ -26,6 +27,7 @@ interface SetupStep {
 export default function CompleteIntegrationSetupPage() {
   const router = useRouter();
   const { user, isAuthenticated, isSystemIntegrator, isLoading } = useUserContext({ requireAuth: true });
+  const [wizardStatus, setWizardStatus] = useState<'checking' | 'ready'>('checking');
   const [setupSteps, setSetupSteps] = useState<SetupStep[]>([
     {
       id: 'business_systems',
@@ -63,7 +65,7 @@ export default function CompleteIntegrationSetupPage() {
 
   useEffect(() => {
     if (isLoading) return;
-    
+
     if (!isAuthenticated) {
       router.push('/auth/signin');
       return;
@@ -74,10 +76,57 @@ export default function CompleteIntegrationSetupPage() {
       return;
     }
 
-    if (user) {
-      // Update onboarding state
-      OnboardingStateManager.updateStep(user.id, 'complete_integration_setup');
-    }
+    const verifyPrerequisites = async () => {
+      try {
+        setWizardStatus('checking');
+        const state = await onboardingApi.getOnboardingState();
+        const prerequisitesMet =
+          Boolean(state?.has_started) &&
+          (
+            Boolean(state?.is_complete) ||
+            Boolean(
+              state?.current_step &&
+                [
+                  'business_systems_setup',
+                  'financial_systems_setup',
+                  'complete_integration_setup',
+                  'reconciliation_setup',
+                  'launch_ready',
+                  'launch',
+                  'onboarding_complete',
+                ].includes(state.current_step)
+            ) ||
+            Boolean(
+              state?.completed_steps?.some((step) =>
+                [
+                  'business_systems_setup',
+                  'financial_systems_setup',
+                  'complete_integration_setup',
+                  'reconciliation_setup',
+                  'launch_ready',
+                  'launch',
+                  'onboarding_complete',
+                ].includes(step)
+              )
+            )
+          );
+
+        if (!prerequisitesMet) {
+          router.replace('/onboarding/si/integration-setup');
+          return;
+        }
+
+        if (user) {
+          OnboardingStateManager.updateStep(user.id, 'complete_integration_setup');
+        }
+        setWizardStatus('ready');
+      } catch (error) {
+        console.error('Failed to verify onboarding prerequisites:', error);
+        router.replace('/onboarding/si/integration-setup');
+      }
+    };
+
+    verifyPrerequisites();
   }, [isLoading, isAuthenticated, isSystemIntegrator, user, router]);
 
   const handleStepAction = async (step: SetupStep) => {
@@ -133,7 +182,7 @@ export default function CompleteIntegrationSetupPage() {
     }
   };
 
-  if (!user) {
+  if (!user || wizardStatus === 'checking') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>

@@ -265,17 +265,26 @@ class TaxPoyntAPIClient {
   /**
    * Store authentication data
    */
-  private storeAuth(authData: AuthResponse): void {
+  private storeAuth(authData: AuthResponse, options: { persist?: boolean } = {}): void {
     if (typeof window === 'undefined') return;
+
+    const shouldPersist = Boolean(options.persist);
     
     // SECURITY: Store token securely using secureTokenStorage
     secureTokenStorage.storeToken(authData.access_token, { 
       encryptTokens: true, 
-      autoRefresh: true 
+      autoRefresh: true,
+      persistAcrossSessions: shouldPersist,
     });
     
     // Store user data in sessionStorage for privacy
-    sessionStorage.setItem(USER_KEY, JSON.stringify(authData.user));
+    const serializedUser = JSON.stringify(authData.user);
+    sessionStorage.setItem(USER_KEY, serializedUser);
+    if (shouldPersist) {
+      localStorage.setItem(USER_KEY, serializedUser);
+    } else {
+      localStorage.removeItem(USER_KEY);
+    }
   }
 
   /**
@@ -286,6 +295,7 @@ class TaxPoyntAPIClient {
     
     secureTokenStorage.clearToken();
     sessionStorage.removeItem(USER_KEY);
+    localStorage.removeItem(USER_KEY);
   }
 
   /**
@@ -294,7 +304,13 @@ class TaxPoyntAPIClient {
   public getStoredUser(): any | null {
     if (typeof window === 'undefined') return null;
     
-    const userStr = sessionStorage.getItem(USER_KEY);
+    let userStr = sessionStorage.getItem(USER_KEY);
+    if (!userStr) {
+      userStr = localStorage.getItem(USER_KEY);
+      if (userStr) {
+        sessionStorage.setItem(USER_KEY, userStr);
+      }
+    }
     return userStr ? JSON.parse(userStr) : null;
   }
 
@@ -341,7 +357,7 @@ class TaxPoyntAPIClient {
       });
       
       // Store authentication data
-      this.storeAuth(response.data);
+      this.storeAuth(response.data, { persist: false });
       
       return response.data;
           } catch (error) {
@@ -402,7 +418,7 @@ class TaxPoyntAPIClient {
       });
       
       // Store authentication data
-      this.storeAuth(response.data);
+      this.storeAuth(response.data, { persist: rememberMe });
       
       return response.data;
     } catch (error) {

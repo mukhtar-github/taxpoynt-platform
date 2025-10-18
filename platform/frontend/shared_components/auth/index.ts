@@ -9,5 +9,5 @@ export { EnhancedSignInForm } from './EnhancedSignInForm';
 export { EnhancedSignUpForm } from './EnhancedSignUpForm';
 
 export type { AuthLayoutProps } from './AuthLayout';
-export type { SignInFormProps } from './EnhancedSignInForm';
+export type { SignInFormProps, SignInCredentials } from './EnhancedSignInForm';
 export type { SignUpFormProps } from './EnhancedSignUpForm';

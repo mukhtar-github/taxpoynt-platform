@@ -12,7 +12,7 @@ import { Button } from '../../design_system/components/Button';
 import { Logo } from '../../design_system/components/Logo';
 
 interface SignInPageProps {
-  onSignIn: (credentials: { email: string; password: string }) => Promise<void>;
+  onSignIn: (credentials: { email: string; password: string; rememberMe?: boolean }) => Promise<void>;
   isLoading?: boolean;
   error?: string;
 }
@@ -29,7 +29,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, isLoading, err
     e.preventDefault();
     await onSignIn({
       email: formData.email,
-      password: formData.password
+      password: formData.password,
+      rememberMe: formData.rememberMe,
     });
   };
 

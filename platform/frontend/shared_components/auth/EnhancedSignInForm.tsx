@@ -9,8 +9,14 @@ import Link from 'next/link';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { TYPOGRAPHY_STYLES, ACCESSIBILITY_PATTERNS } from '../../design_system/style-utilities';
 
+export interface SignInCredentials {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}
+
 export interface SignInFormProps {
-  onSignIn: (credentials: { email: string; password: string }) => Promise<void>;
+  onSignIn: (credentials: SignInCredentials) => Promise<void>;
   isLoading?: boolean;
   error?: string;
 }
@@ -57,7 +63,8 @@ export const EnhancedSignInForm: React.FC<SignInFormProps> = ({
     try {
       await onSignIn({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        rememberMe: formData.rememberMe,
       });
     } catch (err) {
       // Error handling is done by parent component

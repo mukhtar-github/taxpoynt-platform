@@ -229,6 +229,33 @@ export default function SISSetupPage(): JSX.Element | null {
 
   const navigateTo = (path: string) => () => router.push(path);
 
+  const wizardStarted = Boolean(progress?.has_started);
+  const wizardCompleted =
+    Boolean(progress?.is_complete) ||
+    Boolean(progress?.completed_steps?.includes('onboarding_complete'));
+  const mappingStageIds = [
+    'business_systems_setup',
+    'financial_systems_setup',
+    'reconciliation_setup',
+    'complete_integration_setup',
+    'integration_testing',
+    'launch_ready',
+    'launch',
+    'onboarding_complete',
+  ];
+  const integrationStageIds = [
+    'complete_integration_setup',
+    'reconciliation_setup',
+    'onboarding_complete',
+  ];
+  const hasReachedStage = (stageIds: string[]) =>
+    wizardCompleted ||
+    (progress?.current_step ? stageIds.includes(progress.current_step) : false) ||
+    Boolean(progress?.completed_steps?.some((step) => stageIds.includes(step)));
+
+  const canResumeMapping = wizardStarted && hasReachedStage(mappingStageIds);
+  const canManageIntegrations = wizardStarted && hasReachedStage(integrationStageIds);
+
   const renderProgressBadge = () => {
     if (progressStatus === 'loading') {
       return <span className="text-xs font-medium text-slate-500">Loading onboarding status…</span>;
@@ -595,15 +622,24 @@ export default function SISSetupPage(): JSX.Element | null {
             </p>
             <div className="mt-4 space-x-3">
               <TaxPoyntButton
-                variant="outline"
+                variant="primary"
                 onClick={() => router.push('/onboarding/si/integration-setup')}
               >
                 Continue wizard
               </TaxPoyntButton>
-              <TaxPoyntButton variant="outline" onClick={navigateTo('/onboarding/si/complete-integration-setup')}>
+              <TaxPoyntButton
+                variant="outline"
+                onClick={navigateTo('/onboarding/si/complete-integration-setup')}
+                disabled={!canResumeMapping}
+              >
                 Resume mapping
               </TaxPoyntButton>
             </div>
+            {!canResumeMapping && (
+              <p className="mt-3 text-xs font-medium text-amber-600">
+                Complete the onboarding wizard steps before accessing mapping tools.
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
@@ -616,13 +652,25 @@ export default function SISSetupPage(): JSX.Element | null {
               for invoice validation and reconciliation.
             </p>
             <div className="mt-4 space-x-3">
-              <TaxPoyntButton onClick={navigateTo('/dashboard/si/integrations/new')}>
+              <TaxPoyntButton
+                onClick={navigateTo('/dashboard/si/integrations/new')}
+                disabled={!canManageIntegrations}
+              >
                 Connect Odoo RPC
               </TaxPoyntButton>
-              <TaxPoyntButton variant="outline" onClick={navigateTo('/dashboard/si/business-systems')}>
+              <TaxPoyntButton
+                variant="outline"
+                onClick={navigateTo('/dashboard/si/business-systems')}
+                disabled={!canManageIntegrations}
+              >
                 Manage systems
               </TaxPoyntButton>
             </div>
+            {!canManageIntegrations && (
+              <p className="mt-3 text-xs font-medium text-amber-600">
+                Finish the onboarding wizard before connecting external systems.
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">

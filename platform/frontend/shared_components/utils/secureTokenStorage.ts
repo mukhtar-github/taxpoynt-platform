@@ -10,6 +10,7 @@ interface TokenStorageOptions {
   useHttpOnly?: boolean;
   expirationCheck?: boolean;
   autoRefresh?: boolean;
+  persistAcrossSessions?: boolean;
 }
 
 interface StoredToken {
@@ -17,6 +18,7 @@ interface StoredToken {
   expiresAt: number;
   refreshToken?: string;
   scope?: string[];
+  persistAcrossSessions?: boolean;
 }
 
 class SecureTokenStorage {
@@ -38,14 +40,26 @@ class SecureTokenStorage {
    */
   storeToken(token: string, options: TokenStorageOptions = {}): void {
     try {
+      if (typeof window === 'undefined') {
+        throw new Error('Token storage is only available in the browser');
+      }
+
+      const persistAcrossSessions = Boolean(options.persistAcrossSessions);
       const tokenData: StoredToken = {
         value: this.encryptToken(token),
         expiresAt: this.calculateExpiration(),
-        scope: this.extractTokenScope(token)
+        scope: this.extractTokenScope(token),
+        persistAcrossSessions
       };
 
       // Store in sessionStorage for better security (cleared on tab close)
       sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(tokenData));
+
+      if (persistAcrossSessions) {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(tokenData));
+      } else {
+        localStorage.removeItem(this.STORAGE_KEY);
+      }
       
       // Set up auto-refresh if enabled
       if (options.autoRefresh) {
@@ -62,8 +76,19 @@ class SecureTokenStorage {
    */
   getToken(): string | null {
     try {
-      const stored = sessionStorage.getItem(this.STORAGE_KEY);
-      if (!stored) return null;
+      if (typeof window === 'undefined') {
+        return null;
+      }
+
+      let stored = sessionStorage.getItem(this.STORAGE_KEY);
+      if (!stored) {
+        stored = localStorage.getItem(this.STORAGE_KEY);
+        if (!stored) {
+          return null;
+        }
+        // Rehydrate sessionStorage for faster subsequent lookups
+        sessionStorage.setItem(this.STORAGE_KEY, stored);
+      }
 
       const tokenData: StoredToken = JSON.parse(stored);
       
@@ -91,10 +116,14 @@ class SecureTokenStorage {
    */
   clearToken(): void {
     try {
+      if (typeof window === 'undefined') {
+        return;
+      }
       sessionStorage.removeItem(this.STORAGE_KEY);
       // Clear any related data
       sessionStorage.removeItem('taxpoynt_auth_token');
       localStorage.removeItem('taxpoynt_auth_token');
+      localStorage.removeItem(this.STORAGE_KEY);
     } catch (error) {
       console.error('Failed to clear token:', error);
     }
