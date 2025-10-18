@@ -1820,10 +1820,19 @@ class SIServiceRegistry:
         organization_filter = filters.get("organization_id")
         erp_filter = filters.get("erp_system")
 
-        records = await self.erp_connection_repository.list(
-            organization_id=organization_filter,
-            erp_system=erp_filter,
-        )
+        try:
+            records = await self.erp_connection_repository.list(
+                organization_id=organization_filter,
+                erp_system=erp_filter,
+            )
+        except Exception as exc:
+            logger.warning("Failed to list ERP connections: %s", exc)
+            return {
+                "operation": "list_erp_connections",
+                "success": False,
+                "error": "unavailable",
+                "details": str(exc),
+            }
         items = [self._record_to_dict(record) for record in records]
 
         return {
