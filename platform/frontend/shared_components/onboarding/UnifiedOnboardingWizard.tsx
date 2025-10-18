@@ -1053,7 +1053,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   }
 
   const runtimeConnectionItems = runtimeInsights.connections?.items ?? [];
-  const runtimeIrnItems = runtimeInsights.irnProgress?.recent ?? [];
+  const runtimeIrnProgress = runtimeInsights.irnProgress ?? null;
+  const runtimeIrnItems = runtimeIrnProgress?.recent ?? [];
   const runtimeHasSignals =
     runtimeInsights.loginCount > 0 ||
     Boolean(runtimeInsights.connections) ||
