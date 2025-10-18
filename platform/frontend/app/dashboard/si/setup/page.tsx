@@ -594,7 +594,10 @@ export default function SISSetupPage(): JSX.Element | null {
               workspace aligned with FIRS requirements.
             </p>
             <div className="mt-4 space-x-3">
-              <TaxPoyntButton variant="outline" onClick={navigateTo('/onboarding/si/integration-setup')}>
+              <TaxPoyntButton
+                variant="outline"
+                onClick={() => router.push('/onboarding/si/integration-setup')}
+              >
                 Continue wizard
               </TaxPoyntButton>
               <TaxPoyntButton variant="outline" onClick={navigateTo('/onboarding/si/complete-integration-setup')}>
