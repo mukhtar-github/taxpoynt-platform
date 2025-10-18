@@ -233,11 +233,16 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
               </p>
             </div>
             <div className="flex gap-3">
-              <TaxPoyntButton variant="outline" onClick={() => router.push('/dashboard/si/integrations')}>
+              <TaxPoyntButton
+                variant="outline"
+                className="whitespace-nowrap"
+                onClick={() => router.push('/dashboard/si/integrations/new')}
+              >
                 Manage integrations
               </TaxPoyntButton>
               <TaxPoyntButton
                 variant="primary"
+                className="whitespace-nowrap"
                 onClick={() => router.push('/dashboard/si/firs-invoice-generator')}
               >
                 Open FIRS Invoice Generator
@@ -432,4 +437,3 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
 };
 
 export default BusinessSystemsManagementPage;
-
