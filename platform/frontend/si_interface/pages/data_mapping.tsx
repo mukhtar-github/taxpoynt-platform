@@ -236,7 +236,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
     setLoadingSchema(true);
     setErrorMessage(null);
     try {
-      const response = await apiClient.get<any>(`/si/erp/${normalizedKey}/schema`);
+      const response = await apiClient.get<any>(`/si/business/erp/${normalizedKey}/schema`);
 
       const envelope = response?.data ?? response;
       const schemaData = envelope?.schema;
@@ -299,7 +299,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
       setLoadingSystems(true);
       setErrorMessage(null);
       try {
-        const response = await apiClient.get<any>('/si/erp/available');
+        const response = await apiClient.get<any>('/si/business/erp/available');
         const envelope = response?.data ?? response;
         const systemsPayload: Record<string, any> = envelope?.erp_systems ?? {};
         const normalized: BusinessSystemSummary[] = Object.entries(systemsPayload).map(([id, info]) => ({
