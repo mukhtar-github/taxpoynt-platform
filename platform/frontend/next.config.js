@@ -7,13 +7,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async redirects() {
-    return [
-      {
-        source: '/onboarding/si/integration-setup',
-        destination: '/dashboard/si/integrations/new',
-        permanent: true,
-      },
-    ];
+    return [];
   },
   async headers() {
     return [
