@@ -391,23 +391,23 @@ class ERPEndpointsV1:
                     detail=f"Invalid ERP system. Available: {', '.join(self.erp_systems.keys())}"
                 )
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="list_erp_connections",
-                payload={
-                    "si_id": context.user_id,
-                    "filters": {
-                        "organization_id": organization_id,
-                        "erp_system": erp_system,
-                        "status": status
-                    },
-                    "api_version": "v1"
-                }
-            )
+            payload = {
+                "si_id": context.user_id,
+                "filters": {
+                    "organization_id": organization_id,
+                    "erp_system": erp_system,
+                    "status": status
+                },
+                "api_version": "v1"
+            }
+            result = await self._route_with_si_retry("list_erp_connections", payload)
             
             return self._create_v1_response(result, "erp_connections_listed")
         except HTTPException:
             raise
+        except RuntimeError as e:
+            logger.error(f"Error listing ERP connections in v1: {e}")
+            raise HTTPException(status_code=503, detail="SI services are unavailable. Please try again shortly.")
         except Exception as e:
             logger.error(f"Error listing ERP connections in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to list ERP connections")
@@ -436,20 +436,20 @@ class ERPEndpointsV1:
                     detail=f"Invalid ERP system. Available: {', '.join(self.erp_systems.keys())}"
                 )
             
-            result = await self.message_router.route_message(
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                operation="create_erp_connection",
-                payload={
-                    "connection_data": body,
-                    "si_id": context.user_id,
-                    "system_type": "erp",
-                    "api_version": "v1"
-                }
-            )
+            payload = {
+                "connection_data": body,
+                "si_id": context.user_id,
+                "system_type": "erp",
+                "api_version": "v1"
+            }
+            result = await self._route_with_si_retry("create_erp_connection", payload)
             
             return self._create_v1_response(result, "erp_connection_created", status_code=201)
         except HTTPException:
             raise
+        except RuntimeError as e:
+            logger.error(f"Error creating ERP connection in v1: {e}")
+            raise HTTPException(status_code=503, detail="SI services are unavailable. Please try again shortly.")
         except Exception as e:
             logger.error(f"Error creating ERP connection in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to create ERP connection")
@@ -784,6 +784,35 @@ class ERPEndpointsV1:
     def _create_v1_response(self, data: Dict[str, Any], action: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized v1 response format"""
         return build_v1_response(data, action)
+
+    async def _route_with_si_retry(self, operation: str, payload: Dict[str, Any], *, retry: bool = True) -> Dict[str, Any]:
+        """Route to SI services, re-initializing registrations if none are found."""
+        try:
+            return await self.message_router.route_message(
+                service_role=ServiceRole.SYSTEM_INTEGRATOR,
+                operation=operation,
+                payload=payload,
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+            retryable = (
+                "No service responses received" in message
+                or "No routing rules configured" in message
+                or "No target endpoints" in message
+            )
+            if retry and retryable:
+                try:
+                    from si_services import initialize_si_services
+
+                    await initialize_si_services(self.message_router)
+                except Exception as reinit_err:
+                    logger.warning("Failed to reinitialize SI services: %s", reinit_err)
+                else:
+                    logger.info("Reinitialized SI services after missing endpoint for %s", operation)
+                    return await self._route_with_si_retry(operation, payload, retry=False)
+        except Exception:
+            raise
+        raise RuntimeError(f"Unable to route operation {operation}; SI services unavailable.")
 
 
 def create_erp_router(role_detector: HTTPRoleDetector,

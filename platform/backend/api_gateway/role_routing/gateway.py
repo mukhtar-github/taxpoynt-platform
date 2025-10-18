@@ -152,7 +152,10 @@ class TaxPoyntAPIGateway:
             self.permission_guard,
             self.message_router
         )
-        
+
+        # Forgot-password router (public)
+        from ..auth.forgot_password_router import router as forgot_password_router
+
         # Create admin router (platform administration)
         admin_router = create_admin_router()
         
@@ -174,6 +177,12 @@ class TaxPoyntAPIGateway:
         # Include authentication router (available to all service types)
         self.app.include_router(
             auth_router,
+            prefix="/api/v1",
+            tags=["Authentication"]
+        )
+
+        self.app.include_router(
+            forgot_password_router,
             prefix="/api/v1",
             tags=["Authentication"]
         )
