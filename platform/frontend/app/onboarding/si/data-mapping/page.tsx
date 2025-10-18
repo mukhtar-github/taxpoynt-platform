@@ -2,9 +2,9 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import DataMapping from '../../../../../si_interface/pages/data_mapping';
-import { useUserContext } from '../../../../../shared_components/hooks/useUserContext';
-import { OnboardingStateManager } from '../../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import DataMapping from '../../../../si_interface/pages/data_mapping';
+import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
+import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 
 export default function SIDataMappingPage() {
   const router = useRouter();
