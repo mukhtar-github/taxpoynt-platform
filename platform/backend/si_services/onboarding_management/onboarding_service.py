@@ -132,6 +132,26 @@ class SIOnboardingService:
         operation: str,
         payload: Dict[str, Any],
     ) -> Dict[str, Any]:
+        supported_operations = {
+            "get_onboarding_state",
+            "update_onboarding_state",
+            "complete_onboarding_step",
+            "complete_onboarding",
+            "reset_onboarding_state",
+            "get_onboarding_analytics",
+            "initiate_organization_onboarding",
+            "get_organization_onboarding_status",
+        }
+
+        if operation not in supported_operations:
+            logger.debug("Received unsupported onboarding operation %s; skipping", operation)
+            return {
+                "operation": operation,
+                "success": True,
+                "skipped": True,
+                "reason": "unsupported_operation",
+            }
+
         user_id = payload.get("user_id")
         if not user_id:
             raise ValueError("User ID is required for onboarding operations")

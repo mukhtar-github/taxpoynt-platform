@@ -133,8 +133,13 @@ export default function NewIntegrationPage(): JSX.Element | null {
       setStatus({ state: 'saving', message: 'Creating connection…' });
       const payload = buildConnectionPayload();
 
-      const response = await apiClient.post('/si/business/erp/connections', payload);
-      const connectionData = response?.data?.data ?? {};
+      const response = await apiClient.post<{
+        success: boolean;
+        data?: Record<string, any>;
+        meta?: Record<string, any>;
+      }>('/si/business/erp/connections', payload);
+
+      const connectionData = response?.data ?? {};
       const newConnectionId = connectionData.connection_id || connectionData.id || connectionData?.connection?.id || null;
 
       setConnectionId(newConnectionId);
