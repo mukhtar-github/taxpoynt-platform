@@ -18,6 +18,8 @@ export interface FormPersistenceOptions {
   autoSaveInterval?: number;
   /** Enable cross-form data sharing */
   enableCrossFormSharing?: boolean;
+  /** Enable verbose logging for debugging */
+  logging?: boolean;
 }
 
 export interface FormFieldState {
@@ -37,6 +39,7 @@ export class FormPersistenceManager {
       excludeFields: ['password', 'confirmPassword', 'token'],
       autoSaveInterval: 2000, // 2 seconds
       enableCrossFormSharing: true,
+      logging: false,
       ...options
     };
   }
@@ -84,7 +87,9 @@ export class FormPersistenceManager {
         this.saveToSharedStorage(filteredData);
       }
       
-      console.log(`💾 Form data saved to ${this.options.persistent ? 'localStorage' : 'sessionStorage'}:`, this.options.storageKey);
+      if (this.options.logging) {
+        console.log(`💾 Form data saved to ${this.options.persistent ? 'localStorage' : 'sessionStorage'}:`, this.options.storageKey);
+      }
     } catch (error) {
       console.warn('Failed to save form data:', error);
     }
@@ -109,7 +114,9 @@ export class FormPersistenceManager {
         return null;
       }
       
-      console.log(`📂 Form data loaded from ${this.options.persistent ? 'localStorage' : 'sessionStorage'}:`, this.options.storageKey);
+      if (this.options.logging) {
+        console.log(`📂 Form data loaded from ${this.options.persistent ? 'localStorage' : 'sessionStorage'}:`, this.options.storageKey);
+      }
       return parsed.data;
     } catch (error) {
       console.warn('Failed to load form data:', error);
@@ -124,7 +131,9 @@ export class FormPersistenceManager {
     try {
       const storage = this.getStorage();
       storage.removeItem(this.options.storageKey);
-      console.log('🗑️ Form data cleared:', this.options.storageKey);
+      if (this.options.logging) {
+        console.log('🗑️ Form data cleared:', this.options.storageKey);
+      }
     } catch (error) {
       console.warn('Failed to clear form data:', error);
     }
@@ -184,7 +193,9 @@ export class FormPersistenceManager {
         lastUpdatedBy: this.options.storageKey
       }));
       
-      console.log('🔗 Data saved to shared storage for cross-form access');
+      if (this.options.logging) {
+        console.log('🔗 Data saved to shared storage for cross-form access');
+      }
     } catch (error) {
       console.warn('Failed to save to shared storage:', error);
     }

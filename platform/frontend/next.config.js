@@ -6,6 +6,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/onboarding/si/integration-setup',
+        destination: '/dashboard/si/integrations/new',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
