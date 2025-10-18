@@ -26,9 +26,33 @@ import sys
 from datetime import date, timedelta
 from typing import Any, Dict, List, Sequence
 import xmlrpc.client
+from pathlib import Path
 
 
 ProductLine = Dict[str, Any]
+
+
+def load_env_file(path: str = ".env") -> Dict[str, str]:
+    env_path = Path(path)
+    loaded: Dict[str, str] = {}
+    if not env_path.exists():
+        return loaded
+
+    with env_path.open("r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if (value.startswith('"') and value.endswith('"')) or (
+                value.startswith("'") and value.endswith("'")
+            ):
+                value = value[1:-1]
+            os.environ[key] = value
+            loaded[key] = value
+    return loaded
 
 
 def _get_env(name: str, *, required: bool = True) -> str:
@@ -258,6 +282,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_env_file()
     args = parse_args(argv or sys.argv[1:])
     try:
         invoice_ids = generate_demo_invoices(
@@ -277,4 +302,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - script entry point
     sys.exit(main())
-
