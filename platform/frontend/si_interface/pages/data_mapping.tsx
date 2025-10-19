@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 
@@ -210,6 +211,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   organizationId,
   onMappingComplete
 }) => {
+  const router = useRouter();
   const [availableSystems, setAvailableSystems] = useState<BusinessSystemSummary[]>([]);
   const [schemaCache, setSchemaCache] = useState<Record<string, BusinessSystemSchema>>({});
   const [selectedSystem, setSelectedSystem] = useState<BusinessSystemSchema | null>(null);
@@ -222,6 +224,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   const [previewData, setPreviewData] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   const [isValidating, setIsValidating] = useState(false);
+  const [showWizardPrompt, setShowWizardPrompt] = useState(false);
 
   const loadSchema = useCallback(async (systemKey: string, summaryOverride?: BusinessSystemSummary) => {
     const normalizedKey = systemKey.toLowerCase();
@@ -374,6 +377,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   };
 
   const handleDrop = (targetFieldId: string) => {
+    setShowWizardPrompt(false);
     if (draggedField && selectedSystem) {
       const sourceField = selectedSystem.fields.find(f => (f.path ?? f.id) === draggedField);
       const targetField = firsInvoiceSchema.find(f => f.id === targetFieldId);
@@ -412,6 +416,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   const handleValidateMapping = async () => {
     if (!selectedSystem || mappingRules.length === 0) return;
 
+    setShowWizardPrompt(false);
     setIsValidating(true);
     try {
       const result = await apiClient.post<{
@@ -457,6 +462,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
       
       if (result.success) {
         alert('✅ Mapping configuration saved successfully!');
+        setShowWizardPrompt(true);
         if (onMappingComplete) {
           onMappingComplete(mappingRules);
         }
@@ -523,6 +529,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
       return;
     }
 
+    setShowWizardPrompt(false);
     const recommendedPath = selectedSystem.defaultMappings[targetFieldId];
     if (!recommendedPath) {
       return;
@@ -565,6 +572,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
       return;
     }
 
+    setShowWizardPrompt(false);
     const rules: MappingRule[] = Object.entries(selectedSystem.defaultMappings)
       .map(([targetFieldId, recommendedPath]) => {
         const recommendedField = selectedSystem.fields.find(
@@ -607,6 +615,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
     setPreviewData(null);
     setHasAppliedRecommendations(false);
     setErrorMessage(null);
+    setShowWizardPrompt(false);
   };
 
   const recommendedMappingCount = selectedSystem?.defaultMappings
@@ -741,6 +750,29 @@ export const DataMapping: React.FC<DataMappingProps> = ({
                 Save Configuration
               </Button>
             </div>
+            {showWizardPrompt && (
+              <div className="w-full rounded-lg border border-green-200 bg-green-50 px-4 py-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-green-800">
+                    Mapping saved. Continue the onboarding wizard to finish setup.
+                  </p>
+                  <p className="text-xs text-green-700">
+                    We already marked the data mapping step as complete in your onboarding progress.
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="success" onClick={() => router.push('/onboarding/si/complete-integration-setup')}>
+                    Return to Onboarding Wizard
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push('/onboarding/si/integration-setup')}
+                  >
+                    Review Earlier Steps
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
