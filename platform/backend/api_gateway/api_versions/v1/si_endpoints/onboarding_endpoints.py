@@ -85,10 +85,29 @@ class OnboardingEndpointsV1:
             "update_state_requests": 0,
             "reset_state_requests": 0
         }
+        self._local_onboarding_service: Optional[SIOnboardingService] = None
         
         self._setup_routes()
 
         logger.info("Onboarding Endpoints V1 initialized")
+
+    def _router_supports_operation(self, service_role: ServiceRole, operation: str) -> bool:
+        """Check if the configured message router advertises an operation for a role."""
+        endpoints = getattr(self.message_router, "service_endpoints", None)
+        if not isinstance(endpoints, dict):
+            return False
+
+        for endpoint in endpoints.values():
+            if getattr(endpoint, "service_role", None) != service_role:
+                continue
+            if not getattr(endpoint, "active", True):
+                continue
+            metadata = getattr(endpoint, "metadata", {}) or {}
+            advertised = metadata.get("operations")
+            if not advertised or operation in advertised:
+                return True
+
+        return False
 
     async def _route_onboarding_operation(
         self,
@@ -100,6 +119,15 @@ class OnboardingEndpointsV1:
 
         service_role = self._resolve_service_role(context)
         result: Optional[Dict[str, Any]] = None
+
+        if not self._router_supports_operation(service_role, operation):
+            logger.info(
+                "Message router has no active %s endpoints for onboarding operation '%s'; using direct service path.",
+                service_role.value,
+                operation,
+            )
+            return await self._invoke_onboarding_service_direct(operation, payload)
+
         try:
             result = await self.message_router.route_message(service_role, operation, payload)
         except TypeError as exc:
@@ -601,8 +629,9 @@ class OnboardingEndpointsV1:
         payload: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Invoke SI onboarding service directly when message router is unavailable."""
-        service = SIOnboardingService()
-        return await service.handle_operation(operation, payload)
+        if self._local_onboarding_service is None:
+            self._local_onboarding_service = SIOnboardingService()
+        return await self._local_onboarding_service.handle_operation(operation, payload)
 
 
 def create_onboarding_router(
