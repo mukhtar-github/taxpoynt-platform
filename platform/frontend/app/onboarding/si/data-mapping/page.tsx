@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DataMapping from '../../../../si_interface/pages/data_mapping';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
@@ -12,6 +12,7 @@ export default function SIDataMappingPage() {
   const { user, isAuthenticated, isSystemIntegrator, isLoading, organizationId } = useUserContext({
     requireAuth: true,
   });
+  const hasMarkedInitialStep = useRef(false);
 
   useEffect(() => {
     if (isLoading) {
@@ -28,7 +29,8 @@ export default function SIDataMappingPage() {
       return;
     }
 
-    if (user) {
+    if (user && !hasMarkedInitialStep.current) {
+      hasMarkedInitialStep.current = true;
       void OnboardingStateManager.updateStep(user.id, 'data_mapping');
     }
   }, [isAuthenticated, isLoading, isSystemIntegrator, router, user]);
@@ -43,5 +45,31 @@ export default function SIDataMappingPage() {
 
   const systemId = searchParams?.get('system') || undefined;
 
-  return <DataMapping systemId={systemId} organizationId={organizationId ?? undefined} />;
+  const handleResetSelection = useCallback(() => {
+    router.replace('/onboarding/si/data-mapping');
+  }, [router]);
+
+  const handleMappingComplete = useCallback(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await OnboardingStateManager.updateStep(user.id, 'data_mapping', true);
+        await OnboardingStateManager.updateStep(user.id, 'testing_validation');
+      } catch (error) {
+        console.warn('Failed to sync onboarding step after data mapping:', error);
+      }
+    })();
+  }, [user]);
+
+  return (
+    <DataMapping
+      systemId={systemId}
+      organizationId={organizationId ?? undefined}
+      onResetSelection={handleResetSelection}
+      onMappingComplete={handleMappingComplete}
+    />
+  );
 }

@@ -312,9 +312,19 @@ export const OnboardingStateManager = {
   updateStep: async (userId: string, step: string, completed: boolean = false): Promise<void> => {
     try {
       const current = await onboardingApi.getOnboardingState();
-      const completedSteps = completed && current
-        ? [...current.completed_steps, step]
-        : current?.completed_steps || [];
+      const existingSteps = Array.isArray(current?.completed_steps)
+        ? current.completed_steps
+        : [];
+      const alreadyCompleted = existingSteps.includes(step);
+      const alreadyCurrent = current?.current_step === step;
+
+      if (alreadyCurrent && (!completed || alreadyCompleted)) {
+        return;
+      }
+
+      const completedSteps = completed
+        ? Array.from(new Set([...existingSteps, step]))
+        : existingSteps;
 
       await onboardingApi.updateOnboardingState({
         current_step: step,
@@ -329,12 +339,21 @@ export const OnboardingStateManager = {
         const current = saved ? JSON.parse(saved) : null;
         
         if (current) {
+          const legacyCompleted: string[] = Array.isArray(current.completedSteps)
+            ? current.completedSteps
+            : [];
+          const alreadyCompleted = legacyCompleted.includes(step);
+
+          if (current.currentStep === step && (!completed || alreadyCompleted)) {
+            return;
+          }
+
           const updated = {
             ...current,
             currentStep: step,
-            completedSteps: completed 
-              ? [...(current.completedSteps || []), step]
-              : current.completedSteps || [],
+            completedSteps: completed
+              ? Array.from(new Set([...legacyCompleted, step]))
+              : legacyCompleted,
             lastActiveDate: new Date().toISOString()
           };
           localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updated));

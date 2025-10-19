@@ -181,20 +181,48 @@ const onboardingSteps: OnboardingStep[] = [
   }
 ];
 
+const resolveStepIndexFromKey = (stepKey?: string): number | null => {
+  if (!stepKey) {
+    return null;
+  }
+
+  const normalized = stepKey.toLowerCase().replace(/[\s-]+/g, '_');
+  const aliasMap: Record<string, string> = {
+    organization: 'organization_setup',
+    compliance: 'compliance_verification',
+    erp: 'erp_selection',
+    configuration: 'erp_configuration',
+    mapping: 'data_mapping',
+    testing: 'testing_validation',
+    validation: 'testing_validation',
+    deployment: 'production_deployment',
+    production: 'production_deployment',
+    training: 'training_handover',
+    handover: 'training_handover'
+  };
+  const resolvedId = aliasMap[normalized] ?? normalized;
+  const index = onboardingSteps.findIndex(step => step.id === resolvedId);
+  return index >= 0 ? index : null;
+};
+
 interface ERPOnboardingProps {
   organizationId?: string;
   onComplete?: (organizationId: string) => void;
   onSkip?: () => void;
   isLoading?: boolean;
+  initialStepId?: string;
 }
 
 export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   organizationId,
   onComplete,
   onSkip,
-  isLoading = false
+  isLoading = false,
+  initialStepId
 }) => {
   const router = useRouter();
+  const initialStepIndex = resolveStepIndexFromKey(initialStepId);
+  const [currentStep, setCurrentStep] = useState<number>(() => initialStepIndex ?? 0);
   // Form persistence setup for ERP onboarding
   const erpFormPersistence = useFormPersistence({
     storageKey: `taxpoynt_erp_onboarding_${organizationId || 'temp'}`,
@@ -203,7 +231,6 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     autoSaveInterval: 5000 // Save every 5 seconds
   });
 
-  const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<OnboardingStep[]>(onboardingSteps);
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>({
     basicInfo: {
@@ -243,6 +270,12 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
 
+  useEffect(() => {
+    if (initialStepIndex !== null) {
+      setCurrentStep(prev => (prev < initialStepIndex ? initialStepIndex : prev));
+    }
+  }, [initialStepIndex]);
+
   // Load existing onboarding progress and initialize with shared data
   useEffect(() => {
     if (organizationId) {
@@ -269,7 +302,15 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         }));
       }
       if (savedErpData.currentStep !== undefined) {
-        setCurrentStep(savedErpData.currentStep);
+        const savedIndex = savedErpData.currentStep;
+        setCurrentStep(prev => {
+          if (initialStepIndex !== null && savedIndex < initialStepIndex) {
+            return initialStepIndex;
+          }
+          return savedIndex;
+        });
+      } else if (initialStepIndex !== null) {
+        setCurrentStep(prev => (prev < initialStepIndex ? initialStepIndex : prev));
       }
       console.log('📂 ERP onboarding form restored from saved data');
     }
@@ -303,7 +344,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     return () => {
       erpFormPersistence.stopAutoSave();
     };
-  }, [organizationId]);
+  }, [organizationId, initialStepIndex]);
 
   const loadOnboardingProgress = async () => {
     try {
@@ -316,7 +357,15 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
       if (data.progress) {
         setProgress(data.progress);
-        setCurrentStep(data.progress.currentStep);
+        const remoteIndexRaw = typeof data.progress.currentStep === 'number'
+          ? data.progress.currentStep
+          : 0;
+        const remoteIndex = Math.max(0, remoteIndexRaw);
+        const resolvedIndex =
+          initialStepIndex !== null && remoteIndex < initialStepIndex
+            ? initialStepIndex
+            : remoteIndex;
+        setCurrentStep(resolvedIndex);
 
         setSteps(prev => prev.map(step => ({
           ...step,

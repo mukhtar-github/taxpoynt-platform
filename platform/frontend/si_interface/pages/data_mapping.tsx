@@ -204,12 +204,14 @@ interface DataMappingProps {
   systemId?: string;
   organizationId?: string;
   onMappingComplete?: (mappingRules: MappingRule[]) => void;
+  onResetSelection?: () => void;
 }
 
 export const DataMapping: React.FC<DataMappingProps> = ({
   systemId,
   organizationId,
-  onMappingComplete
+  onMappingComplete,
+  onResetSelection
 }) => {
   const router = useRouter();
   const [availableSystems, setAvailableSystems] = useState<BusinessSystemSummary[]>([]);
@@ -627,6 +629,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
     setHasAppliedRecommendations(false);
     setErrorMessage(null);
     setShowWizardPrompt(false);
+    onResetSelection?.();
   };
 
   const recommendedMappingCount = selectedSystem?.defaultMappings
@@ -774,7 +777,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
                 <div className="flex gap-2 flex-wrap">
                   <Button
                     variant="success"
-                    onClick={() => router.push('/onboarding/si/integration-setup?step=testing')}
+                    onClick={() => router.push('/onboarding/si/integration-setup?step=testing_validation')}
                   >
                     Return to Onboarding Wizard
                   </Button>
