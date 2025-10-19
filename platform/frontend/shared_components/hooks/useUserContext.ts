@@ -175,7 +175,20 @@ export const useUserContext = (options: UseUserContextOptions = {}): UserContext
   }, [user]);
 
   const organizationId = useMemo(() => {
-    return user?.organization_id || null;
+    if (!user) {
+      return null;
+    }
+
+    if (user.organization_id) {
+      return user.organization_id;
+    }
+
+    const organization = user.organization as { id?: string } | undefined;
+    if (organization && typeof organization === 'object' && organization.id) {
+      return organization.id;
+    }
+
+    return null;
   }, [user]);
 
   // Role checking functions

@@ -313,28 +313,6 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
       setSelectedSystems(saved.selectedSystems);
     }
 
-    if (Array.isArray(saved.completedStepIds) && saved.completedStepIds.length > 0) {
-      const completedSet = new Set<string>(saved.completedStepIds);
-      setSteps(prev =>
-        prev.map(step =>
-          completedSet.has(step.id) && !step.completed ? { ...step, completed: true } : step
-        )
-      );
-    }
-
-    if (typeof saved.currentStepId === 'string') {
-      const targetIndex = integrationSteps.findIndex(step => step.id === saved.currentStepId);
-      if (targetIndex >= 0) {
-        setCurrentStep(targetIndex);
-      }
-    } else if (typeof saved.currentStep === 'number') {
-      const boundedIndex = Math.min(
-        Math.max(saved.currentStep, 0),
-        integrationSteps.length - 1
-      );
-      setCurrentStep(boundedIndex);
-    }
-
     if (saved.credentials && typeof saved.credentials === 'object') {
       setCredentials(saved.credentials as Record<string, any>);
     }
