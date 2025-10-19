@@ -31,6 +31,7 @@ class OWASPSecurityHeaders:
         self.environment = os.getenv("ENVIRONMENT", "production").lower()
         self.domain = os.getenv("DOMAIN", "taxpoynt.com")
         self.frontend_domains = self._get_frontend_domains()
+        self.allowed_forwarded_hosts = self._get_allowed_forwarded_hosts()
         
         # Security header configuration
         self.security_headers = self._build_security_headers()
@@ -54,6 +55,21 @@ class OWASPSecurityHeaders:
             ])
         
         return domains
+
+    def _get_allowed_forwarded_hosts(self) -> set:
+        """Allow known proxy forwarded hosts to prevent noisy warnings."""
+        allowed = {
+            self.domain,
+            f"www.{self.domain}",
+            f"app.{self.domain}",
+            "web-production-ea5ad.up.railway.app",
+        }
+        extra_hosts = os.getenv("TRUSTED_FORWARDED_HOSTS", "")
+        for host in extra_hosts.split(","):
+            host = host.strip().lower()
+            if host:
+                allowed.add(host)
+        return allowed
     
     def _build_security_headers(self) -> Dict[str, str]:
         """Build comprehensive OWASP security headers"""
@@ -217,6 +233,15 @@ class OWASPSecurityHeaders:
             
             for pattern in suspicious_patterns:
                 if pattern in request.headers:
+                    header_value = request.headers.get(pattern, "")
+                    if pattern == "X-Forwarded-Host":
+                        forwarded_hosts = [
+                            value.split(":")[0].strip().lower()
+                            for value in header_value.split(",")
+                            if value.strip()
+                        ]
+                        if all(host in self.allowed_forwarded_hosts for host in forwarded_hosts):
+                            continue
                     validation_result["warnings"].append(f"Suspicious header detected: {pattern}")
                     validation_result["security_score"] -= 10
             
