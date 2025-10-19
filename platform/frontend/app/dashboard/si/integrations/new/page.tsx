@@ -29,6 +29,53 @@ interface AsyncStatus {
   message?: string;
 }
 
+type JsonMap = Record<string, unknown>;
+
+type APIErrorPayload = {
+  message?: string;
+  response?: {
+    data?: {
+      detail?: string;
+      message?: string;
+    };
+  };
+};
+
+const toJsonMap = (value: unknown): JsonMap | undefined =>
+  value && typeof value === 'object' ? (value as JsonMap) : undefined;
+
+const pickString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+
+const extractJsonValue = (map: JsonMap | undefined, key: string): unknown =>
+  map ? map[key] : undefined;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    const message = pickString(error.message);
+    if (message) return message;
+  }
+
+  if (typeof error === 'string') {
+    const message = pickString(error);
+    if (message) return message;
+  }
+
+  if (error && typeof error === 'object') {
+    const payload = error as APIErrorPayload;
+    const detail = pickString(payload.response?.data?.detail);
+    if (detail) return detail;
+
+    const nestedMessage = pickString(payload.response?.data?.message);
+    if (nestedMessage) return nestedMessage;
+
+    const topMessage = pickString(payload.message);
+    if (topMessage) return topMessage;
+  }
+
+  return fallback;
+};
+
 const DEFAULT_FORM: ConnectionFormState = {
   connectionName: 'Odoo ERP Connection',
   environment: 'sandbox',
@@ -135,19 +182,27 @@ export default function NewIntegrationPage(): JSX.Element | null {
 
       const response = await apiClient.post<{
         success: boolean;
-        data?: Record<string, any>;
-        meta?: Record<string, any>;
+        data?: JsonMap;
+        meta?: Record<string, unknown> | null;
+        message?: string;
+        detail?: string;
       }>('/si/business/erp/connections', payload);
 
-      const connectionData = response?.data ?? {};
-      const newConnectionId = connectionData.connection_id || connectionData.id || connectionData?.connection?.id || null;
+      const connectionData = toJsonMap(response?.data) ?? {};
+      const nestedConnection = toJsonMap(extractJsonValue(connectionData, 'connection'));
+      const newConnectionId =
+        pickString(connectionData.connection_id) ||
+        pickString(connectionData.id) ||
+        pickString(extractJsonValue(nestedConnection, 'id')) ||
+        null;
 
       setConnectionId(newConnectionId);
       setStatus({ state: 'success', message: 'Connection saved. You can now test the link or start syncing.' });
     } catch (error: unknown) {
-      const message = error instanceof Error
-        ? error.message
-        : 'Unable to create the connection. Please verify your details and try again.';
+      const message = extractErrorMessage(
+        error,
+        'Unable to create the connection. Please verify your details and try again.'
+      );
       setStatus({ state: 'error', message });
     }
   };
@@ -162,28 +217,33 @@ export default function NewIntegrationPage(): JSX.Element | null {
       setStatus({ state: 'testing', message: 'Running test from the gateway…' });
       const response = await apiClient.post<{
         success?: boolean;
-        data?: { message?: string; details?: string; [key: string]: any };
+        data?: JsonMap;
         detail?: string;
+        message?: string;
       }>(`/si/business/erp/connections/${connectionId}/test`, {});
 
       const success = response?.success ?? true;
       if (success) {
-        const payload = response?.data ?? {};
+        const payload = toJsonMap(response?.data) ?? {};
         const message =
-          typeof payload.message === 'string'
-            ? payload.message
-            : typeof payload.details === 'string'
-            ? payload.details
-            : 'Connection test completed successfully. Monitor integration health for results.';
+          pickString(extractJsonValue(payload, 'message')) ||
+          pickString(extractJsonValue(payload, 'details')) ||
+          pickString(response?.message) ||
+          'Connection test completed successfully. Monitor integration health for results.';
         setStatus({ state: 'success', message });
       } else {
-        const detail = response?.detail || response?.data?.error || 'Connection test failed.';
+        const payload = toJsonMap(response?.data);
+        const detail =
+          pickString(response?.detail) ||
+          pickString(extractJsonValue(payload, 'error')) ||
+          'Connection test failed.';
         setStatus({ state: 'error', message: detail });
       }
     } catch (error: unknown) {
-      const message = error instanceof Error
-        ? error.message
-        : 'Connection test failed. Confirm your credentials and network access.';
+      const message = extractErrorMessage(
+        error,
+        'Connection test failed. Confirm your credentials and network access.'
+      );
       setStatus({ state: 'error', message });
     }
   };

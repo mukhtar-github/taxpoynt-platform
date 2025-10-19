@@ -12,15 +12,18 @@ echo "📦 Updating pip to latest version..."
 python -m pip install --upgrade pip --no-cache-dir --timeout 300 --retries 5
 
 # Install requirements with robust error handling
-echo "📦 Installing Python dependencies..."
-pip install \
-    --no-cache-dir \
-    --timeout 300 \
-    --retries 5 \
-    --prefer-binary \
-    --force-reinstall \
-    --no-warn-script-location \
-    -r requirements.txt
+if python -m pip show fastapi >/dev/null 2>&1; then
+    echo "📦 Dependencies already present. Skipping reinstall."
+else
+    echo "📦 Installing Python dependencies..."
+    pip install \
+        --no-cache-dir \
+        --timeout 300 \
+        --retries 5 \
+        --prefer-binary \
+        --no-warn-script-location \
+        -r requirements.txt
+fi
 
 # Verify critical imports work
 echo "✅ Verifying critical imports..."

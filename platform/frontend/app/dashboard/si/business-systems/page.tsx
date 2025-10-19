@@ -11,7 +11,8 @@ type V1Response<T> = {
   success: boolean;
   action: string;
   data: T;
-  meta?: Record<string, any> | null;
+  message?: string;
+  meta?: Record<string, unknown> | null;
 };
 
 interface ErpConnectionRecord {
@@ -27,9 +28,9 @@ interface ErpConnectionRecord {
     username?: string;
     auto_sync?: boolean;
     polling_interval?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   status?: string;
   status_reason?: string;
   owner_user_id?: string | null;
@@ -43,6 +44,53 @@ interface ListErpConnectionsResponse {
   connections: ErpConnectionRecord[];
   total_count: number;
 }
+
+type JsonMap = Record<string, unknown>;
+
+type APIErrorPayload = {
+  message?: string;
+  response?: {
+    data?: {
+      detail?: string;
+      message?: string;
+    };
+  };
+};
+
+const toJsonMap = (value: unknown): JsonMap | undefined =>
+  value && typeof value === 'object' ? (value as JsonMap) : undefined;
+
+const pickString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+
+const extractJsonValue = (map: JsonMap | undefined, key: string): unknown =>
+  map ? map[key] : undefined;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    const message = pickString(error.message);
+    if (message) return message;
+  }
+
+  if (typeof error === 'string') {
+    const message = pickString(error);
+    if (message) return message;
+  }
+
+  if (error && typeof error === 'object') {
+    const payload = error as APIErrorPayload;
+    const detail = pickString(payload.response?.data?.detail);
+    if (detail) return detail;
+
+    const nestedMessage = pickString(payload.response?.data?.message);
+    if (nestedMessage) return nestedMessage;
+
+    const topMessage = pickString(payload.message);
+    if (topMessage) return topMessage;
+  }
+
+  return fallback;
+};
 
 const statusStyles: Record<string, string> = {
   active: 'text-green-600 bg-green-50 border border-green-200',
@@ -121,12 +169,12 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
         `/si/business/erp/connections${query}`
       );
       setConnections(response.data?.connections ?? []);
-    } catch (err: any) {
-      console.error('Failed to load ERP connections:', err);
-      const message =
-        err?.message ||
-        err?.response?.data?.detail ||
-        'Unable to load ERP connections. Please try again.';
+    } catch (caughtError: unknown) {
+      console.error('Failed to load ERP connections:', caughtError);
+      const message = extractErrorMessage(
+        caughtError,
+        'Unable to load ERP connections. Please try again.'
+      );
       setError(message);
       setConnections([]);
     } finally {
@@ -138,23 +186,28 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
     setPendingAction({ type: 'test', connectionId });
     setActionMessage(null);
     try {
-      const response = await apiClient.post<V1Response<any>>(
+      const response = await apiClient.post<V1Response<JsonMap>>(
         `/si/business/erp/connections/${connectionId}/test`,
         {}
       );
+      const payload = response.data;
+      const dataMessage = pickString(
+        extractJsonValue(toJsonMap(payload?.data), 'message')
+      );
       const message =
-        response.data?.data?.message ||
-        response.data?.message ||
+        dataMessage ||
+        pickString(payload?.message) ||
         'Connection test completed successfully.';
       setActionType('success');
       setActionMessage(message);
-    } catch (err: any) {
-      console.error('Connection test failed:', err);
+    } catch (caughtError: unknown) {
+      console.error('Connection test failed:', caughtError);
       setActionType('error');
       setActionMessage(
-        err?.response?.data?.detail ||
-          err?.message ||
+        extractErrorMessage(
+          caughtError,
           'Connection test failed. Please review your credentials.'
+        )
       );
     } finally {
       setPendingAction(null);
@@ -165,27 +218,34 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
     setPendingAction({ type: 'sync', connectionId });
     setActionMessage(null);
     try {
-      const response = await apiClient.post<V1Response<any>>(
+      const response = await apiClient.post<V1Response<JsonMap>>(
         `/si/business/erp/connections/${connectionId}/sync`,
         { force: true }
       );
+      const payload = response.data;
+      const statusMap = toJsonMap(extractJsonValue(toJsonMap(payload?.data), 'status'));
+      const latestExecution = toJsonMap(extractJsonValue(statusMap, 'latest_execution'));
+      const statusMessage = pickString(extractJsonValue(latestExecution, 'status'));
       const message =
-        response.data?.status?.latest_execution?.status ||
-        response.data?.message ||
+        statusMessage ||
+        pickString(payload?.message) ||
         'Sync has been queued. Check sync status for progress.';
       setActionType('success');
       setActionMessage(typeof message === 'string' ? message : 'Sync request accepted.');
-    } catch (err: any) {
-      console.error('Failed to queue sync:', err);
+    } catch (caughtError: unknown) {
+      console.error('Failed to queue sync:', caughtError);
       setActionType('error');
       setActionMessage(
-        err?.response?.data?.detail ||
-          err?.message ||
+        extractErrorMessage(
+          caughtError,
           'Unable to queue sync. Please retry later.'
+        )
       );
     } finally {
       setPendingAction(null);
-      await fetchConnections(user!);
+      if (user) {
+        await fetchConnections(user);
+      }
     }
   };
 

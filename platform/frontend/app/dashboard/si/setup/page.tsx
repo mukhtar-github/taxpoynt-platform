@@ -8,11 +8,16 @@ import { TaxPoyntButton } from '../../../../design_system';
 import { onboardingApi } from '../../../../shared_components/services/onboardingApi';
 import apiClient from '../../../../shared_components/api/client';
 
-const isRecord = (value: unknown): value is Record<string, any> =>
+type JsonMap = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is JsonMap =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const toNumber = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const toJsonMap = (value: unknown): JsonMap | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonMap) : null;
 
 const formatDateTime = (value?: string | null): string => {
   if (!value) {
@@ -78,7 +83,7 @@ function parseRuntimeSnapshot(input: unknown): RuntimeSnapshot {
   if (isRecord(input.connections)) {
     const itemsRaw = Array.isArray(input.connections.items) ? input.connections.items : [];
     const items = itemsRaw
-      .filter((item): item is Record<string, any> => isRecord(item))
+      .filter((item): item is JsonMap => isRecord(item))
       .map((item, index) => ({
         id:
           typeof item.id === 'string'
@@ -115,7 +120,7 @@ function parseRuntimeSnapshot(input: unknown): RuntimeSnapshot {
   if (isRecord(irnRaw)) {
     const recentRaw = Array.isArray(irnRaw.recent) ? irnRaw.recent : [];
     const recent = recentRaw
-      .filter((item): item is Record<string, any> => isRecord(item))
+      .filter((item): item is JsonMap => isRecord(item))
       .map((item) => ({
         irn: typeof item.irn === 'string' ? item.irn : undefined,
         status: typeof item.status === 'string' ? item.status : undefined,
@@ -154,7 +159,7 @@ export default function SISSetupPage(): JSX.Element | null {
   const [progress, setProgress] = useState<WizardProgress | null>(null);
   const [progressStatus, setProgressStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<RuntimeSnapshot>(EMPTY_RUNTIME);
-  const [dashboardMetrics, setDashboardMetrics] = useState<Record<string, any> | null>(null);
+  const [dashboardMetrics, setDashboardMetrics] = useState<JsonMap | null>(null);
   const [metricsStatus, setMetricsStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
   useEffect(() => {
@@ -207,12 +212,13 @@ export default function SISSetupPage(): JSX.Element | null {
     const fetchMetrics = async () => {
       setMetricsStatus('loading');
       try {
-        const result = await apiClient.get<any>('/si/dashboard/metrics');
+        const result = await apiClient.get<JsonMap | null>('/si/dashboard/metrics');
         if (result && typeof result === 'object') {
           if ('success' in result) {
-            setDashboardMetrics(result.success ? (result.data ?? null) : null);
+            const payload = result as JsonMap & { success?: boolean; data?: JsonMap | null };
+            setDashboardMetrics(payload.success ? (toJsonMap(payload.data) ?? null) : null);
           } else {
-            setDashboardMetrics(result as Record<string, any>);
+            setDashboardMetrics(result as JsonMap);
           }
         } else {
           setDashboardMetrics(null);
@@ -297,7 +303,7 @@ export default function SISSetupPage(): JSX.Element | null {
   const connectionSystems: ConnectionSystem[] = (() => {
     if (isRecord(dashboardMetrics?.connectionHealth) && Array.isArray(dashboardMetrics.connectionHealth.systems)) {
       return dashboardMetrics.connectionHealth.systems
-        .filter((item): item is Record<string, any> => isRecord(item))
+        .filter((item): item is JsonMap => isRecord(item))
         .map((item, index) => ({
           id:
             typeof item.id === 'string'
@@ -348,7 +354,7 @@ export default function SISSetupPage(): JSX.Element | null {
   })();
 
   const irnRecent = (irnStatus?.recent ?? [])
-    .filter((item): item is Record<string, any> => isRecord(item))
+    .filter((item): item is JsonMap => isRecord(item))
     .map((item, index) => ({
       id:
         typeof item.irn === 'string'
@@ -379,7 +385,7 @@ export default function SISSetupPage(): JSX.Element | null {
   })();
 
   const validationEntries = validationLogs
-    .filter((item): item is Record<string, any> => isRecord(item))
+    .filter((item): item is JsonMap => isRecord(item))
     .map((item, index) => {
       const batchId =
         typeof item.batchId === 'string'

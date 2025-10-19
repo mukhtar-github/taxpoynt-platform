@@ -11,7 +11,8 @@ type V1Response<T> = {
   success: boolean;
   action: string;
   data: T;
-  meta?: Record<string, any> | null;
+  message?: string;
+  meta?: Record<string, unknown> | null;
 };
 
 interface ApiTransaction {
@@ -36,7 +37,7 @@ interface ApiTransaction {
 interface SearchTransactionsResponse {
   transactions: ApiTransaction[];
   total_count: number;
-  filters_applied: Record<string, any>;
+  filters_applied: Record<string, unknown>;
 }
 
 interface ErpConnectionRecord {
@@ -48,9 +49,9 @@ interface ErpConnectionRecord {
   connection_config?: {
     auto_sync?: boolean;
     polling_interval?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   last_status_at?: string | null;
 }
 
@@ -64,7 +65,7 @@ interface GenerationStats {
   consolidation_used?: boolean;
   total_transactions?: number;
   processing_time_seconds?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface GeneratedInvoice {
@@ -86,6 +87,45 @@ interface GenerationResult {
   warnings: string[];
   generation_stats: GenerationStats;
 }
+
+type APIErrorPayload = {
+  message?: string;
+  response?: {
+    data?: {
+      detail?: string;
+      message?: string;
+    };
+  };
+};
+
+const pickString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    const message = pickString(error.message);
+    if (message) return message;
+  }
+
+  if (typeof error === 'string') {
+    const message = pickString(error);
+    if (message) return message;
+  }
+
+  if (error && typeof error === 'object') {
+    const payload = error as APIErrorPayload;
+    const detail = pickString(payload.response?.data?.detail);
+    if (detail) return detail;
+
+    const nestedMessage = pickString(payload.response?.data?.message);
+    if (nestedMessage) return nestedMessage;
+
+    const topMessage = pickString(payload.message);
+    if (topMessage) return topMessage;
+  }
+
+  return fallback;
+};
 
 interface BusinessTransaction {
   id: string;
@@ -230,12 +270,12 @@ export default function FIRSInvoiceGeneratorPage(): JSX.Element | null {
 
       setTransactions(mappedTransactions);
       setConnections(connectionsResponse.data?.connections ?? []);
-    } catch (err: any) {
-      console.error('Failed to load invoice generator data:', err);
-      const message =
-        err?.response?.data?.detail ||
-        err?.message ||
-        'Unable to load business transactions. Try refreshing the page.';
+    } catch (caughtError: unknown) {
+      console.error('Failed to load invoice generator data:', caughtError);
+      const message = extractErrorMessage(
+        caughtError,
+        'Unable to load business transactions. Try refreshing the page.'
+      );
       setError(message);
       setTransactions([]);
     } finally {
@@ -280,17 +320,20 @@ export default function FIRSInvoiceGeneratorPage(): JSX.Element | null {
         consolidate: false,
       });
       setGenerationResult(response.data);
-      await loadInitialData(user!);
-    } catch (err: any) {
-      console.error('Invoice generation failed:', err);
+      if (user) {
+        await loadInitialData(user);
+      }
+    } catch (caughtError: unknown) {
+      console.error('Invoice generation failed:', caughtError);
       setGenerationResult({
         success: false,
         invoices: [],
         total_amount: 0,
         errors: [
-          err?.response?.data?.detail ||
-            err?.message ||
-            'Unable to generate invoices. Please try again later.',
+          extractErrorMessage(
+            caughtError,
+            'Unable to generate invoices. Please try again later.'
+          ),
         ],
         warnings: [],
         generation_stats: {},
