@@ -27,7 +27,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from uuid import uuid4
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from dataclasses import asdict
 from enum import Enum
@@ -90,6 +90,7 @@ class SIServiceRegistry:
         self.erp_connection_repository = ERPConnectionRepository()
         self.integration_health_monitor = None
         self.background_runner = background_runner
+        self._connection_cleanup_task = None
 
     def configure_background_runner(self, runner: Any) -> None:
         """Inject or update the background task runner."""
@@ -944,6 +945,20 @@ class SIServiceRegistry:
                     orchestrator.configure_task_runner(self.background_runner)
                 except Exception as runner_err:
                     logger.warning(f"Failed to configure background runner for orchestrator: {runner_err}")
+
+            try:
+                await self._cleanup_stale_erp_connections()
+            except Exception as cleanup_err:
+                logger.warning(f"Initial ERP connection cleanup failed: {cleanup_err}")
+
+            if self.background_runner and self._connection_cleanup_task is None:
+                try:
+                    self._connection_cleanup_task = self.background_runner.submit(
+                        self._run_erp_connection_cleanup_loop,
+                        description="erp-connection-cleanup",
+                    )
+                except Exception as runner_err:
+                    logger.warning(f"Failed to schedule ERP connection cleanup: {runner_err}")
 
             self.integration_health_monitor = integration_service.get("health_monitor")
             if self.integration_health_monitor and integration_service["connection_manager"]:
@@ -2368,12 +2383,12 @@ class SIServiceRegistry:
         raw_value = (
             connection_config.get("polling_interval")
             or metadata.get("polling_interval_minutes")
-            or 15
+            or 1440
         )
         try:
             minutes = int(raw_value)
         except (TypeError, ValueError):
-            minutes = 15
+            minutes = 1440
         return max(5, minutes)
 
     async def _configure_sync_for_connection(self, record: ERPConnectionRecord) -> ERPConnectionRecord:
@@ -2381,7 +2396,7 @@ class SIServiceRegistry:
         metadata = dict(record.metadata or {})
 
         interval_minutes = self._normalize_polling_interval(connection_config, metadata)
-        auto_sync_enabled = bool(connection_config.get("auto_sync", metadata.get("auto_sync", False)))
+        auto_sync_enabled = False
         sync_id = metadata.get("sync_id") or f"erp-sync-{record.connection_id}"
         schedule_type = "interval" if auto_sync_enabled else "manual"
         schedule_interval = interval_minutes * 60 if auto_sync_enabled else None
@@ -2430,6 +2445,57 @@ class SIServiceRegistry:
         )
         return updated or record
 
+    async def _cleanup_stale_erp_connections(self, *, max_age_days: int = 7) -> None:
+        """Remove inactive ERP connections that have not been touched recently."""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        try:
+            records = await self.erp_connection_repository.list()
+        except Exception as exc:
+            logger.warning("ERP connection cleanup skipped: %s", exc)
+            return
+
+        deleted = 0
+        for record in records:
+            if record.is_active:
+                continue
+            last_touch = record.updated_at or record.created_at or datetime.now(timezone.utc)
+            if last_touch >= cutoff:
+                continue
+            try:
+                await self.erp_connection_repository.delete(record.connection_id)
+                deleted += 1
+            except Exception as delete_err:
+                logger.warning(
+                    "Failed to delete stale ERP connection %s: %s",
+                    record.connection_id,
+                    delete_err,
+                )
+
+        if deleted:
+            logger.info(
+                "Removed %s inactive ERP connections older than %s days",
+                deleted,
+                max_age_days,
+            )
+
+    async def _run_erp_connection_cleanup_loop(
+        self,
+        interval_hours: int = 24,
+        max_age_days: int = 7,
+    ) -> None:
+        """Background loop that periodically prunes stale ERP connections."""
+        try:
+            await self._cleanup_stale_erp_connections(max_age_days=max_age_days)
+            while True:
+                await asyncio.sleep(interval_hours * 3600)
+                try:
+                    await self._cleanup_stale_erp_connections(max_age_days=max_age_days)
+                except Exception as exc:
+                    logger.warning("ERP connection cleanup iteration failed: %s", exc)
+        except asyncio.CancelledError:
+            logger.info("ERP connection cleanup loop cancelled")
+            raise
+
     async def _teardown_sync_for_connection(self, record: ERPConnectionRecord) -> None:
         metadata = dict(record.metadata or {})
         sync_id = metadata.get("sync_id")
@@ -2467,14 +2533,14 @@ class SIServiceRegistry:
             api_key=config.get("api_key"),
             ssl_enabled=bool(parsed and parsed.scheme == 'https'),
             timeout=config.get("timeout", 30),
-            health_check_interval=max(60, interval_seconds // 3),
-            auto_sync_enabled=bool(config.get("auto_sync")),
+            health_check_interval=max(60, min(interval_seconds // 3, 3600)),
+            auto_sync_enabled=False,
             polling_interval_seconds=interval_seconds,
             metadata={
                 "base_url": base_url,
                 "environment": record.environment,
                 "auth_method": config.get("auth_method"),
-                "auto_sync": bool(config.get("auto_sync")),
+                "auto_sync": False,
                 "polling_interval_minutes": interval_minutes,
             },
         )
@@ -2555,6 +2621,13 @@ class SIServiceRegistry:
         """Cleanup all services and unregister from message router"""
         try:
             logger.info("Cleaning up SI services...")
+            if self._connection_cleanup_task:
+                try:
+                    self._connection_cleanup_task.cancel()
+                except Exception as cancel_err:
+                    logger.debug(f"Cleanup loop cancel raised: {cancel_err}")
+                finally:
+                    self._connection_cleanup_task = None
             
             # Unregister from message router
             for service_name, endpoint_id in self.service_endpoints.items():

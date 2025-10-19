@@ -39,8 +39,8 @@ const DEFAULT_FORM: ConnectionFormState = {
   apiKey: '',
   authMode: 'api_key',
   notes: '',
-  autoSync: true,
-  pollingInterval: 15,
+  autoSync: false,
+  pollingInterval: 1440,
 };
 
 export default function NewIntegrationPage(): JSX.Element | null {
@@ -77,7 +77,7 @@ export default function NewIntegrationPage(): JSX.Element | null {
 
     setForm((prev) => ({
       ...prev,
-      [field]: field === 'pollingInterval' ? Number(value) || 5 : value,
+      [field]: field === 'pollingInterval' ? Number(value) || 1440 : value,
     }));
   };
 
