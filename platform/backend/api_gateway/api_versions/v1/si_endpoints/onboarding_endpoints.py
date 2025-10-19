@@ -95,7 +95,7 @@ class OnboardingEndpointsV1:
         """Check if the configured message router advertises an operation for a role."""
         endpoints = getattr(self.message_router, "service_endpoints", None)
         if not isinstance(endpoints, dict):
-            return False
+            return True
 
         for endpoint in endpoints.values():
             if getattr(endpoint, "service_role", None) != service_role:

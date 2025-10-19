@@ -1,40 +1,7 @@
 {
   "queue_name": "dead_letter",
-  "timestamp": "2025-09-28T11:53:04.032073+00:00",
-  "messages": [
-    {
-      "message_id": "1e2bb5c8-ec40-4b92-95f8-b14dd6b243a9",
-      "queue_name": "dead_letter",
-      "payload": {
-        "type": "ap_outbound_delivery",
-        "reason": "client_error",
-        "http_status": 400,
-        "endpoint_url": "http://127.0.0.1:42051/bad",
-        "identifier": null,
-        "original_message_id": "6e962204-b718-414e-b853-2fde84589d95",
-        "original_payload": {
-          "endpoint_url": "http://127.0.0.1:42051/bad",
-          "document": {
-            "id": "inv-4xx"
-          }
-        }
-      },
-      "priority": 0,
-      "scheduled_time": "2025-09-27T14:32:13.962561+00:00",
-      "created_time": "2025-09-27T14:32:13.962561+00:00",
-      "processing_time": "2025-09-28T11:53:01.153044+00:00",
-      "completion_time": null,
-      "expiry_time": null,
-      "retry_count": 0,
-      "max_retries": 3,
-      "status": "processing",
-      "consumer_id": "dead_letter_worker_0",
-      "correlation_id": null,
-      "tenant_id": null,
-      "tags": [],
-      "metadata": {}
-    }
-  ],
+  "timestamp": "2025-10-19T10:27:49.263044+00:00",
+  "messages": [],
   "metrics": {
     "queue_name": "dead_letter",
     "total_messages": 1,
