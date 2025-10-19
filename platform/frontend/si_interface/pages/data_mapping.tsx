@@ -15,7 +15,7 @@
  * - Template-based mapping for common systems
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
@@ -213,7 +213,9 @@ export const DataMapping: React.FC<DataMappingProps> = ({
 }) => {
   const router = useRouter();
   const [availableSystems, setAvailableSystems] = useState<BusinessSystemSummary[]>([]);
+  const availableSystemsRef = useRef<BusinessSystemSummary[]>([]);
   const [schemaCache, setSchemaCache] = useState<Record<string, BusinessSystemSchema>>({});
+  const schemaCacheRef = useRef<Record<string, BusinessSystemSchema>>({});
   const [selectedSystem, setSelectedSystem] = useState<BusinessSystemSchema | null>(null);
   const [loadingSystems, setLoadingSystems] = useState<boolean>(false);
   const [loadingSchema, setLoadingSchema] = useState<boolean>(false);
@@ -229,8 +231,9 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   const loadSchema = useCallback(async (systemKey: string, summaryOverride?: BusinessSystemSummary) => {
     const normalizedKey = systemKey.toLowerCase();
 
-    if (schemaCache[normalizedKey]) {
-      setSelectedSystem(schemaCache[normalizedKey]);
+    const cachedSchema = schemaCacheRef.current[normalizedKey];
+    if (cachedSchema) {
+      setSelectedSystem(cachedSchema);
       setMappingRules([]);
       setValidationErrors({});
       setPreviewData(null);
@@ -251,7 +254,8 @@ export const DataMapping: React.FC<DataMappingProps> = ({
         throw new Error('Schema definition missing fields');
       }
 
-      const summary = summaryOverride || availableSystems.find(sys => sys.id === normalizedKey) || (erpMeta
+      const summaryLookup = availableSystemsRef.current;
+      const summary = summaryOverride || summaryLookup.find(sys => sys.id === normalizedKey) || (erpMeta
         ? ({
             id: normalizedKey,
             name: erpMeta.name ?? normalizedKey.toUpperCase(),
@@ -285,7 +289,11 @@ export const DataMapping: React.FC<DataMappingProps> = ({
         name: summary?.name || schemaData.system_name || normalizedKey.toUpperCase(),
       };
 
-      setSchemaCache(prev => ({ ...prev, [normalizedKey]: normalizedSchema }));
+      setSchemaCache(prev => {
+        const next = { ...prev, [normalizedKey]: normalizedSchema };
+        schemaCacheRef.current = next;
+        return next;
+      });
       setSelectedSystem(normalizedSchema);
       setMappingRules([]);
       setValidationErrors({});
@@ -297,7 +305,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
     } finally {
       setLoadingSchema(false);
     }
-  }, [availableSystems, schemaCache]);
+  }, []);
 
   useEffect(() => {
     const fetchAvailableSystems = async () => {
@@ -316,6 +324,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
         }));
 
         setAvailableSystems(normalized);
+        availableSystemsRef.current = normalized;
 
         if (systemId) {
           const match = normalized.find(sys => sys.id === systemId.toLowerCase());
