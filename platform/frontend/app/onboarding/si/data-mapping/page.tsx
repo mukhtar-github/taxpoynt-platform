@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DataMapping from '../../../../si_interface/pages/data_mapping';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
 
 export default function SIDataMappingPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isSystemIntegrator, isLoading } = useUserContext({
+  const searchParams = useSearchParams();
+  const { user, isAuthenticated, isSystemIntegrator, isLoading, organizationId } = useUserContext({
     requireAuth: true,
   });
 
@@ -40,5 +41,7 @@ export default function SIDataMappingPage() {
     );
   }
 
-  return <DataMapping />;
+  const systemId = searchParams?.get('system') || undefined;
+
+  return <DataMapping systemId={systemId} organizationId={organizationId ?? undefined} />;
 }

@@ -462,9 +462,11 @@ export const DataMapping: React.FC<DataMappingProps> = ({
       
       if (result.success) {
         alert('✅ Mapping configuration saved successfully!');
-        setShowWizardPrompt(true);
         if (onMappingComplete) {
           onMappingComplete(mappingRules);
+          setShowWizardPrompt(true);
+        } else {
+          router.push('/onboarding/si/integration-setup?step=testing');
         }
       } else {
         alert('❌ Failed to save mapping configuration.');
@@ -761,14 +763,14 @@ export const DataMapping: React.FC<DataMappingProps> = ({
                   </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button variant="success" onClick={() => router.push('/onboarding/si/complete-integration-setup')}>
-                    Return to Onboarding Wizard
+                  <Button variant="success" onClick={() => router.push('/onboarding/si/integration-setup?step=testing')}>
+                    Continue Integration Setup
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => router.push('/onboarding/si/integration-setup')}
+                    onClick={() => router.push('/onboarding/si/complete-integration-setup')}
                   >
-                    Review Earlier Steps
+                    View Completion Checklist
                   </Button>
                 </div>
               </div>

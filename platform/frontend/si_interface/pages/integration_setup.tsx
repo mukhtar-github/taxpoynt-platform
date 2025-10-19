@@ -15,11 +15,12 @@
  * - Compliance-ready integration templates
  */
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
+import { useFormPersistence } from '../../shared_components/utils/formPersistence';
 
 interface BusinessSystem {
   id: string;
@@ -288,12 +289,109 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
   onSetupComplete
 }) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const lastStepParamRef = useRef<string | null>(null);
+  const hasLoadedRef = useRef(false);
+  const integrationPersistence = useFormPersistence({
+    storageKey: `taxpoynt_si_integration_setup_${organizationId || 'global'}`,
+    persistent: true,
+  });
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const [steps, setSteps] = useState<IntegrationStep[]>(integrationSteps);
   const [credentials, setCredentials] = useState<Record<string, any>>({});
   const [testResults, setTestResults] = useState<Record<string, boolean>>({});
   const [isProcessing, setIsProcessing] = useState(false);
+  useEffect(() => {
+    const saved = integrationPersistence.loadFormData();
+    if (!saved) {
+      hasLoadedRef.current = true;
+      return;
+    }
+
+    if (Array.isArray(saved.selectedSystems) && saved.selectedSystems.length > 0) {
+      setSelectedSystems(saved.selectedSystems);
+    }
+
+    if (Array.isArray(saved.completedStepIds) && saved.completedStepIds.length > 0) {
+      const completedSet = new Set<string>(saved.completedStepIds);
+      setSteps(prev =>
+        prev.map(step =>
+          completedSet.has(step.id) && !step.completed ? { ...step, completed: true } : step
+        )
+      );
+    }
+
+    if (typeof saved.currentStepId === 'string') {
+      const targetIndex = integrationSteps.findIndex(step => step.id === saved.currentStepId);
+      if (targetIndex >= 0) {
+        setCurrentStep(targetIndex);
+      }
+    } else if (typeof saved.currentStep === 'number') {
+      const boundedIndex = Math.min(
+        Math.max(saved.currentStep, 0),
+        integrationSteps.length - 1
+      );
+      setCurrentStep(boundedIndex);
+    }
+
+    if (saved.credentials && typeof saved.credentials === 'object') {
+      setCredentials(saved.credentials as Record<string, any>);
+    }
+
+    if (saved.testResults && typeof saved.testResults === 'object') {
+      setTestResults(saved.testResults as Record<string, boolean>);
+    }
+
+    hasLoadedRef.current = true;
+  }, [organizationId]);
+
+  useEffect(() => {
+    const stepParam = searchParams?.get('step');
+    if (!stepParam || stepParam === lastStepParamRef.current) {
+      return;
+    }
+
+    const targetIndex = integrationSteps.findIndex(step => step.id === stepParam);
+    if (targetIndex === -1) {
+      lastStepParamRef.current = stepParam;
+      return;
+    }
+
+    lastStepParamRef.current = stepParam;
+
+    setSteps(prev =>
+      prev.map((step, index) =>
+        index < targetIndex && !step.completed ? { ...step, completed: true } : step
+      )
+    );
+    setCurrentStep(targetIndex);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) {
+      return;
+    }
+
+    const sanitizedCredentials = Object.fromEntries(
+      Object.entries(credentials).map(([systemId, value]) => {
+        if (!value || typeof value !== 'object') {
+          return [systemId, {}];
+        }
+        const { apiKey, token, ...rest } = value as Record<string, any>;
+        return [systemId, rest];
+      })
+    );
+
+    integrationPersistence.saveFormData({
+      selectedSystems,
+      credentials: sanitizedCredentials,
+      testResults,
+      currentStep,
+      currentStepId: integrationSteps[currentStep]?.id,
+      completedStepIds: steps.filter(step => step.completed).map(step => step.id),
+    });
+  }, [selectedSystems, credentials, testResults, currentStep, steps]);
 
   const currentStepData = steps[currentStep];
   const canProceed = currentStepData?.completed || false;
@@ -571,7 +669,15 @@ export const IntegrationSetup: React.FC<IntegrationSetupProps> = ({
             <p className="text-gray-600 mb-6">
               Configure how your business data maps to FIRS-compliant invoice format
             </p>
-            <Button onClick={() => router.push('/onboarding/si/data-mapping')}>
+            <Button
+              onClick={() => {
+                const targetSystem = selectedSystems[0];
+                const mappingUrl = targetSystem
+                  ? `/onboarding/si/data-mapping?system=${targetSystem}`
+                  : '/onboarding/si/data-mapping';
+                router.push(mappingUrl);
+              }}
+            >
               Open Data Mapping Tool
             </Button>
           </div>
