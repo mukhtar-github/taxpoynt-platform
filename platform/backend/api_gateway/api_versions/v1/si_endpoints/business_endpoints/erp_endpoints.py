@@ -5,10 +5,11 @@ System Integrator endpoints for Enterprise Resource Planning system integrations
 Covers: SAP, Oracle, Microsoft Dynamics, NetSuite, Odoo
 """
 import logging
-from datetime import datetime
-from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional, Set, Tuple, Literal
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import ServiceRole, MessageRouter
@@ -17,6 +18,7 @@ from api_gateway.role_routing.role_detector import HTTPRoleDetector
 from api_gateway.role_routing.permission_guard import APIPermissionGuard
 from ..version_models import V1ResponseModel
 from api_gateway.utils.v1_response import build_v1_response
+from si_services.onboarding_management.onboarding_service import SIOnboardingService
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +182,70 @@ ERP_SCHEMA_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     }
 }
 
+DEFAULT_FIRS_SCHEMA: List[Dict[str, Any]] = [
+    {"id": "invoice_number", "required": True},
+    {"id": "invoice_date", "required": True},
+    {"id": "supplier_tin", "required": True},
+    {"id": "customer_tin", "required": False},
+    {"id": "line_items", "required": True},
+    {"id": "total_amount", "required": True},
+    {"id": "vat_amount", "required": False},
+    {"id": "currency", "required": True},
+]
+
+
+class MappingTransformationModel(BaseModel):
+    type: Literal["direct", "format", "calculate", "lookup", "conditional"]
+    formula: Optional[str] = None
+    lookup_table: Optional[Dict[str, Any]] = Field(default=None, alias="lookupTable")
+    conditions: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        allow_population_by_field_name = True
+        extra = "allow"
+
+
+class MappingRuleModel(BaseModel):
+    id: str
+    source_field: str = Field(..., alias="sourceField")
+    target_field: str = Field(..., alias="targetField")
+    source_label: Optional[str] = Field(default=None, alias="sourceLabel")
+    transformation: Optional[MappingTransformationModel] = None
+    validated: bool = Field(default=False, alias="validated")
+
+    class Config:
+        allow_population_by_field_name = True
+        extra = "allow"
+
+
+class FIRSFieldModel(BaseModel):
+    id: str
+    required: bool = False
+
+    class Config:
+        extra = "allow"
+
+
+class ValidateMappingRequest(BaseModel):
+    system_id: str = Field(..., alias="system_id")
+    organization_id: Optional[str] = Field(default=None, alias="organization_id")
+    mapping_rules: List[MappingRuleModel] = Field(..., alias="mapping_rules")
+    firs_schema: List[FIRSFieldModel] = Field(default_factory=list, alias="firs_schema")
+
+    class Config:
+        allow_population_by_field_name = True
+        extra = "allow"
+
+
+class SaveMappingRequest(BaseModel):
+    system_id: str = Field(..., alias="system_id")
+    organization_id: Optional[str] = Field(default=None, alias="organization_id")
+    mapping_rules: List[MappingRuleModel] = Field(..., alias="mapping_rules")
+
+    class Config:
+        allow_population_by_field_name = True
+        extra = "allow"
+
 
 class ERPEndpointsV1:
     """
@@ -205,11 +271,13 @@ class ERPEndpointsV1:
     def __init__(self, 
                  role_detector: HTTPRoleDetector,
                  permission_guard: APIPermissionGuard,
-                 message_router: MessageRouter):
+                 message_router: MessageRouter,
+                 onboarding_service: Optional[SIOnboardingService] = None):
         self.role_detector = role_detector
         self.permission_guard = permission_guard
         self.message_router = message_router
         self.router = APIRouter(prefix="/erp", tags=["ERP Systems V1"])
+        self.onboarding_service = onboarding_service or SIOnboardingService()
         
         # Available ERP systems from actual implementation
         self.erp_systems = {
@@ -449,6 +517,35 @@ class ERPEndpointsV1:
             response_model=V1ResponseModel,
             dependencies=guard_deps,
         )
+
+        # ERP Data Mapping Workflow
+        self.router.add_api_route(
+            "/data-mapping/validate",
+            self.validate_data_mapping,
+            methods=["POST"],
+            summary="Validate ERP to FIRS data mapping",
+            description="Validate ERP mapping rules against canonical ERP schema and FIRS requirements",
+            response_class=JSONResponse,
+            dependencies=protected_guard_deps,
+        )
+        self.router.add_api_route(
+            "/data-mapping/save",
+            self.save_data_mapping,
+            methods=["POST"],
+            summary="Persist ERP data mapping configuration",
+            description="Persist validated ERP mapping rules within onboarding metadata",
+            response_class=JSONResponse,
+            dependencies=protected_guard_deps,
+        )
+        self.router.add_api_route(
+            "/data-mapping/{organization_id}/{system_id}",
+            self.get_saved_data_mapping,
+            methods=["GET"],
+            summary="Retrieve saved ERP data mapping rules",
+            description="Fetch previously saved mapping configuration for an organization/system pair",
+            response_class=JSONResponse,
+            dependencies=protected_guard_deps,
+        )
         
         # Bulk Operations
         self.router.add_api_route(
@@ -512,6 +609,339 @@ class ERPEndpointsV1:
     async def _ensure_context(self, request: Request) -> HTTPRoutingContext:
         """Ensure routing context is present when used as a dependency."""
         return await self._get_si_context(request)
+
+    @staticmethod
+    def _iso_now() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _normalize_system_key(system_id: str) -> str:
+        return (system_id or "").strip().lower()
+
+    def _get_erp_schema_entry(self, system_id: str) -> Tuple[str, Dict[str, Any]]:
+        normalized = self._normalize_system_key(system_id)
+        schema = ERP_SCHEMA_DEFINITIONS.get(normalized)
+        if not schema:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported ERP system '{system_id}'",
+            )
+        return normalized, schema
+
+    @staticmethod
+    def _catalog_erp_fields(schema: Dict[str, Any]) -> Set[str]:
+        fields: Set[str] = set()
+        for item in schema.get("fields", []):
+            field_id = item.get("id")
+            field_path = item.get("path")
+            if field_id:
+                fields.add(field_id)
+            if field_path:
+                fields.add(field_path)
+        return fields
+
+    @staticmethod
+    def _prepare_firs_schema(firs_schema: List[FIRSFieldModel]) -> List[FIRSFieldModel]:
+        if firs_schema:
+            return firs_schema
+        return [FIRSFieldModel(**field) for field in DEFAULT_FIRS_SCHEMA]
+
+    def _evaluate_mapping_rules(
+        self,
+        system_id: str,
+        mapping_rules: List[MappingRuleModel],
+        firs_schema: List[FIRSFieldModel],
+    ) -> Tuple[Dict[str, List[str]], Dict[str, str], Set[str], Dict[str, bool]]:
+        _, schema = self._get_erp_schema_entry(system_id)
+        erp_fields = self._catalog_erp_fields(schema)
+
+        firs_models = self._prepare_firs_schema(firs_schema)
+        firs_requirements = {field.id: field.required for field in firs_models}
+
+        errors: Dict[str, List[str]] = {}
+        preview_map: Dict[str, str] = {}
+        mapped_targets: Set[str] = set()
+        seen_targets: Set[str] = set()
+
+        if not mapping_rules:
+            errors["__root__"] = ["At least one mapping rule is required."]
+            return errors, preview_map, mapped_targets, firs_requirements
+
+        for rule in mapping_rules:
+            target = (rule.target_field or "").strip()
+            source = (rule.source_field or "").strip()
+            rule_errors: List[str] = []
+
+            if not target:
+                rule_errors.append("Target field is required.")
+            if not source:
+                rule_errors.append("Source field is required.")
+
+            if target:
+                if target in seen_targets:
+                    rule_errors.append("Target field already mapped.")
+                seen_targets.add(target)
+
+                if target not in firs_requirements:
+                    rule_errors.append("Unknown target field for FIRS mapping.")
+
+            if source and source not in erp_fields:
+                rule_errors.append("Source field not present in ERP schema.")
+
+            if rule_errors:
+                errors.setdefault(target or rule.id, []).extend(rule_errors)
+                continue
+
+            preview_map[target] = source
+            mapped_targets.add(target)
+
+        for target, required in firs_requirements.items():
+            if required and target not in mapped_targets:
+                errors.setdefault(target, []).append("Required field missing mapping.")
+
+        for key, messages in list(errors.items()):
+            deduped = sorted({msg for msg in messages if msg})
+            if deduped:
+                errors[key] = deduped
+            else:
+                errors.pop(key, None)
+
+        return errors, preview_map, mapped_targets, firs_requirements
+
+    @staticmethod
+    def _serialize_mapping_rules(mapping_rules: List[MappingRuleModel]) -> List[Dict[str, Any]]:
+        return [
+            rule.dict(by_alias=True, exclude_none=True)
+            for rule in mapping_rules
+        ]
+
+    async def _load_onboarding_state(
+        self,
+        user_id: str,
+        service_package: str,
+    ) -> Dict[str, Any]:
+        try:
+            response = await self.onboarding_service.handle_operation(
+                "get_onboarding_state",
+                {"user_id": user_id, "service_package": service_package},
+            )
+        except Exception as exc:
+            logger.error("Failed to fetch onboarding state for user %s: %s", user_id, exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Unable to load onboarding state for data mapping",
+            ) from exc
+
+        if not response.get("success"):
+            return {}
+        return response.get("data") or {}
+
+    async def _persist_mapping_metadata(
+        self,
+        user_id: str,
+        service_package: str,
+        metadata: Dict[str, Any],
+        *,
+        current_step: Optional[str],
+        completed_steps: List[str],
+    ) -> None:
+        payload = {
+            "user_id": user_id,
+            "service_package": service_package,
+            "onboarding_data": {
+                "current_step": current_step or "data_mapping",
+                "completed_steps": completed_steps,
+                "metadata": metadata,
+            },
+        }
+
+        try:
+            response = await self.onboarding_service.handle_operation("update_onboarding_state", payload)
+        except Exception as exc:
+            logger.error("Failed to persist data mapping metadata for user %s: %s", user_id, exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Unable to persist data mapping configuration",
+            ) from exc
+
+        if not response.get("success"):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to save data mapping configuration",
+            )
+
+    async def validate_data_mapping(
+        self,
+        request_model: ValidateMappingRequest,
+        request: Request,
+    ) -> JSONResponse:
+        context = await self._get_si_context(request)
+        errors, preview_map, mapped_targets, firs_requirements = self._evaluate_mapping_rules(
+            request_model.system_id,
+            request_model.mapping_rules,
+            request_model.firs_schema,
+        )
+
+        missing_required = [
+            field_id
+            for field_id, required in firs_requirements.items()
+            if required and field_id not in mapped_targets
+        ]
+
+        response: Dict[str, Any] = {
+            "success": not errors,
+            "errors": errors if errors else {},
+            "preview_data": {
+                "system_id": self._normalize_system_key(request_model.system_id),
+                "mapped_fields": preview_map,
+                "validated_targets": sorted(mapped_targets),
+                "missing_required": missing_required,
+                "validated_at": self._iso_now(),
+            },
+        }
+
+        if request_model.organization_id:
+            response["organization_id"] = request_model.organization_id
+        if context and context.user_id:
+            response["validated_by"] = context.user_id
+
+        return JSONResponse(response)
+
+    async def save_data_mapping(
+        self,
+        request_model: SaveMappingRequest,
+        request: Request,
+    ) -> JSONResponse:
+        context = await self._get_si_context(request)
+        organization_id = request_model.organization_id
+        if not organization_id:
+            if context.organization_id:
+                organization_id = str(context.organization_id)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Organization ID is required to save data mapping",
+                )
+
+        user_id = context.user_id
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authenticated user context required for data mapping",
+            )
+
+        errors, preview_map, mapped_targets, firs_requirements = self._evaluate_mapping_rules(
+            request_model.system_id,
+            request_model.mapping_rules,
+            [],
+        )
+
+        if errors:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "errors": errors,
+                    "preview_data": {
+                        "system_id": self._normalize_system_key(request_model.system_id),
+                        "mapped_fields": preview_map,
+                        "missing_required": [
+                            field
+                            for field, required in firs_requirements.items()
+                            if required and field not in mapped_targets
+                        ],
+                        "validated_at": self._iso_now(),
+                    },
+                }
+            )
+
+        service_package = context.metadata.get("service_package") if context else None
+        service_package = service_package or "si"
+
+        state = await self._load_onboarding_state(user_id, service_package)
+        metadata = dict(state.get("metadata") or {})
+        data_mapping_store = dict(metadata.get("data_mapping") or {})
+
+        system_key = self._normalize_system_key(request_model.system_id)
+        serialized_rules = self._serialize_mapping_rules(request_model.mapping_rules)
+        updated_at = self._iso_now()
+
+        data_mapping_store[system_key] = {
+            "system_id": system_key,
+            "organization_id": organization_id,
+            "mapping_rules": serialized_rules,
+            "validated_targets": sorted(mapped_targets),
+            "updated_at": updated_at,
+        }
+
+        metadata["data_mapping"] = data_mapping_store
+        completed_steps = list(state.get("completed_steps") or [])
+        if "data_mapping" not in completed_steps:
+            completed_steps.append("data_mapping")
+
+        await self._persist_mapping_metadata(
+            user_id,
+            service_package,
+            metadata,
+            current_step="data_mapping",
+            completed_steps=completed_steps,
+        )
+
+        response = {
+            "success": True,
+            "saved": True,
+            "system_id": system_key,
+            "organization_id": organization_id,
+            "stored_at": updated_at,
+            "validated_targets": sorted(mapped_targets),
+        }
+        return JSONResponse(response)
+
+    async def get_saved_data_mapping(
+        self,
+        organization_id: str,
+        system_id: str,
+        request: Request,
+    ) -> JSONResponse:
+        context = await self._get_si_context(request)
+        if context.organization_id:
+            context_org = str(context.organization_id)
+            if context_org != organization_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Requested organization does not match authenticated context",
+                )
+
+        user_id = context.user_id
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authenticated user context required to fetch data mapping",
+            )
+
+        service_package = context.metadata.get("service_package") if context else None
+        service_package = service_package or "si"
+
+        state = await self._load_onboarding_state(user_id, service_package)
+        metadata = state.get("metadata") or {}
+        data_mapping_store = metadata.get("data_mapping") or {}
+
+        system_key = self._normalize_system_key(system_id)
+        entry = data_mapping_store.get(system_key)
+
+        if entry and entry.get("organization_id") and entry["organization_id"] != organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Data mapping is not available for the requested organization",
+            )
+
+        response = {
+            "success": True,
+            "system_id": system_key,
+            "organization_id": organization_id,
+            "mapping_rules": entry.get("mapping_rules", []) if entry else [],
+            "updated_at": entry.get("updated_at") if entry else None,
+        }
+        return JSONResponse(response)
     
     # ERP System Discovery
     async def get_available_erp_systems(self, context: Optional[HTTPRoutingContext] = Depends(lambda: None)):
@@ -997,7 +1427,13 @@ class ERPEndpointsV1:
 
 def create_erp_router(role_detector: HTTPRoleDetector,
                      permission_guard: APIPermissionGuard,
-                     message_router: MessageRouter) -> APIRouter:
+                     message_router: MessageRouter,
+                     onboarding_service: Optional[SIOnboardingService] = None) -> APIRouter:
     """Factory function to create ERP Router"""
-    erp_endpoints = ERPEndpointsV1(role_detector, permission_guard, message_router)
+    erp_endpoints = ERPEndpointsV1(
+        role_detector,
+        permission_guard,
+        message_router,
+        onboarding_service=onboarding_service,
+    )
     return erp_endpoints.router

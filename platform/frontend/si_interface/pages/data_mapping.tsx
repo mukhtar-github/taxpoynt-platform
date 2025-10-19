@@ -19,6 +19,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 
+const DATA_MAPPING_BASE = '/si/business/erp/data-mapping';
+
 interface DataField {
   id: string;
   name: string;
@@ -343,7 +345,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
 
     try {
       const data = await apiClient.get<{ mapping_rules?: MappingRule[] }>(
-        `/si/data-mapping/${organizationId}/${selectedSystem?.systemId}`
+        `${DATA_MAPPING_BASE}/${organizationId}/${selectedSystem?.systemId}`
       );
 
       const incomingRules = data?.mapping_rules || [];
@@ -416,7 +418,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
         success: boolean;
         errors?: Record<string, string[]>;
         preview_data?: any;
-      }>('/si/data-mapping/validate', {
+      }>(`${DATA_MAPPING_BASE}/validate`, {
         system_id: selectedSystem.systemId,
         organization_id: organizationId,
         mapping_rules: mappingRules,
@@ -445,7 +447,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
 
     try {
       const result = await apiClient.post<{ success: boolean; error?: string }>(
-        '/si/data-mapping/save',
+        `${DATA_MAPPING_BASE}/save`,
         {
           system_id: selectedSystem.systemId,
           organization_id: organizationId,
