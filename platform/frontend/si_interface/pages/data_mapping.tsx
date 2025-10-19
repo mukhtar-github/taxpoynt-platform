@@ -764,7 +764,7 @@ export const DataMapping: React.FC<DataMappingProps> = ({
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <Button variant="success" onClick={() => router.push('/onboarding/si/integration-setup?step=testing')}>
-                    Continue Integration Setup
+                    Return to Onboarding Wizard
                   </Button>
                   <Button
                     variant="outline"
