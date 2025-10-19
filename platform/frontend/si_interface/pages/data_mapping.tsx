@@ -226,7 +226,6 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   const [previewData, setPreviewData] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   const [isValidating, setIsValidating] = useState(false);
-  const [showWizardPrompt, setShowWizardPrompt] = useState(false);
 
   const loadSchema = useCallback(async (systemKey: string, summaryOverride?: BusinessSystemSummary) => {
     const normalizedKey = systemKey.toLowerCase();
@@ -425,7 +424,6 @@ export const DataMapping: React.FC<DataMappingProps> = ({
   const handleValidateMapping = async () => {
     if (!selectedSystem || mappingRules.length === 0) return;
 
-    setShowWizardPrompt(false);
     setIsValidating(true);
     try {
       const result = await apiClient.post<{
@@ -473,10 +471,8 @@ export const DataMapping: React.FC<DataMappingProps> = ({
         alert('✅ Mapping configuration saved successfully!');
         if (onMappingComplete) {
           onMappingComplete(mappingRules);
-          setShowWizardPrompt(true);
-        } else {
-          router.push('/onboarding/si/integration-setup?step=testing');
         }
+        router.push('/onboarding/si/integration-setup?step=testing');
       } else {
         alert('❌ Failed to save mapping configuration.');
       }
@@ -761,29 +757,6 @@ export const DataMapping: React.FC<DataMappingProps> = ({
                 Save Configuration
               </Button>
             </div>
-            {showWizardPrompt && (
-              <div className="w-full rounded-lg border border-green-200 bg-green-50 px-4 py-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-green-800">
-                    Mapping saved. Continue the onboarding wizard to finish setup.
-                  </p>
-                  <p className="text-xs text-green-700">
-                    We already marked the data mapping step as complete in your onboarding progress.
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Button variant="success" onClick={() => router.push('/onboarding/si/integration-setup?step=testing')}>
-                    Return to Onboarding Wizard
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push('/onboarding/si/complete-integration-setup')}
-                  >
-                    View Completion Checklist
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
