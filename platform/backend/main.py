@@ -97,8 +97,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-if not DEBUG:
-    logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
 
 # Try to import API Gateway components
 try:
