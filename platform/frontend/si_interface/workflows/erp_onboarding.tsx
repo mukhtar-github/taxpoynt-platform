@@ -147,37 +147,57 @@ type ValidateMappingResponse = {
 const pickString = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 
+const normalizeUserFacingMessage = (value?: string): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('network error') || lower.includes('check your connection')) {
+    return 'Service temporarily unavailable. Please retry shortly.';
+  }
+
+  return trimmed;
+};
+
 const extractErrorMessage = (error: unknown, fallback: string): string => {
+  const sanitizedFallback = normalizeUserFacingMessage(fallback) ?? fallback;
+
   if (error instanceof Error) {
-    const msg = pickString(error.message);
+    const msg = normalizeUserFacingMessage(error.message);
     if (msg) return msg;
   }
 
   if (typeof error === 'string') {
-    const msg = pickString(error);
+    const msg = normalizeUserFacingMessage(error);
     if (msg) return msg;
   }
 
   if (error && typeof error === 'object') {
     const errObj = error as Record<string, unknown>;
-    const detail = pickString(errObj.detail);
+    const detail = normalizeUserFacingMessage(pickString(errObj.detail));
     if (detail) return detail;
-    const message = pickString(errObj.message);
+    const message = normalizeUserFacingMessage(pickString(errObj.message));
     if (message) return message;
 
     const response = errObj.response;
     if (response && typeof response === 'object') {
       const data = (response as Record<string, unknown>).data;
       if (data && typeof data === 'object') {
-        const nestedDetail = pickString((data as Record<string, unknown>).detail);
+        const nestedDetail = normalizeUserFacingMessage(pickString((data as Record<string, unknown>).detail));
         if (nestedDetail) return nestedDetail;
-        const nestedMessage = pickString((data as Record<string, unknown>).message);
+        const nestedMessage = normalizeUserFacingMessage(pickString((data as Record<string, unknown>).message));
         if (nestedMessage) return nestedMessage;
       }
     }
   }
 
-  return fallback;
+  return sanitizedFallback;
 };
 
 const onboardingSteps: OnboardingStep[] = [

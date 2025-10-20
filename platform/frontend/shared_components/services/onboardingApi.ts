@@ -69,8 +69,9 @@ export interface ApiResponse<T = any> {
 
 class OnboardingApiClient {
   private baseUrl: string;
-  private retryAttempts: number = 3;
-  private retryDelay: number = 1000; // 1 second
+  private retryAttempts: number = 4;
+  private baseRetryDelay: number = 1500; // start at 1.5s
+  private maxRetryDelay: number = 12000; // 12 seconds cap
 
   constructor() {
     const primaryApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -138,8 +139,6 @@ class OnboardingApiClient {
       const headers = await this.getAuthHeaders();
       const url = `${this.baseUrl}/si/onboarding${endpoint}`;
 
-      console.log(`🔄 Making ${method} request to: ${url}`);
-
       let response: AxiosResponse<ApiResponse<T>>;
 
       switch (method) {
@@ -160,7 +159,6 @@ class OnboardingApiClient {
       }
 
       if (response.data.success) {
-        console.log(`✅ ${method} ${endpoint} successful`);
         return response.data.data;
       }
 
@@ -178,8 +176,8 @@ class OnboardingApiClient {
 
       // Retry logic for network errors
       if (attempt < this.retryAttempts && this.isRetryableError(error)) {
-        console.log(`🔄 Retrying in ${this.retryDelay}ms... (attempt ${attempt + 1}/${this.retryAttempts})`);
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+        const delay = this.getBackoffDelay(attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
         return this.makeRequest<T>(method, endpoint, data, attempt + 1);
       }
 
@@ -196,6 +194,18 @@ class OnboardingApiClient {
       return !error.response || (error.response.status >= 500 && error.response.status < 600);
     }
     return false;
+  }
+
+  /**
+   * Exponential backoff with jitter so we avoid retry stampedes
+   */
+  private getBackoffDelay(attempt: number): number {
+    const exponentialDelay = Math.min(
+      this.baseRetryDelay * Math.pow(2, attempt - 1),
+      this.maxRetryDelay
+    );
+    const jitterFactor = 0.8 + Math.random() * 0.4; // 0.8x – 1.2x jitter
+    return Math.floor(exponentialDelay * jitterFactor);
   }
 
   /**
