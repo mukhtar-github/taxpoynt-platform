@@ -263,6 +263,72 @@ const onboardingSteps: OnboardingStep[] = [
   }
 ];
 
+const createDefaultSteps = (): OnboardingStep[] =>
+  onboardingSteps.map(step => ({ ...step, completed: false }));
+
+const createDefaultOrganizationProfile = (): OrganizationProfile => ({
+  basicInfo: {
+    name: '',
+    rcNumber: '',
+    tinNumber: '',
+    email: '',
+    phone: '',
+    address: '',
+    industry: '',
+    size: ''
+  },
+  compliance: {
+    vatRegistered: false,
+    firsRegistered: false,
+    cbnCompliant: false
+  },
+  businessSystems: {
+    currentSoftware: [],
+    invoiceVolume: '',
+    integrationRequirements: []
+  }
+});
+
+const createDefaultErpConfiguration = (): ERPConfiguration => ({
+  systemType: '',
+  credentials: {},
+  dataSources: {
+    customers: false,
+    products: false,
+    invoices: false,
+    payments: false,
+    inventory: false
+  },
+  mappingRules: []
+});
+
+const DEFAULT_COMPLIANCE_CONFIG = {
+  firsApiKey: '',
+  complianceEmail: '',
+  vatMode: 'standard',
+  vatRate: '7.5',
+  enableRateLimiter: true,
+  enableAuditTrail: true,
+  requireSecureChannels: true,
+  notes: '',
+};
+
+const DEFAULT_PRODUCTION_CHECKLIST = {
+  promoteConnection: true,
+  enableLiveSubmissions: false,
+  notifyFinanceTeam: false,
+  monitoringEnabled: false,
+  rollbackPlanDocumented: true,
+};
+
+const DEFAULT_TRAINING_CHECKLIST = {
+  trainingScheduled: false,
+  supportDocsShared: false,
+  successMetricsDefined: false,
+  postGoLiveSupportAssigned: false,
+  customerSignOffReceived: false,
+};
+
 const resolveStepIndexFromKey = (stepKey?: string): number | null => {
   if (!stepKey) {
     return null;
@@ -313,41 +379,9 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     autoSaveInterval: 5000 // Save every 5 seconds
   });
 
-  const [steps, setSteps] = useState<OnboardingStep[]>(onboardingSteps);
-  const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>({
-    basicInfo: {
-      name: '',
-      rcNumber: '',
-      tinNumber: '',
-      email: '',
-      phone: '',
-      address: '',
-      industry: '',
-      size: ''
-    },
-    compliance: {
-      vatRegistered: false,
-      firsRegistered: false,
-      cbnCompliant: false
-    },
-    businessSystems: {
-      currentSoftware: [],
-      invoiceVolume: '',
-      integrationRequirements: []
-    }
-  });
-  const [erpConfiguration, setErpConfiguration] = useState<ERPConfiguration>({
-    systemType: '',
-    credentials: {},
-    dataSources: {
-      customers: false,
-      products: false,
-      invoices: false,
-      payments: false,
-      inventory: false
-    },
-    mappingRules: []
-  });
+  const [steps, setSteps] = useState<OnboardingStep[]>(() => createDefaultSteps());
+  const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>(() => createDefaultOrganizationProfile());
+  const [erpConfiguration, setErpConfiguration] = useState<ERPConfiguration>(() => createDefaultErpConfiguration());
   const [progress, setProgress] = useState<OnboardingProgress | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
@@ -366,30 +400,11 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
   const [connectionCreationStatus, setConnectionCreationStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [connectionCreationMessage, setConnectionCreationMessage] = useState<string>('');
-  const [complianceConfig, setComplianceConfig] = useState({
-    firsApiKey: '',
-    complianceEmail: '',
-    vatMode: 'standard',
-    vatRate: '7.5',
-    enableRateLimiter: true,
-    enableAuditTrail: true,
-    requireSecureChannels: true,
-    notes: '',
-  });
-  const [productionChecklist, setProductionChecklist] = useState({
-    promoteConnection: true,
-    enableLiveSubmissions: false,
-    notifyFinanceTeam: false,
-    monitoringEnabled: false,
-    rollbackPlanDocumented: true,
-  });
-  const [trainingChecklist, setTrainingChecklist] = useState({
-    trainingScheduled: false,
-    supportDocsShared: false,
-    successMetricsDefined: false,
-    postGoLiveSupportAssigned: false,
-    customerSignOffReceived: false,
-  });
+  const [complianceConfig, setComplianceConfig] = useState(() => ({ ...DEFAULT_COMPLIANCE_CONFIG }));
+  const [productionChecklist, setProductionChecklist] = useState(() => ({ ...DEFAULT_PRODUCTION_CHECKLIST }));
+  const [trainingChecklist, setTrainingChecklist] = useState(() => ({ ...DEFAULT_TRAINING_CHECKLIST }));
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetStatusMessage, setResetStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     connectionsFetchRef.current = false;
@@ -979,6 +994,78 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     erpConfiguration,
     fetchErpConnections,
     resolvedOrganizationId
+  ]);
+
+  const handleResetOnboarding = useCallback(async () => {
+    if (isResetting) {
+      return;
+    }
+
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm('Reset the SI onboarding wizard? All saved progress will be cleared.');
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsResetting(true);
+    setResetStatusMessage('Resetting onboarding progress…');
+
+    try {
+      if (apiClient.isAuthenticated()) {
+        await apiClient.delete('/si/onboarding/state/reset');
+      }
+    } catch (error) {
+      const message = extractErrorMessage(error, 'Failed to reset onboarding state. Please try again.');
+      setResetStatusMessage(message);
+      setIsResetting(false);
+      return;
+    }
+
+    erpFormPersistence.clearFormData();
+    CrossFormDataManager.clearSharedData();
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('taxpoynt_erp_onboarding_step_completed');
+    }
+
+    connectionsFetchRef.current = false;
+    mappingFetchRef.current = false;
+
+    setSteps(createDefaultSteps());
+    setCurrentStep(initialStepIndex ?? 0);
+    setProgress(null);
+    setResolvedOrganizationId(organizationId ?? null);
+    setOrganizationProfile(createDefaultOrganizationProfile());
+    setErpConfiguration(createDefaultErpConfiguration());
+    setComplianceConfig({ ...DEFAULT_COMPLIANCE_CONFIG });
+    setProductionChecklist({ ...DEFAULT_PRODUCTION_CHECKLIST });
+    setTrainingChecklist({ ...DEFAULT_TRAINING_CHECKLIST });
+    setConnections([]);
+    setConnectionsError(null);
+    setConnectionsLoading(false);
+    setConnectionTestStatus('idle');
+    setConnectionTestMessage('');
+    setDataValidationStatus('idle');
+    setDataValidationMessage('');
+    setSavedMapping([]);
+    setSavedMappingStatus('idle');
+    setCreatedConnectionId(null);
+    setConnectionCreationStatus('idle');
+    setConnectionCreationMessage('');
+    setTestResults(null);
+    setResetStatusMessage('Onboarding progress reset. You can start again from the beginning.');
+  } catch (error) {
+    const message = extractErrorMessage(error, 'Unexpected error while resetting onboarding.');
+    setResetStatusMessage(message);
+  } finally {
+    setIsResetting(false);
+  }
+  }, [
+    erpFormPersistence,
+    initialStepIndex,
+    isResetting,
+    organizationId
   ]);
 
 
@@ -2408,17 +2495,36 @@ const renderERPSelection = () => (
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">ERP Onboarding Workflow</h1>
               <p className="text-gray-600 mt-2">Complete organization setup and ERP integration</p>
             </div>
-            <div className="text-sm text-gray-500">
-              Step {currentStep + 1} of {steps.length}
+            <div className="flex flex-col items-end gap-2">
+              <div className="text-sm text-gray-500">
+                Step {currentStep + 1} of {steps.length}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetOnboarding}
+                loading={isResetting}
+                disabled={isResetting}
+              >
+                Reset onboarding
+              </Button>
             </div>
           </div>
         </div>
       </div>
+
+      {resetStatusMessage && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {resetStatusMessage}
+          </div>
+        </div>
+      )}
 
       {/* Progress Steps */}
       <div className="bg-white border-b">
