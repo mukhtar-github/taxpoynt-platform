@@ -67,6 +67,8 @@ interface ERPConfiguration {
     username?: string;
     apiKey?: string;
     oauthToken?: string;
+    password?: string;
+    environment?: string;
   };
   dataSources: {
     customers: boolean;
@@ -254,7 +256,7 @@ const onboardingSteps: OnboardingStep[] = [
     id: 'training_handover',
     title: 'Training & Handover',
     description: 'Client training and system handover',
-    required: true,
+    required: false,
     completed: false,
     estimatedDuration: '60-90 minutes',
     dependencies: ['production_deployment']
@@ -361,6 +363,33 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [savedMapping, setSavedMapping] = useState<MappingRule[]>([]);
   const [savedMappingStatus, setSavedMappingStatus] = useState<'idle' | 'loading' | 'ready' | 'missing' | 'error'>('idle');
   const mappingFetchRef = useRef(false);
+  const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
+  const [connectionCreationStatus, setConnectionCreationStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [connectionCreationMessage, setConnectionCreationMessage] = useState<string>('');
+  const [complianceConfig, setComplianceConfig] = useState({
+    firsApiKey: '',
+    complianceEmail: '',
+    vatMode: 'standard',
+    vatRate: '7.5',
+    enableRateLimiter: true,
+    enableAuditTrail: true,
+    requireSecureChannels: true,
+    notes: '',
+  });
+  const [productionChecklist, setProductionChecklist] = useState({
+    promoteConnection: true,
+    enableLiveSubmissions: false,
+    notifyFinanceTeam: false,
+    monitoringEnabled: false,
+    rollbackPlanDocumented: true,
+  });
+  const [trainingChecklist, setTrainingChecklist] = useState({
+    trainingScheduled: false,
+    supportDocsShared: false,
+    successMetricsDefined: false,
+    postGoLiveSupportAssigned: false,
+    customerSignOffReceived: false,
+  });
 
   useEffect(() => {
     connectionsFetchRef.current = false;
@@ -402,6 +431,10 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
           organizationProfile,
           erpConfiguration,
           currentStep: nextCurrentStep,
+          createdConnectionId,
+          complianceConfig,
+          productionChecklist,
+          trainingChecklist,
           stepsCompleted: completedIds,
           timestamp: Date.now()
         });
@@ -409,7 +442,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         return nextSteps;
       });
     },
-    [currentStep, erpFormPersistence, organizationProfile, erpConfiguration]
+    [currentStep, createdConnectionId, erpFormPersistence, organizationProfile, erpConfiguration]
   );
 
   useEffect(() => {
@@ -515,6 +548,8 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       setConnections(connectionList);
       if (!connectionList.length) {
         setConnectionsError('No ERP connections found yet. Configure a connection to enable automated testing.');
+      } else {
+        setConnectionsError(null);
       }
 
       return connectionList;
@@ -611,6 +646,20 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
           credentials: {} // Never restore credentials
         }));
       }
+      if (savedErpData.complianceConfig) {
+        setComplianceConfig(prev => ({ ...prev, ...savedErpData.complianceConfig }));
+      }
+      if (savedErpData.productionChecklist) {
+        setProductionChecklist(prev => ({ ...prev, ...savedErpData.productionChecklist }));
+      }
+      if (savedErpData.trainingChecklist) {
+        setTrainingChecklist(prev => ({ ...prev, ...savedErpData.trainingChecklist }));
+      }
+      if (savedErpData.createdConnectionId) {
+        setCreatedConnectionId(savedErpData.createdConnectionId);
+        setConnectionCreationStatus('success');
+        setConnectionCreationMessage('ERP connection ready for automated diagnostics.');
+      }
       if (savedErpData.currentStep !== undefined) {
         const savedIndex = savedErpData.currentStep;
         setCurrentStep(prev => {
@@ -647,6 +696,10 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       organizationProfile,
       erpConfiguration,
       currentStep,
+      createdConnectionId,
+      complianceConfig,
+      productionChecklist,
+      trainingChecklist,
       timestamp: Date.now()
     }));
 
@@ -692,6 +745,37 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     
     try {
       setIsProcessing(true);
+
+      if (stepId === 'erp_configuration') {
+        try {
+          await ensureConnectionPersisted();
+        } catch (error) {
+          const message = extractErrorMessage(
+            error,
+            'Unable to save ERP configuration. Please resolve the errors and try again.'
+          );
+          alert(`❌ ${message}`);
+          return;
+        }
+      }
+
+      if (stepId === 'compliance_setup') {
+        if (!complianceConfig.firsApiKey.trim()) {
+          alert('⚠️ Provide the FIRS API key before continuing.');
+          return;
+        }
+        if (!complianceConfig.complianceEmail.trim()) {
+          alert('⚠️ Enter the compliance contact email before continuing.');
+          return;
+        }
+      }
+
+      if (stepId === 'production_deployment') {
+        if (!productionChecklist.promoteConnection || !productionChecklist.enableLiveSubmissions) {
+          alert('⚠️ Confirm promotion and live submissions before marking deployment complete.');
+          return;
+        }
+      }
       
       // Always update local state first for immediate UX feedback
       setSteps(prev => prev.map((step, index) => 
@@ -703,6 +787,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         organizationProfile,
         erpConfiguration,
         currentStep,
+        createdConnectionId,
         stepsCompleted: steps.filter(s => s.completed).map(s => s.id),
         timestamp: Date.now()
       });
@@ -744,15 +829,137 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         return { compliance: organizationProfile.compliance };
       case 'erp_selection':
       case 'erp_configuration':
-        return { erp_configuration: erpConfiguration };
+        return {
+          erp_configuration: erpConfiguration,
+          connection_id: createdConnectionId,
+        };
       case 'data_mapping':
         return { mapping_rules: erpConfiguration.mappingRules };
+      case 'compliance_setup':
+        return { compliance_configuration: complianceConfig };
       case 'testing_validation':
         return { test_results: testResults };
+      case 'production_deployment':
+        return {
+          production_checklist: productionChecklist,
+          connection_id: createdConnectionId,
+        };
+      case 'training_handover':
+        return {
+          training_checklist: trainingChecklist,
+          optional: true,
+        };
       default:
         return {};
     }
   };
+
+  const ensureConnectionPersisted = useCallback(async (): Promise<string | null> => {
+    if (createdConnectionId) {
+      return createdConnectionId;
+    }
+
+    const systemType = (erpConfiguration.systemType || '').trim();
+    if (!systemType) {
+      throw new Error('Select an ERP system before completing the configuration.');
+    }
+
+    if (!resolvedOrganizationId) {
+      throw new Error('Organization context not detected. Please sign in again.');
+    }
+
+    const baseUrl = erpConfiguration.credentials.server?.trim();
+    const database = erpConfiguration.credentials.database?.trim();
+    const username = erpConfiguration.credentials.username?.trim();
+
+    if (!baseUrl) {
+      throw new Error('Provide the ERP server URL before continuing.');
+    }
+    if (!database) {
+      throw new Error('Provide the ERP database or company identifier.');
+    }
+    if (!username) {
+      throw new Error('Provide the integration username.');
+    }
+
+    const apiKey = erpConfiguration.credentials.apiKey?.trim();
+    if (!apiKey) {
+      throw new Error('Provide the ERP API key or integration token before continuing.');
+    }
+
+    const connectionName = `${systemType.toUpperCase()} ERP Connection`;
+
+    const connectionConfig: Record<string, unknown> = {
+      type: systemType,
+      auth_method: 'api_key',
+      url: baseUrl,
+      database,
+      username,
+      api_key: apiKey,
+      environment: 'sandbox',
+      auto_sync: Boolean(erpConfiguration.dataSources?.invoices),
+      data_sources: erpConfiguration.dataSources,
+    };
+
+    if (erpConfiguration.credentials.oauthToken) {
+      connectionConfig.oauth_token = erpConfiguration.credentials.oauthToken;
+    }
+
+    if (erpConfiguration.version) {
+      connectionConfig.version = erpConfiguration.version;
+    }
+
+    setConnectionCreationStatus('saving');
+    setConnectionCreationMessage('Creating ERP connection…');
+
+    try {
+      const payload = {
+        erp_system: systemType,
+        organization_id: resolvedOrganizationId,
+        connection_name: connectionName,
+        environment: 'sandbox',
+        connection_config: connectionConfig,
+      };
+
+      const response = await apiClient.post<Record<string, any>>('/si/business/erp/connections', payload);
+      const responseData = (response?.data ?? response) as Record<string, any>;
+      const nestedConnection = (responseData?.connection ?? {}) as Record<string, any>;
+
+      const newConnectionId =
+        pickString(responseData?.connection_id) ||
+        pickString(responseData?.id) ||
+        pickString(nestedConnection?.connection_id) ||
+        pickString(nestedConnection?.id) ||
+        null;
+
+      if (newConnectionId) {
+        setCreatedConnectionId(newConnectionId);
+        setConnectionCreationStatus('success');
+        setConnectionCreationMessage('ERP connection saved. Diagnostics are ready when you reach Testing.');
+        connectionsFetchRef.current = false;
+        await fetchErpConnections();
+        return newConnectionId;
+      }
+
+      setConnectionCreationStatus('error');
+      setConnectionCreationMessage('Connection created but no identifier was returned. Verify in the connection manager.');
+      return null;
+    } catch (error) {
+      const message = extractErrorMessage(
+        error,
+        'Unable to create ERP connection. Please verify your configuration and try again.'
+      );
+      setConnectionCreationStatus('error');
+      setConnectionCreationMessage(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }, [
+    createdConnectionId,
+    erpConfiguration,
+    fetchErpConnections,
+    resolvedOrganizationId
+  ]);
+
 
   const handleRunConnectionTest = useCallback(async () => {
     setConnectionTestStatus('running');
@@ -1464,6 +1671,437 @@ const renderERPSelection = () => (
           required for invoice synchronization.
         </p>
       </div>
+
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+        <p>
+          When you mark this step complete we will register your {erpConfiguration.systemType?.toUpperCase() || 'ERP'}
+          {' '}connection in the integration gateway using the details above.
+        </p>
+        {connectionCreationStatus === 'saving' && (
+          <p className="mt-2 text-indigo-600">{connectionCreationMessage || 'Creating ERP connection…'}</p>
+        )}
+        {connectionCreationStatus === 'success' && (
+          <p className="mt-2 text-green-600">
+            {connectionCreationMessage || 'ERP connection saved. Diagnostics will pick it up automatically.'}
+            {createdConnectionId && (
+              <span className="block text-xs text-green-700">Connection ID: {createdConnectionId}</span>
+            )}
+          </p>
+        )}
+        {connectionCreationStatus === 'error' && (
+          <p className="mt-2 text-red-600">{connectionCreationMessage}</p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.open('/dashboard/si/business-systems', '_blank', 'noopener');
+              }
+            }}
+          >
+            Open connection manager
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              connectionsFetchRef.current = false;
+              void fetchErpConnections();
+            }}
+            loading={connectionsLoading}
+            disabled={connectionsLoading}
+          >
+            Refresh list
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderComplianceSetup = () => (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-4">
+        <h3 className="text-lg font-semibold text-green-900">🛡️ Compliance Configuration</h3>
+        <p className="mt-1 text-sm text-green-800">
+          Finalize your FIRS credentials, VAT parameters, and security controls before moving live. These settings apply
+          across every submission routed through TaxPoynt.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">FIRS API Key *</label>
+          <input
+            type="password"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-500"
+            value={complianceConfig.firsApiKey}
+            onChange={(event) =>
+              setComplianceConfig((prev) => ({
+                ...prev,
+                firsApiKey: event.target.value,
+              }))
+            }
+            placeholder="Secure token for FIRS gateway"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Compliance contact email *</label>
+          <input
+            type="email"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-500"
+            value={complianceConfig.complianceEmail}
+            onChange={(event) =>
+              setComplianceConfig((prev) => ({
+                ...prev,
+                complianceEmail: event.target.value,
+              }))
+            }
+            placeholder="compliance@client.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">VAT mode</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-500"
+            value={complianceConfig.vatMode}
+            onChange={(event) =>
+              setComplianceConfig((prev) => ({
+                ...prev,
+                vatMode: event.target.value,
+              }))
+            }
+          >
+            <option value="standard">Standard VAT (7.5%)</option>
+            <option value="zero_rated">Zero-rated / Exempt</option>
+            <option value="custom">Custom rate</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">VAT rate (%)</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-500"
+            value={complianceConfig.vatRate}
+            onChange={(event) =>
+              setComplianceConfig((prev) => ({
+                ...prev,
+                vatRate: event.target.value,
+              }))
+            }
+            disabled={complianceConfig.vatMode !== 'custom'}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 p-4">
+        <h4 className="text-sm font-semibold text-gray-900">Security & rate limits</h4>
+        <div className="mt-3 space-y-2 text-sm text-gray-700">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-green-600"
+              checked={complianceConfig.enableRateLimiter}
+              onChange={(event) =>
+                setComplianceConfig((prev) => ({
+                  ...prev,
+                  enableRateLimiter: event.target.checked,
+                }))
+              }
+            />
+            <span>Enable FIRS-specific rate limiter</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-green-600"
+              checked={complianceConfig.enableAuditTrail}
+              onChange={(event) =>
+                setComplianceConfig((prev) => ({
+                  ...prev,
+                  enableAuditTrail: event.target.checked,
+                }))
+              }
+            />
+            <span>Log compliance audit trail for every submission</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-green-600"
+              checked={complianceConfig.requireSecureChannels}
+              onChange={(event) =>
+                setComplianceConfig((prev) => ({
+                  ...prev,
+                  requireSecureChannels: event.target.checked,
+                }))
+              }
+            />
+            <span>Enforce secure channels (TLS ≥ 1.2, signed payloads)</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Compliance notes</label>
+        <textarea
+          rows={4}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-500"
+          value={complianceConfig.notes}
+          onChange={(event) =>
+            setComplianceConfig((prev) => ({
+              ...prev,
+              notes: event.target.value,
+            }))
+          }
+          placeholder="Document any clarifications from FIRS or client-specific exemptions."
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.open('https://docs.taxpoynt.com/compliance/firs', '_blank', 'noopener');
+            }
+          }}
+        >
+          Open FIRS checklist
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.open('/dashboard/si/compliance', '_blank', 'noopener');
+            }
+          }}
+        >
+          Review compliance dashboard
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderProductionDeployment = () => (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-4">
+        <h3 className="text-lg font-semibold text-blue-900">🚀 Activate production</h3>
+        <p className="mt-1 text-sm text-blue-800">
+          Confirm the final go-live actions. We’ll update onboarding state and remind you to monitor the first live
+          submissions.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 p-4 text-sm">
+        <div className="space-y-3 text-gray-700">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-blue-600"
+              checked={productionChecklist.promoteConnection}
+              onChange={(event) =>
+                setProductionChecklist((prev) => ({
+                  ...prev,
+                  promoteConnection: event.target.checked,
+                }))
+              }
+            />
+            <span>Promote sandbox connection to production gateway</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-blue-600"
+              checked={productionChecklist.enableLiveSubmissions}
+              onChange={(event) =>
+                setProductionChecklist((prev) => ({
+                  ...prev,
+                  enableLiveSubmissions: event.target.checked,
+                }))
+              }
+            />
+            <span>Enable live submissions and confirm invoice numbering aligns with FIRS requirements</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-blue-600"
+              checked={productionChecklist.notifyFinanceTeam}
+              onChange={(event) =>
+                setProductionChecklist((prev) => ({
+                  ...prev,
+                  notifyFinanceTeam: event.target.checked,
+                }))
+              }
+            />
+            <span>Notify client finance / tax operations about the cutover date</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-blue-600"
+              checked={productionChecklist.monitoringEnabled}
+              onChange={(event) =>
+                setProductionChecklist((prev) => ({
+                  ...prev,
+                  monitoringEnabled: event.target.checked,
+                }))
+              }
+            />
+            <span>Enable monitoring & alerts for FIRS submission failures or latency</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 text-blue-600"
+              checked={productionChecklist.rollbackPlanDocumented}
+              onChange={(event) =>
+                setProductionChecklist((prev) => ({
+                  ...prev,
+                  rollbackPlanDocumented: event.target.checked,
+                }))
+              }
+            />
+            <span>Document rollback plan and escalation path</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.open('/dashboard/si/monitoring', '_blank', 'noopener');
+            }
+          }}
+        >
+          Open monitoring dashboard
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.open('/dashboard/si/webhooks', '_blank', 'noopener');
+            }
+          }}
+        >
+          Review webhook status
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderTrainingHandover = () => (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
+        <h3 className="text-lg font-semibold text-amber-900">🤝 Training & handover (optional)</h3>
+        <p className="mt-1 text-sm text-amber-800">
+          Capture the client-facing tasks so you can close the engagement smoothly. This step is optional—finish whenever
+          your customer team is ready.
+        </p>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-gray-200 p-4 text-sm text-gray-700">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-amber-600"
+            checked={trainingChecklist.trainingScheduled}
+            onChange={(event) =>
+              setTrainingChecklist((prev) => ({
+                ...prev,
+                trainingScheduled: event.target.checked,
+              }))
+            }
+          />
+          <span>Client training workshop scheduled</span>
+        </label>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-amber-600"
+            checked={trainingChecklist.supportDocsShared}
+            onChange={(event) =>
+              setTrainingChecklist((prev) => ({
+                ...prev,
+                supportDocsShared: event.target.checked,
+              }))
+            }
+          />
+          <span>Support documents / runbooks shared with client teams</span>
+        </label>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-amber-600"
+            checked={trainingChecklist.successMetricsDefined}
+            onChange={(event) =>
+              setTrainingChecklist((prev) => ({
+                ...prev,
+                successMetricsDefined: event.target.checked,
+              }))
+            }
+          />
+          <span>Success metrics / KPIs agreed with client</span>
+        </label>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-amber-600"
+            checked={trainingChecklist.postGoLiveSupportAssigned}
+            onChange={(event) =>
+              setTrainingChecklist((prev) => ({
+                ...prev,
+                postGoLiveSupportAssigned: event.target.checked,
+              }))
+            }
+          />
+          <span>Post go-live support owner assigned</span>
+        </label>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-amber-600"
+            checked={trainingChecklist.customerSignOffReceived}
+            onChange={(event) =>
+              setTrainingChecklist((prev) => ({
+                ...prev,
+                customerSignOffReceived: event.target.checked,
+              }))
+            }
+          />
+          <span>Customer sign-off / acceptance recorded</span>
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.open('/dashboard/si/resources/training-pack', '_blank', 'noopener');
+            }
+          }}
+        >
+          Download training pack
+        </Button>
+        <span className="text-xs text-gray-500">
+          Optional step – you can move forward once activation is complete.
+        </span>
+      </div>
     </div>
   );
 
@@ -1496,6 +2134,8 @@ const renderERPSelection = () => (
             </Button>
           </div>
         );
+      case 'compliance_setup':
+        return renderComplianceSetup();
       case 'testing_validation': {
         const connectionSummary = testResults?.connectionSummary ?? {};
         const connectionValidatedAt = (testResults?.connectionValidatedAt as string | undefined) ?? undefined;
@@ -1521,20 +2161,50 @@ const renderERPSelection = () => (
 
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-lg border border-gray-200 p-5">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900">Connection diagnostics</h4>
                     <p className="text-sm text-gray-600">
                       We’ll ping your configured ERP connectors and report the gateway status.
                     </p>
                   </div>
-                  {connectionsLoading && (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        connectionsFetchRef.current = false;
+                        void fetchErpConnections();
+                      }}
+                      loading={connectionsLoading}
+                      disabled={connectionsLoading}
+                    >
+                      Refresh list
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.open('/dashboard/si/business-systems', '_blank', 'noopener');
+                        }
+                      }}
+                    >
+                      Open connection manager
+                    </Button>
+                  </div>
                 </div>
 
                 {connectionsError ? (
-                  <p className="mt-4 text-sm text-red-600">{connectionsError}</p>
+                  <p
+                    className={
+                      connectionsError.startsWith('No ERP connections')
+                        ? 'mt-4 text-sm text-gray-600'
+                        : 'mt-4 text-sm text-red-600'
+                    }
+                  >
+                    {connectionsError}
+                  </p>
                 ) : displayedConnections.length ? (
                   <ul className="mt-4 space-y-3">
                     {displayedConnections.map((connection) => (
@@ -1589,6 +2259,12 @@ const renderERPSelection = () => (
                   )}
                 </div>
 
+                {createdConnectionId && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Primary connection ID: {createdConnectionId}
+                  </p>
+                )}
+
                 {Object.keys(connectionSummary).length > 0 && (
                   <div className="mt-4 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
                     <div className="font-medium text-gray-900">Last diagnostics</div>
@@ -1606,17 +2282,35 @@ const renderERPSelection = () => (
               </div>
 
               <div className="rounded-lg border border-gray-200 p-5">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900">Data validation</h4>
                     <p className="text-sm text-gray-600">
                       We reuse your saved mapping to produce a FIRS-compliant payload preview.
                     </p>
                   </div>
-                  {savedMappingStatus === 'loading' && (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const targetSystem = erpConfiguration.systemType;
+                        const mappingUrl = targetSystem
+                          ? `/onboarding/si/data-mapping?system=${targetSystem}`
+                          : '/onboarding/si/data-mapping';
+                        if (typeof window !== 'undefined') {
+                          window.open(mappingUrl, '_blank', 'noopener');
+                        }
+                      }}
+                    >
+                      Open mapping tool
+                    </Button>
+                  </div>
                 </div>
+
+                {savedMappingStatus === 'loading' && (
+                  <div className="mt-3 h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                )}
 
                 {savedMappingStatus === 'missing' && (
                   <p className="mt-4 text-sm text-amber-600">
@@ -1673,7 +2367,11 @@ const renderERPSelection = () => (
             </div>
           </div>
         );
-      }
+        }
+      case 'production_deployment':
+        return renderProductionDeployment();
+      case 'training_handover':
+        return renderTrainingHandover();
       default:
         return (
           <div className="text-center py-12">
@@ -1686,7 +2384,7 @@ const renderERPSelection = () => (
   };
 
   const currentStepData = steps[currentStep];
-  const canProceed = currentStepData?.completed || false;
+  const canProceed = currentStepData ? (currentStepData.completed || !currentStepData.required) : false;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1763,7 +2461,7 @@ const renderERPSelection = () => (
                   variant="outline"
                   loading={isProcessing}
                 >
-                  Mark Complete
+                  {currentStepData?.required === false ? 'Mark Complete (optional)' : 'Mark Complete'}
                 </Button>
               )}
               
