@@ -60,6 +60,16 @@ export default function SIDataMappingPage() {
         await OnboardingStateManager.updateStep(user.id, 'testing_validation');
       } catch (error) {
         console.warn('Failed to sync onboarding step after data mapping:', error);
+      } finally {
+        if (typeof window !== 'undefined') {
+          const payload = {
+            step: 'data_mapping',
+            nextStep: 'testing_validation',
+            timestamp: Date.now()
+          };
+          sessionStorage.setItem('taxpoynt_erp_onboarding_step_completed', JSON.stringify(payload));
+          window.dispatchEvent(new CustomEvent('taxpoynt:onboarding-step-completed', { detail: payload }));
+        }
       }
     })();
   }, [user]);

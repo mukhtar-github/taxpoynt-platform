@@ -14,7 +14,7 @@
  * - Progress tracking and status updates
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
@@ -270,11 +270,108 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
 
+  const markStepCompletedExternally = useCallback(
+    (stepId: string | undefined, advanceToStep?: string) => {
+      if (!stepId) {
+        return;
+      }
+
+      const stepIndex = onboardingSteps.findIndex(step => step.id === stepId);
+      if (stepIndex === -1) {
+        return;
+      }
+
+      const advanceIndex = advanceToStep
+        ? onboardingSteps.findIndex(step => step.id === advanceToStep)
+        : -1;
+      const nextIndexCandidate = Math.min(stepIndex + 1, onboardingSteps.length - 1);
+      const nextIndex = advanceIndex >= 0 ? Math.max(nextIndexCandidate, advanceIndex) : nextIndexCandidate;
+
+      const nextCurrentStep = currentStep <= stepIndex ? nextIndex : currentStep;
+      if (currentStep <= stepIndex) {
+        setCurrentStep(nextIndex);
+      }
+
+      setSteps(prev => {
+        const nextSteps = prev.map(step =>
+          step.id === stepId ? { ...step, completed: true } : step
+        );
+
+        const completedIds = nextSteps
+          .filter(step => step.completed)
+          .map(step => step.id);
+
+        erpFormPersistence.saveFormData({
+          organizationProfile,
+          erpConfiguration,
+          currentStep: nextCurrentStep,
+          stepsCompleted: completedIds,
+          timestamp: Date.now()
+        });
+
+        return nextSteps;
+      });
+    },
+    [currentStep, erpFormPersistence, organizationProfile, erpConfiguration]
+  );
+
   useEffect(() => {
     if (initialStepIndex !== null) {
       setCurrentStep(prev => (prev < initialStepIndex ? initialStepIndex : prev));
     }
   }, [initialStepIndex]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const readSessionFlag = () => {
+      const stored = sessionStorage.getItem('taxpoynt_erp_onboarding_step_completed');
+      if (!stored) {
+        return;
+      }
+
+      sessionStorage.removeItem('taxpoynt_erp_onboarding_step_completed');
+      try {
+        const payload = JSON.parse(stored) as { step?: string; nextStep?: string } | null;
+        if (payload?.step) {
+          markStepCompletedExternally(payload.step, payload.nextStep);
+        }
+      } catch (error) {
+        console.warn('Failed to parse onboarding completion payload:', error);
+      }
+    };
+
+    const handleExternalCompletion = (event: Event) => {
+      const detail = (event as CustomEvent<{ step?: string; nextStep?: string }>).detail;
+      if (detail?.step) {
+        markStepCompletedExternally(detail.step, detail.nextStep);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        readSessionFlag();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      readSessionFlag();
+    };
+
+    readSessionFlag();
+
+    window.addEventListener('taxpoynt:onboarding-step-completed', handleExternalCompletion);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      window.removeEventListener('taxpoynt:onboarding-step-completed', handleExternalCompletion);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [markStepCompletedExternally]);
 
   // Load existing onboarding progress and initialize with shared data
   useEffect(() => {
