@@ -932,17 +932,38 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         pickString(nestedConnection?.id) ||
         null;
 
+      connectionsFetchRef.current = false;
+      const updatedConnections = await fetchErpConnections();
+
       if (newConnectionId) {
         setCreatedConnectionId(newConnectionId);
         setConnectionCreationStatus('success');
         setConnectionCreationMessage('ERP connection saved. Diagnostics are ready when you reach Testing.');
-        connectionsFetchRef.current = false;
-        await fetchErpConnections();
         return newConnectionId;
       }
 
+      const fallbackConnection = updatedConnections.find((connection) => {
+        const configObj = connection.connection_config as Record<string, unknown> | undefined;
+        const configUrl = pickString(configObj?.['url']);
+        const configDatabase = pickString(configObj?.['database']);
+        return (
+          connection.erp_system?.toLowerCase() === systemType &&
+          configUrl?.toLowerCase() === baseUrl.toLowerCase() &&
+          configDatabase?.toLowerCase() === database.toLowerCase()
+        );
+      });
+
+      if (fallbackConnection?.connection_id) {
+        setCreatedConnectionId(fallbackConnection.connection_id);
+        setConnectionCreationStatus('success');
+        setConnectionCreationMessage('ERP connection saved. Diagnostics are ready when you reach Testing.');
+        return fallbackConnection.connection_id;
+      }
+
       setConnectionCreationStatus('error');
-      setConnectionCreationMessage('Connection created but no identifier was returned. Verify in the connection manager.');
+      setConnectionCreationMessage(
+        'Connection created but no identifier was returned. Visit the connection manager to confirm the record.'
+      );
       return null;
     } catch (error) {
       const message = extractErrorMessage(
@@ -1696,9 +1717,7 @@ const renderERPSelection = () => (
             variant="outline"
             size="sm"
             onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.open('/dashboard/si/business-systems', '_blank', 'noopener');
-              }
+              router.push('/dashboard/si/business-systems');
             }}
           >
             Open connection manager
@@ -2185,9 +2204,7 @@ const renderERPSelection = () => (
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (typeof window !== 'undefined') {
-                          window.open('/dashboard/si/business-systems', '_blank', 'noopener');
-                        }
+                        router.push('/dashboard/si/business-systems');
                       }}
                     >
                       Open connection manager
