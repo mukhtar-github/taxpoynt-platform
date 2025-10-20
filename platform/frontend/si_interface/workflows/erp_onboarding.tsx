@@ -14,11 +14,12 @@
  * - Progress tracking and status updates
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
+import { authService } from '../../shared_components/services/auth';
 
 interface OnboardingStep {
   id: string;
@@ -97,6 +98,85 @@ interface OnboardingProgress {
     resolved: boolean;
   }>;
 }
+
+type MappingRule = ERPConfiguration['mappingRules'][number];
+
+interface ErpConnectionRecord {
+  connection_id: string;
+  connection_name?: string;
+  organization_id?: string;
+  erp_system?: string;
+  environment?: string;
+  status?: string | null;
+  status_reason?: string | null;
+  last_status_at?: string | null;
+}
+
+type BulkConnectionTestResponse = {
+  success?: boolean;
+  message?: string;
+  detail?: string;
+  data?: {
+    summary?: {
+      total?: number;
+      successful?: number;
+      failed?: number;
+      warnings?: number;
+    };
+    results?: Array<Record<string, unknown>>;
+    connection_activity?: Record<string, unknown>;
+  };
+};
+
+type ValidateMappingResponse = {
+  success?: boolean;
+  message?: string;
+  detail?: string;
+  errors?: Record<string, string[]>;
+  preview_data?: {
+    system_id?: string;
+    validated_at?: string;
+    validated_targets?: string[];
+    missing_required?: string[];
+    mapped_fields?: Record<string, unknown>;
+  };
+};
+
+const pickString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    const msg = pickString(error.message);
+    if (msg) return msg;
+  }
+
+  if (typeof error === 'string') {
+    const msg = pickString(error);
+    if (msg) return msg;
+  }
+
+  if (error && typeof error === 'object') {
+    const errObj = error as Record<string, unknown>;
+    const detail = pickString(errObj.detail);
+    if (detail) return detail;
+    const message = pickString(errObj.message);
+    if (message) return message;
+
+    const response = errObj.response;
+    if (response && typeof response === 'object') {
+      const data = (response as Record<string, unknown>).data;
+      if (data && typeof data === 'object') {
+        const nestedDetail = pickString((data as Record<string, unknown>).detail);
+        if (nestedDetail) return nestedDetail;
+        const nestedMessage = pickString((data as Record<string, unknown>).message);
+        if (nestedMessage) return nestedMessage;
+      }
+    }
+  }
+
+  return fallback;
+};
 
 const onboardingSteps: OnboardingStep[] = [
   {
@@ -269,6 +349,23 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [progress, setProgress] = useState<OnboardingProgress | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
+  const [resolvedOrganizationId, setResolvedOrganizationId] = useState<string | null>(organizationId ?? null);
+  const [connections, setConnections] = useState<ErpConnectionRecord[]>([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(false);
+  const [connectionsError, setConnectionsError] = useState<string | null>(null);
+  const connectionsFetchRef = useRef(false);
+  const [connectionTestStatus, setConnectionTestStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [connectionTestMessage, setConnectionTestMessage] = useState<string>('');
+  const [dataValidationStatus, setDataValidationStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [dataValidationMessage, setDataValidationMessage] = useState<string>('');
+  const [savedMapping, setSavedMapping] = useState<MappingRule[]>([]);
+  const [savedMappingStatus, setSavedMappingStatus] = useState<'idle' | 'loading' | 'ready' | 'missing' | 'error'>('idle');
+  const mappingFetchRef = useRef(false);
+
+  useEffect(() => {
+    connectionsFetchRef.current = false;
+    mappingFetchRef.current = false;
+  }, [resolvedOrganizationId, erpConfiguration.systemType]);
 
   const markStepCompletedExternally = useCallback(
     (stepId: string | undefined, advanceToStep?: string) => {
@@ -322,6 +419,22 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   }, [initialStepIndex]);
 
   useEffect(() => {
+    if (organizationId) {
+      setResolvedOrganizationId(organizationId);
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedUser = authService.getStoredUser();
+    if (storedUser?.organization?.id) {
+      setResolvedOrganizationId(storedUser.organization.id);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -367,11 +480,111 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     window.addEventListener('focus', handleWindowFocus);
 
     return () => {
-      window.removeEventListener('taxpoynt:onboarding-step-completed', handleExternalCompletion);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleWindowFocus);
-    };
-  }, [markStepCompletedExternally]);
+    window.removeEventListener('taxpoynt:onboarding-step-completed', handleExternalCompletion);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('focus', handleWindowFocus);
+  };
+}, [markStepCompletedExternally]);
+
+  const fetchErpConnections = useCallback(async (): Promise<ErpConnectionRecord[]> => {
+    if (!resolvedOrganizationId) {
+      setConnections([]);
+      setConnectionsError('Organization context is required to load ERP connections.');
+      return [];
+    }
+
+    setConnectionsLoading(true);
+    setConnectionsError(null);
+    try {
+      const query = `?organization_id=${encodeURIComponent(resolvedOrganizationId)}`;
+      const response = await apiClient.get<{
+        success?: boolean;
+        data?: { connections?: ErpConnectionRecord[] };
+        connections?: ErpConnectionRecord[];
+        message?: string;
+        detail?: string;
+      }>(`/si/business/erp/connections${query}`);
+
+      const connectionList =
+        Array.isArray(response?.data?.connections)
+          ? response.data.connections
+          : Array.isArray(response?.connections)
+            ? response.connections
+            : [];
+
+      setConnections(connectionList);
+      if (!connectionList.length) {
+        setConnectionsError('No ERP connections found yet. Configure a connection to enable automated testing.');
+      }
+
+      return connectionList;
+    } catch (error) {
+      const message = extractErrorMessage(
+        error,
+        'Unable to load ERP connections. Please try again.'
+      );
+      setConnections([]);
+      setConnectionsError(message);
+      return [];
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, [resolvedOrganizationId]);
+
+  const fetchSavedMapping = useCallback(async (): Promise<MappingRule[]> => {
+    if (!erpConfiguration.systemType || !resolvedOrganizationId) {
+      setSavedMapping([]);
+      setSavedMappingStatus('missing');
+      return [];
+    }
+
+    setSavedMappingStatus('loading');
+    try {
+      const response = await apiClient.get<{
+        success?: boolean;
+        mapping_rules?: MappingRule[];
+        data?: { mapping_rules?: MappingRule[] };
+      }>(`/si/business/erp/data-mapping/${resolvedOrganizationId}/${erpConfiguration.systemType}`);
+
+      const rules =
+        Array.isArray(response?.mapping_rules)
+          ? response.mapping_rules
+          : Array.isArray(response?.data?.mapping_rules)
+            ? response.data.mapping_rules
+            : [];
+
+      if (rules.length) {
+        setSavedMapping(rules);
+        setSavedMappingStatus('ready');
+      } else {
+        setSavedMapping([]);
+        setSavedMappingStatus('missing');
+      }
+
+      return rules;
+    } catch (error) {
+      setSavedMapping([]);
+      setSavedMappingStatus('error');
+      return [];
+    }
+  }, [erpConfiguration.systemType, resolvedOrganizationId]);
+
+  useEffect(() => {
+    const activeStepId = steps[currentStep]?.id;
+    if (activeStepId !== 'testing_validation') {
+      return;
+    }
+
+    if (!connectionsFetchRef.current) {
+      connectionsFetchRef.current = true;
+      void fetchErpConnections();
+    }
+
+    if (!mappingFetchRef.current) {
+      mappingFetchRef.current = true;
+      void fetchSavedMapping();
+    }
+  }, [currentStep, fetchErpConnections, fetchSavedMapping, steps]);
 
   // Load existing onboarding progress and initialize with shared data
   useEffect(() => {
@@ -541,6 +754,160 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     }
   };
 
+  const handleRunConnectionTest = useCallback(async () => {
+    setConnectionTestStatus('running');
+    setConnectionTestMessage('Running connection diagnostics…');
+
+    try {
+      let activeConnections = connections;
+      if (!activeConnections.length) {
+        activeConnections = await fetchErpConnections();
+      }
+
+      if (!activeConnections.length) {
+        throw new Error('No ERP connections found. Configure a connection before running tests.');
+      }
+
+      const connectionIds = activeConnections
+        .map(connection => connection.connection_id)
+        .filter((id): id is string => Boolean(id));
+
+      if (!connectionIds.length) {
+        throw new Error('Connections are missing identifiers. Refresh the integration list and try again.');
+      }
+
+      const response = await apiClient.post<BulkConnectionTestResponse>(
+        '/si/business/erp/bulk/test-connections',
+        { connection_ids: connectionIds }
+      );
+
+      const summary = response?.data?.summary ?? {};
+      const total = typeof summary?.total === 'number' ? summary.total : connectionIds.length;
+      const successful = typeof summary?.successful === 'number' ? summary.successful : 0;
+      const failed = typeof summary?.failed === 'number' ? summary.failed : Math.max(total - successful, 0);
+      const warnings = typeof summary?.warnings === 'number' ? summary.warnings : 0;
+
+      setTestResults(prev => ({
+        ...prev,
+        connectionSummary: summary,
+        connectionResults: response?.data?.results ?? [],
+        connectionValidatedAt: new Date().toISOString(),
+      }));
+
+      if (response?.success !== false && failed === 0) {
+        const message =
+          response?.message ||
+          `Tested ${total} connection${total === 1 ? '' : 's'} successfully.`;
+        setConnectionTestStatus('success');
+        setConnectionTestMessage(message);
+      } else {
+        const message =
+          response?.detail ||
+          response?.message ||
+          `Tested ${total} connection${total === 1 ? '' : 's'} (${successful} passed${failed ? `, ${failed} failed` : ''}${warnings ? `, ${warnings} warning${warnings === 1 ? '' : 's'}` : ''}).`;
+        setConnectionTestStatus(failed === 0 ? 'success' : 'error');
+        setConnectionTestMessage(message);
+      }
+
+      await fetchErpConnections();
+    } catch (error) {
+      const message = extractErrorMessage(
+        error,
+        'Unable to run connection tests. Ensure at least one ERP connection exists.'
+      );
+      setConnectionTestStatus('error');
+      setConnectionTestMessage(message);
+    }
+  }, [connections, fetchErpConnections]);
+
+  const handleValidateSampleData = useCallback(async () => {
+    if (!erpConfiguration.systemType) {
+      setDataValidationStatus('error');
+      setDataValidationMessage('Select an ERP system before running validation.');
+      return;
+    }
+
+    setDataValidationStatus('running');
+    setDataValidationMessage('Validating mapping rules against FIRS schema…');
+
+    try {
+      let mappingRules = savedMapping;
+      if (!mappingRules.length && erpConfiguration.mappingRules.length) {
+        mappingRules = erpConfiguration.mappingRules;
+      }
+      if (!mappingRules.length) {
+        mappingRules = await fetchSavedMapping();
+      }
+
+      if (!mappingRules.length) {
+        setDataValidationStatus('error');
+        setDataValidationMessage('No saved mapping rules found. Complete the Data Mapping step first.');
+        return;
+      }
+
+      const response = await apiClient.post<ValidateMappingResponse>(
+        '/si/business/erp/data-mapping/validate',
+        {
+          system_id: erpConfiguration.systemType,
+          organization_id: resolvedOrganizationId,
+          mapping_rules: mappingRules,
+        }
+      );
+
+      const preview = response?.preview_data;
+      const missing = preview?.missing_required ?? [];
+      const errors = response?.errors ?? {};
+
+      setTestResults(prev => ({
+        ...prev,
+        mappingPreview: preview,
+        mappingValidatedAt: preview?.validated_at ?? new Date().toISOString(),
+        mappingErrors: errors,
+      }));
+
+      if (response?.success === false || missing.length > 0) {
+        const errorMessage =
+          Object.values(errors)
+            .flat()
+            .map(pickString)
+            .find(Boolean) ||
+          (missing.length
+            ? `Validation completed with ${missing.length} missing required field${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}.`
+            : response?.message || response?.detail);
+        setDataValidationStatus('error');
+        setDataValidationMessage(
+          errorMessage ||
+            'Validation reported issues. Review your mapping configuration.'
+        );
+      } else {
+        const message =
+          response?.message ||
+          'Validation successful. All required fields are mapped.';
+        setDataValidationStatus('success');
+        setDataValidationMessage(message);
+      }
+    } catch (error) {
+      const message = extractErrorMessage(
+        error,
+        'Unable to validate mapping. Please retry after refreshing the page.'
+      );
+      setDataValidationStatus('error');
+      setDataValidationMessage(message);
+    }
+  }, [
+    erpConfiguration.mappingRules,
+    erpConfiguration.systemType,
+    fetchSavedMapping,
+    resolvedOrganizationId,
+    savedMapping
+  ]);
+
+  useEffect(() => {
+    if (connectionTestStatus === 'success' && dataValidationStatus === 'success') {
+      markStepCompletedExternally('testing_validation', 'compliance_setup');
+    }
+  }, [connectionTestStatus, dataValidationStatus, markStepCompletedExternally]);
+
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -578,6 +945,40 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const formatTimestamp = (iso?: string) => {
+    if (!iso) {
+      return '';
+    }
+
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) {
+      return iso;
+    }
+
+    return date.toLocaleString();
+  };
+
+  const resolveConnectionStatusClass = (status?: string | null) => {
+    if (!status) {
+      return 'bg-gray-100 text-gray-600';
+    }
+
+    const normalized = status.toLowerCase();
+    if (['active', 'connected', 'healthy', 'success', 'online'].includes(normalized)) {
+      return 'bg-green-100 text-green-700';
+    }
+
+    if (['warning', 'degraded', 'pending'].includes(normalized)) {
+      return 'bg-yellow-100 text-yellow-700';
+    }
+
+    if (['failed', 'error', 'inactive', 'disconnected', 'offline'].includes(normalized)) {
+      return 'bg-red-100 text-red-600';
+    }
+
+    return 'bg-gray-100 text-gray-600';
   };
 
   const renderOrganizationSetup = () => (
@@ -1095,18 +1496,184 @@ const renderERPSelection = () => (
             </Button>
           </div>
         );
-      case 'testing_validation':
+      case 'testing_validation': {
+        const connectionSummary = testResults?.connectionSummary ?? {};
+        const connectionValidatedAt = (testResults?.connectionValidatedAt as string | undefined) ?? undefined;
+        const mappingPreview = testResults?.mappingPreview as
+          | {
+              validated_targets?: string[];
+              missing_required?: string[];
+              mapped_fields?: Record<string, unknown>;
+            }
+          | undefined;
+        const mappingValidatedAt = (testResults?.mappingValidatedAt as string | undefined) ?? undefined;
+        const displayedConnections = connections.slice(0, 3);
+
         return (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">🧪</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Testing & Validation</h3>
-            <p className="text-gray-600 mb-6">Test integration and validate data flow</p>
-            <div className="space-y-4">
-              <Button>Run Connection Test</Button>
-              <Button variant="outline">Validate Sample Data</Button>
+          <div className="space-y-6">
+            <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900">
+              <p className="font-medium">Run automated checks before moving to compliance configuration.</p>
+              <p className="mt-1 text-purple-800">
+                Use the tools below to verify your ERP connection is reachable and that your mapping produces a
+                FIRS-ready payload.
+              </p>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900">Connection diagnostics</h4>
+                    <p className="text-sm text-gray-600">
+                      We’ll ping your configured ERP connectors and report the gateway status.
+                    </p>
+                  </div>
+                  {connectionsLoading && (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                  )}
+                </div>
+
+                {connectionsError ? (
+                  <p className="mt-4 text-sm text-red-600">{connectionsError}</p>
+                ) : displayedConnections.length ? (
+                  <ul className="mt-4 space-y-3">
+                    {displayedConnections.map((connection) => (
+                      <li key={connection.connection_id} className="rounded-md border border-gray-200 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {connection.connection_name || connection.erp_system?.toUpperCase() || 'ERP Connection'}
+                          </div>
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-semibold ${resolveConnectionStatusClass(
+                              connection.status
+                            )}`}
+                          >
+                            {(connection.status || 'unknown').toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {connection.erp_system ? `System: ${connection.erp_system.toUpperCase()}` : 'System not specified'}
+                          {connection.environment ? ` • Environment: ${connection.environment}` : ''}
+                          {connection.last_status_at ? ` • Last status: ${formatTimestamp(connection.last_status_at)}` : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 text-sm text-gray-600">
+                    No ERP connections detected yet. Configure a connection in the previous steps to enable automated
+                    testing.
+                  </p>
+                )}
+
+                <div className="mt-4 space-y-2">
+                  <Button
+                    onClick={handleRunConnectionTest}
+                    loading={connectionTestStatus === 'running'}
+                    disabled={connectionsLoading || connectionTestStatus === 'running'}
+                  >
+                    Run Connection Test
+                  </Button>
+                  {connectionTestMessage && (
+                    <p
+                      className={`text-sm ${
+                        connectionTestStatus === 'success'
+                          ? 'text-green-600'
+                          : connectionTestStatus === 'error'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      {connectionTestMessage}
+                    </p>
+                  )}
+                </div>
+
+                {Object.keys(connectionSummary).length > 0 && (
+                  <div className="mt-4 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                    <div className="font-medium text-gray-900">Last diagnostics</div>
+                    <div className="mt-1 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                      <div>Total: {connectionSummary.total ?? '-'}</div>
+                      <div>Successful: {connectionSummary.successful ?? '-'}</div>
+                      {connectionSummary.failed !== undefined && <div>Failed: {connectionSummary.failed}</div>}
+                      {connectionSummary.warnings !== undefined && <div>Warnings: {connectionSummary.warnings}</div>}
+                    </div>
+                    {connectionValidatedAt && (
+                      <div className="mt-2 text-xs text-gray-500">Run on {formatTimestamp(connectionValidatedAt)}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900">Data validation</h4>
+                    <p className="text-sm text-gray-600">
+                      We reuse your saved mapping to produce a FIRS-compliant payload preview.
+                    </p>
+                  </div>
+                  {savedMappingStatus === 'loading' && (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                  )}
+                </div>
+
+                {savedMappingStatus === 'missing' && (
+                  <p className="mt-4 text-sm text-amber-600">
+                    We could not find saved mapping rules for this organization. Complete the Data Mapping step and save
+                    your configuration first.
+                  </p>
+                )}
+
+                {savedMappingStatus === 'error' && (
+                  <p className="mt-4 text-sm text-red-600">
+                    Unable to load saved mapping from the server. Refresh the page or revisit the Data Mapping tool.
+                  </p>
+                )}
+
+                <div className="mt-4 space-y-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleValidateSampleData}
+                    loading={dataValidationStatus === 'running'}
+                    disabled={dataValidationStatus === 'running'}
+                  >
+                    Validate Sample Data
+                  </Button>
+                  {dataValidationMessage && (
+                    <p
+                      className={`text-sm ${
+                        dataValidationStatus === 'success'
+                          ? 'text-green-600'
+                          : dataValidationStatus === 'error'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      {dataValidationMessage}
+                    </p>
+                  )}
+                </div>
+
+                {mappingPreview && (
+                  <div className="mt-4 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                    <div className="font-medium text-gray-900">Latest validation</div>
+                    <div className="mt-1 text-xs text-gray-600">
+                      Validated targets: {mappingPreview.validated_targets?.length ?? 0}
+                      {mappingPreview.missing_required?.length
+                        ? ` • Missing: ${mappingPreview.missing_required.join(', ')}`
+                        : ' • All required fields mapped'}
+                    </div>
+                    {mappingValidatedAt && (
+                      <div className="mt-2 text-xs text-gray-500">Run on {formatTimestamp(mappingValidatedAt)}</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
+      }
       default:
         return (
           <div className="text-center py-12">
