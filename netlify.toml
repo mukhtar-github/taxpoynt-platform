@@ -1,0 +1,14 @@
+[build]
+  base = "platform/frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_OPTIONS = "--max_old_space_size=4096"
+  NEXT_PUBLIC_API_URL = "https://web-production-ea5ad.up.railway.app/api/v1"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://web-production-ea5ad.up.railway.app/api/:splat"
+  status = 200
+  force = true
