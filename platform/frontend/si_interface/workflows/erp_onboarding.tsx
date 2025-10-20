@@ -1016,51 +1016,45 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       if (apiClient.isAuthenticated()) {
         await apiClient.delete('/si/onboarding/state/reset');
       }
+
+      erpFormPersistence.clearFormData();
+      CrossFormDataManager.clearSharedData();
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('taxpoynt_erp_onboarding_step_completed');
+      }
+
+      connectionsFetchRef.current = false;
+      mappingFetchRef.current = false;
+
+      setSteps(createDefaultSteps());
+      setCurrentStep(initialStepIndex ?? 0);
+      setProgress(null);
+      setResolvedOrganizationId(organizationId ?? null);
+      setOrganizationProfile(createDefaultOrganizationProfile());
+      setErpConfiguration(createDefaultErpConfiguration());
+      setComplianceConfig({ ...DEFAULT_COMPLIANCE_CONFIG });
+      setProductionChecklist({ ...DEFAULT_PRODUCTION_CHECKLIST });
+      setTrainingChecklist({ ...DEFAULT_TRAINING_CHECKLIST });
+      setConnections([]);
+      setConnectionsError(null);
+      setConnectionsLoading(false);
+      setConnectionTestStatus('idle');
+      setConnectionTestMessage('');
+      setDataValidationStatus('idle');
+      setDataValidationMessage('');
+      setSavedMapping([]);
+      setSavedMappingStatus('idle');
+      setCreatedConnectionId(null);
+      setConnectionCreationStatus('idle');
+      setConnectionCreationMessage('');
+      setTestResults(null);
+      setResetStatusMessage('Onboarding progress reset. You can start again from the beginning.');
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to reset onboarding state. Please try again.');
+      const message = extractErrorMessage(error, 'Unexpected error while resetting onboarding.');
       setResetStatusMessage(message);
+    } finally {
       setIsResetting(false);
-      return;
     }
-
-    erpFormPersistence.clearFormData();
-    CrossFormDataManager.clearSharedData();
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('taxpoynt_erp_onboarding_step_completed');
-    }
-
-    connectionsFetchRef.current = false;
-    mappingFetchRef.current = false;
-
-    setSteps(createDefaultSteps());
-    setCurrentStep(initialStepIndex ?? 0);
-    setProgress(null);
-    setResolvedOrganizationId(organizationId ?? null);
-    setOrganizationProfile(createDefaultOrganizationProfile());
-    setErpConfiguration(createDefaultErpConfiguration());
-    setComplianceConfig({ ...DEFAULT_COMPLIANCE_CONFIG });
-    setProductionChecklist({ ...DEFAULT_PRODUCTION_CHECKLIST });
-    setTrainingChecklist({ ...DEFAULT_TRAINING_CHECKLIST });
-    setConnections([]);
-    setConnectionsError(null);
-    setConnectionsLoading(false);
-    setConnectionTestStatus('idle');
-    setConnectionTestMessage('');
-    setDataValidationStatus('idle');
-    setDataValidationMessage('');
-    setSavedMapping([]);
-    setSavedMappingStatus('idle');
-    setCreatedConnectionId(null);
-    setConnectionCreationStatus('idle');
-    setConnectionCreationMessage('');
-    setTestResults(null);
-    setResetStatusMessage('Onboarding progress reset. You can start again from the beginning.');
-  } catch (error) {
-    const message = extractErrorMessage(error, 'Unexpected error while resetting onboarding.');
-    setResetStatusMessage(message);
-  } finally {
-    setIsResetting(false);
-  }
   }, [
     erpFormPersistence,
     initialStepIndex,
