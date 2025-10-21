@@ -57,6 +57,14 @@ type APIErrorPayload = {
   };
 };
 
+const unwrapV1Response = <T,>(raw: V1Response<T> | T): { data: T; meta?: Record<string, unknown>; success?: boolean } => {
+  if (raw && typeof raw === 'object' && raw !== null && 'data' in raw && 'success' in raw) {
+    const typed = raw as V1Response<T> & { meta?: Record<string, unknown> };
+    return { data: typed.data, meta: typed.meta ?? undefined, success: typed.success };
+  }
+  return { data: raw as T };
+};
+
 const toJsonMap = (value: unknown): JsonMap | undefined =>
   value && typeof value === 'object' ? (value as JsonMap) : undefined;
 
@@ -149,7 +157,8 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
       const response = await apiClient.get<V1Response<ListErpConnectionsResponse>>(
         `/si/business/erp/connections${query}`
       );
-      setConnections(response.data?.connections ?? []);
+      const { data: responseData } = unwrapV1Response(response);
+      setConnections(responseData?.connections ?? []);
     } catch (caughtError: unknown) {
       console.error('Failed to load ERP connections:', caughtError);
       const message = extractErrorMessage(
@@ -213,16 +222,16 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
         `/si/business/erp/connections/${connectionId}/test`,
         {}
       );
-      const payload = response.data;
-      const dataMessage = pickString(
-        extractJsonValue(toJsonMap(payload?.data), 'message')
-      );
+      const { data: payload } = unwrapV1Response(response);
+      const payloadMap = toJsonMap(payload);
+      const dataMessage = pickString(extractJsonValue(payloadMap, 'message'))
+        || pickString(extractJsonValue(toJsonMap(extractJsonValue(payloadMap, 'data')), 'message'));
       const message =
         dataMessage ||
-        pickString(payload?.message) ||
+        pickString(extractJsonValue(payloadMap, 'detail')) ||
         'Connection test completed successfully.';
       setActionType('success');
-      setActionMessage(message);
+      setActionMessage(message || 'Connection test completed successfully.');
     } catch (caughtError: unknown) {
       console.error('Connection test failed:', caughtError);
       setActionType('error');
@@ -235,7 +244,7 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
     } finally {
       setPendingAction(null);
       if (activeOrganizationId) {
-        fetchConnections(activeOrganizationId);
+        await fetchConnections(activeOrganizationId);
       }
     }
   };
@@ -248,13 +257,15 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
         `/si/business/erp/connections/${connectionId}/sync`,
         { force: true }
       );
-      const payload = response.data;
-      const statusMap = toJsonMap(extractJsonValue(toJsonMap(payload?.data), 'status'));
+      const { data: payload } = unwrapV1Response(response);
+      const payloadMap = toJsonMap(payload);
+      const statusMap = toJsonMap(extractJsonValue(payloadMap, 'status'))
+        || toJsonMap(extractJsonValue(toJsonMap(extractJsonValue(payloadMap, 'data')), 'status'));
       const latestExecution = toJsonMap(extractJsonValue(statusMap, 'latest_execution'));
       const statusMessage = pickString(extractJsonValue(latestExecution, 'status'));
       const message =
         statusMessage ||
-        pickString(payload?.message) ||
+        pickString(extractJsonValue(payloadMap, 'message')) ||
         'Sync has been queued. Check sync status for progress.';
       setActionType('success');
       setActionMessage(typeof message === 'string' ? message : 'Sync request accepted.');

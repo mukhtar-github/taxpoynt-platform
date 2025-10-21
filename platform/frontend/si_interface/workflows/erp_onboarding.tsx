@@ -130,6 +130,20 @@ type BulkConnectionTestResponse = {
   };
 };
 
+const INFORMATION_REDIRECT_KEY = 'taxpoynt_connection_manager_org';
+
+const unwrapApiPayload = (raw: unknown): { payload: Record<string, any>; meta?: Record<string, any>; success?: boolean } => {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const candidate = raw as Record<string, any>;
+    const inner = candidate.data;
+    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+      return { payload: inner as Record<string, any>, meta: candidate.meta, success: candidate.success };
+    }
+    return { payload: candidate, meta: candidate.meta, success: candidate.success };
+  }
+  return { payload: {} };
+};
+
 type ValidateMappingResponse = {
   success?: boolean;
   message?: string;
@@ -391,9 +405,24 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const router = useRouter();
   const initialStepIndex = resolveStepIndexFromKey(initialStepId);
   const [currentStep, setCurrentStep] = useState<number>(() => initialStepIndex ?? 0);
+  const initialPersistenceKey = useMemo(() => {
+    if (organizationId) {
+      return `taxpoynt_erp_onboarding_${organizationId}`;
+    }
+    if (typeof window !== 'undefined') {
+      const stored = authService.getStoredUser();
+      if (stored?.organization?.id) {
+        return `taxpoynt_erp_onboarding_${stored.organization.id}`;
+      }
+      if (stored?.id) {
+        return `taxpoynt_erp_onboarding_user_${stored.id}`;
+      }
+    }
+    return 'taxpoynt_erp_onboarding_temp';
+  }, [organizationId]);
   // Form persistence setup for ERP onboarding
   const erpFormPersistence = useFormPersistence({
-    storageKey: `taxpoynt_erp_onboarding_${organizationId || 'temp'}`,
+    storageKey: initialPersistenceKey,
     persistent: true, // Use localStorage for longer persistence
     excludeFields: ['credentials'], // Don't store sensitive ERP credentials
     autoSaveInterval: 5000 // Save every 5 seconds
@@ -565,20 +594,17 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     setConnectionsError(null);
     try {
       const query = `?organization_id=${encodeURIComponent(resolvedOrganizationId)}`;
-      const response = await apiClient.get<{
-        success?: boolean;
-        data?: { connections?: ErpConnectionRecord[] };
-        connections?: ErpConnectionRecord[];
-        message?: string;
-        detail?: string;
-      }>(`/si/business/erp/connections${query}`);
-
-      const connectionList =
-        Array.isArray(response?.data?.connections)
-          ? response.data.connections
-          : Array.isArray(response?.connections)
-            ? response.connections
+      const response = await apiClient.get<Record<string, any>>(`/si/business/erp/connections${query}`);
+      const { payload: responseData } = unwrapApiPayload(response);
+      const connectionsFromPayload =
+        Array.isArray(responseData?.connections)
+          ? responseData.connections
+          : Array.isArray((responseData?.data as any)?.connections)
+            ? (responseData.data as any).connections
             : [];
+      const connectionList: ErpConnectionRecord[] = Array.isArray(connectionsFromPayload)
+        ? connectionsFromPayload
+        : [];
 
       setConnections(connectionList);
       if (!connectionList.length) {
@@ -978,11 +1004,13 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       const newConnectionIdExplicit =
         pickString(responseData?.connection_id) ||
         pickString(responseData?.id) ||
+        pickString(responseData?.connectionId) ||
         pickString(metaFromResponse?.connection_id);
 
       const newConnectionId =
         newConnectionIdExplicit ||
         pickString(nestedConnection?.connection_id) ||
+        pickString((nestedConnection as any)?.connectionId) ||
         pickString(nestedConnection?.id) ||
         null;
 
@@ -993,6 +1021,9 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         setCreatedConnectionId(newConnectionId);
         setConnectionCreationStatus('success');
         setConnectionCreationMessage('ERP connection saved. Diagnostics are ready when you reach Testing.');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(INFORMATION_REDIRECT_KEY, resolvedOrganizationId);
+        }
         return newConnectionId;
       }
 
@@ -1000,8 +1031,9 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         const configObj = connection.connection_config as Record<string, unknown> | undefined;
         const configUrl = pickString(configObj?.['url']);
         const configDatabase = pickString(configObj?.['database']);
+        const compareSystem = (connection.erp_system || '').toLowerCase();
         return (
-          connection.erp_system?.toLowerCase() === systemType &&
+          compareSystem === systemType &&
           configUrl?.toLowerCase() === baseUrl.toLowerCase() &&
           configDatabase?.toLowerCase() === database.toLowerCase()
         );
@@ -1011,6 +1043,9 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         setCreatedConnectionId(fallbackConnection.connection_id);
         setConnectionCreationStatus('success');
         setConnectionCreationMessage('ERP connection saved. Diagnostics are ready when you reach Testing.');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(INFORMATION_REDIRECT_KEY, resolvedOrganizationId);
+        }
         return fallbackConnection.connection_id;
       }
 
