@@ -277,12 +277,26 @@ class RedisMessageRouter(MessageRouter):
         while True:
             try:
                 # Check service health
+                idle_threshold = timedelta(minutes=5)
                 for service_id, endpoint in self.service_endpoints.items():
+                    disable_on_idle = endpoint.metadata.get("disable_on_idle", False)
+                    if not disable_on_idle and not endpoint.active:
+                        endpoint.active = True
+                        if endpoint.health_status == "unhealthy":
+                            endpoint.health_status = "stale"
+                        await self._persist_service_endpoint(service_id, endpoint)
+
                     # Basic health check - could be enhanced with actual HTTP checks
                     last_activity = endpoint.last_activity or datetime.now(timezone.utc)
-                    if (datetime.now(timezone.utc) - last_activity).total_seconds() > 300:
-                        endpoint.active = False
-                        endpoint.health_status = "unhealthy"
+                    idle_duration = datetime.now(timezone.utc) - last_activity
+                    if idle_duration > idle_threshold:
+                        if endpoint.health_status == "healthy":
+                            endpoint.health_status = "stale"
+                            await self._persist_service_endpoint(service_id, endpoint)
+                    else:
+                        if endpoint.health_status in ("stale", "unhealthy"):
+                            endpoint.health_status = "healthy"
+                        endpoint.active = True
                         await self._persist_service_endpoint(service_id, endpoint)
                 
                 await asyncio.sleep(60)  # Health check every minute

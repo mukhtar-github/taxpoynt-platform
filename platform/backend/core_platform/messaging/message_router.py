@@ -1240,14 +1240,23 @@ class MessageRouter:
                 
                 current_time = datetime.now(timezone.utc)
                 
+                idle_threshold = timedelta(minutes=5)
                 for endpoint in self.service_endpoints.values():
+                    disable_on_idle = endpoint.metadata.get("disable_on_idle", False)
+                    if not disable_on_idle and not endpoint.active:
+                        endpoint.active = True
+                        if endpoint.health_status == "unhealthy":
+                            endpoint.health_status = "stale"
+
                     # Check if endpoint has been inactive
-                    if current_time - endpoint.last_activity > timedelta(minutes=5):
+                    idle_duration = current_time - endpoint.last_activity
+                    if idle_duration > idle_threshold:
                         if endpoint.health_status == "healthy":
                             endpoint.health_status = "stale"
-                        elif endpoint.health_status == "stale":
-                            endpoint.health_status = "unhealthy"
-                            endpoint.active = False
+                    else:
+                        if endpoint.health_status in ("stale", "unhealthy"):
+                            endpoint.health_status = "healthy"
+                        endpoint.active = True
                 
             except Exception as e:
                 self.logger.error(f"Error in health monitoring: {str(e)}")
