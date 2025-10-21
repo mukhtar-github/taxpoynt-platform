@@ -2674,6 +2674,8 @@ async def initialize_si_services(
         Initialized service registry
     """
     global _service_registry
+
+    logger.warning("SI_INIT_DEBUG: entered initialize_si_services (existing=%s, router=%s)", bool(_service_registry), type(message_router).__name__)
     
     if _service_registry is not None and _service_registry.message_router is not message_router:
         try:
@@ -2688,12 +2690,18 @@ async def initialize_si_services(
             message_router,
             background_runner=background_runner,
         )
+        logger.warning("SI_INIT_DEBUG: created new SIServiceRegistry")
 
     if background_runner is not None:
         _service_registry.configure_background_runner(background_runner)
+        logger.warning("SI_INIT_DEBUG: configured background runner")
 
     if not _service_registry.is_initialized:
+        logger.warning("SI_INIT_DEBUG: calling registry.initialize_services()")
         await _service_registry.initialize_services()
+        logger.warning("SI_INIT_DEBUG: registry.initialize_services() completed")
+    else:
+        logger.warning("SI_INIT_DEBUG: registry already initialized")
     
     return _service_registry
 
