@@ -771,11 +771,9 @@ async def initialize_services():
             
             # Register SI services (optional in staging via ENABLE_SI_SERVICES)
             enable_si = str(os.getenv("ENABLE_SI_SERVICES", "true" if ENVIRONMENT != "staging" else "false")).lower() in ("1", "true", "yes", "on")
-            logger.warning("SI_INIT_DEBUG: enable_si=%s", enable_si)
             if enable_si:
                 try:
                     from si_services import initialize_si_services
-                    logger.warning("SI_INIT_DEBUG: calling initialize_si_services from main")
                     si_registry = await initialize_si_services(
                         app.state.redis_message_router,
                         background_runner=getattr(app.state, "background_runner", None),

@@ -67,6 +67,7 @@ email-validator>=2.0.0
 tenacity>=8.2.3
 uuid>=1.30
 aiofiles>=23.0.0  # Async file operations
+croniter>=1.4.1  # Cron expression parsing for extraction scheduler
 
 # Analytics & Data Science
 numpy>=1.24.0  # Numerical computing for analytics

@@ -996,7 +996,8 @@ class SIServiceRegistry:
                         "get_erp_connection_health",
                         "bulk_test_erp_connections",
                         "bulk_sync_erp_data",
-                    ]
+                    ],
+                    "disable_on_idle": True,
                 }
             )
             
@@ -1076,52 +1077,24 @@ class SIServiceRegistry:
     async def _register_subscription_services(self):
         """Register subscription management services"""
         try:
-            from .subscription_management.si_tier_manager import SITierManager
-            from .subscription_management.si_tier_validator import SITierValidator
-            from .subscription_management.si_usage_tracker import SIUsageTracker
-            from .subscription_management.si_subscription_guard import SISubscriptionGuard
-            
-            # Create subscription service wrapper
-            subscription_service = {
-                "tier_manager": SITierManager(),
-                "tier_validator": SITierValidator(),
-                "usage_tracker": SIUsageTracker(),
-                "subscription_guard": SISubscriptionGuard(),
-                "operations": [
-                    "manage_subscription_tier",
-                    "validate_tier_access",
-                    "track_usage",
-                    "enforce_subscription_limits",
-                    "check_feature_access"
-                ]
-            }
-            
-            self.services["subscription_management"] = subscription_service
-            
-            # Register with message router
-            endpoint_id = await self.message_router.register_service(
-                service_name="subscription_management",
-                service_role=ServiceRole.SYSTEM_INTEGRATOR,
-                callback=self._create_subscription_callback(subscription_service),
-                priority=4,
-                tags=["subscription", "billing", "tier_management", "usage_tracking"],
-                metadata={
-                    "service_type": "subscription_management",
-                    "operations": [
-                        "manage_subscription_tier",
-                        "validate_tier_access", 
-                        "track_usage",
-                        "enforce_subscription_limits",
-                        "check_feature_access"
-                    ]
-                }
+            from .subscription_management.si_tier_manager import SITierManager  # noqa: F401
+            from .subscription_management.si_tier_validator import SITierValidator  # noqa: F401
+            from .subscription_management.si_usage_tracker import SIUsageTracker  # noqa: F401
+            from .subscription_management.si_subscription_guard import SISubscriptionGuard  # noqa: F401
+
+            # The subscription management stack requires the billing orchestration
+            # services to be fully configured (tier manager, subscription manager,
+            # billing repository, metrics collectors, cache manager, etc.). These
+            # dependencies are not yet available in the current deployment, so we
+            # gracefully skip registration until the billing stack is provisioned.
+            logger.info(
+                "Subscription management services detected but dependencies are not yet configured; skipping registration."
             )
-            
-            self.service_endpoints["subscription_management"] = endpoint_id
-            logger.info(f"Subscription management service registered: {endpoint_id}")
-            
+            return
+
         except Exception as e:
-            logger.error(f"Failed to register subscription services: {str(e)}")
+            logger.warning(f"Subscription management modules unavailable, skipping registration: {e}")
+            return
     
     # Service callback creators
     def _create_erp_callback(self, erp_service):
@@ -2675,8 +2648,6 @@ async def initialize_si_services(
     """
     global _service_registry
 
-    logger.warning("SI_INIT_DEBUG: entered initialize_si_services (existing=%s, router=%s)", bool(_service_registry), type(message_router).__name__)
-    
     if _service_registry is not None and _service_registry.message_router is not message_router:
         try:
             await _service_registry.cleanup_services()
@@ -2690,18 +2661,12 @@ async def initialize_si_services(
             message_router,
             background_runner=background_runner,
         )
-        logger.warning("SI_INIT_DEBUG: created new SIServiceRegistry")
 
     if background_runner is not None:
         _service_registry.configure_background_runner(background_runner)
-        logger.warning("SI_INIT_DEBUG: configured background runner")
 
     if not _service_registry.is_initialized:
-        logger.warning("SI_INIT_DEBUG: calling registry.initialize_services()")
         await _service_registry.initialize_services()
-        logger.warning("SI_INIT_DEBUG: registry.initialize_services() completed")
-    else:
-        logger.warning("SI_INIT_DEBUG: registry already initialized")
     
     return _service_registry
 

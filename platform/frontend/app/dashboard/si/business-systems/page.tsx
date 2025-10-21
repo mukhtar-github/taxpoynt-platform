@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
 import { TaxPoyntButton } from '../../../../design_system';
@@ -127,8 +127,11 @@ const getStatusBadgeClass = (status?: string): string => {
   return statusStyles[key] || 'text-slate-600 bg-slate-100 border border-slate-200';
 };
 
+const CONNECTION_MANAGER_ORG_KEY = 'taxpoynt_connection_manager_org';
+
 const BusinessSystemsManagementPage = (): JSX.Element | null => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,31 +139,9 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'success' | 'error'>('success');
   const [pendingAction, setPendingAction] = useState<{ type: 'test' | 'sync'; connectionId: string } | null>(null);
+  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const currentUser = authService.getStoredUser();
-    if (!currentUser || !authService.isAuthenticated()) {
-      router.push('/auth/signin');
-      return;
-    }
-    if (currentUser.role !== 'system_integrator') {
-      router.push('/dashboard');
-      return;
-    }
-
-    setUser(currentUser);
-    fetchConnections(currentUser);
-  }, [router]);
-
-  const fetchConnections = async (currentUser: User) => {
-    const organizationId = currentUser.organization?.id;
-    if (!organizationId) {
-      setConnections([]);
-      setIsLoading(false);
-      setError('No organization context found. Add an organization before managing integrations.');
-      return;
-    }
-
+  const fetchConnections = useCallback(async (organizationId: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -180,7 +161,49 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const initialise = async () => {
+      const hasToken = authService.isAuthenticated();
+      if (!hasToken) {
+        router.push('/auth/signin');
+        return;
+      }
+
+      const storedUser = authService.getStoredUser();
+      const queryOrgId = searchParams?.get('organization_id');
+      const fallbackOrgId = typeof window !== 'undefined'
+        ? window.sessionStorage.getItem(CONNECTION_MANAGER_ORG_KEY)
+        : null;
+
+      const resolvedOrgId = storedUser?.organization?.id || queryOrgId || fallbackOrgId;
+
+      if (!resolvedOrgId) {
+        setConnections([]);
+        setIsLoading(false);
+        setError('Organization context not found. Please sign in again to manage ERP connections.');
+        return;
+      }
+
+      setActiveOrganizationId(resolvedOrgId);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(CONNECTION_MANAGER_ORG_KEY, resolvedOrgId);
+      }
+
+      if (storedUser) {
+        setUser(storedUser);
+        if (storedUser.role !== 'system_integrator') {
+          router.push('/dashboard');
+          return;
+        }
+      }
+
+      await fetchConnections(resolvedOrgId);
+    };
+
+    void initialise();
+  }, [fetchConnections, router, searchParams]);
 
   const handleTestConnection = async (connectionId: string) => {
     setPendingAction({ type: 'test', connectionId });
@@ -211,6 +234,9 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
       );
     } finally {
       setPendingAction(null);
+      if (activeOrganizationId) {
+        fetchConnections(activeOrganizationId);
+      }
     }
   };
 
@@ -243,8 +269,8 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
       );
     } finally {
       setPendingAction(null);
-      if (user) {
-        await fetchConnections(user);
+      if (activeOrganizationId) {
+        await fetchConnections(activeOrganizationId);
       }
     }
   };
@@ -271,15 +297,11 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
     };
   }, [connections]);
 
-  if (!user) {
-    return null;
-  }
-
   return (
     <DashboardLayout
       role="si"
-      userName={`${user.first_name} ${user.last_name}`}
-      userEmail={user.email}
+      userName={user ? `${user.first_name} ${user.last_name}` : 'System Integrator'}
+      userEmail={user?.email ?? ''}
       activeTab="business-systems"
     >
       <div className="space-y-8">
@@ -356,7 +378,7 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <TaxPoyntButton variant="outline" size="sm" onClick={() => user && fetchConnections(user)}>
+              <TaxPoyntButton variant="outline" size="sm" onClick={() => activeOrganizationId && fetchConnections(activeOrganizationId)}>
                 Refresh list
               </TaxPoyntButton>
               <TaxPoyntButton

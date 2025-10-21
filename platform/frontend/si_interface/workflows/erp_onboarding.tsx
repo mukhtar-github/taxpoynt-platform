@@ -889,6 +889,20 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     }
   };
 
+  const INFORMATION_REDIRECT_KEY = 'taxpoynt_connection_manager_org';
+
+  const unwrapApiPayload = (raw: unknown): { payload: Record<string, any>; meta?: Record<string, any>; success?: boolean } => {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const candidate = raw as Record<string, any>;
+      const inner = candidate.data;
+      if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+        return { payload: inner as Record<string, any>, meta: candidate.meta, success: candidate.success };
+      }
+      return { payload: candidate, meta: candidate.meta, success: candidate.success };
+    }
+    return { payload: {} };
+  };
+
   const ensureConnectionPersisted = useCallback(async (): Promise<string | null> => {
     if (createdConnectionId) {
       return createdConnectionId;
@@ -957,12 +971,17 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       };
 
       const response = await apiClient.post<Record<string, any>>('/si/business/erp/connections', payload);
-      const responseData = (response?.data ?? response) as Record<string, any>;
+      const { payload: responseData, meta: responseMeta } = unwrapApiPayload(response);
       const nestedConnection = (responseData?.connection ?? {}) as Record<string, any>;
+      const metaFromResponse = (responseMeta ?? {}) as Record<string, any>;
 
-      const newConnectionId =
+      const newConnectionIdExplicit =
         pickString(responseData?.connection_id) ||
         pickString(responseData?.id) ||
+        pickString(metaFromResponse?.connection_id);
+
+      const newConnectionId =
+        newConnectionIdExplicit ||
         pickString(nestedConnection?.connection_id) ||
         pickString(nestedConnection?.id) ||
         null;
@@ -1818,10 +1837,16 @@ const renderERPSelection = () => (
             variant="outline"
             size="sm"
             onClick={() => {
-              router.push('/dashboard/si/business-systems');
-            }}
-          >
-            Open connection manager
+          if (typeof window !== 'undefined' && resolvedOrganizationId) {
+            window.sessionStorage.setItem(INFORMATION_REDIRECT_KEY, resolvedOrganizationId);
+          }
+          const targetUrl = resolvedOrganizationId
+            ? `/dashboard/si/business-systems?organization_id=${encodeURIComponent(resolvedOrganizationId)}`
+            : '/dashboard/si/business-systems';
+          router.push(targetUrl);
+        }}
+      >
+        Open connection manager
           </Button>
           <Button
             variant="ghost"

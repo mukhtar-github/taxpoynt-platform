@@ -215,9 +215,16 @@ class AuthenticationManager:
         else:
             self.storage_path = None
         
-        # Setup audit logging
+        # Setup audit logging when supported
         if self.config.enable_audit_logging:
-            self._setup_audit_logging()
+            setup_audit = getattr(self, "_setup_audit_logging", None)
+            if callable(setup_audit):
+                setup_audit()
+            else:  # pragma: no cover - legacy compatibility
+                logger.warning(
+                    "Audit logging enabled but _setup_audit_logging is unavailable on %s; continuing without audit trail.",
+                    self.__class__.__name__,
+                )
     
     async def start_auth_manager(self) -> None:
         """Start the authentication manager"""

@@ -13,6 +13,8 @@ Components:
 - extraction_scheduler: Automated scheduling and job management
 """
 
+import logging
+
 from .erp_data_extractor import (
     ERPDataExtractor,
     ERPAdapter,
@@ -63,19 +65,40 @@ from .data_reconciler import (
     create_data_reconciler
 )
 
-from .extraction_scheduler import (
-    ExtractionScheduler,
-    SchedulerConfig,
-    ScheduledJob,
-    JobExecution,
-    ScheduleConfig,
-    ScheduleType,
-    JobType,
-    JobStatus,
-    ExecutionStatus,
-    JobDependency,
-    create_extraction_scheduler
-)
+logger = logging.getLogger(__name__)
+
+try:
+    from .extraction_scheduler import (
+        ExtractionScheduler,
+        SchedulerConfig,
+        ScheduledJob,
+        JobExecution,
+        ScheduleConfig,
+        ScheduleType,
+        JobType,
+        JobStatus,
+        ExecutionStatus,
+        JobDependency,
+        create_extraction_scheduler,
+    )
+    _SCHEDULER_AVAILABLE = True
+except ModuleNotFoundError as scheduler_import_err:  # pragma: no cover - optional dependency
+    logger.warning(
+        "Extraction scheduler unavailable; continuing without scheduler support: %s",
+        scheduler_import_err,
+    )
+    ExtractionScheduler = None  # type: ignore
+    SchedulerConfig = None  # type: ignore
+    ScheduledJob = None  # type: ignore
+    JobExecution = None  # type: ignore
+    ScheduleConfig = None  # type: ignore
+    ScheduleType = None  # type: ignore
+    JobType = None  # type: ignore
+    JobStatus = None  # type: ignore
+    ExecutionStatus = None  # type: ignore
+    JobDependency = None  # type: ignore
+    create_extraction_scheduler = None  # type: ignore
+    _SCHEDULER_AVAILABLE = False
 
 __all__ = [
     # ERP Data Extractor
@@ -123,20 +146,22 @@ __all__ = [
     "ReconciliationStatus",
     "ReconciliationMetrics",
     "create_data_reconciler",
-    
-    # Extraction Scheduler
-    "ExtractionScheduler",
-    "SchedulerConfig",
-    "ScheduledJob",
-    "JobExecution",
-    "ScheduleConfig",
-    "ScheduleType",
-    "JobType",
-    "JobStatus",
-    "ExecutionStatus",
-    "JobDependency",
-    "create_extraction_scheduler"
 ]
+
+if _SCHEDULER_AVAILABLE:
+    __all__.extend([
+        "ExtractionScheduler",
+        "SchedulerConfig",
+        "ScheduledJob",
+        "JobExecution",
+        "ScheduleConfig",
+        "ScheduleType",
+        "JobType",
+        "JobStatus",
+        "ExecutionStatus",
+        "JobDependency",
+        "create_extraction_scheduler",
+    ])
 
 __version__ = "1.0.0"
 __author__ = "TaxPoynt Platform Team"
