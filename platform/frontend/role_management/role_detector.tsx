@@ -15,7 +15,7 @@
  * - Manages role context throughout the application
  */
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient, { APIError } from '../shared_components/api/client';
 
@@ -372,12 +372,7 @@ export function RoleDetectorProvider({
 
   const detector = FrontendRoleDetector.getInstance();
 
-  // Initialize role detection
-  useEffect(() => {
-    detectRoles();
-  }, [authToken]);
-
-  const detectRoles = async () => {
+  const detectRoles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -436,7 +431,12 @@ export function RoleDetectorProvider({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [authToken, detector, fallbackRole]);
+
+  // Initialize role detection
+  useEffect(() => {
+    void detectRoles();
+  }, [detectRoles]);
 
   const switchRole = async (targetRole: PlatformRole): Promise<boolean> => {
     if (!detectionResult) return false;
