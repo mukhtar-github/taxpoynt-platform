@@ -22,7 +22,7 @@ import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 import { authService } from '../../shared_components/services/auth';
-import { onboardingApi, type OnboardingState as UnifiedOnboardingState } from '../../shared_components/services/onboardingApi';
+import { onboardingApi } from '../../shared_components/services/onboardingApi';
 
 interface OnboardingStep {
   id: string;
@@ -290,6 +290,48 @@ const buildErpMetadataWithProgress = (
   return metadataCopy;
 };
 
+const normalizeStepKey = (value: string): string =>
+  value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+
+const ERP_TO_CANONICAL_MAP: Record<string, string> = {
+  organization_setup: 'service-selection',
+  compliance_verification: 'company-profile',
+  erp_selection: 'system-connectivity',
+  erp_configuration: 'system-connectivity',
+  data_mapping: 'system-connectivity',
+  testing_validation: 'system-connectivity',
+  compliance_setup: 'review',
+  production_deployment: 'launch',
+  training_handover: 'launch',
+};
+
+const CANONICAL_TO_ERP_MAP: Record<string, string> = {
+  service_selection: 'organization_setup',
+  company_profile: 'compliance_verification',
+  system_connectivity: 'erp_configuration',
+  review: 'compliance_setup',
+  launch: 'production_deployment',
+};
+
+const getCanonicalStepId = (stepId: string): string => {
+  const normalized = normalizeStepKey(stepId);
+  return ERP_TO_CANONICAL_MAP[normalized] ?? stepId;
+};
+
+const getCanonicalStepIds = (stepIds: string[]): string[] => {
+  const seen = new Set<string>();
+  for (const step of stepIds) {
+    const canonical = getCanonicalStepId(step);
+    seen.add(canonical);
+  }
+  return Array.from(seen);
+};
+
+const getErpStepIdFromCanonical = (stepId: string): string => {
+  const normalized = normalizeStepKey(stepId);
+  return CANONICAL_TO_ERP_MAP[normalized] ?? stepId.replace(/-/g, '_');
+};
+
 const onboardingSteps: OnboardingStep[] = [
   {
     id: 'organization_setup',
@@ -372,6 +414,8 @@ const onboardingSteps: OnboardingStep[] = [
     dependencies: ['production_deployment']
   }
 ];
+
+const KNOWN_ERP_STEPS = new Set(onboardingSteps.map(step => step.id));
 
 const createDefaultSteps = (): OnboardingStep[] =>
   onboardingSteps.map(step => ({ ...step, completed: false }));
@@ -507,7 +551,6 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [steps, setSteps] = useState<OnboardingStep[]>(() => createDefaultSteps());
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>(() => createDefaultOrganizationProfile());
   const [erpConfiguration, setErpConfiguration] = useState<ERPConfiguration>(() => createDefaultErpConfiguration());
-  const [remoteOnboardingState, setRemoteOnboardingState] = useState<UnifiedOnboardingState | null>(null);
   const [remoteMetadata, setRemoteMetadata] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
@@ -544,6 +587,8 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       }
 
       const baseMetadata = deepClone(remoteMetadata) as Record<string, any>;
+      const canonicalCurrentStep = getCanonicalStepId(stepId);
+      const canonicalCompletedSteps = getCanonicalStepIds(completedIds);
       const metadataToSend = buildErpMetadataWithProgress(baseMetadata, {
         currentStep: stepId,
         completedSteps: completedIds,
@@ -558,11 +603,10 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
       try {
         const updatedState = await onboardingApi.updateOnboardingState({
-          current_step: stepId,
-          completed_steps: completedIds,
+          current_step: canonicalCurrentStep,
+          completed_steps: canonicalCompletedSteps,
           metadata: metadataToSend,
         });
-        setRemoteOnboardingState(updatedState);
         const updatedMetadata = isRecord(updatedState.metadata) ? updatedState.metadata : {};
         setRemoteMetadata(updatedMetadata);
         return metadataToSend;
@@ -911,13 +955,20 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       if (!state) {
         return;
       }
-
-      setRemoteOnboardingState(state);
       const metadata = isRecord(state.metadata) ? state.metadata : {};
       setRemoteMetadata(metadata);
 
       const progressMetadata = extractErpProgressMetadata(metadata);
-      const completedSet = new Set(progressMetadata.completedSteps);
+
+      let completedSteps = progressMetadata.completedSteps.filter(step => KNOWN_ERP_STEPS.has(step));
+      if ((!completedSteps || completedSteps.length === 0) && Array.isArray(state.completed_steps)) {
+        completedSteps = state.completed_steps
+          .filter((step): step is string => typeof step === 'string')
+          .map(getErpStepIdFromCanonical)
+          .filter(step => KNOWN_ERP_STEPS.has(step));
+      }
+
+      const completedSet = new Set(completedSteps);
 
       setSteps(prev =>
         prev.map(step => ({
@@ -926,9 +977,16 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         }))
       );
 
-      const preferredStepId =
-        progressMetadata.currentStep ||
-        (typeof state.current_step === 'string' ? state.current_step : undefined);
+      let preferredStepId =
+        progressMetadata.currentStep && KNOWN_ERP_STEPS.has(progressMetadata.currentStep)
+          ? progressMetadata.currentStep
+          : undefined;
+      if (!preferredStepId && typeof state.current_step === 'string') {
+        const mapped = getErpStepIdFromCanonical(state.current_step);
+        if (KNOWN_ERP_STEPS.has(mapped)) {
+          preferredStepId = mapped;
+        }
+      }
 
       if (preferredStepId) {
         const remoteIndex = onboardingSteps.findIndex(step => step.id === preferredStepId);
@@ -1236,7 +1294,6 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     try {
       if (authService.isAuthenticated()) {
         await onboardingApi.resetOnboardingState();
-        setRemoteOnboardingState(null);
         setRemoteMetadata({});
       }
 
@@ -1251,7 +1308,6 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
       setSteps(createDefaultSteps());
       setCurrentStep(initialStepIndex ?? 0);
-      setProgress(null);
       setResolvedOrganizationId(organizationId ?? null);
       setOrganizationProfile(createDefaultOrganizationProfile());
       setErpConfiguration(createDefaultErpConfiguration());
@@ -1497,7 +1553,6 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       };
 
       const finalState = await onboardingApi.completeOnboarding(completionMetadata);
-      setRemoteOnboardingState(finalState);
       const updatedMetadata = isRecord(finalState.metadata) ? finalState.metadata : {};
       setRemoteMetadata(updatedMetadata);
 
