@@ -40,6 +40,7 @@ else:
 # Environment configuration with Railway optimization
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 DEBUG = ENVIRONMENT == "development"
+ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "").strip().lower() in ("1", "true", "yes", "on")
 PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
 RAILWAY_DEPLOYMENT = os.getenv("RAILWAY_DEPLOYMENT_ID") is not None
@@ -302,9 +303,12 @@ def create_taxpoynt_app() -> FastAPI:
         title="TaxPoynt Platform API",
         description="TaxPoynt E-Invoice Platform API",
         version="1.0.0",
-        docs_url="/docs" if DEBUG else None,
-        redoc_url="/redoc" if DEBUG else None
+        docs_url="/docs" if (DEBUG or ENABLE_API_DOCS) else None,
+        redoc_url="/redoc" if (DEBUG or ENABLE_API_DOCS) else None
     )
+
+    if ENABLE_API_DOCS and not DEBUG:
+        logger.info("📘 Production API documentation endpoints enabled via ENABLE_API_DOCS")
     
     # Create permission guard with app
     permission_guard = APIPermissionGuard(app)

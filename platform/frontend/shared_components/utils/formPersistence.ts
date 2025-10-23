@@ -338,15 +338,37 @@ export class CrossFormDataManager {
     try {
       if (typeof window === 'undefined') return;
       
+      const meaningfulUpdates = Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined && value !== null && value !== '')
+      );
+
+      if (Object.keys(meaningfulUpdates).length === 0) {
+        return;
+      }
+
       const currentShared = this.getSharedData();
-      const merged = { ...currentShared, ...data };
+      let hasChanges = false;
+      const merged = { ...currentShared };
+
+      for (const [key, value] of Object.entries(meaningfulUpdates)) {
+        if (currentShared[key] !== value) {
+          merged[key] = value;
+          hasChanges = true;
+        }
+      }
+
+      if (!hasChanges) {
+        return;
+      }
       
       sessionStorage.setItem(this.SHARED_DATA_KEY, JSON.stringify({
         data: merged,
         timestamp: Date.now()
       }));
-      
-      console.log('🔗 Shared form data updated:', Object.keys(data));
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔗 Shared form data updated:', Object.keys(meaningfulUpdates));
+      }
     } catch (error) {
       console.warn('Failed to save shared form data:', error);
     }
