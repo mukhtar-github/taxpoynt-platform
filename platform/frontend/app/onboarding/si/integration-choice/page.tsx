@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * SI Integration Choice Page
  * ==========================

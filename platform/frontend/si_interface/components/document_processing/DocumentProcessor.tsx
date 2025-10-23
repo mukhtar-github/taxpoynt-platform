@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Document Processing Component
  * ============================

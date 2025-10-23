@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Onboarding Analytics Dashboard
  * =============================

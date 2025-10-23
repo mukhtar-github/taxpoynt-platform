@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Inventory Dashboard Component
  * ============================

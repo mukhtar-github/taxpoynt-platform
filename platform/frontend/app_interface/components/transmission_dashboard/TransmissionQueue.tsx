@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Transmission Queue Component
  * ============================

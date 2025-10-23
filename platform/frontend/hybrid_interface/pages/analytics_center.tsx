@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Analytics Center Page (Hybrid Interface)
  * ========================================

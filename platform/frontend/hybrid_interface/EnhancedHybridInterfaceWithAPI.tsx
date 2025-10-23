@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Enhanced Hybrid Interface with Real API Integration
  * ==================================================

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Mono Banking Integration Dashboard
  * =================================

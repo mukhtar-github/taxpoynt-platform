@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Service Onboarding Router
  * =========================

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Compliance Center Page (Hybrid Interface)
  * =========================================

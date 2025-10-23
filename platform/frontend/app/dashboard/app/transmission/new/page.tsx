@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * APP New Transmission Form
  * =========================

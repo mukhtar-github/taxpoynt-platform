@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * TaxPoynt Form Field Component
  * =============================

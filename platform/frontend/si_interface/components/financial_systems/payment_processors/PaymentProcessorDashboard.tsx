@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Payment Processor Dashboard
  * ==========================

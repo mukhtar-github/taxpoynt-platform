@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Cross-Role Troubleshooting Workflow (Hybrid Interface)
  * ======================================================

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Unified Dashboard Page (Hybrid Interface)
  * ========================================

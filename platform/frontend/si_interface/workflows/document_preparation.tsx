@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Document Preparation Workflow
  * ============================

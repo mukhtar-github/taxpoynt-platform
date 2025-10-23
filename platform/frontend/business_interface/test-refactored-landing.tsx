@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Test Implementation File
  * ========================

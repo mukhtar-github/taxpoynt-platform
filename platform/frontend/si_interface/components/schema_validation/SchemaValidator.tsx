@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Schema Validation Component
  * ==========================

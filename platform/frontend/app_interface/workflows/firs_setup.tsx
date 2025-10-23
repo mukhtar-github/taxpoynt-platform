@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * FIRS Setup Workflow Component
  * =============================

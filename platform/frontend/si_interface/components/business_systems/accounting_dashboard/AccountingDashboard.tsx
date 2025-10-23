@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Accounting Dashboard Component
  * =============================

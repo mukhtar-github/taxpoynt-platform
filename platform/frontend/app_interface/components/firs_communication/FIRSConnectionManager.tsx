@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * FIRS Connection Manager Component
  * ================================

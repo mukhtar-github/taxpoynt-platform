@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * APP Status Tracking Center
  * ==========================

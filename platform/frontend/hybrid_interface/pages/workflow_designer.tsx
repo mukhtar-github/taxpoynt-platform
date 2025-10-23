@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Workflow Designer Page (Hybrid Interface)
  * =========================================

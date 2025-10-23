@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Validation Process Workflow
  * ==========================

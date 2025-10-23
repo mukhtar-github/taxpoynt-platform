@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * SDK Sandbox Page
  * ================

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Financial Validation Tools
  * =========================

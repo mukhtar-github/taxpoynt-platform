@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * End-to-End Process Workflow (Hybrid Interface)
  * ==============================================

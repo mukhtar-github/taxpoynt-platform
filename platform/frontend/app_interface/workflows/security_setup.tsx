@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Security Setup Workflow Component
  * =================================

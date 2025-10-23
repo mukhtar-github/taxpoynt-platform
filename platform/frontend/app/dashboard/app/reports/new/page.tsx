@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * APP New Report Generator
  * ========================

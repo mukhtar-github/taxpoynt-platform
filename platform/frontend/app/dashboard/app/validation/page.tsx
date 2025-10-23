@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * APP Data Validation Center
  * ==========================

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Fixed Registration Test Page
  * ============================

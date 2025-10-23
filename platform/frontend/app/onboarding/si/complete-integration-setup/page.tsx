@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * SI Complete Integration Setup Page
  * ==================================

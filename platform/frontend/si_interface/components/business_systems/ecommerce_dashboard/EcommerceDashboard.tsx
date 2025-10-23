@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * E-commerce Dashboard Component
  * =============================

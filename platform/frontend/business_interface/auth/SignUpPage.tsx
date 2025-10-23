@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * TaxPoynt Strategic Sign Up Page
  * ==============================

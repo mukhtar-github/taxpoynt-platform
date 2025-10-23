@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Onboarding Resume Manager
  * ========================

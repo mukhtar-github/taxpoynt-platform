@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * TaxPoynt Platform Compliance Dashboard (Admin-Only)
  * ===================================================

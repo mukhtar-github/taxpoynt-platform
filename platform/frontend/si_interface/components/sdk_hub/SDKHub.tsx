@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * SDK Hub Component for System Integrators
  * Provides SDK downloads, documentation, and integration tools

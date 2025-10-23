@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Select Component
  * ===============

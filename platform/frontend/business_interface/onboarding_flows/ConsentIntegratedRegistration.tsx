@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * TaxPoynt Consent-Integrated Registration
  * =======================================

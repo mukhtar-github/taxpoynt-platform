@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Enhanced Sign Up Form Component
  * ===============================

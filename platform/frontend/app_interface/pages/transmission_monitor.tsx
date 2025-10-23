@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * APP Transmission Monitor Page
  * =============================
