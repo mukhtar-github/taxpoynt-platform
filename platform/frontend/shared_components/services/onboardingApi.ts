@@ -515,13 +515,46 @@ class OnboardingApiClient {
 export const onboardingApi = new OnboardingApiClient();
 
 // Export utility functions
+const onboardingStateCache: Map<string, OnboardingState | null> = new Map();
+const onboardingUpdateSignature: Map<string, string> = new Map();
+
+const resolveUserCacheKey = (explicitUserId?: string): string => {
+  if (explicitUserId) return explicitUserId;
+  const storedUser = authService.getStoredUser();
+  return storedUser?.id ?? 'anonymous';
+};
+
+const updateStateCache = (userId: string, state: OnboardingState | null) => {
+  onboardingStateCache.set(userId, state);
+  if (!state) {
+    onboardingUpdateSignature.delete(userId);
+  }
+};
+
+const computeSignature = (
+  step: string,
+  completedSteps: readonly string[],
+  completed: boolean
+) => {
+  const normalized = [...new Set(completedSteps)].sort().join('|');
+  return `${step}|${completed ? '1' : '0'}|${normalized}`;
+};
+
 export const OnboardingStateManager = {
   /**
    * Get current onboarding state (with backend sync)
    */
   getOnboardingState: async (userId: string): Promise<OnboardingState | null> => {
+    const cacheKey = resolveUserCacheKey(userId);
+    const cached = onboardingStateCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
-      return await onboardingApi.getOnboardingState();
+      const state = await onboardingApi.getOnboardingState();
+      updateStateCache(cacheKey, state);
+      return state;
     } catch (error) {
       console.error('Failed to get onboarding state:', error);
       return null;
@@ -532,17 +565,34 @@ export const OnboardingStateManager = {
    * Update onboarding step (with backend sync)
    */
   updateStep: async (userId: string, step: string, completed: boolean = false): Promise<void> => {
-    try {
-      const current = await onboardingApi.getOnboardingState();
-      const completedSteps = completed && current 
-        ? [...current.completed_steps, step]
-        : current?.completed_steps || [];
+    const cacheKey = resolveUserCacheKey(userId);
 
-      await onboardingApi.updateOnboardingState({
+    try {
+      let current = onboardingStateCache.get(cacheKey);
+      if (!current) {
+        current = await onboardingApi.getOnboardingState();
+        updateStateCache(cacheKey, current);
+      }
+
+      const completedSteps = new Set(current?.completed_steps ?? []);
+      if (completed) {
+        completedSteps.add(step);
+      }
+
+      const signature = computeSignature(step, Array.from(completedSteps), completed);
+      if (onboardingUpdateSignature.get(cacheKey) === signature) {
+        return;
+      }
+
+      const completedStepsArray = Array.from(completedSteps);
+
+      const nextState = await onboardingApi.updateOnboardingState({
         current_step: step,
-        completed_steps: completedSteps,
+        completed_steps: completedStepsArray,
         metadata: { step_updated_at: new Date().toISOString() }
       });
+      updateStateCache(cacheKey, nextState);
+      onboardingUpdateSignature.set(cacheKey, signature);
     } catch (error) {
       console.error('Failed to update onboarding step:', error);
       // Fallback to old localStorage method
@@ -562,6 +612,21 @@ export const OnboardingStateManager = {
           lastActiveDate: new Date().toISOString()
         };
         localStorage.setItem(`onboarding_${user.id}`, JSON.stringify(updated));
+       updateStateCache(cacheKey, {
+         user_id: user.id,
+         current_step: updated.currentStep,
+         completed_steps: updated.completedSteps,
+         has_started: true,
+         is_complete: updated.completedSteps?.includes('onboarding_complete') ?? false,
+         last_active_date: updated.lastActiveDate,
+         metadata: updated.metadata ?? {},
+         created_at: updated.lastActiveDate,
+         updated_at: updated.lastActiveDate
+       });
+        onboardingUpdateSignature.set(
+          cacheKey,
+          computeSignature(updated.currentStep, updated.completedSteps ?? [], completed)
+        );
       }
     }
   },
@@ -570,11 +635,22 @@ export const OnboardingStateManager = {
    * Mark onboarding as complete (with backend sync)
    */
   completeOnboarding: async (userId: string): Promise<void> => {
+    const cacheKey = resolveUserCacheKey(userId);
+
     try {
-      await onboardingApi.completeOnboarding({
+      const completedState = await onboardingApi.completeOnboarding({
         completion_source: 'frontend',
         completed_at: new Date().toISOString()
       });
+      updateStateCache(cacheKey, completedState);
+      onboardingUpdateSignature.set(
+        cacheKey,
+        computeSignature(
+          completedState.current_step,
+          completedState.completed_steps,
+          completedState.completed_steps.includes(completedState.current_step)
+        )
+      );
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       // Fallback to updateStep
@@ -586,8 +662,14 @@ export const OnboardingStateManager = {
    * Check if onboarding is complete (with backend sync)
    */
   isOnboardingComplete: async (userId: string): Promise<boolean> => {
+    const cacheKey = resolveUserCacheKey(userId);
+
     try {
-      const state = await onboardingApi.getOnboardingState();
+      let state = onboardingStateCache.get(cacheKey);
+      if (!state) {
+        state = await onboardingApi.getOnboardingState();
+        updateStateCache(cacheKey, state);
+      }
       return state?.is_complete || false;
     } catch (error) {
       console.error('Failed to check onboarding completion:', error);
@@ -602,12 +684,16 @@ export const OnboardingStateManager = {
    * Reset onboarding state (with backend sync)
    */
   resetOnboarding: async (userId: string): Promise<void> => {
+    const cacheKey = resolveUserCacheKey(userId);
+
     try {
       await onboardingApi.resetOnboardingState();
+      updateStateCache(cacheKey, null);
     } catch (error) {
       console.error('Failed to reset onboarding state:', error);
       // Fallback to localStorage
       localStorage.removeItem(`onboarding_${userId}`);
+      updateStateCache(cacheKey, null);
     }
   }
 };

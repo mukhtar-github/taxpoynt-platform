@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
-import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { useBankingErrorRecovery, BankingError } from '../../../../shared_components/services/bankingErrorRecovery';
 import { getPostBankingUrl } from '../../../../shared_components/utils/dashboardRouting';
 import { TaxPoyntButton } from '../../../../design_system';

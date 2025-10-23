@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { AuthLayout } from '../../../../shared_components/auth/AuthLayout';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
-import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { 
   OnboardingProgressIndicator, 
   useMobileOptimization 

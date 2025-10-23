@@ -12,7 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
-import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { onboardingApi } from '../../../../shared_components/services/onboardingApi';
 import { TaxPoyntButton } from '../../../../design_system';
 import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DataMapping from '../../../../si_interface/pages/data_mapping';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
-import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 
 export default function SIDataMappingPage() {
   const router = useRouter();

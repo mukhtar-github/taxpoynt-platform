@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
-import { OnboardingStateManager } from '../../../../shared_components/onboarding/ServiceOnboardingRouter';
+import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { TaxPoyntButton, TaxPoyntInput } from '../../../../design_system';
 import apiClient from '../../../../shared_components/api/client';
 import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';

@@ -391,7 +391,9 @@ export function RoleDetectorProvider({
 
       // If no result, create a default guest/unauthenticated state instead of throwing error
       if (!result) {
-        console.log('No roles detected, using fallback role');
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('No auth token found; using fallback role');
+        }
         result = {
           primaryRole: fallbackRole,
           allRoles: [],
@@ -412,7 +414,9 @@ export function RoleDetectorProvider({
       
     } catch (err) {
       // Don't set error state for expected authentication failures during registration
-      console.log('Role detection did not complete, using fallback role');
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('Role detection did not complete, using fallback role');
+      }
       
       // Create fallback result instead of error
       const fallbackResult = {
