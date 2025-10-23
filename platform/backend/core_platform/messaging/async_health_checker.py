@@ -585,10 +585,15 @@ async def setup_default_health_checks(manager: AsyncHealthCheckManager):
     # Message router health check  
     async def check_message_router():
         try:
-            from core_platform.messaging.redis_message_router import get_redis_message_router
-            router = get_redis_message_router(manager.redis)
+            from core_platform.messaging.router_registry import get_message_router as get_registered_router
+            router = get_registered_router()
+            if router is None:
+                return "Message router not initialized"
+
             stats = await router.get_routing_statistics()
-            return f"Message router healthy - {stats.get('cluster_wide', {}).get('active_instances', 0)} instances"
+            cluster_stats = stats.get("cluster_wide", {})
+            active_instances = cluster_stats.get("active_instances", 0)
+            return f"Message router healthy - {active_instances} instances"
         except Exception as e:
             raise Exception(f"Message router check failed: {e}")
     

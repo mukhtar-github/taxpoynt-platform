@@ -530,7 +530,10 @@ async def initialize_services():
             
             # Store in app state
             app.state.messaging = messaging_infrastructure
-            app.state.redis_message_router = messaging_infrastructure["redis_message_router"]
+            redis_router = messaging_infrastructure["redis_message_router"]
+            app.state.redis_message_router = redis_router
+            from core_platform.messaging.router_registry import set_message_router as register_message_router
+            register_message_router(redis_router)
             app.state.scaling_coordinator = messaging_infrastructure["scaling_coordinator"]
             app.state.circuit_breaker_manager = messaging_infrastructure["circuit_breaker_manager"]
             app.state.health_check_manager = messaging_infrastructure["health_check_manager"]
