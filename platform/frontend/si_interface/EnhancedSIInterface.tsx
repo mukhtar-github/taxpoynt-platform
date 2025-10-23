@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Enhanced System Integrator (SI) Interface
  * ==========================================

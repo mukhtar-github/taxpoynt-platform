@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ERP Onboarding Workflow
  * =======================
@@ -14,12 +16,13 @@
  * - Progress tracking and status updates
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../design_system/components/Button';
 import apiClient from '../../shared_components/api/client';
 import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 import { authService } from '../../shared_components/services/auth';
+import { onboardingApi, type OnboardingState as UnifiedOnboardingState } from '../../shared_components/services/onboardingApi';
 
 interface OnboardingStep {
   id: string;
@@ -81,23 +84,6 @@ interface ERPConfiguration {
     sourceField: string;
     targetField: string;
     transformation?: string;
-  }>;
-}
-
-interface OnboardingProgress {
-  organizationId: string;
-  currentStep: number;
-  stepsCompleted: string[];
-  startDate: string;
-  expectedCompletion?: string;
-  actualCompletion?: string;
-  assignedIntegrator?: string;
-  notes: string[];
-  issues: Array<{
-    stepId: string;
-    issue: string;
-    severity: 'low' | 'medium' | 'high';
-    resolved: boolean;
   }>;
 }
 
@@ -212,6 +198,96 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
   }
 
   return sanitizedFallback;
+};
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const deepClone = <T>(value: T): T => {
+  try {
+    return JSON.parse(JSON.stringify(value ?? null));
+  } catch {
+    return value;
+  }
+};
+
+const sanitizeErpConfiguration = (config: ERPConfiguration) => {
+  const clone = deepClone(config) as Record<string, any>;
+  if (clone && typeof clone === 'object' && 'credentials' in clone) {
+    delete clone.credentials;
+  }
+  return clone;
+};
+
+const sanitizeStepPayload = (payload: Record<string, any>) => {
+  const clone = deepClone(payload) as Record<string, any>;
+  if (clone?.erp_configuration && typeof clone.erp_configuration === 'object') {
+    delete clone.erp_configuration.credentials;
+  }
+  return clone;
+};
+
+interface ExtractedErpProgress {
+  currentStep?: string;
+  completedSteps: string[];
+  raw: Record<string, any>;
+}
+
+const extractErpProgressMetadata = (metadata: Record<string, any> | null | undefined): ExtractedErpProgress => {
+  if (!metadata || !isRecord(metadata.erp_onboarding)) {
+    return { currentStep: undefined, completedSteps: [], raw: {} };
+  }
+
+  const erpMetadata = metadata.erp_onboarding as Record<string, any>;
+  const completedSteps = Array.isArray(erpMetadata.completed_steps)
+    ? erpMetadata.completed_steps.filter((step): step is string => typeof step === 'string')
+    : [];
+
+  const currentStep =
+    typeof erpMetadata.current_step === 'string' ? erpMetadata.current_step : undefined;
+
+  return {
+    currentStep,
+    completedSteps,
+    raw: erpMetadata,
+  };
+};
+
+const buildErpMetadataWithProgress = (
+  baseMetadata: Record<string, any>,
+  update: {
+    currentStep: string;
+    completedSteps: string[];
+    stepPayload?: Record<string, any>;
+    organizationProfile: OrganizationProfile;
+    erpConfiguration: ERPConfiguration;
+    complianceConfig: typeof DEFAULT_COMPLIANCE_CONFIG;
+    productionChecklist: typeof DEFAULT_PRODUCTION_CHECKLIST;
+    trainingChecklist: typeof DEFAULT_TRAINING_CHECKLIST;
+    connectionId: string | null;
+  }
+) => {
+  const metadataCopy: Record<string, any> = { ...baseMetadata };
+  const existingErp = metadataCopy.erp_onboarding && isRecord(metadataCopy.erp_onboarding)
+    ? { ...metadataCopy.erp_onboarding }
+    : {};
+
+  existingErp.current_step = update.currentStep;
+  existingErp.completed_steps = update.completedSteps;
+  existingErp.last_updated = new Date().toISOString();
+  existingErp.organization_profile = deepClone(update.organizationProfile);
+  existingErp.erp_configuration_snapshot = sanitizeErpConfiguration(update.erpConfiguration);
+  existingErp.compliance_config = deepClone(update.complianceConfig);
+  existingErp.production_checklist = deepClone(update.productionChecklist);
+  existingErp.training_checklist = deepClone(update.trainingChecklist);
+  existingErp.connection_id = update.connectionId ?? null;
+
+  if (update.stepPayload) {
+    existingErp.last_step_payload = sanitizeStepPayload(update.stepPayload);
+  }
+
+  metadataCopy.erp_onboarding = existingErp;
+  return metadataCopy;
 };
 
 const onboardingSteps: OnboardingStep[] = [
@@ -431,7 +507,8 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
   const [steps, setSteps] = useState<OnboardingStep[]>(() => createDefaultSteps());
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>(() => createDefaultOrganizationProfile());
   const [erpConfiguration, setErpConfiguration] = useState<ERPConfiguration>(() => createDefaultErpConfiguration());
-  const [progress, setProgress] = useState<OnboardingProgress | null>(null);
+  const [remoteOnboardingState, setRemoteOnboardingState] = useState<UnifiedOnboardingState | null>(null);
+  const [remoteMetadata, setRemoteMetadata] = useState<Record<string, any>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [resolvedOrganizationId, setResolvedOrganizationId] = useState<string | null>(organizationId ?? null);
@@ -460,6 +537,51 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     mappingFetchRef.current = false;
   }, [resolvedOrganizationId, erpConfiguration.systemType]);
 
+  const syncErpProgress = useCallback(
+    async (stepId: string, completedIds: string[], stepPayload?: Record<string, any>) => {
+      if (!authService.isAuthenticated()) {
+        return undefined;
+      }
+
+      const baseMetadata = deepClone(remoteMetadata) as Record<string, any>;
+      const metadataToSend = buildErpMetadataWithProgress(baseMetadata, {
+        currentStep: stepId,
+        completedSteps: completedIds,
+        stepPayload,
+        organizationProfile,
+        erpConfiguration,
+        complianceConfig,
+        productionChecklist,
+        trainingChecklist,
+        connectionId: createdConnectionId,
+      });
+
+      try {
+        const updatedState = await onboardingApi.updateOnboardingState({
+          current_step: stepId,
+          completed_steps: completedIds,
+          metadata: metadataToSend,
+        });
+        setRemoteOnboardingState(updatedState);
+        const updatedMetadata = isRecord(updatedState.metadata) ? updatedState.metadata : {};
+        setRemoteMetadata(updatedMetadata);
+        return metadataToSend;
+      } catch (error) {
+        console.warn(`Failed to synchronize ERP onboarding step "${stepId}":`, error);
+        return undefined;
+      }
+    },
+    [
+      remoteMetadata,
+      organizationProfile,
+      erpConfiguration,
+      complianceConfig,
+      productionChecklist,
+      trainingChecklist,
+      createdConnectionId,
+    ]
+  );
+
   const markStepCompletedExternally = useCallback(
     (stepId: string | undefined, advanceToStep?: string) => {
       if (!stepId) {
@@ -482,31 +604,42 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         setCurrentStep(nextIndex);
       }
 
-      setSteps(prev => {
-        const nextSteps = prev.map(step =>
+      setSteps(prev =>
+        prev.map(step =>
           step.id === stepId ? { ...step, completed: true } : step
-        );
+        )
+      );
 
-        const completedIds = nextSteps
-          .filter(step => step.completed)
-          .map(step => step.id);
+      const completedIdsSet = new Set(steps.filter(step => step.completed).map(step => step.id));
+      completedIdsSet.add(stepId);
+      const completedIds = Array.from(completedIdsSet);
 
-        erpFormPersistence.saveFormData({
-          organizationProfile,
-          erpConfiguration,
-          currentStep: nextCurrentStep,
-          createdConnectionId,
-          complianceConfig,
-          productionChecklist,
-          trainingChecklist,
-          stepsCompleted: completedIds,
-          timestamp: Date.now()
-        });
-
-        return nextSteps;
+      erpFormPersistence.saveFormData({
+        organizationProfile,
+        erpConfiguration,
+        currentStep: nextCurrentStep,
+        createdConnectionId,
+        complianceConfig,
+        productionChecklist,
+        trainingChecklist,
+        stepsCompleted: completedIds,
+        timestamp: Date.now()
       });
+
+      void syncErpProgress(stepId, completedIds);
     },
-    [currentStep, createdConnectionId, erpFormPersistence, organizationProfile, erpConfiguration]
+    [
+      steps,
+      currentStep,
+      createdConnectionId,
+      erpFormPersistence,
+      organizationProfile,
+      erpConfiguration,
+      complianceConfig,
+      productionChecklist,
+      trainingChecklist,
+      syncErpProgress
+    ]
   );
 
   useEffect(() => {
@@ -684,9 +817,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
   // Load existing onboarding progress and initialize with shared data
   useEffect(() => {
-    if (organizationId) {
-      loadOnboardingProgress();
-    }
+    loadOnboardingProgress();
 
     // Load saved ERP form data and merge with shared registration data
     const savedErpData = erpFormPersistence.loadFormData();
@@ -768,38 +899,51 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     return () => {
       erpFormPersistence.stopAutoSave();
     };
-  }, [organizationId, initialStepIndex]);
+  }, [organizationId, initialStepIndex, loadOnboardingProgress]);
 
-  const loadOnboardingProgress = async () => {
+  const loadOnboardingProgress = useCallback(async () => {
+    if (!authService.isAuthenticated()) {
+      return;
+    }
+
     try {
-      const data = await apiClient.get<{
-        progress?: {
-          currentStep: number;
-          stepsCompleted: string[];
-        };
-      }>(`/si/onboarding/${organizationId}/progress`);
+      const state = await onboardingApi.getOnboardingState();
+      if (!state) {
+        return;
+      }
 
-      if (data.progress) {
-        setProgress(data.progress);
-        const remoteIndexRaw = typeof data.progress.currentStep === 'number'
-          ? data.progress.currentStep
-          : 0;
-        const remoteIndex = Math.max(0, remoteIndexRaw);
-        const resolvedIndex =
-          initialStepIndex !== null && remoteIndex < initialStepIndex
-            ? initialStepIndex
-            : remoteIndex;
-        setCurrentStep(resolvedIndex);
+      setRemoteOnboardingState(state);
+      const metadata = isRecord(state.metadata) ? state.metadata : {};
+      setRemoteMetadata(metadata);
 
-        setSteps(prev => prev.map(step => ({
+      const progressMetadata = extractErpProgressMetadata(metadata);
+      const completedSet = new Set(progressMetadata.completedSteps);
+
+      setSteps(prev =>
+        prev.map(step => ({
           ...step,
-          completed: data.progress.stepsCompleted.includes(step.id)
-        })));
+          completed: completedSet.has(step.id)
+        }))
+      );
+
+      const preferredStepId =
+        progressMetadata.currentStep ||
+        (typeof state.current_step === 'string' ? state.current_step : undefined);
+
+      if (preferredStepId) {
+        const remoteIndex = onboardingSteps.findIndex(step => step.id === preferredStepId);
+        if (remoteIndex >= 0) {
+          const resolvedIndex =
+            initialStepIndex !== null && remoteIndex < initialStepIndex
+              ? initialStepIndex
+              : remoteIndex;
+          setCurrentStep(resolvedIndex);
+        }
       }
     } catch (error) {
       console.error('Failed to load onboarding progress:', error);
     }
-  };
+  }, [initialStepIndex]);
 
   const handleStepComplete = async () => {
     const stepId = steps[currentStep].id;
@@ -839,9 +983,18 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       }
       
       // Always update local state first for immediate UX feedback
-      setSteps(prev => prev.map((step, index) => 
-        index === currentStep ? { ...step, completed: true } : step
-      ));
+      setSteps(prev =>
+        prev.map((step, index) =>
+          index === currentStep ? { ...step, completed: true } : step
+        )
+      );
+
+      const completedIds = Array.from(
+        new Set([
+          ...steps.filter(step => step.completed).map(step => step.id),
+          stepId
+        ])
+      );
 
       // Save to persistence immediately
       erpFormPersistence.saveFormData({
@@ -849,25 +1002,19 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         erpConfiguration,
         currentStep,
         createdConnectionId,
-        stepsCompleted: steps.filter(s => s.completed).map(s => s.id),
+        complianceConfig,
+        productionChecklist,
+        trainingChecklist,
+        stepsCompleted: completedIds,
         timestamp: Date.now()
       });
 
-      // Attempt API save (if organizationId exists and we have auth)
-      if (organizationId && apiClient.isAuthenticated()) {
-        try {
-          await apiClient.post(`/si/onboarding/${organizationId}/step-complete`, {
-            step_id: stepId,
-            step_data: getCurrentStepData(),
-            organization_profile: organizationProfile,
-            erp_configuration: erpConfiguration
-          });
-          console.log(`✅ ${steps[currentStep].title} saved to server successfully!`);
-        } catch (apiError) {
-          console.warn(`⚠️  ${steps[currentStep].title} saved locally but server sync failed`, apiError);
-        }
+      // Attempt API save using onboarding client
+      const syncResult = await syncErpProgress(stepId, completedIds, getCurrentStepData());
+      if (syncResult) {
+        console.log(`✅ ${steps[currentStep].title} progress synced successfully.`);
       } else {
-        console.log(`💾 ${steps[currentStep].title} saved locally (offline mode)`);
+        console.log(`💾 ${steps[currentStep].title} saved locally (offline mode).`);
       }
 
       // Always show success to user - local save succeeded
@@ -1049,9 +1196,9 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         return fallbackConnection.connection_id;
       }
 
-      setConnectionCreationStatus('error');
+      setConnectionCreationStatus('success');
       setConnectionCreationMessage(
-        'Connection created but no identifier was returned. Visit the connection manager to confirm the record.'
+        'Connection saved. Refresh the list or open the connection manager to view the record.'
       );
       return null;
     } catch (error) {
@@ -1087,8 +1234,10 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     setResetStatusMessage('Resetting onboarding progress…');
 
     try {
-      if (apiClient.isAuthenticated()) {
-        await apiClient.delete('/si/onboarding/state/reset');
+      if (authService.isAuthenticated()) {
+        await onboardingApi.resetOnboardingState();
+        setRemoteOnboardingState(null);
+        setRemoteMetadata({});
       }
 
       erpFormPersistence.clearFormData();
@@ -1309,11 +1458,48 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     try {
       setIsProcessing(true);
 
-      await apiClient.post(`/si/onboarding/${organizationId}/complete`, {
-        organization_profile: organizationProfile,
-        erp_configuration: erpConfiguration,
-        completion_date: new Date().toISOString()
+      const completedIds = onboardingSteps.map(step => step.id);
+      const finalStepId = onboardingSteps[onboardingSteps.length - 1]?.id ?? completedIds[completedIds.length - 1];
+
+      setSteps(prev =>
+        prev.map(step => ({
+          ...step,
+          completed: true
+        }))
+      );
+
+      erpFormPersistence.saveFormData({
+        organizationProfile,
+        erpConfiguration,
+        currentStep,
+        createdConnectionId,
+        complianceConfig,
+        productionChecklist,
+        trainingChecklist,
+        stepsCompleted: completedIds,
+        timestamp: Date.now()
       });
+
+      const metadataAfterSync =
+        (await syncErpProgress(finalStepId, completedIds, {
+          completion: true,
+          completed_at: new Date().toISOString()
+        })) || deepClone(remoteMetadata);
+
+      const completionMetadata = {
+        ...metadataAfterSync,
+        erp_onboarding: {
+          ...(metadataAfterSync?.erp_onboarding || {}),
+          status: 'completed',
+          completed_steps: completedIds,
+          completed_at: new Date().toISOString()
+        }
+      };
+
+      const finalState = await onboardingApi.completeOnboarding(completionMetadata);
+      setRemoteOnboardingState(finalState);
+      const updatedMetadata = isRecord(finalState.metadata) ? finalState.metadata : {};
+      setRemoteMetadata(updatedMetadata);
 
       erpFormPersistence.clearFormData();
       console.log('✅ ERP onboarding completed - form data cleared');
