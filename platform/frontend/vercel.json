@@ -12,6 +12,22 @@
     {
       "source": "/api/(.*)",
       "destination": "https://web-production-ea5ad.up.railway.app/api/$1"
+    },
+    {
+      "source": "/docs",
+      "destination": "https://web-production-ea5ad.up.railway.app/docs"
+    },
+    {
+      "source": "/docs/(.*)",
+      "destination": "https://web-production-ea5ad.up.railway.app/docs/$1"
+    },
+    {
+      "source": "/redoc",
+      "destination": "https://web-production-ea5ad.up.railway.app/redoc"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "https://web-production-ea5ad.up.railway.app/openapi.json"
     }
   ],
   "headers": [

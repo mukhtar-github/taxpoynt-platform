@@ -182,6 +182,19 @@ class OWASPSecurityHeaders:
                 # API documentation - only in development
                 if self.environment != "development":
                     response.headers["X-Robots-Tag"] = "noindex, nofollow"
+                    doc_csp = [
+                        "default-src 'self'",
+                        f"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.{self.domain}",
+                        f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.{self.domain}",
+                        f"img-src 'self' data: https://*.{self.domain} https://fastapi.tiangolo.com",
+                        f"font-src 'self' https://fonts.gstatic.com https://*.{self.domain}",
+                        "connect-src 'self'",
+                        "frame-ancestors 'self'",
+                        "object-src 'none'",
+                        "base-uri 'self'",
+                        "form-action 'self'"
+                    ]
+                    response.headers["Content-Security-Policy"] = "; ".join(doc_csp)
             
             # Add security timestamp
             response.headers["X-Security-Timestamp"] = str(int(__import__('time').time()))
