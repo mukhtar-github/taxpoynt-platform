@@ -185,7 +185,7 @@ class OWASPSecurityHeaders:
                     doc_csp = [
                         "default-src 'self'",
                         f"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.{self.domain}",
-                        f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.{self.domain}",
+                        f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://*.{self.domain}",
                         f"img-src 'self' data: https://*.{self.domain} https://fastapi.tiangolo.com",
                         f"font-src 'self' https://fonts.gstatic.com https://*.{self.domain}",
                         "connect-src 'self'",
