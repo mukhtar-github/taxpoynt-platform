@@ -859,6 +859,64 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     }
   }, [currentStep, fetchErpConnections, fetchSavedMapping, steps]);
 
+  const loadOnboardingProgress = useCallback(async () => {
+    if (!authService.isAuthenticated()) {
+      return;
+    }
+
+    try {
+      const state = await onboardingApi.getOnboardingState();
+      if (!state) {
+        return;
+      }
+      const metadata = isRecord(state.metadata) ? state.metadata : {};
+      setRemoteMetadata(metadata);
+
+      const progressMetadata = extractErpProgressMetadata(metadata);
+
+      let completedSteps = progressMetadata.completedSteps.filter(step => KNOWN_ERP_STEPS.has(step));
+      if ((!completedSteps || completedSteps.length === 0) && Array.isArray(state.completed_steps)) {
+        completedSteps = state.completed_steps
+          .filter((step): step is string => typeof step === 'string')
+          .map(getErpStepIdFromCanonical)
+          .filter(step => KNOWN_ERP_STEPS.has(step));
+      }
+
+      const completedSet = new Set(completedSteps);
+
+      setSteps(prev =>
+        prev.map(step => ({
+          ...step,
+          completed: completedSet.has(step.id)
+        }))
+      );
+
+      let preferredStepId =
+        progressMetadata.currentStep && KNOWN_ERP_STEPS.has(progressMetadata.currentStep)
+          ? progressMetadata.currentStep
+          : undefined;
+      if (!preferredStepId && typeof state.current_step === 'string') {
+        const mapped = getErpStepIdFromCanonical(state.current_step);
+        if (KNOWN_ERP_STEPS.has(mapped)) {
+          preferredStepId = mapped;
+        }
+      }
+
+      if (preferredStepId) {
+        const remoteIndex = onboardingSteps.findIndex(step => step.id === preferredStepId);
+        if (remoteIndex >= 0) {
+          const resolvedIndex =
+            initialStepIndex !== null && remoteIndex < initialStepIndex
+              ? initialStepIndex
+              : remoteIndex;
+          setCurrentStep(resolvedIndex);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load onboarding progress:', error);
+    }
+  }, [initialStepIndex]);
+
   // Load existing onboarding progress and initialize with shared data
   useEffect(() => {
     loadOnboardingProgress();
@@ -944,64 +1002,6 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       erpFormPersistence.stopAutoSave();
     };
   }, [organizationId, initialStepIndex, loadOnboardingProgress]);
-
-  const loadOnboardingProgress = useCallback(async () => {
-    if (!authService.isAuthenticated()) {
-      return;
-    }
-
-    try {
-      const state = await onboardingApi.getOnboardingState();
-      if (!state) {
-        return;
-      }
-      const metadata = isRecord(state.metadata) ? state.metadata : {};
-      setRemoteMetadata(metadata);
-
-      const progressMetadata = extractErpProgressMetadata(metadata);
-
-      let completedSteps = progressMetadata.completedSteps.filter(step => KNOWN_ERP_STEPS.has(step));
-      if ((!completedSteps || completedSteps.length === 0) && Array.isArray(state.completed_steps)) {
-        completedSteps = state.completed_steps
-          .filter((step): step is string => typeof step === 'string')
-          .map(getErpStepIdFromCanonical)
-          .filter(step => KNOWN_ERP_STEPS.has(step));
-      }
-
-      const completedSet = new Set(completedSteps);
-
-      setSteps(prev =>
-        prev.map(step => ({
-          ...step,
-          completed: completedSet.has(step.id)
-        }))
-      );
-
-      let preferredStepId =
-        progressMetadata.currentStep && KNOWN_ERP_STEPS.has(progressMetadata.currentStep)
-          ? progressMetadata.currentStep
-          : undefined;
-      if (!preferredStepId && typeof state.current_step === 'string') {
-        const mapped = getErpStepIdFromCanonical(state.current_step);
-        if (KNOWN_ERP_STEPS.has(mapped)) {
-          preferredStepId = mapped;
-        }
-      }
-
-      if (preferredStepId) {
-        const remoteIndex = onboardingSteps.findIndex(step => step.id === preferredStepId);
-        if (remoteIndex >= 0) {
-          const resolvedIndex =
-            initialStepIndex !== null && remoteIndex < initialStepIndex
-              ? initialStepIndex
-              : remoteIndex;
-          setCurrentStep(resolvedIndex);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load onboarding progress:', error);
-    }
-  }, [initialStepIndex]);
 
   const handleStepComplete = async () => {
     const stepId = steps[currentStep].id;
