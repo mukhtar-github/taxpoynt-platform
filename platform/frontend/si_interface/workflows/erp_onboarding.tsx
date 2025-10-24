@@ -1005,7 +1005,12 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
   const handleStepComplete = async () => {
     const stepId = steps[currentStep].id;
-    
+
+    if (stepId === 'erp_selection' && !erpConfiguration.systemType) {
+      alert('Select an ERP system before marking this step complete.');
+      return;
+    }
+
     try {
       setIsProcessing(true);
 
@@ -2805,6 +2810,18 @@ const renderERPSelection = () => (
   const currentStepData = steps[currentStep];
   const canProceed = currentStepData ? (currentStepData.completed || !currentStepData.required) : false;
 
+  const canMarkCurrentStep = (() => {
+    if (!currentStepData) {
+      return false;
+    }
+
+    if (currentStepData.id === 'erp_selection') {
+      return Boolean(erpConfiguration.systemType);
+    }
+
+    return true;
+  })();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -2893,14 +2910,21 @@ const renderERPSelection = () => (
 
             <div className="flex items-center space-x-4">
               {!currentStepData?.completed && (
-                <Button
-                  onClick={handleStepComplete}
-                  disabled={isProcessing}
-                  variant="outline"
-                  loading={isProcessing}
-                >
-                  {currentStepData?.required === false ? 'Mark Complete (optional)' : 'Mark Complete'}
-                </Button>
+                <div className="flex flex-col items-end">
+                  <Button
+                    onClick={handleStepComplete}
+                    disabled={isProcessing || !canMarkCurrentStep}
+                    variant="outline"
+                    loading={isProcessing}
+                  >
+                    {currentStepData?.required === false ? 'Mark Complete (optional)' : 'Mark Complete'}
+                  </Button>
+                  {!isProcessing && !canMarkCurrentStep && currentStepData?.id === 'erp_selection' ? (
+                    <span className="mt-1 text-xs text-gray-500">
+                      Select an ERP system to enable this step.
+                    </span>
+                  ) : null}
+                </div>
               )}
               
               <Button
