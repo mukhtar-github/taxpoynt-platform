@@ -1135,9 +1135,11 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         return { payload: inner as Record<string, any>, meta: candidate.meta, success: candidate.success };
       }
       return { payload: candidate, meta: candidate.meta, success: candidate.success };
-    }
-    return { payload: {} };
-  };
+  }
+  return { payload: {} };
+};
+
+const normalizeString = (value: string | undefined | null): string => (value || '').trim().toLowerCase();
 
   const ensureConnectionPersisted = useCallback(async (): Promise<string | null> => {
     if (createdConnectionId) {
@@ -1170,6 +1172,45 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     const apiKey = erpConfiguration.credentials.apiKey?.trim();
     if (!apiKey) {
       throw new Error('Provide the ERP API key or integration token before continuing.');
+    }
+
+    // Reuse an existing connection if one already matches this configuration
+    try {
+      const existingConnections = await fetchErpConnections();
+      const normalizedSystem = normalizeString(systemType);
+      const normalizedUrl = normalizeString(baseUrl);
+      const normalizedDatabase = normalizeString(database);
+
+      const existingMatch = existingConnections.find(connection => {
+        const connectionSystem = normalizeString(connection.erp_system);
+        if (connectionSystem !== normalizedSystem) {
+          return false;
+        }
+
+        const config = connection.connection_config as Record<string, unknown> | undefined;
+        if (!config) {
+          return false;
+        }
+
+        const configUrl = normalizeString(typeof config['url'] === 'string' ? (config['url'] as string) : undefined);
+        const configDatabase = normalizeString(
+          typeof config['database'] === 'string' ? (config['database'] as string) : undefined
+        );
+
+        return configUrl === normalizedUrl && configDatabase === normalizedDatabase;
+      });
+
+      if (existingMatch?.connection_id) {
+        setCreatedConnectionId(existingMatch.connection_id);
+        setConnectionCreationStatus('success');
+        setConnectionCreationMessage('Existing ERP connection detected. Diagnostics will reuse it.');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(INFORMATION_REDIRECT_KEY, resolvedOrganizationId);
+        }
+        return existingMatch.connection_id;
+      }
+    } catch (lookupError) {
+      console.warn('Unable to verify existing ERP connections before create:', lookupError);
     }
 
     const connectionName = `${systemType.toUpperCase()} ERP Connection`;
@@ -1269,6 +1310,45 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         error,
         'Unable to create ERP connection. Please verify your configuration and try again.'
       );
+
+      try {
+        const existingConnections = await fetchErpConnections();
+        const normalizedSystem = normalizeString(systemType);
+        const normalizedUrl = normalizeString(baseUrl);
+        const normalizedDatabase = normalizeString(database);
+
+        const fallback = existingConnections.find(connection => {
+          const connectionSystem = normalizeString(connection.erp_system);
+          if (connectionSystem !== normalizedSystem) {
+            return false;
+          }
+
+          const config = connection.connection_config as Record<string, unknown> | undefined;
+          if (!config) {
+            return false;
+          }
+
+          const configUrl = normalizeString(typeof config['url'] === 'string' ? (config['url'] as string) : undefined);
+          const configDatabase = normalizeString(
+            typeof config['database'] === 'string' ? (config['database'] as string) : undefined
+          );
+
+          return configUrl === normalizedUrl && configDatabase === normalizedDatabase;
+        });
+
+        if (fallback?.connection_id) {
+          setCreatedConnectionId(fallback.connection_id);
+          setConnectionCreationStatus('success');
+          setConnectionCreationMessage('ERP connection detected after retry. Diagnostics will reuse it.');
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(INFORMATION_REDIRECT_KEY, resolvedOrganizationId);
+          }
+          return fallback.connection_id;
+        }
+      } catch (lookupError) {
+        console.warn('Unable to verify ERP connection state after failure:', lookupError);
+      }
+
       setConnectionCreationStatus('error');
       setConnectionCreationMessage(message);
       throw error instanceof Error ? error : new Error(message);
