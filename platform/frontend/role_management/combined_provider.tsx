@@ -16,7 +16,7 @@
  * - Loading states and fallbacks
  */
 
-import React, { ReactNode, useState, useEffect } from 'react';
+import React, { ComponentType, ReactNode, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { RoleDetectorProvider, PlatformRole } from './role_detector';
 import { PermissionProvider, Permission } from './permission_provider';
@@ -117,10 +117,15 @@ const DefaultLoadingComponent: React.FC = () => (
   </div>
 );
 
-const RoleManagementDevTools = dynamic(() => import('./dev_tools'), {
-  ssr: false,
-  loading: () => null
-});
+type DevToolsComponent = ComponentType<{ enabled: boolean }>;
+
+const RoleManagementDevTools: DevToolsComponent | null =
+  process.env.NODE_ENV === 'production'
+    ? null
+    : dynamic(() => import('./dev_tools'), {
+        ssr: false,
+        loading: () => null
+      });
 
 // Main combined provider component
 export function CombinedRoleProvider({
@@ -196,7 +201,9 @@ export function CombinedRoleProvider({
             initialOverrides={featureFlags}
           >
             {children}
-            {enableDevTools ? <RoleManagementDevTools enabled={enableDevTools} /> : null}
+            {enableDevTools && RoleManagementDevTools ? (
+              <RoleManagementDevTools enabled={enableDevTools} />
+            ) : null}
           </FeatureFlagProvider>
         </PermissionProvider>
       </RoleDetectorProvider>
