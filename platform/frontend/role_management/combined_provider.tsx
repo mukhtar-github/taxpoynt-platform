@@ -117,10 +117,10 @@ const DefaultLoadingComponent: React.FC = () => (
   </div>
 );
 
-const RoleManagementDevTools = dynamic(
-  () => import('./dev_tools').then(mod => mod.DevTools),
-  { ssr: false, loading: () => null }
-);
+const RoleManagementDevTools = dynamic(() => import('./dev_tools'), {
+  ssr: false,
+  loading: () => null
+});
 
 // Main combined provider component
 export function CombinedRoleProvider({
