@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, beforeAll, jest } from '@jest/globals
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { EnhancedSIInterface } from '../EnhancedSIInterface';
 import { onboardingChecklistApi } from '../../shared_components/services/onboardingChecklistApi';
+import apiClient from '../../shared_components/api/client';
 
 const pushMock = jest.fn();
 
@@ -30,6 +31,8 @@ jest.mock('../../shared_components/services/onboardingChecklistApi', () => ({
     fetchChecklist: jest.fn(),
   },
 }));
+
+const apiGetMock = apiClient.get as jest.Mock;
 
 beforeAll(() => {
   Object.defineProperty(window, 'IntersectionObserver', {
@@ -100,10 +103,31 @@ const mockChecklist = {
   updated_at: new Date().toISOString(),
 };
 
+const mockChecklistComplete = {
+  ...mockChecklist,
+  phases: mockChecklist.phases.map((phase) => ({
+    ...phase,
+    status: 'complete',
+    steps: phase.steps.map((step) => ({
+      ...step,
+      status: 'complete',
+      completed: true,
+    })),
+  })),
+  summary: {
+    ...mockChecklist.summary,
+    completed_phases: mockChecklist.phases.map((phase) => phase.id),
+    remaining_phases: [],
+    completion_percentage: 100,
+  },
+};
+
 describe('EnhancedSIInterface', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     pushMock.mockReset();
+    apiGetMock.mockReset();
+    apiGetMock.mockResolvedValue({ success: true, data: {} });
   });
 
   it('renders onboarding checklist data when loaded', async () => {
@@ -133,6 +157,83 @@ describe('EnhancedSIInterface', () => {
 
     render(<EnhancedSIInterface />);
 
+    const guidanceButtons = await screen.findAllByRole('button', { name: /Guidance/i });
+    fireEvent.click(guidanceButtons[0]);
+
     expect(await screen.findByTestId('checklist-guidance-panel')).toBeInTheDocument();
+  });
+
+  it('shows post-onboarding focus actions when checklist is complete', async () => {
+    (onboardingChecklistApi.fetchChecklist as jest.Mock).mockResolvedValue(mockChecklistComplete);
+
+    render(<EnhancedSIInterface />);
+
+    const panel = await screen.findByTestId('checklist-guidance-panel');
+    expect(panel).toHaveTextContent('Post-onboarding focus');
+    expect(screen.getByText('Keep automations running smoothly')).toBeInTheDocument();
+  });
+
+  it('renders connect banking tile when cash flow data is absent', async () => {
+    (onboardingChecklistApi.fetchChecklist as jest.Mock).mockResolvedValue(mockChecklistComplete);
+    apiGetMock.mockResolvedValue({ success: true, data: {} });
+
+    render(<EnhancedSIInterface />);
+
+    expect(await screen.findByText(/Connect banking to unlock insights/i)).toBeInTheDocument();
+  });
+
+  it('renders financial snapshot card when cash flow data is available', async () => {
+    (onboardingChecklistApi.fetchChecklist as jest.Mock).mockResolvedValue(mockChecklistComplete);
+    apiGetMock.mockResolvedValue({
+      success: true,
+      data: {
+        cashFlow: {
+          netFlow: 4_500_000,
+          categories: {
+            Invoices: 3_000_000,
+            Subscriptions: 1_500_000,
+          },
+        },
+        financial: {
+          banking: { connected: 1, totalAccounts: 2, providers: [] },
+          payments: { connected: 1, monthlyVolume: 12_000_000, providers: [] },
+        },
+      },
+    });
+
+    render(<EnhancedSIInterface />);
+
+    expect(await screen.findByText(/Top cash sources/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Connect banking to unlock insights/i)).not.toBeInTheDocument();
+  });
+
+  it('prioritises IRN activity and exposes validation log navigation', async () => {
+    (onboardingChecklistApi.fetchChecklist as jest.Mock).mockResolvedValue(mockChecklistComplete);
+    apiGetMock.mockResolvedValue({
+      success: true,
+      data: {
+        irnStatus: {
+          recent: [
+            {
+              irn: 'SUB-0001',
+              status: 'submitted',
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        },
+        validationLogs: [
+          {
+            status: 'failed',
+            createdAt: new Date().toISOString(),
+            totals: { total: 10 },
+          },
+        ],
+      },
+    });
+
+    render(<EnhancedSIInterface />);
+
+    expect(await screen.findByText(/IRN SUB-0001/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /View validation logs/i })).toBeInTheDocument();
   });
 });

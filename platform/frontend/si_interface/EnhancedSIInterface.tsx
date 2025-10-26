@@ -283,10 +283,6 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       failing: 0,
       needsAttention: 0,
     };
-  const connectionSystems = Array.isArray(metrics.connectionHealth?.systems)
-    ? (metrics.connectionHealth?.systems as Array<Record<string, any>>)
-    : [];
-
   const irnStatus =
     metrics.irnStatus ?? {
       totalGenerated: 0,
@@ -342,6 +338,36 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       actionLabel: 'Add integration',
       actionIcon: '➕',
       onAction: () => router.push('/dashboard/si/integrations/new'),
+    },
+    {
+      label: 'Failing systems',
+      value: formatNumber(connectionSummary.failing),
+      helper:
+        connectionSummary.failing > 0
+          ? 'Resolve sync errors from the integration centre.'
+          : 'No failing systems detected',
+      textClass: connectionSummary.failing > 0 ? 'text-red-600' : 'text-slate-600',
+      borderClass: 'border-red-100',
+      actionLabel: connectionSummary.failing > 0 ? 'View issues' : undefined,
+      onAction:
+        connectionSummary.failing > 0
+          ? () => router.push('/dashboard/si/integrations/health')
+          : undefined,
+    },
+    {
+      label: 'Needs attention',
+      value: formatNumber(connectionSummary.needsAttention),
+      helper:
+        connectionSummary.needsAttention > 0
+          ? 'Review alerts to keep automations on track.'
+          : 'Nothing flagged right now',
+      textClass: connectionSummary.needsAttention > 0 ? 'text-amber-600' : 'text-slate-600',
+      borderClass: 'border-amber-100',
+      actionLabel: connectionSummary.needsAttention > 0 ? 'Review alerts' : undefined,
+      onAction:
+        connectionSummary.needsAttention > 0
+          ? () => router.push('/dashboard/si/integrations/health')
+          : undefined,
     },
     {
       label: 'Auto-reconciled today',
@@ -413,33 +439,6 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
     },
   ];
 
-  const integrationCategories = [
-    {
-      label: 'ERP systems',
-      active: metrics.integrations.erp.active,
-      total: metrics.integrations.erp.total,
-      helper: `${formatNumber(metrics.integrations.erp.totalCustomers)} customers`,
-    },
-    {
-      label: 'CRM systems',
-      active: metrics.integrations.crm.active,
-      total: metrics.integrations.crm.total,
-      helper: `${formatNumber(metrics.integrations.crm.totalContacts)} contacts`,
-    },
-    {
-      label: 'POS systems',
-      active: metrics.integrations.pos.active,
-      total: metrics.integrations.pos.total,
-      helper: `${formatNumber(metrics.integrations.pos.totalItems)} items tracked`,
-    },
-    {
-      label: 'E-commerce',
-      active: metrics.integrations.ecommerce.active,
-      total: metrics.integrations.ecommerce.total,
-      helper: `${formatNumber(metrics.integrations.ecommerce.totalOrders)} orders`,
-    },
-  ];
-
   const complianceSnapshot = [
     {
       label: 'IRNs pending',
@@ -476,8 +475,17 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
     if (!selectedGuidancePhase || !checklistData) {
       return null;
     }
-    return checklistData.phases.find(phase => phase.id === selectedGuidancePhase) ?? null;
-  }, [checklistData, selectedGuidancePhase]);
+    const phase = checklistData.phases.find((item) => item.id === selectedGuidancePhase) ?? null;
+    if (!phase) {
+      return null;
+    }
+    if (onboardingComplete && phase.status === 'complete') {
+      return null;
+    }
+    return phase;
+  }, [checklistData, onboardingComplete, selectedGuidancePhase]);
+
+  const showGuidancePanel = Boolean(guidancePhase) || onboardingComplete;
 
   useEffect(() => {
     if (!checklistData || selectedGuidancePhase) {
@@ -569,10 +577,8 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
   ];
 
   const activityFeed = useMemo(() => {
-    const events: Array<{ title: string; description: string; meta: string; amount?: string }> = [];
-
     const irnEvents = irnRecent
-      .slice(0, 3)
+      .slice(0, 5)
       .map((item) => {
         const irn = typeof item.irn === 'string' ? item.irn : undefined;
         const status = typeof item.status === 'string' ? item.status : 'unknown';
@@ -602,57 +608,8 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
         };
       })
       .filter((entry) => Boolean(entry.title));
-
-    events.push(...irnEvents);
-
-    const validationEvents = combinedValidationActivity
-      .slice(0, 3)
-      .map((item) => {
-        const status = typeof item.status === 'string' ? item.status : 'validation';
-        const batchId =
-          typeof item.batchId === 'string'
-            ? item.batchId
-            : typeof item.batch_id === 'string'
-            ? item.batch_id
-            : undefined;
-        const title = batchId ? `Batch ${batchId}` : `Batch ${status}`;
-        const created =
-          typeof item.updated_at === 'string'
-            ? item.updated_at
-            : typeof item.createdAt === 'string'
-            ? item.createdAt
-            : typeof item.created_at === 'string'
-            ? item.created_at
-            : undefined;
-        const totalsRecord = isPlainObject(item.totals) ? (item.totals as Record<string, unknown>) : {};
-        const invoiceCount =
-          typeof item.total === 'number'
-            ? item.total
-            : typeof totalsRecord.total === 'number'
-            ? totalsRecord.total
-            : typeof item.totalInvoices === 'number'
-            ? item.totalInvoices
-            : undefined;
-        const description =
-          typeof item.description === 'string'
-            ? item.description
-            : typeof item.notes === 'string'
-            ? item.notes
-            : `Validation ${status}`;
-
-        return {
-          title,
-          description,
-          meta: created ? formatDateTime(created) : 'Awaiting schedule',
-          amount: typeof invoiceCount === 'number' ? `${invoiceCount.toLocaleString()} invoices` : undefined,
-        };
-      })
-      .filter((entry) => Boolean(entry.title));
-
-    events.push(...validationEvents);
-
-    if (events.length > 0) {
-      return events.slice(0, 5);
+    if (irnEvents.length > 0) {
+      return irnEvents;
     }
 
     return [
@@ -672,7 +629,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
         meta: 'Collaboration',
       },
     ];
-  }, [combinedValidationActivity, irnRecent]);
+  }, [irnRecent]);
 
   const quickToolCards = [
     {
@@ -763,35 +720,69 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                 {checklistBannerMessage}
               </p>
             )}
-            {guidancePhase && (
+            {showGuidancePanel && (
               <div
                 data-testid="checklist-guidance-panel"
                 className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"
               >
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Guidance</p>
-                    <h4 className="text-sm font-semibold text-blue-900">{guidancePhase.title}</h4>
-                    <p className="text-xs text-blue-800">{guidancePhase.description}</p>
+                {guidancePhase ? (
+                  <>
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Guidance</p>
+                        <h4 className="text-sm font-semibold text-blue-900">{guidancePhase.title}</h4>
+                        <p className="text-xs text-blue-800">{guidancePhase.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGuidancePhase(null)}
+                        className="text-xs font-medium text-blue-700 hover:text-blue-600"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <ul className="space-y-2">
+                      {guidancePhase.steps.map(step => (
+                        <li key={step.id} className="rounded border border-blue-100 bg-white px-3 py-2 text-xs">
+                          <span className="font-semibold text-blue-900">{step.title}</span>
+                          {step.success_criteria && (
+                            <p className="text-[11px] text-blue-700">Success: {step.success_criteria}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Post-onboarding focus</p>
+                      <h4 className="text-sm font-semibold text-blue-900">Keep automations running smoothly</h4>
+                      <p className="text-xs text-blue-800">
+                        Prioritise the tasks that sustain healthy integrations and compliance.
+                      </p>
+                    </div>
+                    <ul className="space-y-3">
+                      {priorityActions.map((item) => (
+                        <li
+                          key={item.id}
+                          className="rounded-xl border border-blue-100 bg-white px-3 py-3"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-blue-900">
+                                {item.icon} {item.title}
+                              </p>
+                              <p className="mt-1 text-xs text-blue-700">{item.description}</p>
+                            </div>
+                            <TaxPoyntButton variant="outline" size="sm" onClick={item.onAction}>
+                              {item.actionLabel}
+                            </TaxPoyntButton>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedGuidancePhase(null)}
-                    className="text-xs font-medium text-blue-700 hover:text-blue-600"
-                  >
-                    Close
-                  </button>
-                </div>
-                <ul className="space-y-2">
-                  {guidancePhase.steps.map(step => (
-                    <li key={step.id} className="rounded border border-blue-100 bg-white px-3 py-2 text-xs">
-                      <span className="font-semibold text-blue-900">{step.title}</span>
-                      {step.success_criteria && (
-                        <p className="text-[11px] text-blue-700">Success: {step.success_criteria}</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                )}
               </div>
             )}
           </div>
@@ -823,205 +814,93 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
           ))}
         </div>
 
-            {/* Primary focus */}
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <DashboardCard
-            title="Today's focus"
-            description="Prioritise the tasks that keep automations healthy."
-            icon="🎯"
-          >
-            <div className="space-y-4">
-              {priorityActions.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50/80 p-4"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {item.icon} {item.title}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+            <div className="grid grid-cols-1 gap-6">
+              <DashboardCard
+                title="Compliance readiness"
+                description="Ensure you are ready to submit to FIRS."
+                icon="✅"
+                badge={`${validationPassRate}% pass`}
+                badgeColor="emerald"
+              >
+                <div className="space-y-3">
+                  {complianceSnapshot.map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center justify-between text-sm text-slate-700"
+                    >
+                      <span>{item.label}</span>
+                      <span className="font-semibold text-slate-900">{item.value}</span>
                     </div>
-                    <TaxPoyntButton variant="outline" size="sm" onClick={item.onAction}>
-                      {item.actionLabel}
-                    </TaxPoyntButton>
+                  ))}
+                  {latestValidationLogs.length > 0 ? (
+                    <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Validation logs</p>
+                      <ul className="mt-2 space-y-2 text-xs text-emerald-700">
+                        {latestValidationLogs.map((log) => (
+                          <li key={log.id} className="flex flex-col rounded-md border border-emerald-50 px-2 py-1">
+                            <span className="font-semibold text-emerald-700">{log.status}</span>
+                            <span className="text-emerald-500">
+                              {log.createdAt ? formatDateTime(log.createdAt) : 'Awaiting schedule'}
+                            </span>
+                            {typeof log.totalInvoices === 'number' && (
+                              <span className="text-emerald-500">
+                                {log.totalInvoices.toLocaleString()} invoices
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-emerald-100 bg-white px-3 py-2 text-xs text-emerald-600">
+                      Validation logs will surface here once batches are processed.
+                    </div>
+                  )}
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    Last submission: {lastSubmission}
                   </div>
+                  <TaxPoyntButton
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    onClick={() => router.push('/dashboard/si/compliance')}
+                  >
+                    View compliance centre
+                  </TaxPoyntButton>
                 </div>
-              ))}
+              </DashboardCard>
             </div>
-          </DashboardCard>
-
-          <DashboardCard
-            title="Integration health"
-            description="Snapshot of connected business systems."
-            icon="🧩"
-            badge={`${metrics.integrations.overall.activeSystems}/${metrics.integrations.overall.totalSystems || 0} active`}
-            badgeColor="indigo"
-          >
-            <div className="space-y-3">
-              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
-                Active {formatNumber(connectionSummary.active)} of {formatNumber(connectionSummary.total)} systems ·{' '}
-                {formatNumber(connectionSummary.failing)} failing · {formatNumber(connectionSummary.needsAttention)} flagged
-              </div>
-              {integrationCategories.map((category) => (
-                <div
-                  key={category.label}
-                  className="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">{category.label}</p>
-                    <p className="text-xs text-slate-500">{category.helper}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {category.active}/{category.total}
-                  </span>
-                </div>
-              ))}
-              {connectionSystems.length > 0 ? (
-                <div className="rounded-lg border border-slate-100 bg-white px-3 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent updates</p>
-                  <ul className="mt-2 space-y-2">
-                    {connectionSystems.slice(0, 3).map((system, index) => {
-                      const record = system as Record<string, any>;
-                      const systemId =
-                        typeof record.id === 'string'
-                          ? record.id
-                          : typeof record.name === 'string'
-                          ? `${record.name}-${index}`
-                          : `system-${index}`;
-                      const name = typeof record.name === 'string' ? record.name : 'Integration';
-                      const status = typeof record.status === 'string' ? record.status : 'unknown';
-                      const lastSyncValue =
-                        typeof record.lastSync === 'string'
-                          ? record.lastSync
-                          : typeof record.last_sync === 'string'
-                          ? record.last_sync
-                          : undefined;
-                      const needsAttention = Boolean(record.needsAttention ?? record.needs_attention);
-                      const error = typeof record.error === 'string' ? record.error : undefined;
-
-                      return (
-                        <li key={systemId} className="flex flex-col rounded-md border border-slate-100 px-3 py-2">
-                          <div className="flex items-center justify-between text-sm font-semibold text-slate-800">
-                            <span>{name}</span>
-                            <span className="text-xs uppercase tracking-wide text-slate-500">{status}</span>
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Last sync: {lastSyncValue ? formatDateTime(lastSyncValue) : 'No sync recorded'}
-                          </div>
-                          {needsAttention && (
-                            <div className="mt-1 text-xs font-semibold text-amber-600">
-                              ⚠️ {error ? error : 'Needs attention'}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
-                  Run a connection test to populate recent integration updates.
-                </div>
-              )}
-              <TaxPoyntButton
-                variant="outline"
-                size="sm"
-                className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                onClick={() => router.push('/dashboard/si/business-systems')}
-              >
-                Manage systems
-              </TaxPoyntButton>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard
-            title="Compliance readiness"
-            description="Ensure you are ready to submit to FIRS."
-            icon="✅"
-            badge={`${validationPassRate}% pass`}
-            badgeColor="emerald"
-          >
-            <div className="space-y-3">
-              {complianceSnapshot.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between text-sm text-slate-700"
-                >
-                  <span>{item.label}</span>
-                  <span className="font-semibold text-slate-900">{item.value}</span>
-                </div>
-              ))}
-              {latestValidationLogs.length > 0 ? (
-                <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Validation logs</p>
-                  <ul className="mt-2 space-y-2 text-xs text-emerald-700">
-                    {latestValidationLogs.map((log) => (
-                      <li key={log.id} className="flex flex-col rounded-md border border-emerald-50 px-2 py-1">
-                        <span className="font-semibold text-emerald-700">{log.status}</span>
-                        <span className="text-emerald-500">
-                          {log.createdAt ? formatDateTime(log.createdAt) : 'Awaiting schedule'}
-                        </span>
-                        {typeof log.totalInvoices === 'number' && (
-                          <span className="text-emerald-500">
-                            {log.totalInvoices.toLocaleString()} invoices
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-emerald-100 bg-white px-3 py-2 text-xs text-emerald-600">
-                  Validation logs will surface here once batches are processed.
-                </div>
-              )}
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                Last submission: {lastSubmission}
-              </div>
-              <TaxPoyntButton
-                variant="outline"
-                size="sm"
-                className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                onClick={() => router.push('/dashboard/si/compliance')}
-              >
-                View compliance centre
-              </TaxPoyntButton>
-            </div>
-          </DashboardCard>
-        </div>
 
         {/* Secondary insights */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <DashboardCard
-            title="Financial snapshot"
-            description="Monitor cash flow and payment performance."
-            icon="💰"
-            badge={
-              metrics.financial.banking.connected > 0
-                ? `${metrics.financial.banking.connected} providers`
-                : undefined
-            }
-            badgeColor="blue"
-          >
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {financialHighlights.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-lg border border-blue-100 bg-blue-50/70 p-3"
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                      {item.label}
-                    </p>
-                    <p className="mt-1 text-lg font-semibold text-blue-900">{item.value}</p>
-                    <p className="text-xs text-blue-600">{item.helper}</p>
-                  </div>
-                ))}
-              </div>
+          {hasCashFlow ? (
+            <DashboardCard
+              title="Financial snapshot"
+              description="Monitor cash flow and payment performance."
+              icon="💰"
+              badge={
+                metrics.financial.banking.connected > 0
+                  ? `${metrics.financial.banking.connected} providers`
+                  : undefined
+              }
+              badgeColor="blue"
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {financialHighlights.map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-lg border border-blue-100 bg-blue-50/70 p-3"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-blue-900">{item.value}</p>
+                      <p className="text-xs text-blue-600">{item.helper}</p>
+                    </div>
+                  ))}
+                </div>
 
-              {hasCashFlow ? (
                 <div className="rounded-lg border border-blue-100 bg-white p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Top cash sources
@@ -1040,22 +919,34 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                     ))}
                   </ul>
                 </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-blue-200 bg-white/70 p-3 text-sm text-blue-700">
-                  Connect a banking provider to unlock live cash flow analytics.
-                </div>
-              )}
 
+                <TaxPoyntButton
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                  onClick={() => router.push('/dashboard/si/financial/connect')}
+                >
+                  Manage financial connections
+                </TaxPoyntButton>
+              </div>
+            </DashboardCard>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-blue-200 bg-white/70 p-6 text-blue-800">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Cash flow</p>
+              <h3 className="mt-1 text-lg font-semibold text-blue-900">Connect banking to unlock insights</h3>
+              <p className="mt-2 text-sm text-blue-700">
+                Link financial accounts to activate live cash flow analytics and payment performance tracking.
+              </p>
               <TaxPoyntButton
-                variant="outline"
+                variant="primary"
                 size="sm"
-                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                className="mt-4 bg-blue-600 text-white hover:bg-blue-700"
                 onClick={() => router.push('/dashboard/si/financial/connect')}
               >
-                Manage financial connections
+                Connect banking
               </TaxPoyntButton>
             </div>
-          </DashboardCard>
+          )}
 
           <DashboardCard
             title="Recent activity"
@@ -1078,6 +969,14 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                   <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{event.meta}</p>
                 </div>
               ))}
+              <TaxPoyntButton
+                variant="outline"
+                size="sm"
+                className="w-full border-slate-200 text-slate-700 hover:bg-slate-50"
+                onClick={() => router.push('/dashboard/si/compliance')}
+              >
+                View validation logs
+              </TaxPoyntButton>
             </div>
           </DashboardCard>
         </div>
