@@ -1,4 +1,5 @@
 import React from 'react';
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import ERPOnboarding from '../erp_onboarding';
 import { onboardingApi } from '../../../shared_components/services/onboardingApi';
@@ -60,9 +61,15 @@ jest.mock('../../../shared_components/utils/onboardingSessionPersistence', () =>
   },
 }));
 
-const mockUpdateState = onboardingApi.updateOnboardingState as jest.Mock;
-const mockSaveServiceSelection = onboardingApi.saveServiceSelection as jest.Mock;
-const mockSaveCompanyProfile = onboardingApi.saveCompanyProfile as jest.Mock;
+const mockUpdateState = onboardingApi.updateOnboardingState as jest.MockedFunction<
+  typeof onboardingApi.updateOnboardingState
+>;
+const mockSaveServiceSelection = onboardingApi.saveServiceSelection as jest.MockedFunction<
+  typeof onboardingApi.saveServiceSelection
+>;
+const mockSaveCompanyProfile = onboardingApi.saveCompanyProfile as jest.MockedFunction<
+  typeof onboardingApi.saveCompanyProfile
+>;
 
 beforeEach(() => {
   jest.clearAllMocks();

@@ -19,17 +19,19 @@ import {
 } from '../design_system/style-utilities';
 import apiClient from '../shared_components/api/client';
 import { APIResponse } from './types';
+import ChecklistSidebar, { ChecklistPayload } from './components/checklistSidebar';
+import { onboardingChecklistApi } from '../shared_components/services/onboardingChecklistApi';
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const mergeDeep = <T,>(target: T, source: Partial<T>): T => {
+const mergeDeep = (target: any, source: any): any => {
   if (source === undefined || source === null) {
     return target;
   }
 
   if (Array.isArray(source)) {
-    return source.slice() as unknown as T;
+    return source.slice();
   }
 
   if (isPlainObject(source)) {
@@ -41,13 +43,13 @@ const mergeDeep = <T,>(target: T, source: Partial<T>): T => {
       const existing = isPlainObject(target)
         ? (target as Record<string, unknown>)[key]
         : undefined;
-      base[key] = mergeDeep(existing as unknown, value as unknown);
+      base[key] = mergeDeep(existing, value);
     }
 
-    return base as T;
+    return base;
   }
 
-  return source as unknown as T;
+  return source;
 };
 
 const toMillionsDisplay = (value?: number, digits: number = 1): string | null => {
@@ -84,6 +86,10 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
 }) => {
   const router = useRouter();
   const [hasLiveData, setHasLiveData] = useState(false);
+  const [checklist, setChecklist] = useState<ChecklistPayload | null>(null);
+  const [checklistStatus, setChecklistStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [checklistError, setChecklistError] = useState<string | null>(null);
+  const [selectedGuidancePhase, setSelectedGuidancePhase] = useState<string | null>(null);
 
   const buildEmptyMetrics = useCallback(() => ({
     integrations: {
@@ -190,7 +196,10 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       apiLatency: 0,
       uptime: 0,
     },
-    cashFlow: undefined,
+    cashFlow: {
+      netFlow: 0,
+      categories: {},
+    },
   }), []);
 
   type DashboardMetrics = ReturnType<typeof buildEmptyMetrics>;
@@ -205,7 +214,7 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
         );
 
         if (response?.success && response.data) {
-          setMetrics((prev) => mergeDeep(prev, response.data));
+          setMetrics((prev) => mergeDeep(prev, response.data ?? {}));
           setHasLiveData(true);
         } else {
           setHasLiveData(false);
@@ -220,6 +229,35 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
 
     loadDashboardData();
   }, [buildEmptyMetrics]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchChecklist = async () => {
+      try {
+        setChecklistStatus('loading');
+        const data = await onboardingChecklistApi.fetchChecklist();
+        if (cancelled) {
+          return;
+        }
+        setChecklist(data);
+        setChecklistStatus('ready');
+        setChecklistError(null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        console.error('Failed to fetch onboarding checklist:', error);
+        setChecklist(null);
+        setChecklistStatus('error');
+        setChecklistError('Unable to load onboarding checklist. Showing latest known progress.');
+      }
+    };
+
+    fetchChecklist();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const sectionStyle = combineStyles(
     TYPOGRAPHY_STYLES.optimizedText,
@@ -257,18 +295,36 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       lastGeneratedAt: undefined,
       recent: [],
     };
-  const irnRecent = Array.isArray(irnStatus.recent) ? irnStatus.recent : [];
+  const irnRecent = Array.isArray(irnStatus.recent)
+    ? (irnStatus.recent as Array<Record<string, any>>)
+    : [];
 
   const validationSummary = metrics.validation?.summary ?? { totals: { total: 0, passed: 0, failed: 0 } };
   const validationTotals = validationSummary.totals ?? { total: 0, passed: 0, failed: 0 };
   const validationPassRate = validationTotals.total
     ? Math.round(((validationTotals.passed ?? 0) / validationTotals.total) * 100)
     : 0;
-  const validationRecent = metrics.validation?.recentBatches ?? [];
-  const validationLogs = Array.isArray(metrics.validationLogs) ? metrics.validationLogs : [];
-  const combinedValidationActivity = validationLogs.length > 0 ? validationLogs : validationRecent;
+  const validationRecent = Array.isArray(metrics.validation?.recentBatches)
+    ? (metrics.validation?.recentBatches as Array<Record<string, any>>)
+    : [];
+  const validationLogs = Array.isArray(metrics.validationLogs)
+    ? (metrics.validationLogs as Array<Record<string, any>>)
+    : [];
+  const combinedValidationActivity: Array<Record<string, any>> =
+    validationLogs.length > 0 ? validationLogs : validationRecent;
 
-  const quickStats = [
+  type QuickStat = {
+    label: string;
+    value: string;
+    helper: string;
+    textClass: string;
+    borderClass: string;
+    actionLabel?: string;
+    actionIcon?: string;
+    onAction?: () => void;
+  };
+
+  const quickStats: QuickStat[] = [
     {
       label: 'Active systems',
       value:
@@ -283,6 +339,9 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
           : 'Connect a system to start tracking health',
       textClass: 'text-indigo-600',
       borderClass: 'border-indigo-100',
+      actionLabel: 'Add integration',
+      actionIcon: '➕',
+      onAction: () => router.push('/dashboard/si/integrations/new'),
     },
     {
       label: 'Auto-reconciled today',
@@ -402,6 +461,44 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
     ? formatDateTime(metrics.compliance.lastSubmission)
     : 'Not submitted yet';
 
+  const checklistData = checklistStatus === 'ready' ? checklist : null;
+  const onboardingComplete = (checklistData?.summary?.remaining_phases.length ?? 0) === 0;
+
+  const handleResumeOnboarding = useCallback(() => {
+    router.push('/onboarding/si/integration-setup');
+  }, [router]);
+
+  const handleViewGuidance = useCallback((phaseId: string) => {
+    setSelectedGuidancePhase(phaseId);
+  }, []);
+
+  const guidancePhase = useMemo(() => {
+    if (!selectedGuidancePhase || !checklistData) {
+      return null;
+    }
+    return checklistData.phases.find(phase => phase.id === selectedGuidancePhase) ?? null;
+  }, [checklistData, selectedGuidancePhase]);
+
+  useEffect(() => {
+    if (!checklistData || selectedGuidancePhase) {
+      return;
+    }
+    const nextPhase = checklistData.phases.find(phase => phase.status !== 'complete');
+    if (nextPhase) {
+      setSelectedGuidancePhase(nextPhase.id);
+    }
+  }, [checklistData, selectedGuidancePhase]);
+
+  const checklistBannerMessage = useMemo(() => {
+    if (checklistStatus === 'loading') {
+      return 'Syncing onboarding checklist…';
+    }
+    if (checklistStatus === 'error' && checklistError) {
+      return checklistError;
+    }
+    return null;
+  }, [checklistError, checklistStatus]);
+
   const latestValidationLogs = combinedValidationActivity
     .filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'))
     .slice(0, 3)
@@ -441,24 +538,23 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
       };
     });
 
+  const cashFlowSummary = metrics.cashFlow as { netFlow?: number; categories?: Record<string, number> };
   const hasCashFlow = Boolean(
-    metrics.cashFlow &&
-      typeof metrics.cashFlow === 'object' &&
-      (typeof metrics.cashFlow.netFlow === 'number' ||
-        (metrics.cashFlow.categories && Object.keys(metrics.cashFlow.categories).length > 0))
+    cashFlowSummary &&
+      typeof cashFlowSummary.netFlow === 'number' &&
+      cashFlowSummary.categories &&
+      Object.keys(cashFlowSummary.categories).length > 0
   );
 
-  const cashFlowTopCategories = Object.entries(
-    (metrics.cashFlow?.categories as Record<string, number> | undefined) ?? {}
-  )
+  const cashFlowTopCategories = Object.entries(cashFlowSummary?.categories ?? {})
     .sort(([, a], [, b]) => Number(b ?? 0) - Number(a ?? 0))
     .slice(0, 2);
 
   const financialHighlights = [
     {
       label: 'Net cash flow',
-      value: toMillionsDisplay(metrics.cashFlow?.netFlow, 1) ?? '--',
-      helper: metrics.cashFlow ? 'This month' : 'Connect banking to begin tracking',
+      value: toMillionsDisplay(cashFlowSummary?.netFlow, 1) ?? '--',
+      helper: hasCashFlow ? 'This month' : 'Connect banking to begin tracking',
     },
     {
       label: 'Connected accounts',
@@ -476,7 +572,6 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
     const events: Array<{ title: string; description: string; meta: string; amount?: string }> = [];
 
     const irnEvents = irnRecent
-      .filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'))
       .slice(0, 3)
       .map((item) => {
         const irn = typeof item.irn === 'string' ? item.irn : undefined;
@@ -511,7 +606,6 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
     events.push(...irnEvents);
 
     const validationEvents = combinedValidationActivity
-      .filter((item): item is Record<string, any> => Boolean(item && typeof item === 'object'))
       .slice(0, 3)
       .map((item) => {
         const status = typeof item.status === 'string' ? item.status : 'validation';
@@ -630,43 +724,107 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                 </span>
               )}
             </p>
+            {onboardingComplete && (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                <span>🎉</span>
+                <span>Onboarding complete! Continue managing integrations from the actions below.</span>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-3">
             <TaxPoyntButton
-              variant="outline"
-              onClick={() => router.push('/dashboard/si/integrations/new')}
-              className="border-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-            >
-              <span className="mr-2">➕</span>
-              Add Integration
-            </TaxPoyntButton>
-            <TaxPoyntButton
               variant="primary"
-              onClick={() => router.push('/dashboard/si/setup')}
+              onClick={() =>
+                checklistData?.summary?.remaining_phases.length
+                  ? router.push('/onboarding/si/integration-setup')
+                  : router.push('/dashboard/si/firs-invoicing')
+              }
               className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
             >
-              <span className="mr-2">⚙️</span>
-              System Setup
+              <span className="mr-2">{checklistData?.summary?.remaining_phases.length ? '🚀' : '📄'}</span>
+              {checklistData?.summary?.remaining_phases.length
+                ? 'View onboarding guidance'
+                : 'Generate first invoice'}
             </TaxPoyntButton>
           </div>
         </div>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {quickStats.map((stat) => (
+        <div className="grid gap-6 lg:grid-cols-[320px_1fr] lg:items-start">
+          <div className="space-y-4">
+            <ChecklistSidebar
+              checklist={checklistData}
+              onResume={handleResumeOnboarding}
+              onViewGuidance={handleViewGuidance}
+            />
+            {checklistBannerMessage && (
+              <p
+                className={`text-xs ${checklistStatus === 'error' ? 'text-red-600' : 'text-slate-600'}`}
+              >
+                {checklistBannerMessage}
+              </p>
+            )}
+            {guidancePhase && (
+              <div
+                data-testid="checklist-guidance-panel"
+                className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"
+              >
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Guidance</p>
+                    <h4 className="text-sm font-semibold text-blue-900">{guidancePhase.title}</h4>
+                    <p className="text-xs text-blue-800">{guidancePhase.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGuidancePhase(null)}
+                    className="text-xs font-medium text-blue-700 hover:text-blue-600"
+                  >
+                    Close
+                  </button>
+                </div>
+                <ul className="space-y-2">
+                  {guidancePhase.steps.map(step => (
+                    <li key={step.id} className="rounded border border-blue-100 bg-white px-3 py-2 text-xs">
+                      <span className="font-semibold text-blue-900">{step.title}</span>
+                      {step.success_criteria && (
+                        <p className="text-[11px] text-blue-700">Success: {step.success_criteria}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-8">
+            {/* Quick stats */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {quickStats.map((stat) => (
             <div
               key={stat.label}
               className={`rounded-2xl border ${stat.borderClass} bg-white p-4 shadow-sm`}
             >
-              <p className="text-sm text-slate-500">{stat.label}</p>
+              <p className="flex items-center justify-between text-sm text-slate-500">
+                <span>{stat.label}</span>
+                {stat.onAction && (
+                  <button
+                    type="button"
+                    onClick={stat.onAction}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                    aria-label={stat.actionLabel ?? 'Open action'}
+                  >
+                    {stat.actionIcon ?? '→'}
+                  </button>
+                )}
+              </p>
               <p className={`mt-2 text-2xl font-semibold ${stat.textClass}`}>{stat.value}</p>
               <p className="mt-1 text-xs text-slate-500">{stat.helper}</p>
             </div>
           ))}
         </div>
 
-        {/* Primary focus */}
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            {/* Primary focus */}
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <DashboardCard
             title="Today's focus"
             description="Prioritise the tasks that keep automations healthy."
@@ -925,12 +1083,12 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
         </div>
 
         {/* Tools & resources */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {quickToolCards.map((tool) => (
-            <div
-              key={tool.title}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-            >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {quickToolCards.map((tool) => (
+                <div
+                  key={tool.title}
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
               <h3 className="text-sm font-semibold text-slate-800">{tool.title}</h3>
               <p className="mt-2 text-sm text-slate-600">{tool.description}</p>
               <TaxPoyntButton
@@ -942,7 +1100,9 @@ export const EnhancedSIInterface: React.FC<EnhancedSIInterfaceProps> = ({
                 {tool.actionLabel}
               </TaxPoyntButton>
             </div>
-          ))}
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>
