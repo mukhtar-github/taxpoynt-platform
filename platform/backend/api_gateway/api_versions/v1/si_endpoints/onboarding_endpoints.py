@@ -9,9 +9,8 @@ import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException, Depends, status, Query
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Request, HTTPException, Depends, status
+from pydantic import BaseModel, EmailStr, Field
 
 from core_platform.authentication.role_manager import PlatformRole
 from core_platform.messaging.message_router import (
@@ -35,6 +34,9 @@ from core_platform.data_management.db_async import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.idempotency.store import IdempotencyStore
 from si_services.onboarding_management.onboarding_service import SIOnboardingService
+from core_platform.data_management.repositories.onboarding_state_repo_async import (
+    OnboardingStateRepositoryAsync,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,42 @@ class OnboardingStateResponse(BaseModel):
     metadata: Dict[str, Any]
     created_at: str
     updated_at: str
+
+
+class CompanyProfileRequest(BaseModel):
+    company_name: str = Field(..., min_length=1, max_length=255)
+    rc_number: Optional[str] = Field(None, max_length=100)
+    tin: Optional[str] = Field(None, max_length=100)
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = Field(None, max_length=50)
+    address: Optional[str] = Field(None, max_length=500)
+    industry: Optional[str] = Field(None, max_length=100)
+    company_size: Optional[str] = Field(None, max_length=50)
+    compliance_contact: Optional[str] = Field(None, max_length=255)
+    current_step: Optional[str] = Field(
+        default=None,
+        description="Optional override for current step; defaults to company-profile.",
+    )
+
+
+class ServiceSelectionRequest(BaseModel):
+    selected_package: Optional[str] = Field(
+        None, description="Preferred service package for the onboarding journey."
+    )
+    integration_targets: Optional[List[str]] = Field(
+        default=None, description="Identifiers of systems the SI plans to connect."
+    )
+    primary_use_cases: Optional[List[str]] = Field(
+        default=None, description="Key use cases to tailor recommendations."
+    )
+    go_live_timeline: Optional[str] = Field(
+        None, description="Target go-live timeline (e.g., Q1, 30-days)."
+    )
+    notes: Optional[str] = Field(None, max_length=500)
+    current_step: Optional[str] = Field(
+        default=None,
+        description="Optional override for current step; defaults to service-selection.",
+    )
 
 
 class OnboardingEndpointsV1:
@@ -90,6 +128,34 @@ class OnboardingEndpointsV1:
         self._setup_routes()
 
         logger.info("Onboarding Endpoints V1 initialized")
+
+    _CANONICAL_STEP_ORDER: Dict[str, int] = {
+        "service-selection": 0,
+        "company-profile": 1,
+        "system-connectivity": 2,
+        "review": 3,
+        "launch": 4,
+    }
+    _LEGACY_TO_CANONICAL: Dict[str, str] = {
+        "organization_setup": "service-selection",
+        "organization-setup": "service-selection",
+        "compliance_verification": "company-profile",
+        "compliance-verification": "company-profile",
+        "erp_selection": "system-connectivity",
+        "erp-selection": "system-connectivity",
+        "erp_configuration": "system-connectivity",
+        "erp-configuration": "system-connectivity",
+        "data_mapping": "system-connectivity",
+        "data-mapping": "system-connectivity",
+        "testing_validation": "system-connectivity",
+        "testing-validation": "system-connectivity",
+        "compliance_setup": "review",
+        "compliance-setup": "review",
+        "production_deployment": "launch",
+        "production-deployment": "launch",
+        "training_handover": "launch",
+        "training-handover": "launch",
+    }
 
     def _router_supports_operation(self, service_role: ServiceRole, operation: str) -> bool:
         """Check if the configured message router advertises an operation for a role."""
@@ -305,6 +371,24 @@ class OnboardingEndpointsV1:
             summary="Get onboarding analytics",
             description="Get detailed analytics about onboarding progress and completion",
             response_model=V1ResponseModel
+        )
+
+        # Wizard autosave endpoints
+        self.router.add_api_route(
+            "/wizard/company-profile",
+            self.save_company_profile,
+            methods=["PUT"],
+            summary="Save company profile details",
+            description="Autosave company profile information for the onboarding wizard",
+            response_model=V1ResponseModel,
+        )
+        self.router.add_api_route(
+            "/wizard/service-selection",
+            self.save_service_selection,
+            methods=["PUT"],
+            summary="Save service selection details",
+            description="Autosave service selection preferences for the onboarding wizard",
+            response_model=V1ResponseModel,
         )
 
     # Core Onboarding State Management
@@ -632,6 +716,172 @@ class OnboardingEndpointsV1:
         if self._local_onboarding_service is None:
             self._local_onboarding_service = SIOnboardingService()
         return await self._local_onboarding_service.handle_operation(operation, payload)
+
+    @staticmethod
+    def _strip_none(data: Dict[str, Any]) -> Dict[str, Any]:
+        return {key: value for key, value in data.items() if value is not None}
+
+    def _canonicalize_step(self, step: Optional[str]) -> str:
+        if not step:
+            return "service-selection"
+        normalized = step.strip().lower().replace(" ", "-")
+        normalized = normalized.replace("_", "-")
+        return self._LEGACY_TO_CANONICAL.get(normalized, normalized)
+
+    def _max_canonical_step(self, existing: str, candidate: str) -> str:
+        existing_rank = self._CANONICAL_STEP_ORDER.get(existing, -1)
+        candidate_rank = self._CANONICAL_STEP_ORDER.get(candidate, -1)
+        return existing if existing_rank >= candidate_rank else candidate
+
+    async def save_company_profile(
+        self,
+        payload: CompanyProfileRequest,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """Autosave company profile details within the onboarding wizard."""
+        try:
+            context = await self._require_onboarding_access(request)
+            service_package = context.metadata.get("service_package") or self._infer_service_package(context)
+            if not context.user_id:
+                raise HTTPException(status_code=400, detail="User context required for company profile save")
+            user_id = str(context.user_id)
+
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(payload.dict())
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=user_id,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "company_profile_saved", status_code=stored_code or 200)
+
+            repo = OnboardingStateRepositoryAsync(db)
+            current_state = await repo.ensure_state(user_id, service_package)
+            existing_step = self._canonicalize_step(current_state.current_step)
+            requested_step = self._canonicalize_step(payload.current_step or "company-profile")
+            target_step = self._max_canonical_step(existing_step, requested_step)
+
+            profile_payload = self._strip_none(
+                payload.dict(exclude={"current_step"}, exclude_unset=True)
+            )
+
+            await repo.upsert_wizard_section(
+                user_id,
+                service_package,
+                section="company_profile",
+                payload=profile_payload,
+                current_step=target_step,
+            )
+
+            result = await self._invoke_onboarding_service_direct(
+                "get_onboarding_state",
+                {
+                    "user_id": user_id,
+                    "service_package": service_package,
+                    "api_version": "v1",
+                },
+            )
+
+            response = self._create_v1_response(result, "company_profile_saved")
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=user_id,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
+            return response
+        except HTTPException:
+            raise
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except Exception as exc:
+            logger.error("Error saving company profile: %s", exc, exc_info=True)
+            raise HTTPException(status_code=502, detail="Failed to save company profile")
+
+    async def save_service_selection(
+        self,
+        payload: ServiceSelectionRequest,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session),
+    ):
+        """Autosave service selection preferences within the onboarding wizard."""
+        try:
+            context = await self._require_onboarding_access(request)
+            service_package = context.metadata.get("service_package") or self._infer_service_package(context)
+            if not context.user_id:
+                raise HTTPException(status_code=400, detail="User context required for service selection save")
+            user_id = str(context.user_id)
+
+            idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+            if idem_key:
+                req_hash = IdempotencyStore.compute_request_hash(payload.dict())
+                exists, stored, stored_code, conflict = await IdempotencyStore.try_begin(
+                    db,
+                    requester_id=user_id,
+                    key=idem_key,
+                    method=request.method,
+                    endpoint=str(request.url.path),
+                    request_hash=req_hash,
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Idempotency key reuse with different request body")
+                if exists and stored is not None:
+                    return self._create_v1_response(stored, "service_selection_saved", status_code=stored_code or 200)
+
+            repo = OnboardingStateRepositoryAsync(db)
+            current_state = await repo.ensure_state(user_id, service_package)
+            existing_step = self._canonicalize_step(current_state.current_step)
+            requested_step = self._canonicalize_step(payload.current_step or "service-selection")
+            target_step = self._max_canonical_step(existing_step, requested_step)
+
+            selection_payload = self._strip_none(
+                payload.dict(exclude={"current_step"}, exclude_unset=True)
+            )
+
+            await repo.upsert_wizard_section(
+                user_id,
+                service_package,
+                section="service_focus",
+                payload=selection_payload,
+                current_step=target_step,
+            )
+
+            result = await self._invoke_onboarding_service_direct(
+                "get_onboarding_state",
+                {
+                    "user_id": user_id,
+                    "service_package": service_package,
+                    "api_version": "v1",
+                },
+            )
+
+            response = self._create_v1_response(result, "service_selection_saved")
+            if idem_key:
+                await IdempotencyStore.finalize_success(
+                    db,
+                    requester_id=user_id,
+                    key=idem_key,
+                    response=result,
+                    status_code=200,
+                )
+            return response
+        except HTTPException:
+            raise
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except Exception as exc:
+            logger.error("Error saving service selection: %s", exc, exc_info=True)
+            raise HTTPException(status_code=502, detail="Failed to save service selection")
 
 
 def create_onboarding_router(
