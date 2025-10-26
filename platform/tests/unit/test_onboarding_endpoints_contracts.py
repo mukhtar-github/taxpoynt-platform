@@ -250,3 +250,179 @@ def test_unified_hybrid_routes_as_si(unified_onboarding_app):
     call = message_router.calls[0]
     assert call.service_role == ServiceRole.SYSTEM_INTEGRATOR
     assert call.payload["service_package"] == "hybrid"
+
+
+def test_unified_get_state_surfaces_canonical_wizard_payload(unified_onboarding_app):
+    client, _endpoints, message_router, _permission_guard, _app, _role_detector = unified_onboarding_app
+
+    message_router.set_response(
+        "get_onboarding_state",
+        {
+            "success": True,
+            "data": {
+                "user_id": "si-user-123",
+                "current_step": "system-connectivity",
+                "completed_steps": ["service-selection", "company-profile"],
+                "has_started": True,
+                "is_complete": False,
+                "last_active_date": "2024-01-01T00:00:00Z",
+                "metadata": {
+                    "service_package": "si",
+                    "expected_steps": [
+                        "service-selection",
+                        "company-profile",
+                        "system-connectivity",
+                        "review",
+                        "launch",
+                    ],
+                    "step_definitions": {
+                        "service-selection": {"title": "Select Service", "description": "", "success_criteria": ""},
+                        "company-profile": {"title": "Company Profile", "description": "", "success_criteria": ""},
+                    },
+                    "wizard": {
+                        "company_profile": {
+                            "company_name": "Example Ltd",
+                            "rc_number": "RC123456",
+                            "tin": "01234567-0001",
+                        },
+                        "service_focus": {
+                            "selected_package": "si",
+                            "integration_targets": ["odoo", "sap"],
+                        },
+                        "system_connectivity": {
+                            "connections": [{"id": "conn-001", "type": "odoo", "status": "pending"}],
+                        },
+                    },
+                },
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+            },
+        },
+    )
+
+    response = client.get("/api/v1/si/onboarding/state")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    payload = body["data"]
+    assert payload["current_step"] == "system-connectivity"
+    assert payload["completed_steps"] == ["service-selection", "company-profile"]
+    expected_steps = payload["metadata"]["expected_steps"]
+    assert expected_steps[0] == "service-selection"
+    wizard_profile = payload["metadata"]["wizard"]["company_profile"]
+    assert wizard_profile["company_name"] == "Example Ltd"
+
+
+def test_unified_get_state_preserves_legacy_step_names(unified_onboarding_app):
+    client, _endpoints, message_router, _permission_guard, _app, _role_detector = unified_onboarding_app
+
+    message_router.set_response(
+        "get_onboarding_state",
+        {
+            "success": True,
+            "data": {
+                "user_id": "si-user-legacy",
+                "current_step": "organization_setup",
+                "completed_steps": ["organization_setup", "erp_configuration"],
+                "has_started": True,
+                "is_complete": False,
+                "last_active_date": "2024-01-02T00:00:00Z",
+                "metadata": {
+                    "service_package": "si",
+                    "expected_steps": [
+                        "organization_setup",
+                        "compliance_verification",
+                        "erp_configuration",
+                    ],
+                    "legacy": True,
+                },
+                "created_at": "2024-01-02T00:00:00Z",
+                "updated_at": "2024-01-02T00:00:00Z",
+            },
+        },
+    )
+
+    response = client.get("/api/v1/si/onboarding/state")
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["current_step"] == "organization_setup"
+    assert "erp_configuration" in payload["completed_steps"]
+    assert payload["metadata"]["legacy"] is True
+
+
+def test_update_state_accepts_canonical_payload(unified_onboarding_app):
+    client, _endpoints, message_router, _permission_guard, _app, _role_detector = unified_onboarding_app
+
+    message_router.set_response(
+        "update_onboarding_state",
+        {
+            "success": True,
+            "data": {
+                "user_id": "si-user-123",
+                "current_step": "review",
+                "completed_steps": ["service-selection", "company-profile", "system-connectivity"],
+                "metadata": {"wizard": {"review": {"checklist_acknowledged": True}}},
+            },
+        },
+    )
+
+    request_body = {
+        "current_step": "review",
+        "completed_steps": ["service-selection", "company-profile", "system-connectivity"],
+        "metadata": {
+            "wizard": {
+                "company_profile": {"company_name": "Example Ltd"},
+                "system_connectivity": {"connections": 2},
+            }
+        },
+    }
+
+    response = client.put("/api/v1/si/onboarding/state", json=request_body)
+
+    assert response.status_code == 200
+    call = message_router.calls[0]
+    payload = call.payload["onboarding_data"]
+    assert payload["current_step"] == "review"
+    assert payload["completed_steps"] == [
+        "service-selection",
+        "company-profile",
+        "system-connectivity",
+    ]
+    assert payload["metadata"]["wizard"]["company_profile"]["company_name"] == "Example Ltd"
+
+
+def test_update_state_accepts_legacy_payload(unified_onboarding_app):
+    client, _endpoints, message_router, _permission_guard, _app, _role_detector = unified_onboarding_app
+
+    message_router.set_response(
+        "update_onboarding_state",
+        {
+            "success": True,
+            "data": {
+                "user_id": "si-user-legacy",
+                "current_step": "testing_validation",
+                "completed_steps": ["organization_setup", "erp_configuration", "data_mapping"],
+            },
+        },
+    )
+
+    request_body = {
+        "current_step": "testing_validation",
+        "completed_steps": ["organization_setup", "erp_configuration", "data_mapping"],
+        "metadata": {"legacy": True},
+    }
+
+    response = client.put("/api/v1/si/onboarding/state", json=request_body)
+
+    assert response.status_code == 200
+    call = message_router.calls[0]
+    payload = call.payload["onboarding_data"]
+    assert payload["current_step"] == "testing_validation"
+    assert payload["completed_steps"] == [
+        "organization_setup",
+        "erp_configuration",
+        "data_mapping",
+    ]
+    assert payload["metadata"]["legacy"] is True
