@@ -1,9 +1,11 @@
 import pytest
+import pytest_asyncio
 from fastapi import FastAPI
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from platform.backend.api_gateway.api_versions.v1.si_endpoints.onboarding_endpoints import (
     OnboardingEndpointsV1,
+    PlatformRole,
 )
 from platform.backend.api_gateway.role_routing.models import HTTPRoutingContext
 from platform.backend.core_platform.data_management import db_async
@@ -15,7 +17,6 @@ from platform.backend.core_platform.data_management.models.base import Base
 from platform.backend.core_platform.data_management.repositories.onboarding_state_repo_async import (
     OnboardingStateRepositoryAsync,
 )
-from platform.backend.core_platform.authentication.role_manager import PlatformRole
 
 
 class StubRoleDetector:
@@ -40,10 +41,11 @@ def _si_context() -> HTTPRoutingContext:
     ctx = HTTPRoutingContext(user_id="si-user-wizard", platform_role=PlatformRole.SYSTEM_INTEGRATOR)
     ctx.primary_role = PlatformRole.SYSTEM_INTEGRATOR
     ctx.metadata["service_package"] = "si"
+    ctx.is_authenticated = True
     return ctx
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def wizard_client(tmp_path, monkeypatch):
     db_path = tmp_path / "wizard_endpoints.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path}")
@@ -62,10 +64,13 @@ async def wizard_client(tmp_path, monkeypatch):
     endpoints = OnboardingEndpointsV1(role_detector, permission_guard, message_router)
     app.include_router(endpoints.router, prefix="/api/v1/si")
 
-    async with AsyncClient(app=app, base_url="http://testserver") as client:
+    transport = ASGITransport(app=app)
+    client = AsyncClient(transport=transport, base_url="http://testserver")
+    try:
         yield client
-
-    await engine.dispose()
+    finally:
+        await client.aclose()
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

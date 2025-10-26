@@ -733,6 +733,20 @@ class OnboardingEndpointsV1:
         candidate_rank = self._CANONICAL_STEP_ORDER.get(candidate, -1)
         return existing if existing_rank >= candidate_rank else candidate
 
+    def _invalidate_local_service_cache(self, user_id: Optional[str]) -> None:
+        """Invalidate cached onboarding state when repositories are written to directly."""
+        if not user_id:
+            return
+        if self._local_onboarding_service is None:
+            try:
+                self._local_onboarding_service = SIOnboardingService()
+            except Exception:
+                return
+        try:
+            self._local_onboarding_service._invalidate_cache(user_id)  # type: ignore[attr-defined]
+        except AttributeError:
+            pass
+
     async def save_company_profile(
         self,
         payload: CompanyProfileRequest,
@@ -780,6 +794,8 @@ class OnboardingEndpointsV1:
                 payload=profile_payload,
                 current_step=target_step,
             )
+
+            self._invalidate_local_service_cache(user_id)
 
             result = await self._invoke_onboarding_service_direct(
                 "get_onboarding_state",
@@ -855,6 +871,8 @@ class OnboardingEndpointsV1:
                 payload=selection_payload,
                 current_step=target_step,
             )
+
+            self._invalidate_local_service_cache(user_id)
 
             result = await self._invoke_onboarding_service_direct(
                 "get_onboarding_state",

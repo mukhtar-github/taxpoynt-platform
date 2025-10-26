@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -8,7 +9,7 @@ from platform.backend.core_platform.data_management.repositories.onboarding_stat
 )
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def async_session(tmp_path):
     db_path = tmp_path / "onboarding_repo.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
@@ -21,7 +22,6 @@ async def async_session(tmp_path):
 
     async with SessionLocal() as session:
         yield session
-        await session.rollback()
 
     await engine.dispose()
 
