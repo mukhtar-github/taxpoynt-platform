@@ -103,6 +103,128 @@ class SIOnboardingService:
         ],
     }
 
+    LEGACY_STEP_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+        "organization_setup": {
+            "title": "Organization Setup",
+            "description": "Register organisation information and verify business credentials.",
+            "success_criteria": "Organisation record captured",
+        },
+        "compliance_verification": {
+            "title": "Compliance Verification",
+            "description": "Confirm FIRS registration, VAT status, and supporting compliance documentation.",
+            "success_criteria": "Compliance evidence recorded",
+        },
+        "erp_selection": {
+            "title": "ERP System Selection",
+            "description": "Choose and prioritise the ERP or financial system to integrate.",
+            "success_criteria": "Primary ERP selected",
+        },
+        "erp_configuration": {
+            "title": "ERP Configuration",
+            "description": "Configure ERP connection parameters, credentials, and environments.",
+            "success_criteria": "Credentials verified",
+        },
+        "data_mapping": {
+            "title": "Data Mapping Setup",
+            "description": "Map ERP data fields to TaxPoynt requirements for compliance.",
+            "success_criteria": "Critical data fields mapped",
+        },
+        "testing_validation": {
+            "title": "Testing & Validation",
+            "description": "Run integration validation scenarios and confirm data flow.",
+            "success_criteria": "Test scenarios passing",
+        },
+        "compliance_setup": {
+            "title": "Compliance Configuration",
+            "description": "Configure regulatory safeguards, audit settings, and escalation contacts.",
+            "success_criteria": "Compliance controls enabled",
+        },
+        "production_deployment": {
+            "title": "Production Deployment",
+            "description": "Promote the integration to production and enable live submissions.",
+            "success_criteria": "Production mode activated",
+        },
+        "training_handover": {
+            "title": "Training & Handover",
+            "description": "Facilitate training, share documentation, and capture sign-off.",
+            "success_criteria": "Client sign-off received",
+        },
+    }
+
+    STEP_CANONICAL_MAPPING: Dict[str, str] = {
+        "organization_setup": "service-selection",
+        "organization-setup": "service-selection",
+        "service_selection": "service-selection",
+        "service-selection": "service-selection",
+        "compliance_verification": "company-profile",
+        "compliance-verification": "company-profile",
+        "company_profile": "company-profile",
+        "company-profile": "company-profile",
+        "erp_selection": "system-connectivity",
+        "erp-selection": "system-connectivity",
+        "erp_configuration": "system-connectivity",
+        "erp-configuration": "system-connectivity",
+        "data_mapping": "system-connectivity",
+        "data-mapping": "system-connectivity",
+        "system_connectivity": "system-connectivity",
+        "system-connectivity": "system-connectivity",
+        "testing_validation": "review",
+        "testing-validation": "review",
+        "compliance_setup": "review",
+        "compliance-setup": "review",
+        "review": "review",
+        "production_deployment": "launch",
+        "production-deployment": "launch",
+        "launch": "launch",
+        "training_handover": "launch",
+        "training-handover": "launch",
+    }
+
+    PHASE_CONFIGURATION: List[Dict[str, Any]] = [
+        {
+            "id": "service-foundation",
+            "title": "Company & Compliance Setup",
+            "description": "Confirm service focus and capture core company information.",
+            "steps": [
+                {"id": "service-selection", "canonical": "service-selection"},
+                {"id": "organization_setup", "canonical": "service-selection"},
+                {"id": "company-profile", "canonical": "company-profile"},
+                {"id": "compliance_verification", "canonical": "company-profile"},
+            ],
+        },
+        {
+            "id": "integration-readiness",
+            "title": "System Integration Setup",
+            "description": "Prepare ERP connectivity and data mapping for automation.",
+            "steps": [
+                {"id": "system-connectivity", "canonical": "system-connectivity"},
+                {"id": "erp_selection", "canonical": "system-connectivity"},
+                {"id": "erp_configuration", "canonical": "system-connectivity"},
+                {"id": "data_mapping", "canonical": "system-connectivity"},
+            ],
+        },
+        {
+            "id": "validation-go-live",
+            "title": "Validation & Go-Live Prep",
+            "description": "Run integration tests and confirm compliance safeguards.",
+            "steps": [
+                {"id": "review", "canonical": "review"},
+                {"id": "testing_validation", "canonical": "review"},
+                {"id": "compliance_setup", "canonical": "review"},
+                {"id": "production_deployment", "canonical": "launch"},
+            ],
+        },
+        {
+            "id": "launch-enablement",
+            "title": "Onboarding Completion & Support",
+            "description": "Finalise launch tasks, schedule training, and confirm support coverage.",
+            "steps": [
+                {"id": "launch", "canonical": "launch"},
+                {"id": "training_handover", "canonical": "launch"},
+            ],
+        },
+    ]
+
     def __init__(self) -> None:
         self.service_name = "SI Onboarding Service"
         self.version = "2.1.0"
@@ -141,6 +263,7 @@ class SIOnboardingService:
             "get_onboarding_analytics",
             "initiate_organization_onboarding",
             "get_organization_onboarding_status",
+            "get_onboarding_checklist",
         }
 
         if operation not in supported_operations:
@@ -170,6 +293,8 @@ class SIOnboardingService:
             return await self._handle_reset_onboarding_state(repo, user_id)
         if operation == "get_onboarding_analytics":
             return await self._handle_get_onboarding_analytics(repo, user_id, service_package)
+        if operation == "get_onboarding_checklist":
+            return await self._handle_get_onboarding_checklist(repo, user_id, service_package)
         if operation == "initiate_organization_onboarding":
             org_id = payload.get("org_id")
             return {"operation": operation, "success": True, "organization_id": org_id, "initiated": True}
@@ -312,6 +437,21 @@ class SIOnboardingService:
             "operation": "get_onboarding_analytics",
             "success": True,
             "data": analytics,
+            "user_id": user_id,
+        }
+
+    async def _handle_get_onboarding_checklist(
+        self,
+        repo: OnboardingStateRepositoryAsync,
+        user_id: str,
+        service_package: str,
+    ) -> Dict[str, Any]:
+        state = await self._get_onboarding_state(repo, user_id, service_package)
+        checklist = self._build_checklist(state, service_package)
+        return {
+            "operation": "get_onboarding_checklist",
+            "success": True,
+            "data": checklist,
             "user_id": user_id,
         }
 
@@ -785,3 +925,110 @@ class SIOnboardingService:
         if value.endswith("Z"):
             value = value.replace("Z", "+00:00")
         return datetime.fromisoformat(value)
+
+    def _canonicalize_step(self, step: Optional[str]) -> str:
+        if not step:
+            return ""
+        normalized = step.strip().lower().replace(" ", "-").replace("_", "-")
+        return self.STEP_CANONICAL_MAPPING.get(normalized, normalized)
+
+    def _get_step_metadata(self, step_id: str, canonical: str) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
+        if canonical in self.STEP_DEFINITIONS:
+            metadata.update(self.STEP_DEFINITIONS[canonical])
+        if step_id in self.LEGACY_STEP_DEFINITIONS:
+            metadata.update(self.LEGACY_STEP_DEFINITIONS[step_id])
+        elif canonical in self.LEGACY_STEP_DEFINITIONS and canonical != step_id:
+            metadata.update(self.LEGACY_STEP_DEFINITIONS[canonical])
+        if not metadata:
+            metadata = {
+                "title": step_id.replace("-", " ").replace("_", " ").title(),
+                "description": "",
+                "success_criteria": "",
+            }
+        return metadata
+
+    def _build_checklist(self, state: OnboardingState, service_package: str) -> Dict[str, Any]:
+        completed_canonical = {
+            self._canonicalize_step(step) for step in (state.completed_steps or [])
+        }
+        canonical_current = self._canonicalize_step(state.current_step)
+
+        phases: List[Dict[str, Any]] = []
+        current_phase_id: Optional[str] = None
+        completed_phase_ids: List[str] = []
+        total_phases = len(self.PHASE_CONFIGURATION)
+
+        for phase_def in self.PHASE_CONFIGURATION:
+            step_entries: List[Dict[str, Any]] = []
+            phase_complete = True
+            phase_has_activity = False
+
+            for step_def in phase_def["steps"]:
+                step_id = step_def["id"]
+                canonical = step_def.get("canonical") or self._canonicalize_step(step_id)
+                completed = canonical in completed_canonical
+                status = "complete" if completed else "pending"
+                if not completed and canonical == canonical_current:
+                    status = "in_progress"
+
+                if status != "complete":
+                    phase_complete = False
+                if status in {"complete", "in_progress"}:
+                    phase_has_activity = True
+
+                metadata = self._get_step_metadata(step_id, canonical)
+                step_entries.append(
+                    {
+                        "id": step_id,
+                        "canonical_id": canonical,
+                        "title": metadata.get("title", step_id.title()),
+                        "description": metadata.get("description", ""),
+                        "success_criteria": metadata.get("success_criteria", ""),
+                        "status": status,
+                        "completed": status == "complete",
+                    }
+                )
+
+            if phase_complete:
+                phase_status = "complete"
+                completed_phase_ids.append(phase_def["id"])
+            elif phase_has_activity:
+                phase_status = "in_progress"
+            else:
+                phase_status = "pending"
+
+            if current_phase_id is None and phase_status in {"in_progress", "pending"}:
+                current_phase_id = phase_def["id"]
+
+            phases.append(
+                {
+                    "id": phase_def["id"],
+                    "title": phase_def["title"],
+                    "description": phase_def["description"],
+                    "status": phase_status,
+                    "steps": step_entries,
+                }
+            )
+
+        if current_phase_id is None and phases:
+            current_phase_id = phases[-1]["id"]
+
+        completion_percentage = (
+            round(len(completed_phase_ids) / total_phases * 100, 1) if total_phases else 0
+        )
+
+        return {
+            "user_id": state.user_id,
+            "service_package": service_package,
+            "current_phase": current_phase_id,
+            "phases": phases,
+            "summary": {
+                "completed_phases": completed_phase_ids,
+                "remaining_phases": [
+                    phase["id"] for phase in phases if phase["status"] != "complete"
+                ],
+                "completion_percentage": completion_percentage,
+            },
+            "updated_at": state.updated_at,
+        }

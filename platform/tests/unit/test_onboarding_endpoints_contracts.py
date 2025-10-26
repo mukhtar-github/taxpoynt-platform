@@ -426,3 +426,36 @@ def test_update_state_accepts_legacy_payload(unified_onboarding_app):
         "data_mapping",
     ]
     assert payload["metadata"]["legacy"] is True
+
+
+def test_unified_checklist_endpoint_routes_to_service(unified_onboarding_app):
+    client, _endpoints, message_router, permission_guard, _app, role_detector = unified_onboarding_app
+    _set_unified_context(role_detector, _si_context)
+
+    message_router.set_response(
+        "get_onboarding_checklist",
+        {
+            "success": True,
+            "data": {
+                "user_id": "si-user-123",
+                "current_phase": "service-foundation",
+                "phases": [
+                    {"id": "service-foundation", "status": "complete", "steps": []},
+                    {"id": "integration-readiness", "status": "pending", "steps": []},
+                ],
+            },
+        },
+    )
+
+    response = client.get("/api/v1/si/onboarding/checklist")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["action"] == "onboarding_checklist_retrieved"
+    assert body["data"]["current_phase"] == "service-foundation"
+
+    call = message_router.calls[-1]
+    assert call.operation == "get_onboarding_checklist"
+    assert call.service_role == ServiceRole.SYSTEM_INTEGRATOR
+    assert permission_guard.calls[-1][1].endswith("/onboarding/checklist")

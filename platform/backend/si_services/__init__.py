@@ -395,7 +395,8 @@ class SIServiceRegistry:
                         "complete_onboarding_step",
                         "complete_onboarding",
                         "reset_onboarding_state",
-                        "get_onboarding_analytics"
+                        "get_onboarding_analytics",
+                        "get_onboarding_checklist",
                     ],
                     "supported_roles": ["system_integrator", "access_point_provider", "hybrid_user"]
                 }

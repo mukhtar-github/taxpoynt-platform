@@ -33,7 +33,10 @@ from api_gateway.utils.v1_response import build_v1_response
 from core_platform.data_management.db_async import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from core_platform.idempotency.store import IdempotencyStore
-from si_services.onboarding_management.onboarding_service import SIOnboardingService
+from si_services.onboarding_management.onboarding_service import (
+    SIOnboardingService,
+    OnboardingState as ServiceOnboardingState,
+)
 from core_platform.data_management.repositories.onboarding_state_repo_async import (
     OnboardingStateRepositoryAsync,
 )
@@ -373,6 +376,16 @@ class OnboardingEndpointsV1:
             response_model=V1ResponseModel
         )
 
+        # Aggregated checklist endpoint
+        self.router.add_api_route(
+            "/checklist",
+            self.get_onboarding_checklist,
+            methods=["GET"],
+            summary="Get onboarding checklist",
+            description="Retrieve aggregated onboarding phases and step completion status",
+            response_model=V1ResponseModel,
+        )
+
         # Wizard autosave endpoints
         self.router.add_api_route(
             "/wizard/company-profile",
@@ -668,6 +681,34 @@ class OnboardingEndpointsV1:
             logger.error(f"Error getting onboarding analytics in v1: {e}")
             raise HTTPException(status_code=502, detail="Failed to get onboarding analytics")
 
+    async def get_onboarding_checklist(self, request: Request):
+        """Return aggregated onboarding checklist grouped by phase."""
+        try:
+            context = await self._require_onboarding_access(request)
+            result = await self._route_onboarding_operation(
+                context,
+                "get_onboarding_checklist",
+                {
+                    "user_id": context.user_id,
+                    "service_package": context.metadata.get("service_package"),
+                    "api_version": "v1",
+                },
+            )
+
+            if not result or not isinstance(result, dict) or not result.get("success"):
+                fallback_payload = self._build_checklist_fallback(context)
+                return self._create_v1_response(
+                    fallback_payload,
+                    "onboarding_checklist_retrieved",
+                )
+
+            return self._create_v1_response(result, "onboarding_checklist_retrieved")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting onboarding checklist in v1: {e}")
+            raise HTTPException(status_code=502, detail="Failed to get onboarding checklist")
+
     def _create_v1_response(self, data: Any, message: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized V1 response"""
         return build_v1_response(data, action=message)
@@ -705,6 +746,34 @@ class OnboardingEndpointsV1:
             },
             "created_at": now_iso,
             "updated_at": now_iso,
+        }
+
+    def _build_checklist_fallback(self, context: HTTPRoutingContext) -> Dict[str, Any]:
+        """Construct a fallback checklist payload when services are unavailable."""
+        fallback_state = self._build_fallback_state(context)
+        service_package = fallback_state["metadata"].get("service_package") or self._infer_service_package(context)
+
+        if self._local_onboarding_service is None:
+            self._local_onboarding_service = SIOnboardingService()
+
+        state = ServiceOnboardingState(
+            user_id=fallback_state["user_id"],
+            service_package=service_package,
+            current_step=fallback_state["current_step"],
+            completed_steps=list(fallback_state.get("completed_steps", [])),
+            has_started=fallback_state.get("has_started", False),
+            is_complete=fallback_state.get("is_complete", False),
+            last_active_date=fallback_state["last_active_date"],
+            metadata=fallback_state.get("metadata", {}),
+            created_at=fallback_state["created_at"],
+            updated_at=fallback_state["updated_at"],
+        )
+
+        checklist = self._local_onboarding_service._build_checklist(state, service_package)  # type: ignore[attr-defined]
+        return {
+            "success": True,
+            "data": checklist,
+            "fallback": True,
         }
 
     async def _invoke_onboarding_service_direct(
