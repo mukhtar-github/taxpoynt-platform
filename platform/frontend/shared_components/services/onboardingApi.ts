@@ -67,6 +67,33 @@ export interface ApiResponse<T = any> {
   meta?: Record<string, any>;
 }
 
+export interface ServiceSelectionPayload {
+  selected_package?: string | null;
+  integration_targets?: string[] | null;
+  primary_use_cases?: string[] | null;
+  go_live_timeline?: string | null;
+  notes?: string | null;
+}
+
+export interface CompanyProfilePayload {
+  company_name: string;
+  rc_number?: string | null;
+  tin?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  address?: string | null;
+  industry?: string | null;
+  company_size?: string | null;
+  compliance_contact?: string | null;
+}
+
+const generateIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `idemp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+};
+
 class OnboardingApiClient {
   private baseUrl: string;
   private retryAttempts: number = 4;
@@ -133,10 +160,14 @@ class OnboardingApiClient {
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
     data?: any,
-    attempt: number = 1
+    attempt: number = 1,
+    extraHeaders?: Record<string, string>
   ): Promise<T> {
     try {
-      const headers = await this.getAuthHeaders();
+      const headers = {
+        ...(await this.getAuthHeaders()),
+        ...(extraHeaders ?? {}),
+      };
       const url = `${this.baseUrl}/si/onboarding${endpoint}`;
 
       let response: AxiosResponse<ApiResponse<T>>;
@@ -349,6 +380,38 @@ class OnboardingApiClient {
       console.error('Failed to reset onboarding state:', error);
       throw error;
     }
+  }
+
+  async saveServiceSelection(
+    payload: ServiceSelectionPayload,
+    options?: { idempotencyKey?: string }
+  ): Promise<OnboardingState> {
+    const idempotencyKey = options?.idempotencyKey ?? generateIdempotencyKey();
+    const state = await this.makeRequest<OnboardingState>(
+      'PUT',
+      '/wizard/service-selection',
+      payload,
+      1,
+      { 'x-idempotency-key': idempotencyKey }
+    );
+    await this.updateLocalOnboardingState(state);
+    return state;
+  }
+
+  async saveCompanyProfile(
+    payload: CompanyProfilePayload,
+    options?: { idempotencyKey?: string }
+  ): Promise<OnboardingState> {
+    const idempotencyKey = options?.idempotencyKey ?? generateIdempotencyKey();
+    const state = await this.makeRequest<OnboardingState>(
+      'PUT',
+      '/wizard/company-profile',
+      payload,
+      1,
+      { 'x-idempotency-key': idempotencyKey }
+    );
+    await this.updateLocalOnboardingState(state);
+    return state;
   }
 
   /**
