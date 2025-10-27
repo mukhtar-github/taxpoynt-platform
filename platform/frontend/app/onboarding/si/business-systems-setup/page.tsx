@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { TaxPoyntButton } from '../../../../design_system';
+import { AutosaveStatusChip, type AutosaveStatus } from '../../../../shared_components/onboarding';
 
 interface BusinessSystem {
   id: string;
@@ -26,6 +27,34 @@ export default function BusinessSystemsSetupPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const [connectingSystem, setConnectingSystem] = useState<string | null>(null);
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isContinuing, setIsContinuing] = useState(false);
+
+  const persistProgress = useCallback(
+    async (step: string, markComplete: boolean = false): Promise<boolean> => {
+      if (!user) {
+        return false;
+      }
+
+      setAutosaveStatus('saving');
+      setAutosaveMessage(null);
+
+      try {
+        await OnboardingStateManager.updateStep(user.id, step, markComplete);
+        setAutosaveStatus('saved');
+        setLastSavedAt(new Date());
+        return true;
+      } catch (error) {
+        console.error('Failed to persist onboarding progress:', error);
+        setAutosaveStatus('error');
+        setAutosaveMessage('Unable to save progress');
+        return false;
+      }
+    },
+    [user]
+  );
 
   // Enhanced business systems with comprehensive coverage
   const businessSystems: BusinessSystem[] = [
@@ -268,6 +297,10 @@ export default function BusinessSystemsSetupPage() {
     }
   };
 
+  const handleBack = () => {
+    router.push('/onboarding/si/integration-choice');
+  };
+
   const getSystemAPIEndpoint = (category: string): string => {
     const endpoints: Record<string, string> = {
       'erp': '/api/v1/si/integrations/erp',
@@ -288,26 +321,33 @@ export default function BusinessSystemsSetupPage() {
   };
 
   const handleSystemSetupComplete = (systemId: string) => {
-    setSelectedSystems(prev => [...prev, systemId]);
+    setSelectedSystems((prev) => (prev.includes(systemId) ? prev : [...prev, systemId]));
     console.log(`✅ ${systemId} setup completed successfully`);
+    void persistProgress('business_systems_setup');
   };
 
-  const handleCompleteSetup = () => {
+  const handleContinue = async () => {
     if (selectedSystems.length === 0) {
-      alert('Please connect at least one business system to continue');
+      setAutosaveStatus('error');
+      setAutosaveMessage('Connect at least one business system before continuing');
       return;
     }
 
-    // Update onboarding state
-    OnboardingStateManager.updateStep(user.id, 'business_systems_complete', true);
-    
-    // Route to reconciliation setup (NOT directly to dashboard)
-    router.push('/onboarding/si/reconciliation-setup');
-  };
+    if (!user) {
+      router.push('/onboarding/si/reconciliation-setup');
+      return;
+    }
 
-  const handleSkipForNow = () => {
-    // Skip business systems and go to reconciliation setup
-    router.push('/onboarding/si/reconciliation-setup');
+    setIsContinuing(true);
+
+    try {
+      const saved = await persistProgress('business_systems_complete', true);
+      if (saved) {
+        router.push('/onboarding/si/reconciliation-setup');
+      }
+    } finally {
+      setIsContinuing(false);
+    }
   };
 
   if (isLoading) {
@@ -351,33 +391,27 @@ export default function BusinessSystemsSetupPage() {
         
         {/* Enhanced Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <h1 className="text-4xl font-black text-slate-800 mb-2">
-                🏢 Business Systems Integration
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+                Phase 2 · Business systems
+              </p>
+              <h1 className="mt-2 text-4xl font-black text-slate-800">
+                🏢 Connect your business systems
               </h1>
-              <p className="text-xl text-slate-600">
-                Connect your ERP, CRM, POS, and E-commerce systems for comprehensive data automation
+              <p className="mt-2 text-lg text-slate-600">
+                Link ERP, CRM, POS, and e-commerce platforms so automations have a single source of truth.
+              </p>
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                Next milestone · Prepare reconciliation rules for connected systems
               </p>
             </div>
-            
-            <div className="flex space-x-4">
-              <TaxPoyntButton
-                variant="outline"
-                onClick={handleSkipForNow}
-                className="border-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-              >
-                Skip for Now
-              </TaxPoyntButton>
-              <TaxPoyntButton
-                variant="primary"
-                onClick={handleCompleteSetup}
-                disabled={selectedSystems.length === 0}
-                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
-              >
-                Complete Setup ({selectedSystems.length} connected)
-              </TaxPoyntButton>
-            </div>
+            <AutosaveStatusChip
+              status={autosaveStatus}
+              lastSavedAt={lastSavedAt ?? undefined}
+              message={autosaveMessage}
+              className="self-start"
+            />
           </div>
 
           {/* Progress Stats */}
@@ -505,6 +539,24 @@ export default function BusinessSystemsSetupPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
+          <TaxPoyntButton
+            variant="outline"
+            onClick={handleBack}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </TaxPoyntButton>
+          <TaxPoyntButton
+            variant="primary"
+            onClick={handleContinue}
+            disabled={isContinuing || selectedSystems.length === 0}
+            className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
+          >
+            {isContinuing ? 'Continuing…' : 'Continue'}
+          </TaxPoyntButton>
         </div>
 
       </div>

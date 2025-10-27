@@ -6,14 +6,12 @@
  * Enhanced integration choice page with better UX and clearer explanations
  * Part of the improved onboarding flow for System Integration users
  */
-
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
-import { SkipWithTimeButton } from '../../../../shared_components/onboarding';
+import { AutosaveStatusChip, type AutosaveStatus } from '../../../../shared_components/onboarding';
+import { TaxPoyntButton } from '../../../../design_system';
 
 interface IntegrationChoice {
   id: string;
@@ -30,8 +28,11 @@ interface IntegrationChoice {
 export default function SIIntegrationChoicePage() {
   const router = useRouter();
   const [selectedIntegration, setSelectedIntegration] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isContinuing, setIsContinuing] = useState(false);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -51,7 +52,44 @@ export default function SIIntegrationChoicePage() {
     OnboardingStateManager.updateStep(currentUser.id, 'integration_choice');
   }, [router]);
 
-  const integrationChoices: IntegrationChoice[] = [
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadExistingSelection = async () => {
+      try {
+        const state = await OnboardingStateManager.getOnboardingState(user.id);
+        if (!state || cancelled) {
+          return;
+        }
+
+        const previouslySelected = integrationChoices.find((choice) =>
+          state.completed_steps?.includes(choice.id)
+        );
+
+        if (previouslySelected) {
+          setSelectedIntegration(previouslySelected.id);
+          if (state.updated_at) {
+            setLastSavedAt(new Date(state.updated_at));
+            setAutosaveStatus('saved');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load saved integration choice:', error);
+      }
+    };
+
+    void loadExistingSelection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, integrationChoices]);
+
+  const integrationChoices = useMemo<IntegrationChoice[]>(() => [
     {
       id: 'business_systems',
       name: 'Business Systems Integration',
@@ -106,35 +144,71 @@ export default function SIIntegrationChoicePage() {
       icon: '🚀',
       nextStep: '/onboarding/si/complete-integration-setup'
     }
-  ];
+  ], []);
 
   const handleIntegrationSelect = async (integrationId: string) => {
-    const choice = integrationChoices.find(c => c.id === integrationId);
-    if (!choice) return;
-    if (!user) return;
+    const choice = integrationChoices.find((c) => c.id === integrationId);
+    if (!choice) {
+      return;
+    }
 
-    setIsLoading(true);
     setSelectedIntegration(integrationId);
-    
+
+    if (!user) {
+      return;
+    }
+
+    setAutosaveStatus('saving');
+    setAutosaveMessage(null);
+
     try {
-      console.log('📊 SI user selected integration:', integrationId);
-      
-      // Save integration choice to user profile/onboarding state
-      OnboardingStateManager.updateStep(user.id, integrationId, true);
-      
-      // Route immediately to appropriate setup flow
-      router.push(choice.nextStep);
-      
+      await OnboardingStateManager.updateStep(user.id, integrationId, true);
+      setAutosaveStatus('saved');
+      setLastSavedAt(new Date());
     } catch (error) {
       console.error('Integration selection failed:', error);
-      setIsLoading(false);
+      setAutosaveStatus('error');
+      setAutosaveMessage('Unable to save integration choice');
     }
   };
 
-  const handleSkipForNow = () => {
-    // Mark onboarding as complete and go to dashboard
-    OnboardingStateManager.completeOnboarding(user?.id);
-    router.push('/dashboard/si');
+  const handleBack = () => {
+    router.push('/onboarding/si/integration-setup');
+  };
+
+  const handleContinue = async () => {
+    if (!selectedIntegration) {
+      setAutosaveStatus('error');
+      setAutosaveMessage('Select an integration path to continue');
+      return;
+    }
+
+    const choice = integrationChoices.find((item) => item.id === selectedIntegration);
+    if (!choice) {
+      return;
+    }
+
+    if (!user) {
+      router.push(choice.nextStep);
+      return;
+    }
+
+    setIsContinuing(true);
+    setAutosaveStatus('saving');
+    setAutosaveMessage(null);
+
+    try {
+      await OnboardingStateManager.updateStep(user.id, selectedIntegration, true);
+      setAutosaveStatus('saved');
+      setLastSavedAt(new Date());
+      router.push(choice.nextStep);
+    } catch (error) {
+      console.error('Failed to continue onboarding:', error);
+      setAutosaveStatus('error');
+      setAutosaveMessage('Unable to continue. Try again.');
+    } finally {
+      setIsContinuing(false);
+    }
   };
 
   const getComplexityColor = (complexity: string) => {
@@ -157,143 +231,137 @@ export default function SIIntegrationChoicePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Choose Your Integration Path 🛤️
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Select how you&apos;d like to connect your systems to TaxPoynt. 
-            You can always add more integrations later.
-          </p>
-          
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
-            <div className="flex items-center justify-center text-indigo-800 text-sm">
-              <span className="mr-2">👋</span>
-              <span>Welcome, {user.first_name}! Let&apos;s set up your <strong>System Integration</strong> workspace.</span>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+                Phase 1 · Service foundation
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Choose your integration path</h1>
+              <p className="mt-2 max-w-2xl text-base text-slate-600">
+                Decide where to start connecting your systems. You can layer in additional integrations once
+                your launch checklist is complete.
+              </p>
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                Next milestone · Configure setup tasks for your selected path
+              </p>
             </div>
+            <AutosaveStatusChip
+              status={autosaveStatus}
+              lastSavedAt={lastSavedAt ?? undefined}
+              message={autosaveMessage}
+              className="self-start"
+            />
+          </div>
+          <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-800">
+            <span className="mr-2">👋</span>
+            <span>
+              Welcome, {user.first_name}! Select the stack you want to configure first. You can always return to add more
+              systems later.
+            </span>
           </div>
         </div>
 
-        {/* Integration Options */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          {integrationChoices.map((choice) => (
-            <div
-              key={choice.id}
-              onClick={() => handleIntegrationSelect(choice.id)}
-              className={`relative border-2 rounded-2xl p-6 cursor-pointer transition-all duration-200 hover:border-indigo-400 hover:shadow-xl hover:transform hover:scale-105 ${
-                isLoading && selectedIntegration === choice.id
-                  ? 'border-indigo-500 bg-indigo-50 opacity-75 pointer-events-none'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {/* Loading Indicator */}
-              {isLoading && selectedIntegration === choice.id && (
-                <div className="absolute -top-3 -right-3">
-                  <div className="bg-indigo-500 text-white rounded-full w-8 h-8 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  </div>
-                </div>
-              )}
-
-              <div className="text-center mb-4">
-                <div className="text-5xl mb-3">{choice.icon}</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{choice.name}</h3>
-                <p className="text-gray-600 text-sm">{choice.description}</p>
-              </div>
-
-              {/* Complexity Badge */}
-              <div className="flex justify-center mb-4">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getComplexityColor(choice.complexity)}`}>
-                  {choice.complexity} Setup
-                </span>
-              </div>
-
-              {/* Features */}
-              <div className="space-y-2 mb-4">
-                {choice.features.slice(0, 3).map((feature, index) => (
-                  <div key={index} className="flex items-center text-sm text-gray-600">
-                    <span className="text-indigo-500 mr-2">✓</span>
-                    {feature}
-                  </div>
-                ))}
-                {choice.features.length > 3 && (
-                  <div className="text-xs text-gray-500 text-center">
-                    +{choice.features.length - 3} more features
-                  </div>
+        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {integrationChoices.map((choice) => {
+            const isSelected = selectedIntegration === choice.id;
+            return (
+              <button
+                type="button"
+                key={choice.id}
+                onClick={() => handleIntegrationSelect(choice.id)}
+                className={`relative flex h-full flex-col rounded-2xl border-2 p-6 text-left transition ${
+                  isSelected
+                    ? 'border-indigo-500 bg-indigo-50 shadow-lg'
+                    : 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md'
+                }`}
+              >
+                {isSelected && (
+                  <span className="absolute right-4 top-4 inline-flex items-center rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white">
+                    Selected
+                  </span>
                 )}
-              </div>
-
-              {/* Time Estimate */}
-              <div className="text-center">
-                <div className="text-xs text-gray-500">
-                  ⏱️ Estimated setup time: {choice.estimatedTime}
+                <div className="text-5xl">{choice.icon}</div>
+                <h3 className="mt-4 text-xl font-semibold text-slate-900">{choice.name}</h3>
+                <p className="mt-2 text-sm text-slate-600">{choice.description}</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getComplexityColor(choice.complexity)}`}>
+                    {choice.complexity} setup
+                  </span>
+                  <span className="text-xs text-slate-500">⏱ {choice.estimatedTime}</span>
                 </div>
-              </div>
-
-              {/* Click to continue indicator */}
-              <div className="mt-4 text-center">
-                <div className="inline-flex items-center text-sm text-indigo-600 font-medium">
-                  <span>Click to start setup</span>
-                  <span className="ml-1">→</span>
-                </div>
-              </div>
-            </div>
-          ))}
+                <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                  {choice.features.slice(0, 3).map((feature) => (
+                    <li key={feature} className="flex items-start gap-2">
+                      <span className="text-indigo-500">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                  {choice.features.length > 3 && (
+                    <li className="text-xs text-slate-500">+{choice.features.length - 3} more benefits</li>
+                  )}
+                </ul>
+                <span className="mt-auto pt-4 text-sm font-medium text-indigo-600">
+                  {isSelected ? 'Ready to continue' : 'Select to preview setup'}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center">
-          <SkipWithTimeButton
-            onClick={handleSkipForNow}
-            disabled={isLoading}
-            text="Skip Setup for Now"
-            estimatedTime="15-20 minutes"
-            analyticsEvent="si_integration_choice_skipped"
-          />
-        </div>
-        
-        {/* Instruction Text */}
-        <div className="text-center mt-6">
-          <p className="text-gray-600 text-sm">
-            💡 <strong>Tip:</strong> Click on any integration card above to start the setup process immediately
+        <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Need help deciding?</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Your choice determines the tasks we preload into your checklist. You can expand to other integrations once
+            your launch metrics are stable.
           </p>
-        </div>
-
-        {/* Help Section */}
-        <div className="mt-12 bg-white rounded-xl border border-gray-200 p-6 max-w-4xl mx-auto">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-            Need Help Deciding? 🤔
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-            <div className="text-center">
-              <div className="text-2xl mb-2">🏢</div>
-              <h4 className="font-medium text-gray-900 mb-1">Choose Business Systems If:</h4>
-              <ul className="text-gray-600 space-y-1">
-                <li>• You use ERP/CRM systems</li>
-                <li>• You want automated invoicing</li>
-                <li>• You have structured business data</li>
+          <div className="mt-6 grid grid-cols-1 gap-6 text-sm text-slate-600 sm:grid-cols-3">
+            <div>
+              <div className="text-2xl">🏢</div>
+              <h3 className="mt-2 font-medium text-slate-900">Pick Business Systems if you:</h3>
+              <ul className="mt-2 space-y-1">
+                <li>• Depend on ERP/CRM data for invoicing</li>
+                <li>• Need automations tied to operations data</li>
+                <li>• Want deep system-to-system mapping</li>
               </ul>
             </div>
-            <div className="text-center">
-              <div className="text-2xl mb-2">🏦</div>
-              <h4 className="font-medium text-gray-900 mb-1">Choose Financial Systems If:</h4>
-              <ul className="text-gray-600 space-y-1">
-                <li>• You want banking integration</li>
-                <li>• You need transaction-based invoices</li>
-                <li>• You prefer simple setup</li>
+            <div>
+              <div className="text-2xl">🏦</div>
+              <h3 className="mt-2 font-medium text-slate-900">Pick Financial Systems if you:</h3>
+              <ul className="mt-2 space-y-1">
+                <li>• Want banking and payments live quickly</li>
+                <li>• Prefer lightweight transaction-driven flows</li>
+                <li>• Need compliance-ready financial data</li>
               </ul>
             </div>
-            <div className="text-center">
-              <div className="text-2xl mb-2">🚀</div>
-              <h4 className="font-medium text-gray-900 mb-1">Choose Complete Integration If:</h4>
-              <ul className="text-gray-600 space-y-1">
-                <li>• You want maximum automation</li>
-                <li>• You use multiple systems</li>
-                <li>• You want comprehensive setup</li>
+            <div>
+              <div className="text-2xl">🚀</div>
+              <h3 className="mt-2 font-medium text-slate-900">Pick Complete Integration if you:</h3>
+              <ul className="mt-2 space-y-1">
+                <li>• Manage multiple data sources today</li>
+                <li>• Need unified analytics out of the gate</li>
+                <li>• Have a team ready for parallel setup</li>
               </ul>
             </div>
           </div>
+        </div>
+
+        <div className="mt-12 flex items-center justify-between border-t border-slate-200 pt-6">
+          <TaxPoyntButton
+            variant="outline"
+            onClick={handleBack}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </TaxPoyntButton>
+          <TaxPoyntButton
+            variant="primary"
+            onClick={handleContinue}
+            disabled={!selectedIntegration || isContinuing}
+            className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
+          >
+            {isContinuing ? 'Continuing…' : 'Continue'}
+          </TaxPoyntButton>
         </div>
       </div>
     </div>

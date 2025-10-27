@@ -6,16 +6,13 @@
  * Comprehensive setup for both business and financial system integrations
  * Provides a wizard-like experience for advanced users
  */
-
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { onboardingApi } from '../../../../shared_components/services/onboardingApi';
 import { TaxPoyntButton } from '../../../../design_system';
-import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';
+import { AutosaveStatusChip, type AutosaveStatus } from '../../../../shared_components/onboarding';
 
 interface SetupStep {
   id: string;
@@ -64,6 +61,34 @@ export default function CompleteIntegrationSetupPage() {
       route: '/dashboard/si/setup'
     }
   ]);
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isContinuing, setIsContinuing] = useState(false);
+
+  const persistProgress = useCallback(
+    async (step: string, markComplete: boolean = false): Promise<boolean> => {
+      if (!user) {
+        return false;
+      }
+
+      setAutosaveStatus('saving');
+      setAutosaveMessage(null);
+
+      try {
+        await OnboardingStateManager.updateStep(user.id, step, markComplete);
+        setAutosaveStatus('saved');
+        setLastSavedAt(new Date());
+        return true;
+      } catch (error) {
+        console.error('Failed to persist integration setup progress:', error);
+        setAutosaveStatus('error');
+        setAutosaveMessage('Unable to save progress');
+        return false;
+      }
+    },
+    [user]
+  );
 
   useEffect(() => {
     if (isLoading) return;
@@ -132,33 +157,52 @@ export default function CompleteIntegrationSetupPage() {
   }, [isLoading, isAuthenticated, isSystemIntegrator, user, router]);
 
   const handleStepAction = async (step: SetupStep) => {
-    
     try {
       console.log('🚀 Starting step:', step.id);
-      
-      // Update step status to in_progress
-      setSetupSteps(prev => prev.map(s => 
-        s.id === step.id ? { ...s, status: 'in_progress' } : s
-      ));
-      
-      // Save progress
-      if (user) {
-        OnboardingStateManager.updateStep(user.id, step.id, true);
+
+      setSetupSteps((prev) =>
+        prev.map((s) => (s.id === step.id ? { ...s, status: 'in_progress' } : s))
+      );
+
+      const saved = await persistProgress(step.id);
+      if (saved) {
+        router.push(step.route);
       }
-      
-      // Navigate to step
-      router.push(step.route);
-      
     } catch (error) {
       console.error('Step navigation failed:', error);
     }
   };
 
-  const handleSkipForNow = () => {
-    if (user) {
-      // Mark onboarding as complete and go to dashboard
-      OnboardingStateManager.completeOnboarding(user.id);
-      router.push(getPostOnboardingUrl(user));
+  const handleBack = () => {
+    router.push('/onboarding/si/integration-choice');
+  };
+
+  const handleContinue = async () => {
+    const nextStep = setupSteps.find((step) => step.status !== 'completed');
+
+    if (nextStep) {
+      setIsContinuing(true);
+      try {
+        await handleStepAction(nextStep);
+      } finally {
+        setIsContinuing(false);
+      }
+      return;
+    }
+
+    if (!user) {
+      router.push('/onboarding/si/reconciliation-setup');
+      return;
+    }
+
+    setIsContinuing(true);
+    try {
+      const saved = await persistProgress('complete_integration_setup', true);
+      if (saved) {
+        router.push('/onboarding/si/reconciliation-setup');
+      }
+    } finally {
+      setIsContinuing(false);
     }
   };
 
@@ -196,20 +240,33 @@ export default function CompleteIntegrationSetupPage() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Complete Integration Setup 🚀
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Let&apos;s set up comprehensive integrations for your business. 
-            We&apos;ll guide you through each step to ensure everything works perfectly.
-          </p>
-          
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6 max-w-2xl mx-auto">
-            <div className="flex items-center justify-center text-amber-800 text-sm">
-              <span className="mr-2">⭐</span>
-              <span>Welcome to the <strong>Complete Integration</strong> experience! This comprehensive setup will unlock maximum automation.</span>
+        <div className="mb-10">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+                Phase 2 · Hybrid rollout
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">
+                Coordinate your complete integration setup 🚀
+              </h1>
+              <p className="mt-2 text-base text-slate-600 max-w-3xl">
+                Work through the combined business and financial tasks so launch-day automations stay in sync across systems.
+              </p>
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                Next milestone · Finish reconciliation readiness after linking both data sources
+              </p>
             </div>
+            <AutosaveStatusChip
+              status={autosaveStatus}
+              lastSavedAt={lastSavedAt ?? undefined}
+              message={autosaveMessage}
+              className="self-start"
+            />
+          </div>
+
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <span className="mr-2">⭐</span>
+            <span>Knock out these coordinated steps to unlock cross-system automations and monitoring.</span>
           </div>
         </div>
 
@@ -248,11 +305,10 @@ export default function CompleteIntegrationSetupPage() {
                   
                   {step.status === 'pending' && (
                     <TaxPoyntButton
-                      variant="primary"
+                      variant="outline"
                       onClick={() => handleStepAction(step)}
-                      loading={isLoading}
                       disabled={isLoading}
-                      className="px-6"
+                      className="px-6 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
                     >
                       {step.nextAction}
                     </TaxPoyntButton>
@@ -275,19 +331,6 @@ export default function CompleteIntegrationSetupPage() {
             </div>
           ))}
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-lg mx-auto">
-          <TaxPoyntButton
-            variant="secondary"
-            onClick={handleSkipForNow}
-            disabled={isLoading}
-            className="flex-1"
-          >
-            Skip to Dashboard
-          </TaxPoyntButton>
-        </div>
-
         {/* Help Section */}
         <div className="mt-12 bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
@@ -313,11 +356,29 @@ export default function CompleteIntegrationSetupPage() {
               </ul>
             </div>
           </div>
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm">
-              🕒 <strong>Estimated total time:</strong> 60-90 minutes for complete setup
-            </p>
-          </div>
+        <div className="mt-6 text-center">
+          <p className="text-gray-600 text-sm">
+            🕒 <strong>Estimated total time:</strong> 60-90 minutes for complete setup
+          </p>
+        </div>
+      </div>
+
+        <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
+          <TaxPoyntButton
+            variant="outline"
+            onClick={handleBack}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </TaxPoyntButton>
+          <TaxPoyntButton
+            variant="primary"
+            onClick={handleContinue}
+            disabled={isContinuing}
+            className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
+          >
+            {isContinuing ? 'Continuing…' : 'Continue'}
+          </TaxPoyntButton>
         </div>
       </div>
     </div>

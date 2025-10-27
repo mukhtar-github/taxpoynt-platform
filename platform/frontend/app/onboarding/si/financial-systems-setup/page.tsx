@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 import { TaxPoyntButton } from '../../../../design_system';
-import { SkipForNowButton } from '../../../../shared_components/onboarding';
+import { AutosaveStatusChip, type AutosaveStatus } from '../../../../shared_components/onboarding';
 import apiClient from '../../../../shared_components/api/client';
 
 interface FinancialIntegration {
@@ -28,6 +28,43 @@ export default function FinancialSystemsSetupPage() {
   const [selectedIntegration, setSelectedIntegration] = useState<string>('');
   const [showMonoWidget, setShowMonoWidget] = useState(false);
   const [monoWidgetUrl, setMonoWidgetUrl] = useState<string>('');
+  const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isContinuing, setIsContinuing] = useState(false);
+
+  const persistProgress = useCallback(
+    async (step: string, markComplete: boolean = false): Promise<boolean> => {
+      if (!user) {
+        return false;
+      }
+
+      setAutosaveStatus('saving');
+      setAutosaveMessage(null);
+
+      try {
+        await OnboardingStateManager.updateStep(user.id, step, markComplete);
+        setAutosaveStatus('saved');
+        setLastSavedAt(new Date());
+        return true;
+      } catch (error) {
+        console.error('Failed to persist onboarding progress:', error);
+        setAutosaveStatus('error');
+        setAutosaveMessage('Unable to save progress');
+        return false;
+      }
+    },
+    [user]
+  );
+
+  const markIntegrationConnected = useCallback(
+    (integrationId: string) => {
+      setConnectedIntegrations((prev) => (prev.includes(integrationId) ? prev : [...prev, integrationId]));
+      void persistProgress('financial_systems_setup');
+    },
+    [persistProgress]
+  );
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -119,12 +156,6 @@ export default function FinancialSystemsSetupPage() {
     }
   ];
 
-  const handleSkipForNow = () => {
-    // Mark onboarding as complete and go to dashboard
-    OnboardingStateManager.completeOnboarding(user?.id);
-    router.push('/dashboard/si');
-  };
-
   const handleIntegrationClick = async (integration: FinancialIntegration) => {
     setIsLoading(true);
     setSelectedIntegration(integration.id);
@@ -147,6 +178,34 @@ export default function FinancialSystemsSetupPage() {
       alert('Failed to start integration setup. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    router.push('/onboarding/si/integration-choice');
+  };
+
+  const handleContinue = async () => {
+    if (connectedIntegrations.length === 0) {
+      setAutosaveStatus('error');
+      setAutosaveMessage('Connect at least one financial integration before continuing');
+      return;
+    }
+
+    if (!user) {
+      router.push('/onboarding/si/reconciliation-setup');
+      return;
+    }
+
+    setIsContinuing(true);
+
+    try {
+      const saved = await persistProgress('financial_systems_complete', true);
+      if (saved) {
+        router.push('/onboarding/si/reconciliation-setup');
+      }
+    } finally {
+      setIsContinuing(false);
     }
   };
 
@@ -225,7 +284,7 @@ export default function FinancialSystemsSetupPage() {
     alert('💳 Demo: Paystack Integration\n\nThis would:\n• Configure Paystack API keys\n• Set up payment webhooks\n• Configure transaction monitoring\n• Enable invoice payment links\n\nProceeding to reconciliation setup...');
     
     setTimeout(() => {
-      handleFinancialSetupComplete();
+      handleFinancialSetupComplete('paystack_processor');
     }, 2000);
   };
 
@@ -234,29 +293,32 @@ export default function FinancialSystemsSetupPage() {
     alert('🌍 Demo: Flutterwave Integration\n\nThis would:\n• Configure Flutterwave API keys\n• Set up multi-currency support\n• Configure payment webhooks\n• Enable bulk payment features\n\nProceeding to reconciliation setup...');
     
     setTimeout(() => {
-      handleFinancialSetupComplete();
+      handleFinancialSetupComplete('flutterwave_processor');
     }, 2000);
   };
 
   const initiateReconciliationSetup = async () => {
-    // Route directly to dedicated reconciliation setup page
-    console.log('⚖️ Redirecting to reconciliation setup page');
-    OnboardingStateManager.updateStep(user.id, 'reconciliation_setup');
-    router.push('/onboarding/si/reconciliation-setup');
+    console.log('⚖️ Flagging reconciliation setup for later');
+    setSelectedIntegration('reconciliation_engine');
+    markIntegrationConnected('reconciliation_engine');
   };
 
   const handleBankingSetupComplete = () => {
-    // Banking setup complete, now go to reconciliation
-    OnboardingStateManager.updateStep(user.id, 'banking_connected', true);
-    OnboardingStateManager.updateStep(user.id, 'reconciliation_setup');
-    router.push('/onboarding/si/reconciliation-setup');
+    setSelectedIntegration('mono_banking');
+    if (user) {
+      OnboardingStateManager.updateStep(user.id, 'banking_connected', true);
+    }
+    markIntegrationConnected('mono_banking');
+    setIsLoading(false);
   };
 
-  const handleFinancialSetupComplete = () => {
-    // Payment processor setup complete, now go to reconciliation
-    OnboardingStateManager.updateStep(user.id, 'payment_processors_connected', true);
-    OnboardingStateManager.updateStep(user.id, 'reconciliation_setup');
-    router.push('/onboarding/si/reconciliation-setup');
+  const handleFinancialSetupComplete = (integrationId: string) => {
+    setSelectedIntegration(integrationId);
+    if (user) {
+      OnboardingStateManager.updateStep(user.id, 'payment_processors_connected', true);
+    }
+    markIntegrationConnected(integrationId);
+    setIsLoading(false);
   };
 
   const getComplexityColor = (complexity: string) => {
@@ -289,114 +351,123 @@ export default function FinancialSystemsSetupPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto py-8 px-4">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-green-100 p-3 rounded-2xl mr-4">
-              <span className="text-3xl">💰</span>
-            </div>
-            <div className="text-left">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Financial Systems Integration
+        <div className="mb-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                Phase 2 · Financial systems
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">
+                💰 Connect your banking and payments stack
               </h1>
-              <p className="text-green-600 font-medium text-lg">Banking & Payment Processors</p>
+              <p className="mt-2 text-base text-slate-600 max-w-3xl">
+                Securely link Nigerian banking platforms and payment processors so TaxPoynt can reconcile transactions
+                and trigger invoice automation without manual uploads.
+              </p>
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                Next milestone · Enable reconciliation rules once financial feeds are active
+              </p>
             </div>
+            <AutosaveStatusChip
+              status={autosaveStatus}
+              lastSavedAt={lastSavedAt ?? undefined}
+              message={autosaveMessage}
+              className="self-start"
+            />
           </div>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Connect your financial systems to automate transaction processing, reconciliation, and invoice generation
-          </p>
+          <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-800">
+            <span className="mr-2">🔐</span>
+            <span>Connections happen through secure provider portals. We autosave your progress after each successful link.</span>
+          </div>
         </div>
 
         {/* Integration Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {financialIntegrations.map((integration) => (
-            <div
-              key={integration.id}
-              onClick={() => handleIntegrationClick(integration)}
-              className={`
-                relative border-2 rounded-2xl p-6 cursor-pointer transition-all duration-200 hover:shadow-xl hover:transform hover:scale-[1.02]
-                ${isLoading && selectedIntegration === integration.id
-                  ? 'border-green-500 bg-green-50 opacity-75 pointer-events-none'
-                  : integration.status === 'available'
-                  ? 'border-gray-200 hover:border-green-400 hover:bg-green-50'
-                  : 'border-gray-200 hover:border-gray-300 opacity-60 cursor-not-allowed'
-                }
-                ${integration.isPopular ? 'ring-2 ring-green-200' : ''}
-              `}
-            >
-              {/* Popular Badge */}
-              {integration.isPopular && (
-                <div className="absolute -top-3 -right-3">
-                  <div className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-medium">
-                    Most Popular
-                  </div>
-                </div>
-              )}
+        <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2">
+          {financialIntegrations.map((integration) => {
+            const isConnected = connectedIntegrations.includes(integration.id);
+            const isProcessing = isLoading && selectedIntegration === integration.id;
+            const isAvailable = integration.status === 'available';
+            const isDisabled = !isAvailable || isProcessing;
 
-              {/* Loading Indicator */}
-              {isLoading && selectedIntegration === integration.id && (
-                <div className="absolute top-4 right-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
-                </div>
-              )}
-
-              {/* Icon & Provider */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <span className="text-4xl mr-4">{integration.icon}</span>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">{integration.name}</h3>
-                    <p className="text-sm text-gray-600">by {integration.provider}</p>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end space-y-1">
-                  <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(integration.status)}`}>
-                    {integration.status.replace('_', ' ')}
+            return (
+              <button
+                type="button"
+                key={integration.id}
+                onClick={() => !isDisabled && handleIntegrationClick(integration)}
+                disabled={isDisabled}
+                className={`relative flex h-full flex-col rounded-2xl border-2 p-6 text-left transition-all duration-200 ${
+                  isConnected
+                    ? 'border-emerald-500 bg-emerald-50 shadow-lg'
+                    : isProcessing
+                    ? 'border-emerald-400 bg-emerald-50 opacity-75'
+                    : isAvailable
+                    ? 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50'
+                    : 'border-slate-200 bg-white opacity-60'
+                } disabled:cursor-not-allowed disabled:pointer-events-none ${integration.isPopular ? 'ring-2 ring-emerald-200' : ''}`}
+              >
+                {integration.isPopular && (
+                  <span className="absolute -top-3 -right-3 inline-flex items-center rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white">
+                    Most popular
                   </span>
-                  <span className={`px-2 py-1 text-xs rounded-full font-medium ${getComplexityColor(integration.complexity)}`}>
-                    {integration.complexity}
+                )}
+                {isConnected && (
+                  <span className="absolute right-4 top-4 inline-flex items-center rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                    Connected
+                  </span>
+                )}
+                {isProcessing && (
+                  <span className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Connecting…
+                  </span>
+                )}
+
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-4xl">{integration.icon}</span>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900">{integration.name}</h3>
+                      <p className="text-sm text-slate-600">by {integration.provider}</p>
+                    </div>
+                  </div>
+                  <span className={`px-3 py-1 text-xs font-semibold capitalize rounded-full ${getStatusColor(integration.status)}`}>
+                    {isAvailable ? 'Available' : integration.status.replace('_', ' ')}
                   </span>
                 </div>
-              </div>
 
-              {/* Description */}
-              <p className="text-gray-700 mb-4">{integration.description}</p>
+                <p className="mt-3 text-sm text-slate-600">{integration.description}</p>
 
-              {/* Features */}
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Key Features:</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  {integration.features.slice(0, 3).map((feature, index) => (
-                    <li key={index} className="flex items-center">
-                      <span className="text-green-500 mr-2">✓</span>
-                      {feature}
+                <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                  {integration.features.slice(0, 3).map((feature) => (
+                    <li key={feature} className="flex items-center gap-2">
+                      <span className="text-emerald-500">✓</span>
+                      <span>{feature}</span>
                     </li>
                   ))}
                   {integration.features.length > 3 && (
-                    <li className="text-gray-500 text-xs">
-                      +{integration.features.length - 3} more features
-                    </li>
+                    <li className="text-xs text-slate-500">+{integration.features.length - 3} more benefits</li>
                   )}
                 </ul>
-              </div>
 
-              {/* Estimated Time */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-sm text-gray-600">
-                  <span className="mr-2">⏱️</span>
-                  Setup time: {integration.estimatedTime}
+                <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                  <span>⏱ {integration.estimatedTime}</span>
+                  {isAvailable ? (
+                    <span className="font-medium text-emerald-600">
+                      {isConnected ? 'Connected' : 'Start setup →'}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">Coming soon</span>
+                  )}
                 </div>
-                {integration.status === 'available' ? (
-                  <div className="text-green-600 font-medium text-sm">
-                    {isLoading && selectedIntegration === integration.id ? 'Starting...' : 'Click to Setup →'}
-                  </div>
-                ) : (
-                  <div className="text-gray-500 text-sm">
-                    Coming Soon
+
+                {integration.id === 'mono_banking' && (
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                    🔐 Secure Open Banking flow with bank-level authentication
                   </div>
                 )}
-              </div>
-            </div>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
         {/* Info Section */}
@@ -413,19 +484,6 @@ export default function FinancialSystemsSetupPage() {
             </div>
           </div>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4">
-          <SkipForNowButton
-            onClick={handleSkipForNow}
-            disabled={isLoading}
-            text="Skip for Now"
-            description="You can set up financial integrations later from your dashboard"
-            estimatedTime="5-10 minutes"
-            analyticsEvent="si_financial_systems_skipped"
-          />
-        </div>
-
         {/* Help Section */}
         <div className="mt-8 text-center">
           <div className="inline-flex items-center text-gray-600 text-sm">
@@ -435,6 +493,24 @@ export default function FinancialSystemsSetupPage() {
               Contact Support
             </button>
           </div>
+        </div>
+
+        <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
+          <TaxPoyntButton
+            variant="outline"
+            onClick={handleBack}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </TaxPoyntButton>
+          <TaxPoyntButton
+            variant="primary"
+            onClick={handleContinue}
+            disabled={isContinuing || connectedIntegrations.length === 0}
+            className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700"
+          >
+            {isContinuing ? 'Continuing…' : 'Continue'}
+          </TaxPoyntButton>
         </div>
 
         {/* Mono Widget Modal */}

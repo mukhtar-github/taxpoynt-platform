@@ -19,6 +19,12 @@ export {
 } from './OnboardingProgressIndicator';
 
 export {
+  AutosaveStatusChip,
+  type AutosaveStatus,
+  type AutosaveStatusChipProps
+} from './AutosaveStatusChip';
+
+export {
   SkipForNowButton,
   QuickSkipButton,
   SkipWithTimeButton,
