@@ -65,7 +65,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ className = 
           
           <TaxPoyntButton
             variant="primary"
-            onClick={() => router.push('/auth/signup')}
+            onClick={() => router.push('/auth/signup?service=si&next=/onboarding/si/integration-choice')}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold focus:ring-blue-500"
             aria-label="Get started with TaxPoynt"
           >

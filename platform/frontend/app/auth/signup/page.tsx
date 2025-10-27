@@ -21,8 +21,27 @@ const SignUpPageContent: React.FC = () => {
 
   const initialServicePackage = useMemo(() => {
     const serviceParam = searchParams.get('service');
-    return isValidService(serviceParam) ? serviceParam : undefined;
+    return isValidService(serviceParam) ? serviceParam : 'si';
   }, [searchParams]);
+
+  const nextParam = searchParams.get('next');
+
+  const safeNextPath = useMemo(() => {
+    if (!nextParam) {
+      return undefined;
+    }
+
+    const trimmed = nextParam.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    if (trimmed.startsWith('/')) {
+      return trimmed;
+    }
+
+    return `/${trimmed.replace(/^\/+/, '')}`;
+  }, [nextParam]);
 
   const handleRegistration = async (registrationData: StreamlinedRegistrationData) => {
     setIsSubmitting(true);
@@ -54,7 +73,12 @@ const SignUpPageContent: React.FC = () => {
         ? serviceFromResponse
         : registrationData.service_package;
 
-      router.push(`/onboarding?service=${nextService}`);
+      const defaultDestination =
+        nextService === 'si'
+          ? '/onboarding/si/integration-choice'
+          : `/onboarding?service=${nextService}`;
+
+      router.push(safeNextPath ?? defaultDestination);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setError(message);
@@ -70,6 +94,7 @@ const SignUpPageContent: React.FC = () => {
       isLoading={isSubmitting}
       error={error}
       initialServicePackage={initialServicePackage}
+      nextPath={safeNextPath ?? '/onboarding/si/integration-choice'}
     />
   );
 };

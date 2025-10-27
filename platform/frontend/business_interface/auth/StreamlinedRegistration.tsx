@@ -3,23 +3,33 @@
 /**
  * Streamlined Registration Component
  * ==================================
- * Simplified Stage 1 registration focusing on essential information only
- * Advanced details moved to service-specific onboarding flows
+ * SI-focused registration with checklist preview and minimal required fields
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AuthLayout } from '../../shared_components/auth/AuthLayout';
 import { TaxPoyntButton } from '../../design_system/components/TaxPoyntButton';
-import { TaxPoyntInput } from '../../design_system/components/TaxPoyntInput';
 import { FormField } from '../../design_system/components/FormField';
-import { useFormPersistence, CrossFormDataManager } from '../../shared_components/utils/formPersistence';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
 
-interface StreamlinedRegistrationProps {
+interface PhaseSummary {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface ChecklistHighlight {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface StreamlinedRegistrationProps {
   onCompleteRegistration: (registrationData: StreamlinedRegistrationData) => Promise<void>;
   isLoading?: boolean;
   error?: string;
   initialServicePackage?: 'si' | 'app' | 'hybrid';
+  nextPath?: string;
 }
 
 export interface StreamlinedRegistrationData {
@@ -35,569 +45,311 @@ export interface StreamlinedRegistrationData {
   privacy_accepted: boolean;
   trial_started: boolean;
   trial_start_date: string;
-  [key: string]: any; // Allow string indexing for form persistence
+  [key: string]: any;
 }
+
+const PHASE_SUMMARY: PhaseSummary[] = [
+  {
+    id: 'phase-one',
+    title: 'Phase 1 · Integration choice',
+    description: 'Pick what to connect first and preview the tailored checklist.',
+  },
+  {
+    id: 'phase-two',
+    title: 'Phase 2 · Connect systems',
+    description: 'Link ERPs, CRMs, and financial feeds with autosave on every step.',
+  },
+  {
+    id: 'phase-three',
+    title: 'Phase 3 · Launch readiness',
+    description: 'Complete compliance checks and unlock analytics for go-live.',
+  },
+];
+
+const CHECKLIST_HIGHLIGHTS: ChecklistHighlight[] = [
+  {
+    id: 'autosave',
+    title: 'Autosave across devices',
+    description: 'Every task you complete is stored so you can resume from any browser.',
+  },
+  {
+    id: 'progress',
+    title: 'Progress you can trust',
+    description: 'The SI dashboard mirrors each phase, so teams share one source of truth.',
+  },
+  {
+    id: 'support',
+    title: 'Guided assistance',
+    description: 'Contextual help and escalation paths are embedded in every phase.',
+  },
+];
 
 export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = ({
   onCompleteRegistration,
   isLoading = false,
   error,
-  initialServicePackage
+  initialServicePackage = 'si',
+  nextPath = '/onboarding/si/integration-choice',
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<StreamlinedRegistrationData>(() => ({
+  const [formData, setFormData] = useState<StreamlinedRegistrationData>({
     first_name: '',
     last_name: '',
     email: '',
     password: '',
     business_name: '',
-    companyType: '',
-    companySize: '',
-    service_package: initialServicePackage ?? 'si',
+    companyType: 'system_integrator',
+    companySize: '1-10',
+    service_package: initialServicePackage,
     terms_accepted: false,
     privacy_accepted: false,
-    trial_started: true,
-    trial_start_date: new Date().toISOString()
-  }));
-  
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  // Form persistence setup
-  const formPersistence = useFormPersistence({
-    storageKey: 'taxpoynt_streamlined_registration',
-    persistent: false, // Use sessionStorage for privacy
-    excludeFields: ['password', 'terms_accepted', 'privacy_accepted'],
-    enableCrossFormSharing: true,
-    autoSaveInterval: 3000 // Save every 3 seconds
+    trial_started: false,
+    trial_start_date: new Date().toISOString(),
   });
 
-  // Initialize form with persistence and shared data
-  useEffect(() => {
-    // Load saved form data and merge with shared data
-    const savedData = formPersistence.loadFormData();
-    const sharedData = CrossFormDataManager.getSharedData();
-    
-    if (savedData || Object.keys(sharedData).length > 0) {
-      const mergedData = {
-        ...formData,
-        ...sharedData,
-        ...savedData,
-        // Never restore sensitive fields
-        password: '',
-        // Preserve existing consent state
-        terms_accepted: savedData?.terms_accepted || formData.terms_accepted,
-        privacy_accepted: savedData?.privacy_accepted || formData.privacy_accepted
-      };
-      setFormData(mergedData);
-      secureLogger.formData('Form restored from saved data', { 
-        has_saved_data: !!savedData,
-        has_shared_data: Object.keys(sharedData).length > 0
-      });
-    }
-
-    // Start auto-save
-    formPersistence.startAutoSave(() => formData);
-
-    // Cleanup on unmount
-    return () => {
-      formPersistence.stopAutoSave();
-    };
-  }, []);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!initialServicePackage) {
-      return;
-    }
-
-    setFormData(prev => {
-      if (prev.service_package === initialServicePackage) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        service_package: initialServicePackage
-      };
-    });
+    setFormData((prev) => ({
+      ...prev,
+      service_package: initialServicePackage,
+    }));
   }, [initialServicePackage]);
 
-  // Save form data when it changes
-  useEffect(() => {
-    if (Object.keys(formData).some(key => formData[key] !== '')) {
-      // Save shared data for cross-form population
-      CrossFormDataManager.saveSharedData({
-        email: formData.email,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        business_name: formData.business_name,
-        companyType: formData.companyType,
-        companySize: formData.companySize
+  const serviceLabel = useMemo(() => {
+    switch (formData.service_package) {
+      case 'app':
+        return 'Access Point Provider workspace';
+      case 'hybrid':
+        return 'Hybrid workspace';
+      default:
+        return 'System Integrator workspace';
+    }
+  }, [formData.service_package]);
+
+  const updateField = (field: keyof StreamlinedRegistrationData) => (value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
       });
     }
-  }, [formData]);
+  };
 
-  const steps = [
-    { id: 'personal', title: 'Personal Info', description: 'Your basic information' },
-    { id: 'business', title: 'Business Info', description: 'Basic business details' },
-    { id: 'service', title: 'Service Selection', description: 'Choose your TaxPoynt service' },
-    { id: 'consent', title: 'Terms & Privacy', description: 'Accept our terms' }
-  ];
+  const handleCheckboxChange = (field: 'terms_accepted' | 'privacy_accepted' | 'trial_started') =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const { checked } = event.target;
+      setFormData((prev) => ({ ...prev, [field]: checked }));
+      if (fieldErrors[field]) {
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next[field];
+          return next;
+        });
+      }
+    };
 
-  const validateCurrentStep = (): boolean => {
+  const validateForm = () => {
     const errors: Record<string, string> = {};
-    
-    switch (currentStep) {
-      case 0: // Personal Info
-        if (!formData.first_name.trim()) errors.first_name = 'First name is required';
-        if (!formData.last_name.trim()) errors.last_name = 'Last name is required';
-        if (!formData.email.trim()) errors.email = 'Email is required';
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Valid email required';
-        if (!formData.password) errors.password = 'Password is required';
-        else if (formData.password.length < 8) errors.password = 'Password must be at least 8 characters';
-        break;
-        
-      case 1: // Business Info
-        if (!formData.business_name.trim()) errors.business_name = 'Business name is required';
-        if (!formData.companyType) errors.companyType = 'Company type is required';
-        if (!formData.companySize) errors.companySize = 'Company size is required';
-        break;
-        
-      case 2: // Service Selection - No validation needed, has default
-        break;
-        
-      case 3: // Consent
-        if (!formData.terms_accepted) errors.terms_accepted = 'Terms must be accepted';
-        if (!formData.privacy_accepted) errors.privacy_accepted = 'Privacy policy must be accepted';
-        break;
+
+    if (!formData.first_name.trim()) {
+      errors.first_name = 'First name is required';
     }
-    
+    if (!formData.last_name.trim()) {
+      errors.last_name = 'Last name is required';
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'Work email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Enter a valid email address';
+    }
+    if (!formData.password) {
+      errors.password = 'Create a password to continue';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+    if (!formData.business_name.trim()) {
+      errors.business_name = 'Business or workspace name is required';
+    }
+    if (!formData.terms_accepted) {
+      errors.terms_accepted = 'You must accept the Terms of Service';
+    }
+    if (!formData.privacy_accepted) {
+      errors.privacy_accepted = 'You must acknowledge the Privacy Policy';
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleNext = () => {
-    if (!validateCurrentStep()) return;
-    
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleSubmit();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!validateForm()) {
+      return;
     }
+
+    secureLogger.userAction('Submitting streamlined registration', {
+      service_package: formData.service_package,
+      has_business_name: Boolean(formData.business_name),
+    });
+
+    await onCompleteRegistration(formData);
   };
-
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!validateCurrentStep()) return;
-    
-    try {
-      secureLogger.userAction('Starting streamlined registration', {
-        service_package: formData.service_package,
-        company_type: formData.companyType,
-        company_size: formData.companySize
-      });
-      await onCompleteRegistration(formData);
-    } catch (err) {
-      secureLogger.error('Registration failed', err);
-    }
-  };
-
-  const renderPersonalStep = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Let's get started 👋</h2>
-        <p className="text-gray-600">Create your account to begin your 7-day free trial</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FormField
-          label="First Name"
-          name="first_name"
-          type="text"
-          value={formData.first_name}
-          onChange={(value) => setFormData({...formData, first_name: value})}
-          placeholder="John"
-          required
-          error={fieldErrors.first_name}
-          showPersistenceIndicator={true}
-          autoPopulateFromShared={true}
-        />
-        
-        <FormField
-          label="Last Name"
-          name="last_name"
-          type="text"
-          value={formData.last_name}
-          onChange={(value) => setFormData({...formData, last_name: value})}
-          placeholder="Doe"
-          required
-          error={fieldErrors.last_name}
-          showPersistenceIndicator={true}
-          autoPopulateFromShared={true}
-        />
-      </div>
-
-      <FormField
-        label="Work Email"
-        name="email"
-        type="email"
-        value={formData.email}
-        onChange={(value) => setFormData({...formData, email: value})}
-        placeholder="john@company.com"
-        required
-        error={fieldErrors.email}
-        showPersistenceIndicator={true}
-        autoPopulateFromShared={true}
-      />
-      
-      <FormField
-        label="Password"
-        name="password"
-        type="password"
-        value={formData.password}
-        onChange={(value) => setFormData({...formData, password: value})}
-        placeholder="Create a secure password"
-        required
-        error={fieldErrors.password}
-        helperText="At least 8 characters"
-        showPersistenceIndicator={false}
-        autoPopulateFromShared={false}
-      />
-
-      {/* Display errors */}
-      {Object.entries(fieldErrors).map(([field, message]) => (
-        <p key={field} className="text-sm text-red-600">{message}</p>
-      ))}
-    </div>
-  );
-
-  const renderBusinessStep = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell us about your business 🏢</h2>
-        <p className="text-gray-600">Basic business information to get started</p>
-      </div>
-
-      <FormField
-        label="Business Name"
-        name="business_name"
-        type="text"
-        value={formData.business_name}
-        onChange={(value) => setFormData({...formData, business_name: value})}
-        placeholder="Your Company Ltd"
-        required
-        error={fieldErrors.business_name}
-        helperText="We'll collect more business details later based on your service choice"
-        showPersistenceIndicator={true}
-        autoPopulateFromShared={true}
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FormField
-          label="Company Type"
-          name="companyType"
-          type="select"
-          value={formData.companyType || ''}
-          onChange={(value) => setFormData({...formData, companyType: value})}
-          required
-          error={fieldErrors.companyType}
-          options={[
-            { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
-            { value: 'partnership', label: 'Partnership' },
-            { value: 'limited_company', label: 'Limited Company' },
-            { value: 'public_company', label: 'Public Company' },
-            { value: 'non_profit', label: 'Non-Profit' },
-            { value: 'cooperative', label: 'Cooperative' }
-          ]}
-          showPersistenceIndicator={true}
-          autoPopulateFromShared={true}
-        />
-        
-        <FormField
-          label="Company Size"
-          name="companySize"
-          type="select"
-          value={formData.companySize || ''}
-          onChange={(value) => setFormData({...formData, companySize: value})}
-          required
-          error={fieldErrors.companySize}
-          options={[
-            { value: 'startup', label: 'Startup (1-10 employees)' },
-            { value: 'small', label: 'Small (11-50 employees)' },
-            { value: 'medium', label: 'Medium (51-200 employees)' },
-            { value: 'large', label: 'Large (201-1000 employees)' },
-            { value: 'enterprise', label: 'Enterprise (1000+ employees)' }
-          ]}
-          showPersistenceIndicator={true}
-          autoPopulateFromShared={true}
-        />
-      </div>
-    </div>
-  );
-
-  const renderServiceStep = () => {
-    const services = [
-      {
-        id: 'si',
-        name: 'System Integration',
-        description: 'Connect your ERP, CRM, POS, and financial systems',
-        features: ['ERP Integration', 'Banking Connections', 'Data Mapping', 'Invoice Generation'],
-        icon: '🔗',
-        color: 'indigo',
-        popular: false
-      },
-      {
-        id: 'app',
-        name: 'Access Point Provider',
-        description: 'Direct FIRS invoice processing and compliance',
-        features: ['FIRS Integration', 'Invoice Validation', 'Compliance Monitoring', 'Tax Reporting'],
-        icon: '📄',
-        color: 'green',
-        popular: false
-      },
-      {
-        id: 'hybrid',
-        name: 'Hybrid Premium',
-        description: 'Complete solution with both SI and APP capabilities',
-        features: ['All SI Features', 'All APP Features', 'Priority Support', 'Advanced Analytics'],
-        icon: '🚀',
-        color: 'purple',
-        popular: false
-      }
-    ];
-
-    return (
-      <div className="space-y-6">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Service 🎯</h2>
-          <p className="text-gray-600">Start your 7-day free trial with any service</p>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
-            <span className="text-green-800 font-medium">🎉 7-Day Free Trial • No credit card required</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {services.map((service) => (
-            <div
-              key={service.id}
-              onClick={() => setFormData({...formData, service_package: service.id as any})}
-              className={`relative border-2 rounded-xl p-6 cursor-pointer transition-all ${
-                formData.service_package === service.id
-                  ? `border-${service.color}-500 bg-${service.color}-50 ring-2 ring-${service.color}-200`
-                  : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
-              }`}
-            >
-              {service.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-              
-              <div className="text-center">
-                <div className="text-4xl mb-3">{service.icon}</div>
-                <h3 className="font-bold text-lg text-gray-900 mb-2">{service.name}</h3>
-                <p className="text-gray-600 text-sm mb-4">{service.description}</p>
-                
-                <div className="space-y-2">
-                  {service.features.map((feature, index) => (
-                    <div key={index} className="text-xs text-gray-500 flex items-center justify-center">
-                      <span className="text-green-500 mr-1">✓</span>
-                      {feature}
-                    </div>
-                  ))}
-                </div>
-                
-                {formData.service_package === service.id && (
-                  <div className="mt-3">
-                    <span className={`text-${service.color}-600 font-medium text-sm`}>
-                      ✓ Selected
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <h4 className="font-medium text-blue-900 mb-2">📋 What happens next?</h4>
-          <div className="text-sm text-blue-800">
-            {formData.service_package === 'si' && (
-              <p>After registration, you'll choose which systems to integrate (ERP, CRM, Banking) and complete the setup process.</p>
-            )}
-            {formData.service_package === 'app' && (
-              <p>After registration, you'll complete business verification and set up direct FIRS invoice processing.</p>
-            )}
-            {formData.service_package === 'hybrid' && (
-              <p>After registration, you'll choose which features to enable and complete comprehensive system setup.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderConsentStep = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Almost Ready! 🎉</h2>
-        <p className="text-gray-600">Please accept our terms to start your free trial</p>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <div className="space-y-4">
-          <div className="flex items-start">
-            <input
-              type="checkbox"
-              checked={formData.terms_accepted}
-              onChange={(e) => setFormData({...formData, terms_accepted: e.target.checked})}
-              className={`h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer ${
-                fieldErrors.terms_accepted ? 'border-red-500' : ''
-              }`}
-              required
-            />
-            <span className="ml-3 text-sm text-gray-700">
-              I agree to the{' '}
-              <a 
-                href="/legal/terms-of-service" 
-                target="_blank" 
-                className="text-blue-600 hover:text-blue-800 underline font-medium"
-              >
-                Terms of Service
-              </a>
-              {' '}(required)
-            </span>
-          </div>
-
-          <div className="flex items-start">
-            <input
-              type="checkbox"
-              checked={formData.privacy_accepted}
-              onChange={(e) => setFormData({...formData, privacy_accepted: e.target.checked})}
-              className={`h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer ${
-                fieldErrors.privacy_accepted ? 'border-red-500' : ''
-              }`}
-              required
-            />
-            <span className="ml-3 text-sm text-gray-700">
-              I acknowledge the{' '}
-              <a 
-                href="/legal/privacy-policy" 
-                target="_blank" 
-                className="text-blue-600 hover:text-blue-800 underline font-medium"
-              >
-                Privacy Policy
-              </a>
-              {' '}and{' '}
-              <a 
-                href="/legal/ndpr-notice" 
-                target="_blank" 
-                className="text-blue-600 hover:text-blue-800 underline font-medium"
-              >
-                NDPR Notice
-              </a>
-              {' '}(required)
-            </span>
-          </div>
-        </div>
-
-        {/* Display consent errors */}
-        {(fieldErrors.terms_accepted || fieldErrors.privacy_accepted) && (
-          <div className="mt-4 space-y-1">
-            {fieldErrors.terms_accepted && (
-              <p className="text-sm text-red-600">{fieldErrors.terms_accepted}</p>
-            )}
-            {fieldErrors.privacy_accepted && (
-              <p className="text-sm text-red-600">{fieldErrors.privacy_accepted}</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-        <p className="text-sm text-yellow-800">
-          <span className="font-medium">📋 Next Step:</span> After registration, you'll complete service-specific setup including business details and data consent based on your <span className="font-medium">{formData.service_package.toUpperCase()}</span> service selection.
-        </p>
-      </div>
-    </div>
-  );
 
   return (
     <AuthLayout
-      title="Join TaxPoynt"
-      subtitle="Start your 7-day free trial"
-      showBackToHome={true}
+      title="Create your SI workspace"
+      subtitle="Verify your email next, then follow the three-phase checklist to launch."
     >
-      <div className="space-y-6">
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((step, index) => (
-            <React.Fragment key={step.id}>
-              <div className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  index <= currentStep ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {index + 1}
-                </div>
-                <div className="ml-2 text-sm">
-                  <div className={`font-medium ${index <= currentStep ? 'text-blue-600' : 'text-gray-500'}`}>
-                    {step.title}
-                  </div>
-                </div>
-              </div>
-              {index < steps.length - 1 && (
-                <div className={`flex-1 h-1 mx-4 ${
-                  index < currentStep ? 'bg-blue-600' : 'bg-gray-200'
-                }`} />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-
-        {/* Error Display */}
+      <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-            <div className="flex items-center">
-              <span className="text-red-600 mr-3 text-xl">⚠️</span>
-              <div className="text-red-700">{error}</div>
-            </div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+            {error}
           </div>
         )}
 
-        {/* Step Content */}
-        <div className="min-h-[400px]">
-          {currentStep === 0 && renderPersonalStep()}
-          {currentStep === 1 && renderBusinessStep()}
-          {currentStep === 2 && renderServiceStep()}
-          {currentStep === 3 && renderConsentStep()}
+        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">What to expect</p>
+          <div className="mt-4 space-y-3">
+            {PHASE_SUMMARY.map((phase) => (
+              <div key={phase.id} className="rounded-xl bg-white/80 p-3 shadow-sm">
+                <p className="text-sm font-semibold text-indigo-900">{phase.title}</p>
+                <p className="text-xs text-indigo-700 leading-relaxed">{phase.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between pt-6">
-          <TaxPoyntButton
-            variant="secondary"
-            onClick={handlePrevious}
-            disabled={currentStep === 0}
-          >
-            Previous
-          </TaxPoyntButton>
-          
-          <TaxPoyntButton
-            variant="primary"
-            onClick={handleNext}
-            loading={isLoading}
-            disabled={isLoading}
-          >
-            {currentStep === steps.length - 1 ? 'Start Free Trial' : 'Next'}
-          </TaxPoyntButton>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Workspace preset</p>
+                <p className="text-xs text-slate-600">{serviceLabel}</p>
+              </div>
+              <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-600">
+                Step 0 · Registration
+              </span>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                label="First name"
+                name="first_name"
+                value={formData.first_name}
+                onChange={updateField('first_name')}
+                placeholder="Ada"
+                required
+                error={fieldErrors.first_name}
+              />
+              <FormField
+                label="Last name"
+                name="last_name"
+                value={formData.last_name}
+                onChange={updateField('last_name')}
+                placeholder="Okeke"
+                required
+                error={fieldErrors.last_name}
+              />
+            </div>
+
+            <FormField
+              label="Work email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={updateField('email')}
+              placeholder="adaobi@example.com"
+              required
+              error={fieldErrors.email}
+            />
+
+            <FormField
+              label="Create password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={updateField('password')}
+              placeholder="Minimum 8 characters"
+              required
+              error={fieldErrors.password}
+            />
+
+            <FormField
+              label="Business or workspace name"
+              name="business_name"
+              value={formData.business_name}
+              onChange={updateField('business_name')}
+              placeholder="Your organisation"
+              required
+              error={fieldErrors.business_name}
+            />
+          </div>
         </div>
-      </div>
+
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Why the checklist matters</p>
+          <ul className="mt-4 space-y-3">
+            {CHECKLIST_HIGHLIGHTS.map((item) => (
+              <li key={item.id} className="flex gap-3 rounded-xl bg-white/80 p-3 shadow-sm">
+                <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">{item.title}</p>
+                  <p className="text-xs text-blue-700 leading-relaxed">{item.description}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-blue-700">
+            Next stop: <span className="font-semibold">{nextPath}</span> — we&rsquo;ll confirm your email and unlock the SI onboarding checklist.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              checked={formData.terms_accepted}
+              onChange={handleCheckboxChange('terms_accepted')}
+              required
+            />
+            <span>
+              I agree to the <a href="/legal/terms" className="text-indigo-600 hover:underline">TaxPoynt Terms of Service</a>.
+              {fieldErrors.terms_accepted && (
+                <span className="block text-xs text-red-600">{fieldErrors.terms_accepted}</span>
+              )}
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              checked={formData.privacy_accepted}
+              onChange={handleCheckboxChange('privacy_accepted')}
+              required
+            />
+            <span>
+              I acknowledge the <a href="/legal/privacy" className="text-indigo-600 hover:underline">Privacy Policy</a> covering data storage and processing.
+              {fieldErrors.privacy_accepted && (
+                <span className="block text-xs text-red-600">{fieldErrors.privacy_accepted}</span>
+              )}
+            </span>
+          </label>
+        </div>
+
+        <TaxPoyntButton
+          type="submit"
+          variant="primary"
+          className="w-full bg-indigo-600 hover:bg-indigo-700"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Creating workspace…' : 'Continue to email verification'}
+        </TaxPoyntButton>
+      </form>
     </AuthLayout>
   );
 };

@@ -21,12 +21,12 @@ export const LandingPage: React.FC = () => {
 
   type OnboardingService = 'si' | 'app' | 'hybrid';
 
-  const startOnboarding = (service?: OnboardingService) => {
-    if (service) {
-      router.push(`/onboarding?service=${service}`);
-    } else {
-      router.push('/onboarding');
+  const startOnboarding = (service: OnboardingService = 'si') => {
+    const params = new URLSearchParams({ service });
+    if (service === 'si') {
+      params.set('next', '/onboarding/si/integration-choice');
     }
+    router.push(`/auth/signup?${params.toString()}`);
   };
 
   const packageServiceMap: Record<string, OnboardingService> = {
