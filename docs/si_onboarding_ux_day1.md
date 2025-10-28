@@ -183,3 +183,9 @@ _Prepared for Day 1 deliverables. Subsequent work will iterate on fidelity, ass
 - Finalise the verification step copy as: **“Verify email and continue”** with supporting checklist chip (“Saved at HH:MM”) so messaging matches the automated regression flow.
 - Checklist summary highlights the **“Verify account”** item as complete once the analytics hook reports `si_onboarding.email_verified`; the widget text now reads: _“Verify account — Email confirmed and terms accepted.”_
 - Release note call-out: include “Guided onboarding copy polished for verification & checklist handoff” in the Day 7 change log.
+
+### Day 8 UX Note – Micro-interaction Polish
+
+- Verification CTA retains the autosave chip while the checklist call-to-action animates only once (`Saved at HH:MM`), preventing flicker noted in early QA.
+- Checklist sidebar now displays “Verify account — Email confirmed and terms accepted.” once analytics confirms completion; fallback copy remains unchanged when analytics events are missing.
+- Hover tooltip latency reduced to 150ms to align with release-day accessibility feedback.

@@ -293,7 +293,11 @@ def test_onboarding_flow_covers_signup_wizard_and_checklist(onboarding_regressio
     assert checklist_response.status_code == 200
     assert checklist_response.json()["data"]["summary"]["completion_percentage"] == 45
 
-    analytics_events = {event["payload"]["events"][0]["eventType"] for event in message_router.analytics_events}
+    analytics_events = {
+        recorded_event["eventType"]
+        for batch in message_router.analytics_events
+        for recorded_event in batch["payload"]["events"]
+    }
     assert analytics_events == {"si_onboarding.email_verified", "si_onboarding.terms_confirmed"}
 
     routed_operations = [call["operation"] for call in message_router.operations]

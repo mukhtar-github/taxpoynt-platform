@@ -157,3 +157,11 @@ _Prepared for Day 2 goals: data audit, contract planning, and test scaffolding.
 - Legacy nine-step identifiers are now guarded by `test_legacy_nine_step_names_redirect_to_canonical_flow`, which asserts that any `organization_setup`/`compliance_verification` payloads are canonicalised to the new wizard steps before persistence.
 - Telemetry hooks were reviewed: analytics events are routed through the message router, and the tests capture the emitted batches to ensure they align with the analytics plan.
 - Coverage captured locally via `pytest -q platform/tests/integration/test_onboarding_regression.py`.
+
+---
+
+## 8. Day 8 Launch-Readiness Buffer
+
+- Synthetic observability request (`platform/tests/integration/test_observability_synthetic.py`) confirmed Prometheus counters (`taxpoynt_http_requests_total`, `taxpoynt_http_request_duration_seconds`) and FIRS latency hooks populate as expected.
+- Dashboard review: Prometheus & OpenTelemetry dashboards display updated spans with `taxpoynt.service_role` and `taxpoynt.business_operation` attributes observed during synthetic run.
+- Rollback & monitoring windows recorded in `docs/launch_plan_day8.md`; release artefacts noted in `docs/release_notes_day8.md`.
