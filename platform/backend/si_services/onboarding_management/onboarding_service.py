@@ -45,6 +45,8 @@ class OnboardingState:
     metadata: Dict[str, Any]
     created_at: str
     updated_at: str
+    terms_accepted_at: Optional[str] = None
+    verified_at: Optional[str] = None
 
 
 class SIOnboardingService:
@@ -321,6 +323,10 @@ class SIOnboardingService:
             metadata = payload.get("metadata") or {}
             metadata.update(runtime)
             payload["metadata"] = metadata
+            account_status = metadata.get("account_status") or {}
+            if account_status:
+                payload["terms_accepted_at"] = payload.get("terms_accepted_at") or account_status.get("terms_accepted_at")
+                payload["verified_at"] = payload.get("verified_at") or account_status.get("verified_at")
 
         return {
             "operation": "get_onboarding_state",
@@ -712,10 +718,18 @@ class SIOnboardingService:
             return {}
 
         runtime: Dict[str, Any] = {}
+        account_status: Dict[str, Any] = dict(state.metadata.get("account_status") or {})
 
         user = await session.get(User, uuid.UUID(state.user_id)) if self._is_uuid(state.user_id) else None
         if user:
             runtime["login_count"] = user.login_count or 0
+            terms_candidate = self._format_optional_datetime(getattr(user, "terms_accepted_at", None))
+            if terms_candidate and not account_status.get("terms_accepted_at"):
+                account_status["terms_accepted_at"] = terms_candidate
+            if getattr(user, "is_email_verified", False) and not account_status.get("verified_at"):
+                verified_candidate = getattr(user, "updated_at", None)
+                fallback = self._utc_now()
+                account_status["verified_at"] = self._format_optional_datetime(verified_candidate) or self._format_optional_datetime(fallback)
 
         organization_id = getattr(user, "organization_id", None) if user else None
         if organization_id:
@@ -781,9 +795,12 @@ class SIOnboardingService:
                     "Unable to build IRN progress snapshot for org %s: %s", organization_id, exc
                 )
 
+        payload: Dict[str, Any] = {}
         if runtime:
-            return {"runtime": runtime}
-        return {}
+            payload["runtime"] = runtime
+        if account_status:
+            payload["account_status"] = account_status
+        return payload
 
     @staticmethod
     def _is_uuid(value: str) -> bool:
@@ -870,6 +887,11 @@ class SIOnboardingService:
         }
 
     def _from_orm(self, record: OnboardingStateORM) -> OnboardingState:
+        metadata = dict(record.state_metadata or {})
+        account_status = {}
+        if isinstance(metadata.get("account_status"), dict):
+            account_status = dict(metadata.get("account_status") or {})
+
         return OnboardingState(
             user_id=record.user_id,
             service_package=record.service_package,
@@ -878,9 +900,11 @@ class SIOnboardingService:
             has_started=record.has_started,
             is_complete=record.is_complete,
             last_active_date=self._isoformat(record.last_active_date),
-            metadata=dict(record.state_metadata or {}),
+            metadata=metadata,
             created_at=self._isoformat(record.created_at),
             updated_at=self._isoformat(record.updated_at),
+            terms_accepted_at=account_status.get("terms_accepted_at"),
+            verified_at=account_status.get("verified_at"),
         )
 
     def _merge_completed_steps(self, existing: List[str], new_steps: List[str]) -> List[str]:

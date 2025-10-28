@@ -41,6 +41,8 @@ class APPOnboardingStateResponse(BaseModel):
     metadata: Dict[str, Any]
     created_at: str
     updated_at: str
+    terms_accepted_at: Optional[str] = None
+    verified_at: Optional[str] = None
 
 
 class APPOnboardingEndpointsV1:

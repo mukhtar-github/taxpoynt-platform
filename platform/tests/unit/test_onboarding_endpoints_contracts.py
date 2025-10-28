@@ -266,6 +266,8 @@ def test_unified_get_state_surfaces_canonical_wizard_payload(unified_onboarding_
                 "has_started": True,
                 "is_complete": False,
                 "last_active_date": "2024-01-01T00:00:00Z",
+                "terms_accepted_at": "2024-01-01T02:00:00Z",
+                "verified_at": "2024-01-01T02:05:00Z",
                 "metadata": {
                     "service_package": "si",
                     "expected_steps": [
@@ -312,6 +314,44 @@ def test_unified_get_state_surfaces_canonical_wizard_payload(unified_onboarding_
     assert expected_steps[0] == "service-selection"
     wizard_profile = payload["metadata"]["wizard"]["company_profile"]
     assert wizard_profile["company_name"] == "Example Ltd"
+    assert payload["terms_accepted_at"] == "2024-01-01T02:00:00Z"
+    assert payload["verified_at"] == "2024-01-01T02:05:00Z"
+
+
+def test_unified_get_state_promotes_account_status_metadata(unified_onboarding_app):
+    client, _endpoints, message_router, _permission_guard, _app, _role_detector = unified_onboarding_app
+
+    message_router.set_response(
+        "get_onboarding_state",
+        {
+            "success": True,
+            "data": {
+                "user_id": "si-user-123",
+                "current_step": "service-selection",
+                "completed_steps": [],
+                "has_started": True,
+                "is_complete": False,
+                "last_active_date": "2024-01-03T00:00:00Z",
+                "metadata": {
+                    "service_package": "si",
+                    "account_status": {
+                        "terms_accepted_at": "2024-01-02T09:00:00Z",
+                        "verified_at": "2024-01-02T09:02:00Z",
+                    },
+                },
+                "created_at": "2024-01-02T00:00:00Z",
+                "updated_at": "2024-01-03T00:00:00Z",
+            },
+        },
+    )
+
+    response = client.get("/api/v1/si/onboarding/state")
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["terms_accepted_at"] == "2024-01-02T09:00:00Z"
+    assert payload["verified_at"] == "2024-01-02T09:02:00Z"
+    assert payload["metadata"]["account_status"]["verified_at"] == "2024-01-02T09:02:00Z"
 
 
 def test_unified_get_state_preserves_legacy_step_names(unified_onboarding_app):

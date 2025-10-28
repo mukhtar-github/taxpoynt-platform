@@ -321,7 +321,10 @@ class AuthDatabaseManager:
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
                 "last_login": None,
-                "login_count": 0
+                "login_count": 0,
+                "terms_accepted_at": user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
+                "privacy_accepted_at": user.privacy_accepted_at.isoformat() if user.privacy_accepted_at else None,
+                "verified_at": None,
             }
         except Exception as e:
             session.rollback()
@@ -402,6 +405,11 @@ class AuthDatabaseManager:
         """Get user by email using existing User model."""
         session = self.get_session()
         try:
+            def _format(dt):
+                if not dt:
+                    return None
+                return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
             query = session.query(User).filter(User.email == email)
             
             # By default, exclude soft-deleted users
@@ -424,12 +432,15 @@ class AuthDatabaseManager:
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
                 "email_verification_token": user.email_verification_token,
-                "email_verification_sent_at": user.email_verification_sent_at.isoformat() if user.email_verification_sent_at else None,
+                "email_verification_sent_at": _format(user.email_verification_sent_at),
                 "organization_id": str(user.organization_id) if user.organization_id else None,
-                "created_at": user.created_at.isoformat() if user.created_at else None,
-                "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                "created_at": _format(user.created_at),
+                "updated_at": _format(user.updated_at),
                 "last_login": None,
-                "login_count": 0
+                "login_count": 0,
+                "terms_accepted_at": _format(user.terms_accepted_at),
+                "privacy_accepted_at": _format(user.privacy_accepted_at),
+                "verified_at": None,
             }
         except Exception as e:
             logger.error(f"Error getting user by email: {e}")
@@ -441,6 +452,11 @@ class AuthDatabaseManager:
         """Get user by ID using existing User model."""
         session = self.get_session()
         try:
+            def _format(dt):
+                if not dt:
+                    return None
+                return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
             # Ensure UUID type for comparison
             import uuid as _uuid
             _user_id = user_id
@@ -472,10 +488,13 @@ class AuthDatabaseManager:
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
                 "organization_id": str(user.organization_id) if user.organization_id else None,
-                "created_at": user.created_at.isoformat() if user.created_at else None,
-                "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                "created_at": _format(user.created_at),
+                "updated_at": _format(user.updated_at),
                 "last_login": None,
-                "login_count": 0
+                "login_count": 0,
+                "terms_accepted_at": _format(user.terms_accepted_at),
+                "privacy_accepted_at": _format(user.privacy_accepted_at),
+                "verified_at": None,
             }
         except Exception as e:
             logger.error(f"Error getting user by ID: {e}")
@@ -603,6 +622,15 @@ class AuthDatabaseManager:
             session.commit()
             session.refresh(user)
 
+            def _format(dt):
+                if not dt:
+                    return None
+                return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+            terms_accepted_at = _format(user.terms_accepted_at)
+            privacy_accepted_at = _format(user.privacy_accepted_at)
+            verified_at = _format(now)
+
             return {
                 "id": str(user.id),
                 "email": user.email,
@@ -612,6 +640,9 @@ class AuthDatabaseManager:
                 "service_package": user.service_package,
                 "is_email_verified": user.is_email_verified,
                 "organization_id": str(user.organization_id) if user.organization_id else None,
+                "terms_accepted_at": terms_accepted_at,
+                "privacy_accepted_at": privacy_accepted_at,
+                "verified_at": verified_at,
             }
         except Exception as exc:
             session.rollback()

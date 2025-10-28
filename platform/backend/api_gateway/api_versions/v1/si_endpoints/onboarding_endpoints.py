@@ -62,6 +62,8 @@ class OnboardingStateResponse(BaseModel):
     metadata: Dict[str, Any]
     created_at: str
     updated_at: str
+    terms_accepted_at: Optional[str] = None
+    verified_at: Optional[str] = None
 
 
 class CompanyProfileRequest(BaseModel):
@@ -746,6 +748,8 @@ class OnboardingEndpointsV1:
             },
             "created_at": now_iso,
             "updated_at": now_iso,
+            "terms_accepted_at": None,
+            "verified_at": None,
         }
 
     def _build_checklist_fallback(self, context: HTTPRoutingContext) -> Dict[str, Any]:

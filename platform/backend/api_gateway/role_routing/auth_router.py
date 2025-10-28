@@ -14,7 +14,7 @@ import smtplib
 import secrets
 import string
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
@@ -49,6 +49,10 @@ from .models import HTTPRoutingContext
 from .role_detector import HTTPRoleDetector
 from .permission_guard import APIPermissionGuard
 from .auth_database import get_auth_database
+from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.repositories.onboarding_state_repo_async import (
+    OnboardingStateRepositoryAsync,
+)
 
 logger = logging.getLogger(__name__)
 SHARED_CONFIG_DIR = Path(__file__).resolve().parents[3] / "shared_config"
@@ -237,6 +241,44 @@ async def _send_verification_email(recipient: str, code: str, first_name: Option
 
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, _send)
+
+
+def _isoformat_utc(value: datetime) -> str:
+    return value.replace(microsecond=0).astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+async def _record_onboarding_account_status(
+    user_id: str,
+    service_package: Optional[str],
+    *,
+    verified_at: Optional[str],
+    terms_accepted_at: Optional[str],
+) -> None:
+    if not verified_at:
+        return
+
+    try:
+        async for session in get_async_session():
+            repo = OnboardingStateRepositoryAsync(session)
+            record = await repo.ensure_state(user_id, service_package or "si")
+            metadata = dict(record.state_metadata or {})
+            account_status = dict(metadata.get("account_status") or {})
+            account_status["verified_at"] = verified_at
+            if terms_accepted_at:
+                account_status["terms_accepted_at"] = terms_accepted_at
+            metadata["account_status"] = account_status
+            record.state_metadata = metadata
+            now = datetime.now(timezone.utc)
+            record.updated_at = now
+            record.last_active_date = now
+            await repo.persist(record)
+            break
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.warning(
+            "Failed to persist onboarding account status for user %s: %s",
+            user_id,
+            exc,
+        )
 
 
 def _normalize_domain_entry(value: Any) -> Optional[str]:
@@ -660,6 +702,9 @@ def create_auth_router(
             if not user:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+            verified_at_iso: Optional[str] = user.get("verified_at")
+            terms_accepted_at_iso: Optional[str] = user.get("terms_accepted_at")
+
             if user.get("is_email_verified"):
                 logger.info("Email already verified for %s", request.email)
             else:
@@ -673,6 +718,9 @@ def create_auth_router(
                     privacy_accepted=request.privacy_accepted,
                 )
                 user.update(updated_user)
+                verified_at_iso = updated_user.get("verified_at") or verified_at_iso
+                if updated_user.get("terms_accepted_at"):
+                    terms_accepted_at_iso = updated_user["terms_accepted_at"]
 
             organization = db.get_organization_by_id(user.get("organization_id"))
             if not organization:
@@ -680,6 +728,24 @@ def create_auth_router(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="User organization data not found",
                 )
+
+            if user.get("is_email_verified"):
+                if not verified_at_iso:
+                    verified_at_iso = _isoformat_utc(datetime.now(timezone.utc))
+                user["verified_at"] = verified_at_iso
+                try:
+                    await _record_onboarding_account_status(
+                        user_id=user["id"],
+                        service_package=user.get("service_package"),
+                        verified_at=verified_at_iso,
+                        terms_accepted_at=terms_accepted_at_iso,
+                    )
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.debug(
+                        "Unable to persist onboarding account status for %s: %s",
+                        user["id"],
+                        exc,
+                    )
 
             organization_response = OrganizationResponse(
                 id=organization["id"],
