@@ -148,3 +148,12 @@ These tests leverage the existing stubs and maintain isolation, satisfying the `
 - Use analytics `phase_breakdown` to power the checklist visual described in Day 1 UX documentation.
 
 _Prepared for Day 2 goals: data audit, contract planning, and test scaffolding._ 
+
+---
+
+## 7. Day 7 Validation Summary
+
+- End-to-end pytest scenario (`platform/tests/integration/test_onboarding_regression.py::test_onboarding_flow_covers_signup_wizard_and_checklist`) exercises the full sign-up → verification → checklist flow using the production routers and records telemetry emission of `si_onboarding.email_verified` and `si_onboarding.terms_confirmed`.
+- Legacy nine-step identifiers are now guarded by `test_legacy_nine_step_names_redirect_to_canonical_flow`, which asserts that any `organization_setup`/`compliance_verification` payloads are canonicalised to the new wizard steps before persistence.
+- Telemetry hooks were reviewed: analytics events are routed through the message router, and the tests capture the emitted batches to ensure they align with the analytics plan.
+- Coverage captured locally via `pytest -q platform/tests/integration/test_onboarding_regression.py`.

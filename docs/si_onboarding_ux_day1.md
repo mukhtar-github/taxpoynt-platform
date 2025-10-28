@@ -175,3 +175,11 @@ These scenarios will inform component tests (React Testing Library), integration
 ---
 
 _Prepared for Day 1 deliverables. Subsequent work will iterate on fidelity, asset design, and engineering integration._
+
+---
+
+### Day 7 UX Note – Final Copy & Checklist Surfacing
+
+- Finalise the verification step copy as: **“Verify email and continue”** with supporting checklist chip (“Saved at HH:MM”) so messaging matches the automated regression flow.
+- Checklist summary highlights the **“Verify account”** item as complete once the analytics hook reports `si_onboarding.email_verified`; the widget text now reads: _“Verify account — Email confirmed and terms accepted.”_
+- Release note call-out: include “Guided onboarding copy polished for verification & checklist handoff” in the Day 7 change log.
