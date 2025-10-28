@@ -426,9 +426,11 @@ class OnboardingEndpointsV1:
                 },
             )
 
-            # Fall back to mock result if downstream services are unavailable
-            if not result or not isinstance(result, dict) or not result.get("success"):
+            if result and isinstance(result, dict) and result.get("success"):
+                self._normalize_onboarding_state_response(result)
+            else:
                 fallback_payload = {"success": True, "data": mock_state, "fallback": True}
+                self._normalize_onboarding_state_response(fallback_payload)
                 return self._create_v1_response(fallback_payload, "onboarding_state_retrieved")
 
             return self._create_v1_response(result, "onboarding_state_retrieved")
@@ -443,6 +445,7 @@ class OnboardingEndpointsV1:
                 "fallback": True,
                 "error_message": str(service_error),
             }
+            self._normalize_onboarding_state_response(fallback_payload)
             return self._create_v1_response(fallback_payload, "onboarding_state_retrieved")
         except HTTPException:
             raise
@@ -714,6 +717,31 @@ class OnboardingEndpointsV1:
     def _create_v1_response(self, data: Any, message: str, status_code: int = 200) -> V1ResponseModel:
         """Create standardized V1 response"""
         return build_v1_response(data, action=message)
+
+    def _normalize_onboarding_state_response(self, payload: Dict[str, Any]) -> None:
+        """Promote account status metadata into top-level keys when present."""
+        if not isinstance(payload, dict):
+            return
+
+        state = payload.get("data")
+        if not isinstance(state, dict):
+            return
+
+        metadata = state.get("metadata")
+        if not isinstance(metadata, dict):
+            return
+
+        account_status = metadata.get("account_status")
+        if not isinstance(account_status, dict):
+            return
+
+        terms_accepted_at = account_status.get("terms_accepted_at")
+        if terms_accepted_at and not state.get("terms_accepted_at"):
+            state["terms_accepted_at"] = terms_accepted_at
+
+        verified_at = account_status.get("verified_at")
+        if verified_at and not state.get("verified_at"):
+            state["verified_at"] = verified_at
 
     def _build_fallback_state(self, context: HTTPRoutingContext) -> Dict[str, Any]:
         """Construct a minimal onboarding state when downstream services are unavailable."""

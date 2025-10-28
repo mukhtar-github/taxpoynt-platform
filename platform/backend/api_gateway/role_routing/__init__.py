@@ -60,6 +60,7 @@ except ImportError:
         SYSTEM_INTEGRATOR = "si"
         ACCESS_POINT_PROVIDER = "app"
         HYBRID = "hybrid"
+        ANALYTICS = "analytics"
         CORE = "core"
     
     # MessageRouter should be imported from core_platform.messaging

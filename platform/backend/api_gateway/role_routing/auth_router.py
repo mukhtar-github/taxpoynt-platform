@@ -501,6 +501,40 @@ def create_auth_router(
     
     router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+    async def _emit_onboarding_events(events: List[Dict[str, Any]]) -> None:
+        """Emit onboarding analytics events through the message router."""
+        if not events:
+            return
+
+        route = getattr(message_router, "route_message", None)
+        if route is None:
+            return
+
+        # Ensure timestamps are available for batching
+        batch_timestamp = None
+        for event in events:
+            if isinstance(event, dict):
+                ts = event.get("timestamp")
+                if isinstance(ts, str) and ts:
+                    batch_timestamp = ts
+                    break
+
+        if batch_timestamp is None:
+            batch_timestamp = _isoformat_utc(datetime.now(timezone.utc))
+
+        try:
+            await route(
+                service_role=ServiceRole.ANALYTICS,
+                operation="process_onboarding_events",
+                payload={
+                    "events": events,
+                    "batch_timestamp": batch_timestamp,
+                    "api_version": "v1",
+                },
+            )
+        except Exception as analytics_error:  # pragma: no cover - analytics is best-effort
+            logger.debug("Failed to emit onboarding analytics events: %s", analytics_error)
+
     @router.post("/oauth/token", response_model=OAuthTokenResponse, include_in_schema=False)
     async def oauth_token(request: Request):
         oauth_manager = get_oauth2_manager()
@@ -702,8 +736,10 @@ def create_auth_router(
             if not user:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+            was_verified = bool(user.get("is_email_verified"))
             verified_at_iso: Optional[str] = user.get("verified_at")
             terms_accepted_at_iso: Optional[str] = user.get("terms_accepted_at")
+            had_terms_before = bool(terms_accepted_at_iso)
 
             if user.get("is_email_verified"):
                 logger.info("Email already verified for %s", request.email)
@@ -746,6 +782,57 @@ def create_auth_router(
                         user["id"],
                         exc,
                     )
+
+                analytics_events: List[Dict[str, Any]] = []
+                user_service_package = str(user.get("service_package") or "si").lower()
+                session_id = f"{user_service_package}-onboarding-{user['id']}"
+                metadata_base = {
+                    "service_package": user_service_package,
+                    "organization_id": user.get("organization_id"),
+                }
+                verification_timestamp = verified_at_iso or _isoformat_utc(datetime.now(timezone.utc))
+
+                if not was_verified:
+                    analytics_events.append(
+                        {
+                            "eventType": "si_onboarding.email_verified",
+                            "stepId": "email_verification",
+                            "userId": user["id"],
+                            "userRole": user_service_package,
+                            "timestamp": verification_timestamp,
+                            "sessionId": session_id,
+                            "metadata": {
+                                **metadata_base,
+                                "verified_at": verification_timestamp,
+                                "terms_accepted": bool(request.terms_accepted),
+                                "privacy_accepted": bool(request.privacy_accepted),
+                                "onboarding_token": request.onboarding_token,
+                            },
+                        }
+                    )
+
+                if request.terms_accepted:
+                    if not terms_accepted_at_iso:
+                        terms_accepted_at_iso = verification_timestamp
+                    analytics_events.append(
+                        {
+                            "eventType": "si_onboarding.terms_confirmed",
+                            "stepId": "terms_acceptance",
+                            "userId": user["id"],
+                            "userRole": user_service_package,
+                            "timestamp": terms_accepted_at_iso,
+                            "sessionId": session_id,
+                            "metadata": {
+                                **metadata_base,
+                                "terms_accepted_at": terms_accepted_at_iso,
+                                "verified_at": verification_timestamp,
+                                "onboarding_token": request.onboarding_token,
+                            },
+                        }
+                    )
+
+                if analytics_events:
+                    await _emit_onboarding_events(analytics_events)
 
             organization_response = OrganizationResponse(
                 id=organization["id"],

@@ -1,4 +1,5 @@
 // @ts-check
+const path = require('path');
 const { defineConfig, devices } = require('@playwright/test');
 require('dotenv').config();
 
@@ -23,9 +24,10 @@ module.exports = defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html', { outputFolder: './test-results/html-report' }],
+    ['html', { outputFolder: './playwright-report' }],
     ['json', { outputFile: './test-results/results.json' }]
   ],
+  outputDir: './test-results/artifacts',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
@@ -49,10 +51,13 @@ module.exports = defineConfig({
   ],
 
   /* Run local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  //   timeout: 120 * 1000,
-  // },
+  webServer: {
+    command: 'npm run dev -- --port 3001',
+    cwd: path.resolve(__dirname, '../..', 'frontend'),
+    url: 'http://localhost:3001',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  },
 });
