@@ -7,6 +7,7 @@ import {
   type StreamlinedRegistrationData,
 } from '../../../business_interface/auth/StreamlinedRegistration';
 import { authService } from '../../../shared_components/services/auth';
+import { OnboardingStateManager } from '../../../shared_components/services/onboardingApi';
 
 type ServicePackage = 'si' | 'app' | 'hybrid';
 
@@ -48,8 +49,10 @@ const SignUpPageContent: React.FC = () => {
     setError(undefined);
 
     try {
+      const trimmedEmail = registrationData.email.trim();
+
       const response = await authService.register({
-        email: registrationData.email.trim(),
+        email: trimmedEmail,
         password: registrationData.password,
         first_name: registrationData.first_name.trim(),
         last_name: registrationData.last_name.trim(),
@@ -72,6 +75,28 @@ const SignUpPageContent: React.FC = () => {
       const nextService = isValidService(serviceFromResponse)
         ? serviceFromResponse
         : registrationData.service_package;
+
+      try {
+        await OnboardingStateManager.updateStep(response.user.id, 'registration', true);
+      } catch (updateError) {
+        console.warn('Failed to persist registration step:', updateError);
+      }
+
+      if ('status' in response && response.status === 'pending') {
+        const verifyPath = response.next?.startsWith('/') ? response.next : '/auth/verify-email';
+        const params = new URLSearchParams({
+          email: trimmedEmail,
+          service: nextService,
+        });
+        if ('onboarding_token' in response && response.onboarding_token) {
+          params.set('onboarding_token', response.onboarding_token);
+        }
+        if (safeNextPath) {
+          params.set('next', safeNextPath);
+        }
+        router.push(`${verifyPath}?${params.toString()}`);
+        return;
+      }
 
       const defaultDestination =
         nextService === 'si'

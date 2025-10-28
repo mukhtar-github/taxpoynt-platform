@@ -45,30 +45,39 @@ interface StepValidationResult {
 
 const STEP_HIERARCHY: Record<string, Record<string, number>> = {
   si: {
-    'service_introduction': 0,
-    'integration_choice': 1,
-    'business_systems_setup': 2,
-    'financial_systems_setup': 3,
-    'banking_connected': 4,
-    'reconciliation_setup': 5,
-    'integration_setup': 6,
-    'onboarding_complete': 7
+    'registration': 0,
+    'email_verification': 1,
+    'terms_acceptance': 2,
+    'service_introduction': 3,
+    'integration_choice': 4,
+    'business_systems_setup': 5,
+    'financial_systems_setup': 6,
+    'banking_connected': 7,
+    'reconciliation_setup': 8,
+    'integration_setup': 9,
+    'onboarding_complete': 10
   },
   app: {
-    'service_introduction': 0,
-    'business_verification': 1,
-    'firs_integration_setup': 2,
-    'compliance_settings': 3,
-    'taxpayer_setup': 4,
-    'onboarding_complete': 5
+    'registration': 0,
+    'email_verification': 1,
+    'terms_acceptance': 2,
+    'service_introduction': 3,
+    'business_verification': 4,
+    'firs_integration_setup': 5,
+    'compliance_settings': 6,
+    'taxpayer_setup': 7,
+    'onboarding_complete': 8
   },
   hybrid: {
-    'service_introduction': 0,
-    'service_selection': 1,
-    'business_verification': 2,
-    'integration_setup': 3,
-    'compliance_setup': 4,
-    'onboarding_complete': 5
+    'registration': 0,
+    'email_verification': 1,
+    'terms_acceptance': 2,
+    'service_introduction': 3,
+    'service_selection': 4,
+    'business_verification': 5,
+    'integration_setup': 6,
+    'compliance_setup': 7,
+    'onboarding_complete': 8
   }
 };
 

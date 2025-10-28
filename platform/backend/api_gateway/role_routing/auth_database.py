@@ -315,6 +315,8 @@ class AuthDatabaseManager:
                 "service_package": user.service_package,
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
+                "email_verification_token": user.email_verification_token,
+                "email_verification_sent_at": user.email_verification_sent_at.isoformat() if user.email_verification_sent_at else None,
                 "organization_id": str(user.organization_id) if user.organization_id else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
@@ -421,6 +423,8 @@ class AuthDatabaseManager:
                 "service_package": user.service_package,
                 "is_active": user.is_active,
                 "is_email_verified": user.is_email_verified,
+                "email_verification_token": user.email_verification_token,
+                "email_verification_sent_at": user.email_verification_sent_at.isoformat() if user.email_verification_sent_at else None,
                 "organization_id": str(user.organization_id) if user.organization_id else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
@@ -535,6 +539,84 @@ class AuthDatabaseManager:
         except Exception as e:
             session.rollback()
             logger.error(f"Error updating user login: {e}")
+        finally:
+            session.close()
+
+    def set_email_verification_token(self, user_id: str, token_hash: str) -> None:
+        """Store hashed email verification token and timestamp."""
+        session = self.get_session()
+        try:
+            import uuid as _uuid
+            from datetime import datetime, timezone
+
+            _user_id = user_id
+            if isinstance(user_id, str):
+                try:
+                    _user_id = _uuid.UUID(user_id)
+                except ValueError:
+                    _user_id = user_id
+
+            user = session.query(User).filter(User.id == _user_id).first()
+            if not user:
+                raise ValueError("User not found")
+
+            user.email_verification_token = token_hash
+            user.email_verification_sent_at = datetime.now(timezone.utc)
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            logger.error(f"Error setting email verification token: {exc}")
+            raise
+        finally:
+            session.close()
+
+    def mark_email_verified(self, user_id: str,
+                             terms_accepted: bool = False,
+                             privacy_accepted: bool = False) -> Dict[str, Any]:
+        """Mark user as email verified and update consent timestamps."""
+        session = self.get_session()
+        try:
+            import uuid as _uuid
+            from datetime import datetime, timezone
+
+            _user_id = user_id
+            if isinstance(user_id, str):
+                try:
+                    _user_id = _uuid.UUID(user_id)
+                except ValueError:
+                    _user_id = user_id
+
+            user = session.query(User).filter(User.id == _user_id).first()
+            if not user:
+                raise ValueError("User not found")
+
+            now = datetime.now(timezone.utc)
+            user.is_email_verified = True
+            user.email_verification_token = None
+            user.email_verification_sent_at = None
+
+            if terms_accepted:
+                user.terms_accepted_at = now
+            if privacy_accepted:
+                user.privacy_accepted_at = now
+
+            session.commit()
+            session.refresh(user)
+
+            return {
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role.value,
+                "service_package": user.service_package,
+                "is_email_verified": user.is_email_verified,
+                "organization_id": str(user.organization_id) if user.organization_id else None,
+            }
+        except Exception as exc:
+            session.rollback()
+            logger.error(f"Error marking email verified: {exc}")
+            raise
         finally:
             session.close()
     

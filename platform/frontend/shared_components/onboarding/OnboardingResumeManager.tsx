@@ -49,6 +49,9 @@ interface ResumeSession {
 
 const STEP_NAMES: Record<string, Record<string, string>> = {
   si: {
+    'registration': 'Create Workspace',
+    'email_verification': 'Verify Email',
+    'terms_acceptance': 'Accept Terms',
     'service_introduction': 'Service Introduction',
     'integration_choice': 'Integration Choice',
     'business_systems_setup': 'Business Systems Setup',
@@ -59,6 +62,9 @@ const STEP_NAMES: Record<string, Record<string, string>> = {
     'onboarding_complete': 'Setup Complete'
   },
   app: {
+    'registration': 'Create Workspace',
+    'email_verification': 'Verify Email',
+    'terms_acceptance': 'Accept Terms',
     'service_introduction': 'Service Introduction',
     'business_verification': 'Business Verification',
     'firs_integration_setup': 'FIRS Integration',
@@ -67,6 +73,9 @@ const STEP_NAMES: Record<string, Record<string, string>> = {
     'onboarding_complete': 'Setup Complete'
   },
   hybrid: {
+    'registration': 'Create Workspace',
+    'email_verification': 'Verify Email',
+    'terms_acceptance': 'Accept Terms',
     'service_introduction': 'Service Introduction',
     'service_selection': 'Service Selection',
     'business_verification': 'Business Verification',

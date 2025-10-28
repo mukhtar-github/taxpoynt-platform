@@ -119,6 +119,36 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     servicePackage: 'si' | 'app' | 'hybrid',
     state: OnboardingState
   ) => {
+    const preCheckSteps = new Set(['registration', 'email_verification', 'terms_acceptance']);
+
+    if (preCheckSteps.has(state.current_step)) {
+      const storedUser = authService.getStoredUser();
+      const email = storedUser?.email || (state.metadata?.email as string | undefined);
+      const onboardingToken = state.metadata?.onboarding_token;
+      const params = new URLSearchParams({ service: servicePackage });
+      if (email) {
+        params.set('email', email);
+      }
+      if (typeof onboardingToken === 'string') {
+        params.set('onboarding_token', onboardingToken);
+      }
+
+      const nextByRole: Record<'si' | 'app' | 'hybrid', string> = {
+        si: '/onboarding/si/integration-choice',
+        app: '/onboarding/app/business-verification',
+        hybrid: '/onboarding/hybrid/service-selection',
+      };
+      params.set('next', nextByRole[servicePackage]);
+
+      if (state.current_step === 'registration') {
+        router.push(`/auth/signup?${params.toString()}`);
+        return;
+      }
+
+      router.push(`/auth/verify-email?${params.toString()}`);
+      return;
+    }
+
     if (state.completed_steps.includes('onboarding_complete')) {
       switch (servicePackage) {
         case 'si':
@@ -154,6 +184,12 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     }
 
     switch (legacyStep) {
+      case 'registration':
+        return 'registration';
+      case 'email_verification':
+        return 'email_verification';
+      case 'terms_acceptance':
+        return 'terms_acceptance';
       case 'service_introduction':
       case 'integration_choice':
       case 'business_verification':

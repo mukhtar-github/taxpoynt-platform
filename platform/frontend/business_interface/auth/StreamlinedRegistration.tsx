@@ -11,6 +11,7 @@ import { AuthLayout } from '../../shared_components/auth/AuthLayout';
 import { TaxPoyntButton } from '../../design_system/components/TaxPoyntButton';
 import { FormField } from '../../design_system/components/FormField';
 import { secureLogger } from '../../shared_components/utils/secureLogger';
+import { getBusinessEmailValidationMessage } from '../../shared_components/utils/businessEmailPolicy';
 
 interface PhaseSummary {
   id: string;
@@ -137,19 +138,6 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     }
   };
 
-  const handleCheckboxChange = (field: 'terms_accepted' | 'privacy_accepted' | 'trial_started') =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { checked } = event.target;
-      setFormData((prev) => ({ ...prev, [field]: checked }));
-      if (fieldErrors[field]) {
-        setFieldErrors((prev) => {
-          const next = { ...prev };
-          delete next[field];
-          return next;
-        });
-      }
-    };
-
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -163,6 +151,11 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
       errors.email = 'Work email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Enter a valid email address';
+    } else {
+      const emailPolicyMessage = getBusinessEmailValidationMessage(formData.email.trim());
+      if (emailPolicyMessage) {
+        errors.email = emailPolicyMessage;
+      }
     }
     if (!formData.password) {
       errors.password = 'Create a password to continue';
@@ -171,12 +164,6 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     }
     if (!formData.business_name.trim()) {
       errors.business_name = 'Business or workspace name is required';
-    }
-    if (!formData.terms_accepted) {
-      errors.terms_accepted = 'You must accept the Terms of Service';
-    }
-    if (!formData.privacy_accepted) {
-      errors.privacy_accepted = 'You must acknowledge the Privacy Policy';
     }
 
     setFieldErrors(errors);
@@ -305,40 +292,6 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
           <p className="mt-4 text-xs text-blue-700">
             Next stop: <span className="font-semibold">{nextPath}</span> — we&rsquo;ll confirm your email and unlock the SI onboarding checklist.
           </p>
-        </div>
-
-        <div className="space-y-4">
-          <label className="flex items-start gap-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-              checked={formData.terms_accepted}
-              onChange={handleCheckboxChange('terms_accepted')}
-              required
-            />
-            <span>
-              I agree to the <a href="/legal/terms" className="text-indigo-600 hover:underline">TaxPoynt Terms of Service</a>.
-              {fieldErrors.terms_accepted && (
-                <span className="block text-xs text-red-600">{fieldErrors.terms_accepted}</span>
-              )}
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-              checked={formData.privacy_accepted}
-              onChange={handleCheckboxChange('privacy_accepted')}
-              required
-            />
-            <span>
-              I acknowledge the <a href="/legal/privacy" className="text-indigo-600 hover:underline">Privacy Policy</a> covering data storage and processing.
-              {fieldErrors.privacy_accepted && (
-                <span className="block text-xs text-red-600">{fieldErrors.privacy_accepted}</span>
-              )}
-            </span>
-          </label>
         </div>
 
         <TaxPoyntButton

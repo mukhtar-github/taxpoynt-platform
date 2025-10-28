@@ -221,7 +221,27 @@ export class UrlBuilder {
    */
   static onboardingStepUrl(role: 'si' | 'app' | 'hybrid', step: string): string {
     const baseUrl = urlConfig.base.frontend;
-    
+
+    const serviceParam = role;
+    const params = new URLSearchParams({ service: serviceParam });
+
+    const nextByRole: Record<'si' | 'app' | 'hybrid', string> = {
+      si: urlConfig.onboarding.si.integrationChoice,
+      app: urlConfig.onboarding.app.businessVerification,
+      hybrid: urlConfig.onboarding.hybrid.serviceSelection,
+    };
+
+    // When user is still in account setup stages, route through auth flows
+    if (step === 'registration') {
+      params.set('next', nextByRole[role]);
+      return `${baseUrl}/auth/signup?${params.toString()}`;
+    }
+
+    if (step === 'email_verification' || step === 'terms_acceptance') {
+      params.set('next', nextByRole[role]);
+      return `${baseUrl}/auth/verify-email?${params.toString()}`;
+    }
+
     switch (role) {
       case 'si':
         return `${baseUrl}/onboarding/si/${step}`;

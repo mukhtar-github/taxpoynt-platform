@@ -83,6 +83,23 @@ export interface RegisterRequest {
   consents?: Record<string, any>;
 }
 
+export interface RegisterPendingResponse {
+  status: 'pending';
+  next: string;
+  user: AuthResponse['user'];
+  onboarding_token?: string;
+}
+
+export interface VerifyEmailRequest {
+  email: string;
+  code: string;
+  service_package?: string;
+  onboarding_token?: string;
+  terms_accepted: boolean;
+  privacy_accepted: boolean;
+  metadata?: Record<string, any>;
+}
+
 /**
  * Production-Grade API Client Class
  */
@@ -324,7 +341,7 @@ class TaxPoyntAPIClient {
   /**
    * Register new user
    */
-  public async register(userData: RegisterRequest): Promise<AuthResponse> {
+  public async register(userData: RegisterRequest): Promise<AuthResponse | RegisterPendingResponse> {
     try {
       secureLogger.userAction('TaxPoynt API: Attempting registration', { 
         endpoint: `${API_BASE_URL}/auth/register`,
@@ -349,17 +366,32 @@ class TaxPoyntAPIClient {
       }
       
       secureLogger.userAction('Sending registration request');
-      const response = await this.client.post<AuthResponse>('/auth/register', userData);
-      
-      secureLogger.success('Registration successful', { 
-        user_email: response.data.user.email,
-        service_package: response.data.user.service_package 
+      const response = await this.client.post<AuthResponse | RegisterPendingResponse | { success: boolean; data: any }>(
+        '/auth/register',
+        userData
+      );
+
+      const payload = (response.data as any)?.success ? (response.data as any).data : response.data;
+      const data = payload as AuthResponse | RegisterPendingResponse;
+
+      if ('status' in data && data.status === 'pending') {
+        secureLogger.success('Registration pending verification', {
+          user_email: data.user.email,
+          service_package: data.user.service_package,
+          next: data.next,
+        });
+        return data;
+      }
+
+      secureLogger.success('Registration successful', {
+        user_email: data.user.email,
+        service_package: data.user.service_package,
       });
       
-      // Store authentication data
-      this.storeAuth(response.data, { persist: false });
-      
-      return response.data;
+      // Store authentication data when immediate login is allowed
+      this.storeAuth(data as AuthResponse, { persist: false });
+
+      return data;
           } catch (error) {
         secureLogger.error('Registration failed', error);
 
@@ -403,6 +435,23 @@ class TaxPoyntAPIClient {
       }
       
       throw error; // Re-throw formatted error from interceptor
+    }
+  }
+
+  public async verifyEmail(payload: VerifyEmailRequest): Promise<AuthResponse> {
+    try {
+      secureLogger.userAction('TaxPoynt API: Verifying email', { email: payload.email });
+      const response = await this.client.post<AuthResponse | { success: boolean; data: AuthResponse }>(
+        '/auth/verify-email',
+        payload
+      );
+      const data = (response.data as any)?.success ? (response.data as any).data : response.data;
+      this.storeAuth(data as AuthResponse, { persist: false });
+      secureLogger.success('Email verification successful', { email: payload.email });
+      return data as AuthResponse;
+    } catch (error) {
+      secureLogger.error('Email verification failed', error);
+      throw error;
     }
   }
 

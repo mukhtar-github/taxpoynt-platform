@@ -4,11 +4,21 @@ Authentication Router - Shared Across All Service Types
 Provides authentication endpoints accessible to SI, APP, and Hybrid users.
 Integrates with role-based routing system and supports user onboarding flow.
 """
+import asyncio
 import base64
+import json
 import logging
+import os
+import re
+import smtplib
+import secrets
+import string
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Tuple
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+from typing import Dict, Any, Optional, List, Tuple, Union, Literal
 
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -41,6 +51,8 @@ from .permission_guard import APIPermissionGuard
 from .auth_database import get_auth_database
 
 logger = logging.getLogger(__name__)
+SHARED_CONFIG_DIR = Path(__file__).resolve().parents[3] / "shared_config"
+FREE_EMAIL_DOMAINS_DEFAULT_PATH = SHARED_CONFIG_DIR / "free_email_domains.json"
 
 # Authentication configuration
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -84,6 +96,15 @@ class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
 
+class EmailVerificationRequest(BaseModel):
+    """Email verification request payload"""
+    email: EmailStr
+    code: str
+    service_package: Optional[str] = None
+    onboarding_token: Optional[str] = None
+    terms_accepted: bool = False
+    privacy_accepted: bool = False
+
 class OrganizationResponse(BaseModel):
     """Organization response model"""
     id: str
@@ -113,6 +134,15 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+
+class RegistrationPendingResponse(BaseModel):
+    """Pending registration response when email verification is required."""
+    status: Literal["pending"] = "pending"
+    next: str
+    user: UserResponse
+    onboarding_token: Optional[str] = None
+    message: Optional[str] = None
 
 
 class OAuthTokenResponse(BaseModel):
@@ -148,6 +178,183 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def _generate_verification_code(length: int = 6) -> str:
+    alphabet = string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _smtp_config() -> Dict[str, Any]:
+    host = os.getenv("SMTP_HOST")
+    username = os.getenv("SMTP_USERNAME")
+    password = os.getenv("SMTP_PASSWORD")
+    from_email = os.getenv("EMAILS_FROM_EMAIL") or os.getenv("SMTP_FROM_EMAIL")
+    from_name = os.getenv("EMAILS_FROM_NAME", "TaxPoynt Platform")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    use_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
+
+    if not all([host, username, password, from_email]):
+        raise RuntimeError("SMTP configuration is incomplete. Ensure SMTP_* and EMAILS_FROM_* variables are set.")
+
+    return {
+        "host": host,
+        "port": port,
+        "username": username,
+        "password": password,
+        "from_email": from_email,
+        "from_name": from_name,
+        "use_tls": use_tls,
+    }
+
+
+async def _send_verification_email(recipient: str, code: str, first_name: Optional[str] = None) -> None:
+    config = _smtp_config()
+
+    subject = "Verify your TaxPoynt email"
+    greeting = first_name or recipient.split("@")[0]
+    body = (
+        f"Hello {greeting},\n\n"
+        "Thanks for registering with TaxPoynt.\n\n"
+        f"Your verification code is: {code}\n\n"
+        "Enter this code in the verification screen to unlock your onboarding checklist.\n\n"
+        "If you did not create this account, please contact support immediately.\n\n"
+        "— TaxPoynt Platform"
+    )
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = formataddr((config["from_name"], config["from_email"]))
+    message["To"] = recipient
+    message.attach(MIMEText(body, "plain"))
+
+    def _send():
+        with smtplib.SMTP(config["host"], config["port"]) as server:
+            if config.get("use_tls", True):
+                server.starttls()
+            server.login(config["username"], config["password"])
+            server.send_message(message)
+
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _send)
+
+
+def _normalize_domain_entry(value: Any) -> Optional[str]:
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token and not token.startswith("#"):
+            return token
+    return None
+
+
+def _parse_domain_tokens(raw: Optional[str]) -> set[str]:
+    if not raw:
+        return set()
+    tokens = re.split(r"[,\s]+", raw)
+    domains = {token for token in (_normalize_domain_entry(t) for t in tokens) if token}
+    return domains
+
+
+def _read_domains_from_path(path: Path) -> set[str]:
+    domains: set[str] = set()
+    try:
+        if not path.exists():
+            return domains
+        if path.suffix.lower() == ".json":
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            candidates = []
+            if isinstance(payload, list):
+                candidates = payload
+            elif isinstance(payload, dict):
+                for key in ("domains", "denylist", "blocklist", "free"):
+                    value = payload.get(key)
+                    if isinstance(value, list):
+                        candidates = value
+                        break
+            domains.update(
+                token for token in (_normalize_domain_entry(entry) for entry in candidates) if token
+            )
+        else:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                token = _normalize_domain_entry(line)
+                if token:
+                    domains.add(token)
+    except Exception as exc:
+        logger.warning("Failed to load domain list from %s: %s", path, exc)
+    return domains
+
+
+def _load_business_email_policy() -> Dict[str, Any]:
+    mode = os.getenv("BUSINESS_EMAIL_POLICY_MODE", "strict").strip().lower()
+    if mode in {"allowlist", "allowlist_only"}:
+        mode = "allowlist_only"
+    elif mode in {"disabled", "off", "skip"}:
+        mode = "disabled"
+    else:
+        mode = "strict"
+
+    denylist: set[str] = set()
+    denylist.update(_read_domains_from_path(FREE_EMAIL_DOMAINS_DEFAULT_PATH))
+    denylist.update(_parse_domain_tokens(os.getenv("BUSINESS_EMAIL_DENYLIST")))
+    denylist_path = os.getenv("BUSINESS_EMAIL_DENYLIST_PATH")
+    if denylist_path:
+        denylist.update(_read_domains_from_path(Path(denylist_path).expanduser()))
+
+    allowlist: set[str] = set()
+    allowlist.update(_parse_domain_tokens(os.getenv("BUSINESS_EMAIL_ALLOWLIST")))
+    allowlist_path = os.getenv("BUSINESS_EMAIL_ALLOWLIST_PATH")
+    if allowlist_path:
+        allowlist.update(_read_domains_from_path(Path(allowlist_path).expanduser()))
+
+    return {
+        "mode": mode,
+        "denylist": denylist,
+        "allowlist": allowlist,
+    }
+
+
+def _domain_matches(domain: str, candidates: set[str]) -> bool:
+    domain = domain.lower()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if candidate.startswith("*."):
+            suffix = candidate[1:]
+            if domain.endswith(suffix):
+                return True
+        elif domain == candidate:
+            return True
+        elif domain.endswith(f".{candidate}"):
+            return True
+    return False
+
+
+def _enforce_business_email_policy(email: str) -> None:
+    policy = _load_business_email_policy()
+    if policy["mode"] == "disabled":
+        return
+
+    try:
+        domain = email.split("@", 1)[1].lower()
+    except IndexError:
+        return
+
+    if _domain_matches(domain, policy["allowlist"]):
+        return
+
+    if policy["mode"] == "allowlist_only":
+        logger.info("Rejected registration for domain %s (not in allowlist)", domain)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This sign-up requires an approved business email domain.",
+        )
+
+    if _domain_matches(domain, policy["denylist"]):
+        logger.info("Rejected registration for non-business email domain %s", domain)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please use a business email address to sign up.",
+        )
 
 
 def _oauth_error(error: str, status_code: int, description: Optional[str] = None) -> HTTPException:
@@ -308,7 +515,7 @@ def create_auth_router(
         result = oauth_manager.introspect(token)
         return OAuthIntrospectionResponse(**result)
 
-    @router.post("/register", response_model=TokenResponse)
+    @router.post("/register", response_model=Union[TokenResponse, RegistrationPendingResponse])
     async def register_user(user_data: UserRegisterRequest):
         """Register a new user with organization"""
         try:
@@ -324,6 +531,8 @@ def create_auth_router(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Privacy policy must be accepted"
                 )
+
+            _enforce_business_email_policy(user_data.email)
             
             # Check if user already exists
             if get_user_by_email(user_data.email):
@@ -384,18 +593,6 @@ def create_auth_router(
             # Update organization with owner_id
             db.update_organization_owner(organization_id, user_id)
             
-            # Create access token
-            token_data = {
-                "sub": user["email"],
-                "user_id": user_id,
-                "role": user_role,
-                "organization_id": organization_id,
-                "service_package": user_data.service_package
-            }
-            
-            # Create access token via centralized manager
-            access_token = create_access_token(data=token_data)
-            
             # Prepare response
             organization_response = OrganizationResponse(
                 id=organization_id,
@@ -418,15 +615,32 @@ def create_auth_router(
                 is_email_verified=user["is_email_verified"],
                 organization=organization_response
             )
-            
-            logger.info(f"User registered successfully: {user['email']} ({user_role})")
-            
-            from core_platform.security import get_jwt_manager
-            jwt_manager = get_jwt_manager()
-            return TokenResponse(
-                access_token=access_token,
-                expires_in=int(jwt_manager.access_token_expire_minutes) * 60,
-                user=user_response
+
+            verification_code = _generate_verification_code()
+            hashed_code = hash_password(verification_code)
+
+            try:
+                db.set_email_verification_token(user_id, hashed_code)
+                await _send_verification_email(
+                    recipient=user["email"],
+                    code=verification_code,
+                    first_name=user.get("first_name")
+                )
+            except Exception as email_error:
+                logger.error(f"Failed to send verification email: {email_error}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Unable to send verification email. Please try again later."
+                )
+
+            logger.info(f"User registered successfully (verification pending): {user['email']} ({user_role})")
+
+            return RegistrationPendingResponse(
+                status="pending",
+                next="/auth/verify-email",
+                user=user_response,
+                onboarding_token=secrets.token_urlsafe(32),
+                message="Verification email sent. Please check your inbox."
             )
             
         except HTTPException:
@@ -437,7 +651,87 @@ def create_auth_router(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Registration failed due to server error"
             )
-    
+
+    @router.post("/verify-email", response_model=TokenResponse)
+    async def verify_email(request: EmailVerificationRequest):
+        try:
+            db = get_auth_database()
+            user = get_user_by_email(request.email)
+            if not user:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+            if user.get("is_email_verified"):
+                logger.info("Email already verified for %s", request.email)
+            else:
+                token_hash = user.get("email_verification_token")
+                if not token_hash or not verify_password(request.code, token_hash):
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
+
+                updated_user = db.mark_email_verified(
+                    user_id=user["id"],
+                    terms_accepted=request.terms_accepted,
+                    privacy_accepted=request.privacy_accepted,
+                )
+                user.update(updated_user)
+
+            organization = db.get_organization_by_id(user.get("organization_id"))
+            if not organization:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="User organization data not found",
+                )
+
+            organization_response = OrganizationResponse(
+                id=organization["id"],
+                name=organization["name"],
+                business_type=organization["business_type"],
+                tin=organization["tin"],
+                rc_number=organization["rc_number"],
+                status=organization["status"],
+                service_packages=organization["service_packages"],
+            )
+
+            role_str = user["role"] if isinstance(user["role"], str) else user["role"].value
+            frontend_role = convert_db_role_to_frontend_role(role_str)
+
+            user_response = UserResponse(
+                id=user["id"],
+                email=user["email"],
+                first_name=user.get("first_name"),
+                last_name=user.get("last_name"),
+                phone=user.get("phone"),
+                role=frontend_role,
+                service_package=user["service_package"],
+                is_email_verified=True,
+                organization=organization_response,
+            )
+
+            token_data = {
+                "sub": user["email"],
+                "user_id": user["id"],
+                "role": frontend_role,
+                "organization_id": user.get("organization_id"),
+                "service_package": user["service_package"],
+            }
+            access_token = create_access_token(data=token_data)
+
+            from core_platform.security import get_jwt_manager
+
+            jwt_manager = get_jwt_manager()
+            return TokenResponse(
+                access_token=access_token,
+                expires_in=int(jwt_manager.access_token_expire_minutes) * 60,
+                user=user_response,
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"Email verification failed: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Verification failed due to server error",
+            )
+
     @router.post("/login", response_model=TokenResponse)
     async def login_user(credentials: UserLoginRequest):
         """Authenticate user and return access token"""
@@ -462,6 +756,12 @@ def create_auth_router(
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Account has been deactivated. Please contact support."
+                )
+
+            if not user.get("is_email_verified", False):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Email address is not verified."
                 )
             
             # Get organization from database

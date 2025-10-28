@@ -115,14 +115,63 @@ export const OnboardingResumeMiddleware: React.FC<ResumeMiddlewareProps> = ({
   }, []);
 
   // Check if current path should be excluded from resume prompts
+  const allowedAuthPaths = ['/auth/signup', '/auth/verify-email'];
+
   const isExcludedPath = useCallback((path: string): boolean => {
-    return excludePaths.some(excluded => path.startsWith(excluded));
+    return excludePaths.some(excluded => {
+      if (excluded === '/auth') {
+        const isAllowedAuthPath = allowedAuthPaths.some(allowed => path.startsWith(allowed));
+        return path.startsWith(excluded) && !isAllowedAuthPath;
+      }
+      return path.startsWith(excluded);
+    });
   }, [excludePaths]);
 
   // Check if user is currently in an onboarding flow
   const isInOnboardingFlow = useCallback((path: string): boolean => {
-    return path.includes('/onboarding/');
+    return (
+      path.includes('/onboarding/') ||
+      allowedAuthPaths.some(allowed => path.startsWith(allowed))
+    );
   }, []);
+
+  const getServiceFromRole = useCallback((): 'si' | 'app' | 'hybrid' => {
+    if (!user?.role) return 'si';
+    const roleMap: Record<string, 'si' | 'app' | 'hybrid'> = {
+      'system_integrator': 'si',
+      'access_point_provider': 'app',
+      'hybrid_user': 'hybrid',
+    };
+    return roleMap[user.role] || 'si';
+  }, [user?.role]);
+
+  const buildPrecheckUrl = useCallback(
+    (step: string) => {
+      const service = getServiceFromRole();
+      const params = new URLSearchParams({ service });
+      const email = user?.email || (progressState?.metadata?.email as string | undefined);
+      if (email) {
+        params.set('email', email);
+      }
+      const token = progressState?.metadata?.onboarding_token;
+      if (token && typeof token === 'string') {
+        params.set('onboarding_token', token);
+      }
+
+      const nextByRole: Record<'si' | 'app' | 'hybrid', string> = {
+        si: '/onboarding/si/integration-choice',
+        app: '/onboarding/app/business-verification',
+        hybrid: '/onboarding/hybrid/service-selection',
+      };
+      params.set('next', nextByRole[service]);
+
+      if (step === 'registration') {
+        return `/auth/signup?${params.toString()}`;
+      }
+      return `/auth/verify-email?${params.toString()}`;
+    },
+    [getServiceFromRole, user?.email, progressState?.metadata]
+  );
 
   // Determine if we should show resume prompt
   const shouldShowResume = useCallback((): boolean => {
@@ -184,6 +233,29 @@ export const OnboardingResumeMiddleware: React.FC<ResumeMiddlewareProps> = ({
     sessionState,
     isExcludedPath,
     isInOnboardingFlow
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !progressState || progressLoading) {
+      return;
+    }
+
+    const precheckSteps = new Set(['registration', 'email_verification', 'terms_acceptance']);
+    if (!precheckSteps.has(progressState.currentStep)) {
+      return;
+    }
+
+    const targetUrl = buildPrecheckUrl(progressState.currentStep);
+    if (!pathname.startsWith(targetUrl.split('?')[0])) {
+      router.replace(targetUrl);
+    }
+  }, [
+    isAuthenticated,
+    progressState,
+    progressLoading,
+    pathname,
+    router,
+    buildPrecheckUrl,
   ]);
 
   // Handle resume action

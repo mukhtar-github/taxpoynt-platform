@@ -5,7 +5,7 @@
  * Connects frontend components to backend authentication API endpoints.
  */
 
-import apiClient, { APIError } from '../api/client';
+import apiClient, { APIError, RegisterPendingResponse, VerifyEmailRequest } from '../api/client';
 
 export interface User {
   id: string;
@@ -64,6 +64,8 @@ export interface AuthResponse {
   user: User;
 }
 
+export type RegistrationResponse = AuthResponse | RegisterPendingResponse;
+
 class AuthService {
   private tokenKey = 'taxpoynt_token';
   private userKey = 'taxpoynt_user';
@@ -72,7 +74,7 @@ class AuthService {
     // API client handles base URL and configuration
   }
 
-  async register(userData: RegisterRequest): Promise<AuthResponse> {
+  async register(userData: RegisterRequest): Promise<RegistrationResponse> {
     try {
       // Use API client for registration with built-in error handling
       const authData = await apiClient.register({
@@ -99,6 +101,15 @@ class AuthService {
       return authData;
     } catch (error) {
       // API client already formats errors consistently
+      throw error;
+    }
+  }
+
+  async verifyEmail(payload: VerifyEmailRequest): Promise<AuthResponse> {
+    try {
+      const authData = await apiClient.verifyEmail(payload);
+      return authData;
+    } catch (error) {
       throw error;
     }
   }

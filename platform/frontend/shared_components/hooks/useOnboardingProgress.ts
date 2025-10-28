@@ -91,7 +91,10 @@ interface UseOnboardingProgressReturn {
 // Step configurations with dependencies and time estimates
 const STEP_CONFIGURATIONS = {
   si: [
-    { id: 'service_introduction', estimatedMinutes: 2, dependencies: [] },
+    { id: 'registration', estimatedMinutes: 2, dependencies: [] },
+    { id: 'email_verification', estimatedMinutes: 2, dependencies: ['registration'] },
+    { id: 'terms_acceptance', estimatedMinutes: 1, dependencies: ['email_verification'] },
+    { id: 'service_introduction', estimatedMinutes: 2, dependencies: ['terms_acceptance'] },
     { id: 'integration_choice', estimatedMinutes: 3, dependencies: ['service_introduction'] },
     { id: 'business_systems_setup', estimatedMinutes: 8, dependencies: ['integration_choice'] },
     { id: 'financial_systems_setup', estimatedMinutes: 5, dependencies: ['business_systems_setup'] },
@@ -101,7 +104,10 @@ const STEP_CONFIGURATIONS = {
     { id: 'onboarding_complete', estimatedMinutes: 1, dependencies: ['integration_setup'] }
   ],
   app: [
-    { id: 'service_introduction', estimatedMinutes: 2, dependencies: [] },
+    { id: 'registration', estimatedMinutes: 2, dependencies: [] },
+    { id: 'email_verification', estimatedMinutes: 2, dependencies: ['registration'] },
+    { id: 'terms_acceptance', estimatedMinutes: 1, dependencies: ['email_verification'] },
+    { id: 'service_introduction', estimatedMinutes: 2, dependencies: ['terms_acceptance'] },
     { id: 'business_verification', estimatedMinutes: 10, dependencies: ['service_introduction'] },
     { id: 'firs_integration_setup', estimatedMinutes: 12, dependencies: ['business_verification'] },
     { id: 'compliance_settings', estimatedMinutes: 8, dependencies: ['firs_integration_setup'] },
@@ -109,7 +115,10 @@ const STEP_CONFIGURATIONS = {
     { id: 'onboarding_complete', estimatedMinutes: 1, dependencies: ['compliance_settings'] }
   ],
   hybrid: [
-    { id: 'service_introduction', estimatedMinutes: 3, dependencies: [] },
+    { id: 'registration', estimatedMinutes: 2, dependencies: [] },
+    { id: 'email_verification', estimatedMinutes: 2, dependencies: ['registration'] },
+    { id: 'terms_acceptance', estimatedMinutes: 1, dependencies: ['email_verification'] },
+    { id: 'service_introduction', estimatedMinutes: 3, dependencies: ['terms_acceptance'] },
     { id: 'service_selection', estimatedMinutes: 5, dependencies: ['service_introduction'] },
     { id: 'business_verification', estimatedMinutes: 12, dependencies: ['service_selection'] },
     { id: 'integration_setup', estimatedMinutes: 15, dependencies: ['business_verification'] },
