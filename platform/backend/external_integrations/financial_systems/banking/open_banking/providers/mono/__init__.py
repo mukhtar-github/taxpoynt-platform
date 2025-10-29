@@ -37,6 +37,11 @@ from .operations import (
     MONO_TRANSFORM_TRANSACTION_OPERATION,
 )
 from .token_provider import SecretBackedMonoTokenProvider, MonoTokenBundle
+from .transaction_sync import (
+    MonoTransactionSyncService,
+    MonoSyncResult,
+    InMemorySyncStateStore,
+)
 
 
 class MonoEnvironment(str, Enum):
@@ -150,4 +155,7 @@ __all__ = [
     "MONO_TRANSFORM_TRANSACTION_OPERATION",
     "SecretBackedMonoTokenProvider",
     "MonoTokenBundle",
+    "MonoTransactionSyncService",
+    "MonoSyncResult",
+    "InMemorySyncStateStore",
 ]

@@ -28,3 +28,4 @@ Describe the end-to-end pipeline for fetching financial transactions from Mono, 
 - `MonoClient` wrapper introduced with built-in rate limiting, exponential backoff, and Prometheus instrumentation (service role `mono_open_banking`).
 - Token loading delegated to `SecretBackedMonoTokenProvider`, enabling retrieval from the configuration management secrets service and pluggable refresh callbacks.
 - Operation identifiers (`mono.fetch_transactions`, `mono.transform_transaction`) published in `operations.py` to keep retry manager and message router naming consistent.
+- Day 3 introduced `MonoTransactionSyncService`, which orchestrates paginated fetches using the shared retry manager, idempotency guard, and synthetic fetch started/completed events.
