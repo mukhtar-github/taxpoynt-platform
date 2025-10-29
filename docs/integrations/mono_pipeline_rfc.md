@@ -82,3 +82,8 @@ Describe the end-to-end pipeline for fetching financial transactions from Mono, 
 - Dashboard tweaks incorporate account-level filtering, Markdown context, and Loki log streaming for `mono-pipeline` events.
 - Prometheus alert rules now scope to `provider="mono"` and leverage the new `account_id` label emitted by the observability helpers.
 - Additional notes and operational reminders captured in `docs/integrations/mono_day9_feedback_buffer.md`.
+
+## Day 10 – Production Release
+- Feature flag `MONO_TRANSACTIONS_ENABLED` gates the live Mono pipeline; disabled mode returns a deferred response, enabled mode executes the full fetch/transform/persist stack.
+- `sync_banking_transactions` now orchestrates MonoClient → MonoTransactionPipeline, persisting cursors in `bank_accounts.account_metadata` and updating `banking_connections.last_sync_at`.
+- Release runbook captured in `docs/integrations/mono_day10_production_release.md`, including rollback instructions and monitoring expectations.

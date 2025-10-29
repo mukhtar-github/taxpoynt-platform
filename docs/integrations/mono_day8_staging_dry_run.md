@@ -15,6 +15,7 @@
    - `MONO_RATE_LIMIT_PER_MINUTE` (optional override, default 60)
    - `MONO_DEFAULT_TRANSACTION_LIMIT` (optional, default 50)
    - `MONO_ENVIRONMENT=sandbox`
+   - `MONO_TRANSACTIONS_ENABLED=true` (staging only during dry run)
    - `ROUTER_VALIDATE_ON_STARTUP=true` and `ROUTER_FAIL_FAST_ON_STARTUP=true` (ensures service metadata alignment)
    - Standard DB/env secrets (`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET_KEY`, etc.)
 

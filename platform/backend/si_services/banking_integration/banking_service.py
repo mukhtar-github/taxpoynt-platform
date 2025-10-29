@@ -1,48 +1,93 @@
-"""
-SI Banking Service
-==================
-
-Main service for handling banking-related operations for System Integrators.
-Acts as a dispatcher to specific banking provider services.
-
-Operations Handled:
-- create_mono_widget_link
-- list_open_banking_connections  
-- create_open_banking_connection
-- get_open_banking_connection
-- update_open_banking_connection
-- delete_open_banking_connection
-- get_banking_transactions
-- sync_banking_transactions
-- get_banking_accounts
-- get_account_balance
-- test_banking_connection
-- get_banking_connection_health
-
-Architecture:
-- Follows SI service patterns
-- Delegates to provider-specific services
-- Handles message router operations
-"""
-
 import logging
+import os
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core_platform.data_management.db_async import get_async_session
+from core_platform.data_management.models.banking import BankAccount, BankingConnection
 from core_platform.data_management.repositories.banking_repo_async import (
     create_banking_connection,
+    delete_banking_connection,
     get_banking_connection,
     list_banking_connections,
     update_banking_connection,
-    delete_banking_connection,
 )
-
 from .mono_integration_service import MonoIntegrationService
-from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.models import AuditEventType
 from si_services.utils.audit import record_audit_event
+from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.client import (
+    MonoClient,
+    MonoClientConfig,
+)
+from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.observability import (
+    LATENCY_ALERT_SECONDS,
+)
+from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.pipeline import (
+    MonoTransactionPipeline,
+)
+from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.transaction_sync import (
+    MonoTransactionSyncService,
+    SyncStateStore,
+)
+from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.transformer import (
+    MonoTransactionTransformer,
+)
+from platform.backend.core_platform.services.banking_ingestion_service import BankingIngestionService
 
 logger = logging.getLogger(__name__)
+
+_FLAG_ENV = "MONO_TRANSACTIONS_ENABLED"
+_TRUTHY_VALUES = {"1", "true", "yes", "on"}
+
+
+@dataclass
+class _AccountSyncStateStore(SyncStateStore):
+    """Persist Mono cursors in bank account metadata while keeping per-run dedupe in memory."""
+
+    session: AsyncSession
+    _account_cache: Dict[str, BankAccount] = field(default_factory=dict)
+    _dedupe: Dict[str, set[str]] = field(default_factory=dict)
+    last_cursor: Optional[str] = None
+
+    async def get_cursor(self, account_id: str) -> Optional[str]:
+        account = await self._get_account(account_id)
+        metadata = dict(account.account_metadata or {})
+        return metadata.get("mono_last_cursor")
+
+    async def set_cursor(self, account_id: str, cursor: Optional[str]) -> None:
+        account = await self._get_account(account_id)
+        metadata = dict(account.account_metadata or {})
+        metadata["mono_last_cursor"] = cursor
+        account.account_metadata = metadata
+        self.last_cursor = cursor
+
+    async def register_transaction(self, account_id: str, dedupe_key: str) -> bool:
+        bucket = self._dedupe.setdefault(account_id, set())
+        if dedupe_key in bucket:
+            return False
+        bucket.add(dedupe_key)
+        return True
+
+    async def _get_account(self, provider_account_id: str) -> BankAccount:
+        if provider_account_id in self._account_cache:
+            return self._account_cache[provider_account_id]
+
+        stmt = (
+            select(BankAccount)
+            .where(BankAccount.provider_account_id == provider_account_id)
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        account = result.scalar_one_or_none()
+        if not account:
+            raise ValueError(f"Bank account with provider account id '{provider_account_id}' not found")
+        self._account_cache[provider_account_id] = account
+        return account
 
 
 class SIBankingService:
@@ -323,22 +368,126 @@ class SIBankingService:
     
     async def _handle_sync_banking_transactions(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle syncing banking transactions"""
-        sync_config = payload.get("sync_config", {})
-        
-        # For now, return mock sync result
-        result = {
-            "sync_started": True,
-            "config": sync_config,
-            "estimated_duration": "5-10 minutes",
-            "si_id": si_id
-        }
-        
-        return {
-            "operation": "sync_banking_transactions",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+        sync_enabled = os.getenv(_FLAG_ENV, "false").lower() in _TRUTHY_VALUES
+        sync_config = payload.get("sync_config") or {}
+
+        if not sync_enabled:
+            logger.info("Mono transactions sync requested while feature flag disabled", extra={"si_id": si_id})
+            return {
+                "operation": "sync_banking_transactions",
+                "success": True,
+                "data": {
+                    "sync_started": False,
+                    "feature_enabled": False,
+                    "message": f"Mono transactions disabled – set {_FLAG_ENV}=true to enable pipeline",
+                    "si_id": si_id,
+                },
+                "si_id": si_id,
+            }
+
+        account_db_id_value = sync_config.get("account_db_id") or sync_config.get("account_id")
+        if not account_db_id_value:
+            raise ValueError("account_db_id is required in sync_config when Mono transactions are enabled")
+
+        try:
+            account_db_id = UUID(str(account_db_id_value))
+        except ValueError as exc:
+            raise ValueError("account_db_id must be a valid UUID") from exc
+
+        mono_account_id = sync_config.get("mono_account_id")
+        page_size = int(os.getenv("MONO_PAGE_LIMIT", "100"))
+
+        mono_secret = os.getenv("MONO_SECRET_KEY")
+        mono_app_id = os.getenv("MONO_APP_ID")
+        mono_base_url = os.getenv("MONO_BASE_URL", "https://api.withmono.com")
+
+        if not mono_secret or not mono_app_id:
+            raise RuntimeError("MONO_SECRET_KEY and MONO_APP_ID must be configured to sync transactions")
+
+        async for db in get_async_session():
+            account: BankAccount = await db.get(BankAccount, account_db_id)
+            if not account:
+                raise ValueError(f"Bank account {account_db_id} not found")
+
+            connection: BankingConnection = await db.get(BankingConnection, account.connection_id)
+            if not connection:
+                raise ValueError(f"Banking connection {account.connection_id} not found")
+
+            mono_account_identifier = mono_account_id or account.provider_account_id
+            if not mono_account_identifier:
+                raise ValueError("Mono account identifier unavailable (provide mono_account_id or ensure provider_account_id is stored)")
+
+            state_store = _AccountSyncStateStore(session=db)
+
+            async def _emit(event: str, event_payload: Dict[str, Any]) -> None:
+                logger.info(
+                    "Mono pipeline event",
+                    extra={
+                        "event": event,
+                        "si_id": si_id,
+                        "account_id": mono_account_identifier,
+                        "account_db_id": str(account.id),
+                        "payload": event_payload,
+                    },
+                )
+
+            mono_client = MonoClient(
+                MonoClientConfig(
+                    base_url=mono_base_url,
+                    secret_key=mono_secret,
+                    app_id=mono_app_id,
+                    rate_limit_per_minute=int(os.getenv("MONO_RATE_LIMIT_PER_MINUTE", "60")),
+                    request_timeout=float(os.getenv("MONO_REQUEST_TIMEOUT", "30")),
+                )
+            )
+
+            try:
+                sync_service = MonoTransactionSyncService(
+                    mono_client,
+                    state_store,
+                    _emit,
+                    page_size=page_size,
+                )
+                ingestion_service = BankingIngestionService(db, _emit)
+                pipeline = MonoTransactionPipeline(sync_service, MonoTransactionTransformer(), ingestion_service, _emit)
+
+                result = await pipeline.run(
+                    account_id=mono_account_identifier,
+                    account_number=account.account_number,
+                    provider_account_id=account.provider_account_id,
+                    connection_db_id=connection.id,
+                    account_db_id=account.id,
+                )
+
+                account.account_metadata = {
+                    **(account.account_metadata or {}),
+                    "mono_last_synced_at": self._current_timestamp(),
+                    "mono_last_cursor": state_store.last_cursor,
+                }
+                connection.last_sync_at = datetime.now(timezone.utc)
+
+                await db.commit()
+            finally:
+                await mono_client.aclose()
+
+            response_payload = {
+                "sync_started": True,
+                "feature_enabled": True,
+                "persisted": result.inserted_count,
+                "duplicates": result.duplicate_count,
+                "account_id": str(account.id),
+                "connection_id": str(connection.id),
+                "mono_account_id": mono_account_identifier,
+                "last_cursor": state_store.last_cursor,
+                "latency_sla_seconds": LATENCY_ALERT_SECONDS,
+            }
+
+            return {
+                "operation": "sync_banking_transactions",
+                "success": True,
+                "data": response_payload,
+                "si_id": si_id,
+            }
     
     async def _handle_get_banking_accounts(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle getting banking accounts"""
