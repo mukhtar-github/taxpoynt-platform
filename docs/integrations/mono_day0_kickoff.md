@@ -3,47 +3,51 @@
 ## 1. Access & Compliance Checklist
 
 - **API credentials**: confirmed availability of `MONO_CLIENT_ID`, `MONO_CLIENT_SECRET`, and webhook signing key. These will be stored in the platform secrets manager (`secrets://open_banking/mono`) with per-tenant scoping.
-- **Tenant scoping**: mono connections are mapped 1:1 with organizations already tracked in `banking_linked_accounts`. We will reuse the existing tenant guard (`TenantScopeService`) to enforce row-level filters when fetching transactions.
-- **Security posture**: verify HTTPS-only webhooks, rotate secrets quarterly, and enable IP restriction (Mono dashboard) to match production egress IPs.
+- **Tenant scoping**: connections map 1:1 with `banking_linked_accounts`; reuse `TenantScopeService` to enforce row-level filters.
+- **Security posture**: enforce HTTPS-only webhooks, rotate secrets quarterly, and whitelist production egress IPs in the Mono dashboard.
 
 ## 2. Existing Integration Review
 
 | Component | Notes |
 |-----------|-------|
-| `external_integrations/financial_systems/banking/open_banking/providers/mono` | Base connector, auth helpers, and webhook handler already scaffolded. Requires transaction fetch extension and transformation layer. |
-| Retry manager (`core_platform.messaging.retry_manager`) | Supports exponential backoff & jitter; will wrap Mono fetch calls to handle 5xx and 429 responses. |
-| Observability (`core_platform/monitoring/fastapi_middleware.py`) | Exposes Prometheus counters/histograms. Synthetic tests show we can emit FIRS-style metrics; we’ll add `mono_transactions_*` gauges as part of implementation. |
-| Banking ingestion service (`core_platform.services.banking_ingestion_service`) | Currently ingests unified banking transactions. We will plug Mono fetcher here, preserving the existing canonical DTO. |
+| `external_integrations/.../providers/mono` | Connector/auth scaffolding in place; transaction fetch/transform to be extended. |
+| Retry manager | `core_platform.messaging.retry_manager` handles backoff/jitter; wrap Mono API calls. |
+| Observability | `core_platform/monitoring/fastapi_middleware.py` provides Prometheus hooks; extend with `mono_transactions_*`. |
+| Banking ingestion service | `core_platform.services.banking_ingestion_service` consumes canonical DTO; Mono pipeline will plug into this entry point. |
 
 ## 3. Data Contract Comparison
 
-| Mono field | Example | Canonical field | Notes |
-|------------|---------|-----------------|-------|
-| `id` | `trn_01ht...` | `transaction_id` | Used for idempotency; stored as string. |
-| `account.id` | `acc_01hs...` | `source_account_id` | Maps to linked bank account. |
-| `amount` | `-45000` | `amount.value` | Stored in kobo; sign retained (debits negative). |
-| `currency` | `NGN` | `amount.currency` | Must be ISO 4217; fallback to tenant currency if missing. |
-| `type` | `debit`/`credit` | `direction` | Enum mapped to canonical `DEBIT`/`CREDIT`. |
-| `narration` | `POS PURCHASE` | `description` | Trimmed, stored as plain text. |
-| `category` | `pos` | `classification.primary` | Optional, used for analytics tagging. |
-| `status` | `completed` | `status` | Pending/reversed flagged for downstream reconciliation. |
-| `date` | `2025-01-05T08:15:22Z` | `posted_at` | Converted to aware UTC datetime. |
-| `meta` | `{ "counterparty": {...} }` | `metadata` | Stored as JSONB; subject to size limits. |
+| Mono field | Canonical field | Notes |
+|------------|-----------------|-------|
+| `id` | `BankTransaction.id` | Primary idempotency key. |
+| `account.id` | `provider_account_id` | Stored with `account_number` for traceability. |
+| `account.account_number` | `account_number` | Normalised string. |
+| `amount` | `amount` | Absolute decimal; direction set via `transaction_type`. |
+| `currency` | `currency` | Defaults to account currency when missing. |
+| `type` | `transaction_type` | `credit`/`debit`. |
+| `status` | `status` | Supported: completed/pending/reversed. |
+| `balance` | `ledger_info.ledger_balance` | Optional snapshot. |
+| `narration` | `narration` | Long-form description. |
+| `description` | `description` | Short description; fallback to narration. |
+| `meta.counterparty.*` | `counterparty.*` | Nested counterparty info. |
+| `meta.tags` | `tags` | Lowercased/deduplicated. |
+| `date` | `transaction_date` | UTC aware datetime. |
+| `value_date` | `value_date` | Optional. |
+| `meta.is_reversal` | `is_reversal` | Falls back to `status == "reversed"`. |
 
-Validation rules: ensure amount not `None`, currency 3-char uppercase, status in allowed enum, and narration length ≤ 255.
+Validation rules: non-negative amount, 3-letter currency, constrained statuses, zero amounts flagged as holds, duplicate detection `(id, provider_account_id, transaction_date)`.
 
 ## 4. Authentication Strategy
 
-- Use **client credentials** with refresh tokens provided by Mono Connect.
-- Tokens cached via the secrets manager and refreshed using `MonoAuthService` (existing scaffolding). Fallback to tenant-specific refresh token where provided.
-- All secrets are encrypted at rest; tokens loaded via dependency injection (no hardcoded env usage in business logic).
+- Use client credentials with Mono refresh tokens. Tokens stored in secrets manager, loaded via dependency injection in the connector.
+- Secrets encrypted at rest; no raw env references inside business logic.
 
 ## 5. Fetch & Transform RFC (Summary)
 
-- **Pipeline**: scheduler → Mono fetcher → retry manager → transformation → persistence → event bus → observability. Detailed RFC tracked in `docs/integrations/mono_pipeline_rfc.md` (to be expanded during Day 1).
-- **Error handling**: network errors retried; validation failures logged + pushed to dead-letter queue (`mono.transactions.deadletter`).
-- **Idempotency**: composite key `(mono_transaction_id, tenant_id)` stored in ingestion table; duplicates discarded.
-- **Alerting**: Prometheus counter `mono_transactions_failed_total` triggers WARN after 5 failures within 10 minutes.
+- Pipeline: scheduler → Mono fetcher → retry manager → transform → persistence → event bus → observability. RFC tracked in `docs/integrations/mono_pipeline_rfc.md`.
+- Errors retried with backoff; validation failures routed to `mono.transactions.deadletter`.
+- Idempotency enforced with composite key `(mono_transaction_id, tenant_id)`.
+- Prometheus counter `mono_transactions_failed_total` emits WARN after 5 failures in 10 minutes.
 
 ### Sequence Diagram
 
@@ -63,6 +67,6 @@ sequenceDiagram
 
 ## 6. Next Steps
 
-1. Day 1: finalise canonical DTO implementation and transformation test plan.
-2. Day 2: build Mono client with auth/refresh logic.
-3. Day 3+: wire fetch pipeline, observability, and persistence as per roadmap.
+1. Day 1: canonical DTO & transformation tests.
+2. Day 2: Mono client + auth flow (current task).
+3. Day 3+: fetch pipeline, observability, persistence integrations.

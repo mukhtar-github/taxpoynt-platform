@@ -31,6 +31,13 @@ Follows existing TaxPoynt patterns from backend/app/integrations/
 from enum import Enum
 from typing import Dict, Any
 
+from .client import MonoClient, MonoClientConfig
+from .operations import (
+    MONO_FETCH_TRANSACTIONS_OPERATION,
+    MONO_TRANSFORM_TRANSACTION_OPERATION,
+)
+from .token_provider import SecretBackedMonoTokenProvider, MonoTokenBundle
+
 
 class MonoEnvironment(str, Enum):
     """Mono API environments"""
@@ -133,8 +140,14 @@ SUPPORTED_BANKS = {
 # Export key components
 __all__ = [
     "MonoEnvironment",
-    "MonoScope", 
+    "MonoScope",
     "MonoEventType",
     "MONO_CONFIG",
-    "SUPPORTED_BANKS"
+    "SUPPORTED_BANKS",
+    "MonoClient",
+    "MonoClientConfig",
+    "MONO_FETCH_TRANSACTIONS_OPERATION",
+    "MONO_TRANSFORM_TRANSACTION_OPERATION",
+    "SecretBackedMonoTokenProvider",
+    "MonoTokenBundle",
 ]
