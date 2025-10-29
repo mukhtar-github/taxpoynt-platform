@@ -1,0 +1,32 @@
+groups:
+  - name: mono_pipeline_alerts
+    rules:
+      - alert: MonoPipelineHighFailureRate
+        expr: increase(taxpoynt_mono_pipeline_errors_total[5m]) >= 5
+        for: 5m
+        labels:
+          severity: warning
+          service: mono_pipeline
+        annotations:
+          summary: "Mono pipeline experiencing repeated failures"
+          description: "Over five Mono pipeline errors recorded within 5 minutes. Investigate sync stability and Mono API availability."
+
+      - alert: MonoPipelineLatencySLA
+        expr: histogram_quantile(0.95, sum by (stage, le) (rate(taxpoynt_mono_pipeline_stage_seconds_bucket{stage=\"sync\"}[10m]))) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: mono_pipeline
+        annotations:
+          summary: "Mono pipeline latency SLA breach"
+          description: "P95 sync latency has exceeded 2 seconds for the last 10 minutes. Review downstream persistence and Mono response times."
+
+      - alert: MonoPipelineZeroTransactions
+        expr: increase(taxpoynt_mono_pipeline_zero_transactions_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: info
+          service: mono_pipeline
+        annotations:
+          summary: "Mono pipeline yielded zero transactions"
+          description: "Mono pipeline has reported runs with zero transactions in the last hour. Confirm account connectivity and cursor alignment."
