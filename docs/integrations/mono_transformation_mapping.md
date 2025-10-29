@@ -42,3 +42,7 @@
 - Transform: `mono.transform_transaction`
 
 These identifiers appear in message router metadata and observability logs.
+
+## Implementation Notes (Day 4)
+- `MonoTransactionTransformer` (`transformer.py`) materialises the mapping above, handling kobo→naira conversion, reversal detection, and zero-amount hold enforcement.
+- Tag enrichment hooks allow downstream classification to append domain-specific labels without modifying the core transformer.
