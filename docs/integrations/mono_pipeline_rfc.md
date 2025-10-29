@@ -29,3 +29,4 @@ Describe the end-to-end pipeline for fetching financial transactions from Mono, 
 - Token loading delegated to `SecretBackedMonoTokenProvider`, enabling retrieval from the configuration management secrets service and pluggable refresh callbacks.
 - Operation identifiers (`mono.fetch_transactions`, `mono.transform_transaction`) published in `operations.py` to keep retry manager and message router naming consistent.
 - Day 3 introduced `MonoTransactionSyncService`, which orchestrates paginated fetches using the shared retry manager, idempotency guard, and synthetic fetch started/completed events.
+- Day 5 wired `MonoTransactionPipeline` with the new ingestion service, persisting canonical records and emitting `bank.transactions.ingested` / `mono.pipeline.completed` events.

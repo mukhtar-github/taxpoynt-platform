@@ -43,6 +43,7 @@ from .transaction_sync import (
     InMemorySyncStateStore,
 )
 from .transformer import MonoTransactionTransformer, MonoTransformationError
+from .pipeline import MonoTransactionPipeline
 
 
 class MonoEnvironment(str, Enum):
@@ -161,4 +162,5 @@ __all__ = [
     "InMemorySyncStateStore",
     "MonoTransactionTransformer",
     "MonoTransformationError",
+    "MonoTransactionPipeline",
 ]
