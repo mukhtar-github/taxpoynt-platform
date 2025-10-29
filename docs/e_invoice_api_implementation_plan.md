@@ -8,8 +8,11 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 
 ## Guiding Principles
 - **DDD alignment:** Keep bounded contexts (invoicing, compliance, onboarding) isolated; domain logic lives in `contexts/<context>/domain`.
-- **Incremental delivery:** Every branch should boot, run lint/tests, and keep CI passing; avoid “big bang” merges.
-- **Configuration-first:** Secrets remain out of repo; settings go through `config/settings.example.env` and Pydantic Settings.
+- **Foundation first:** Phases 0–3 must leave a production-ready skeleton (settings, security, middleware, DB/migrations, CI) before any context work merges.
+- **Incremental vertical slices:** Each branch delivers a cohesive slice—domain → application → infrastructure → API—with passing tests and docs.
+- **Shared services early:** Messaging, observability, and background job scaffolds should exist before contexts depend on them.
+- **Platform compatibility checklist:** Every merge checks auth/tenant hooks, observability metrics, messaging, and migrations.
+- **Configuration-first:** Secrets remain out of repo; use `config/settings.example.env` + Pydantic Settings for environment parity.
 - **Telemetry/security parity:** Carry across JWT, permission guards, observability hooks from the source repo early in the migration.
 - **Testing mirrors structure:** Unit tests under `tests/unit/...`, integration/end-to-end under `tests/integration` and `tests/e2e`.
 
@@ -82,18 +85,21 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 - Port aggregate roots (Invoice, LineItem, etc.), value objects, domain events.
 - Implement domain services (e.g., invoice total calculations).
 - Tests: pure unit tests covering entities/events/services.
+- **Platform checklist:** run full test suite; confirm logging/auth/migrations unaffected.
 
 ### Day 8 – Application Layer
 **Branch:** `feat/context-invoicing-app`
 - Implement commands, queries, handlers orchestrating domain logic.
 - Add DTOs mapping HTTP payloads to domain commands.
 - Tests: application layer unit tests using in-memory repositories.
+- **Platform checklist:** exercise dependency wiring; ensure message bus hooks compile (even if stubbed).
 
 ### Day 9 – Infrastructure Ports
 **Branch:** `feat/context-invoicing-infra`
 - Implement SQLAlchemy repositories, mappers, external clients (e.g., FIRS adapter) within `contexts/invoicing/infrastructure`.
 - Wire repository implementations into dependency injection.
 - Integration tests: repository persistence roundtrips against test DB; HTTP contract tests for FIRS mock client.
+- **Platform checklist:** verify metrics/logging for new routes; rerun lint/tests before merge.
 
 ---
 
@@ -103,18 +109,21 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 - Mirror Day 7–9 steps for compliance (domain → application → infrastructure).
 - Focus on validation rules, audit logging, compliance event publishing.
 - Include tests for regulatory workflows.
+- **Platform checklist:** ensure compliance routes respect auth/tenant + observability.
 
 ### Day 11 – Onboarding & Checklist Flows
 **Branch:** `feat/context-onboarding`
 - Port onboarding state machine, metadata, analytics emission.
 - Implement API routes under `app/routes/v1/onboarding.py`.
 - Tests: integration tests covering sign-up → checklist retrieval using message bus fakes.
+- **Platform checklist:** confirm analytics events flow through telemetry pipeline.
 
 ### Day 12 – Cross-Context Services
 **Branch:** `feat/services-orchestrators`
 - Migrate background jobs, orchestrators, message consumers interacting across contexts.
 - Ensure consistent telemetry + retry strategy (reuse core/messaging abstractions).
 - Tests: service-level unit tests with mocks for context boundaries.
+- **Platform checklist:** verify background jobs integrate with shared messaging/observability.
 
 ---
 
@@ -124,6 +133,7 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 - Port Redis/Kafka message bus abstractions, event bus, message router.
 - Update contexts to publish/subscribe via shared bus.
 - Integration test using embedded Redis or in-memory broker.
+- **Platform checklist:** confirm existing contexts integrate with the bus without regressions.
 
 ### Day 14 – Observability & Alerting
 **Branch:** `feat/core-observability`
@@ -131,21 +141,24 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 - Update `config/telemetry.toml` with dashboards/alert references.
 - `scripts/verify_release.py` ensures telemetry endpoints respond.
 - Tests: smoke tests verifying metrics endpoint and trace exporters configuration.
+- **Platform checklist:** rerun regression suite; double-check dashboards/alerts.
 
 ---
 
-## Phase 7 – Release Hardening (Days 15–16)
+## Phase 7 – Release Hardening & Platform Audits (Days 15–16)
 ### Day 15 – API Surface & Documentation
 **Branch:** `feat/docs-api`
 - Generate OpenAPI docs, update README with runbooks, add ADRs for contexts.
 - Document branch/PR workflow and deployment checklist.
 - Add `scripts/release_notes.py` template.
+- **Platform checklist:** ensure docs capture configuration/feature flags introduced so far.
 
 ### Day 16 – Final QA & Cutover Prep
 **Branch:** `feat/release-readiness`
 - Run full test suite, load test critical endpoints, verify observability dashboards in staging.
 - Ensure `config/settings.example.env` matches production requirements.
 - Prepare migration playbook to cut over from legacy monolith to new service.
+- **Platform checklist:** perform dependency audit, security scan, confirm rollback steps documented.
 
 ---
 
@@ -154,6 +167,70 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 - **Code Quality:** Adopt pre-commit hooks mirroring fast feedback loops.
 - **Performance Benchmarks:** Introduce Locust or k6 scenarios under `tests/performance`.
 - **Security Review:** Integrate dependency scanning (e.g., GitHub Dependabot, pip-audit).
+- **Quarterly hardening branches:** schedule `feat/platform-hardening` after major milestones to reconcile dependencies, refresh infra configs, and address tech debt.
+
+---
+
+## Major Functional Domains Migration
+
+### System Integrator (SI) Integrations
+- **Day 17 – SI Banking & Open Banking**
+  - **Branch:** `feat/si-banking`
+  - Port Mono/Stitch integration services into `contexts/onboarding` or dedicated `contexts/si_integrations`.
+  - Implement message bus handlers, webhook routers, and cursor persistence mirroring existing logic.
+  - Tests: unit for SI services, integration hitting `/routes/v1/si/...`.
+  - **Platform checklist:** confirm feature flags, logging, and observability coverage.
+
+- **Day 18 – SI Onboarding + Analytics**
+  - **Branch:** `feat/si-onboarding`
+  - Move onboarding analytics emission, checklist state, and message router registrations.
+  - Ensure `shared/event_bus.py` is leveraged for cross-service notifications.
+  - **Platform checklist:** validate analytics events reach telemetry pipeline; rerun regression suite.
+
+- **Day 19 – SI Reporting & Subscription**
+  - **Branch:** `feat/si-reporting`
+  - Port SI dashboards/reporting services, audit logs, and regulator exports.
+  - Tests: repository + API contract tests; ensure Prometheus counters wired.
+  - **Platform checklist:** verify audit logs, dashboards, and SI routes respect auth/tenant boundaries.
+
+### APP Transmission Services
+- **Day 20 – Transmission Core**
+  - **Branch:** `feat/app-transmission-core`
+  - Migrate APP transmission command handlers, FIRS submission workflows, and retry logic.
+  - Wire FastAPI routes under `app/routes/v1/app/transmission.py`.
+  - Tests: integration tests with fake FIRS endpoints, ensuring analytics events emitted.
+  - **Platform checklist:** confirm rate limiting, messaging, and observability hooks updated.
+
+- **Day 21 – Transmission Observability & Rate Limits**
+  - **Branch:** `feat/app-transmission-observability`
+  - Port transmission-specific metrics, alerts, and rate limit middleware.
+  - Add smoke script in `scripts/verify_transmission.py`.
+  - **Platform checklist:** ensure alerts fire in staging; update docs with new dashboards.
+
+### Hybrid Shared Operations
+- **Day 22 – Hybrid Aggregation Services**
+  - **Branch:** `feat/hybrid-aggregation`
+  - Move hybrid analytics aggregation, unified dashboards, and multi-context orchestration.
+  - Ensure background jobs (Celery/RQ) reflect new package layout under `background/`.
+  - **Platform checklist:** run end-to-end tests spanning SI + APP + Hybrid flows.
+
+- **Day 23 – Shared Messaging & Tenant Context**
+  - **Branch:** `feat/hybrid-shared-context`
+  - Finalise shared abstractions consumed by SI/APP/Hybrid services (message router adapters, tenant policies).
+  - Tests: integration ensuring tenant-aware routing across contexts.
+  - **Platform checklist:** confirm tenant policies and message routing consistent post-refactor.
+
+- **Day 24 – Final Domain Parity Review**
+  - **Branch:** `feat/domain-parity-review`
+  - Run diff between legacy platform and new repo; fill any gaps (edge cases, fallback routes).
+  - Prepare cutover checklist for Hybrid shared operations.
+  - **Platform checklist:** consolidate outstanding issues, confirm rollback paths, tag release candidate.
+
+### Additional Modules (post-core)
+- External integrations (ERP/Odoo, payroll, third-party tax services).
+- Admin/support tooling (audit replay, maintenance endpoints).
+- Legacy shims & shared utilities (feature flags, DAL helpers) to retire once parity confirmed.
+- Schedule follow-on branches once primary contexts are stable.
 
 ---
 
