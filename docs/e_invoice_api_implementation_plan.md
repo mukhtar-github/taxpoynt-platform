@@ -176,7 +176,7 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 ### System Integrator (SI) Integrations
 - **Day 17 – SI Banking & Open Banking**
   - **Branch:** `feat/si-banking`
-  - Port Mono/Stitch integration services into `contexts/onboarding` or dedicated `contexts/si_integrations`.
+  - Port Mono/Stitch integration services and external ERP/Odoo connectors into `contexts/onboarding` or dedicated `contexts/si_integrations`.
   - Implement message bus handlers, webhook routers, and cursor persistence mirroring existing logic.
   - Tests: unit for SI services, integration hitting `/routes/v1/si/...`.
   - **Platform checklist:** confirm feature flags, logging, and observability coverage.
