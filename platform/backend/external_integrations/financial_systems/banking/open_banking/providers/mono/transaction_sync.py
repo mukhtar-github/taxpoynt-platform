@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from time import perf_counter
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Protocol
+from uuid import uuid4
 
 from platform.backend.external_integrations.connector_framework.shared_utilities.retry_manager import (
     RetryConfig,
@@ -15,6 +17,17 @@ from platform.backend.external_integrations.connector_framework.shared_utilities
 
 from .client import MonoClient
 from .models import MonoTransaction, MonoTransactionsResponse
+from .observability import (
+    FAILURE_ALERT_THRESHOLD,
+    LATENCY_ALERT_SECONDS,
+    latency_sla_breached,
+    reason_from_exception,
+    record_stage_duration,
+    record_stage_error,
+    record_zero_transactions,
+    register_failure,
+    reset_failure,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,37 +106,116 @@ class MonoTransactionSyncService:
         *,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        correlation_id: Optional[str] = None,
     ) -> MonoSyncResult:
+        correlation = correlation_id or f"mono-sync-{uuid4().hex}"
         cursor = await self._state_store.get_cursor(account_id)
-        await self._emit("mono.fetch.started", {"account_id": account_id, "cursor": cursor})
+        await self._emit(
+            "mono.fetch.started",
+            {"account_id": account_id, "cursor": cursor, "correlation_id": correlation},
+        )
+        logger.info(
+            "Mono transaction sync started",
+            extra={"account_id": account_id, "cursor": cursor, "correlation_id": correlation},
+        )
 
         aggregated: List[MonoTransaction] = []
         page = 0
         next_cursor = cursor
+        fetch_started_at = perf_counter()
 
-        while True:
-            params = self._build_query(next_cursor, start_date, end_date)
+        try:
+            while True:
+                params = self._build_query(next_cursor, start_date, end_date)
 
-            async def _operation() -> MonoTransactionsResponse:
-                return await self._fetch_transactions(account_id, params)
+                async def _operation() -> MonoTransactionsResponse:
+                    return await self._fetch_transactions(account_id, params)
 
-            response = await self._retry_manager.execute_with_retry(
-                _operation,
-                operation_name="mono.fetch_transactions",
+                response = await self._retry_manager.execute_with_retry(
+                    _operation,
+                    operation_name="mono.fetch_transactions",
+                )
+                page += 1
+
+                for transaction in response.data:
+                    dedupe_key = self._make_dedupe_key(transaction)
+                    if not await self._state_store.register_transaction(account_id, dedupe_key):
+                        continue
+                    aggregated.append(transaction)
+
+                next_cursor = self._extract_next_cursor(response.paging)
+                if not next_cursor:
+                    break
+        except Exception as exc:
+            duration = perf_counter() - fetch_started_at
+            record_stage_duration("sync", "error", duration)
+            record_stage_error("sync", reason_from_exception(exc))
+            failures = register_failure(account_id)
+            await self._emit(
+                "mono.fetch.failed",
+                {
+                    "account_id": account_id,
+                    "cursor": next_cursor,
+                    "correlation_id": correlation,
+                    "failures": failures,
+                    "threshold": FAILURE_ALERT_THRESHOLD,
+                    "duration": duration,
+                    "reason": reason_from_exception(exc),
+                },
             )
-            page += 1
-
-            for transaction in response.data:
-                dedupe_key = self._make_dedupe_key(transaction)
-                if not await self._state_store.register_transaction(account_id, dedupe_key):
-                    continue
-                aggregated.append(transaction)
-
-            next_cursor = self._extract_next_cursor(response.paging)
-            if not next_cursor:
-                break
+            if failures >= FAILURE_ALERT_THRESHOLD:
+                logger.error(
+                    "Mono transaction sync consecutive failure threshold breached",
+                    extra={
+                        "account_id": account_id,
+                        "correlation_id": correlation,
+                        "failures": failures,
+                        "threshold": FAILURE_ALERT_THRESHOLD,
+                    },
+                )
+            else:
+                logger.warning(
+                    "Mono transaction sync failed",
+                    extra={"account_id": account_id, "correlation_id": correlation, "failures": failures},
+                )
+            raise
 
         await self._state_store.set_cursor(account_id, next_cursor)
+        duration = perf_counter() - fetch_started_at
+        record_stage_duration("sync", "success", duration)
+        reset_failure(account_id)
+
+        if latency_sla_breached(duration):
+            await self._emit(
+                "mono.fetch.latency_sla_exceeded",
+                {
+                    "account_id": account_id,
+                    "duration": duration,
+                    "threshold": LATENCY_ALERT_SECONDS,
+                    "correlation_id": correlation,
+                },
+            )
+            logger.warning(
+                "Mono transaction sync latency SLA breached",
+                extra={"account_id": account_id, "correlation_id": correlation, "duration": duration},
+            )
+
+        if not aggregated:
+            record_zero_transactions()
+            await self._emit(
+                "mono.fetch.zero_transactions",
+                {
+                    "account_id": account_id,
+                    "correlation_id": correlation,
+                    "cursor": next_cursor,
+                    "duration": duration,
+                },
+            )
+            logger.warning(
+                "Mono transaction sync completed with zero transactions",
+                extra={"account_id": account_id, "correlation_id": correlation},
+            )
+
         await self._emit(
             "mono.fetch.completed",
             {
@@ -131,6 +223,18 @@ class MonoTransactionSyncService:
                 "cursor": next_cursor,
                 "transactions_fetched": len(aggregated),
                 "pages": page,
+                "duration": duration,
+                "correlation_id": correlation,
+            },
+        )
+        logger.info(
+            "Mono transaction sync completed",
+            extra={
+                "account_id": account_id,
+                "correlation_id": correlation,
+                "transactions_fetched": len(aggregated),
+                "pages": page,
+                "cursor": next_cursor,
             },
         )
 
