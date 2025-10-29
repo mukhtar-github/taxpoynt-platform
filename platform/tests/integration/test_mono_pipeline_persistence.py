@@ -124,4 +124,11 @@ async def test_pipeline_persists_transactions_and_emits_events():
     assert pipeline_events
     last_pipeline = pipeline_events[-1]
     assert last_pipeline["persisted"] >= 0
-    assert set(last_pipeline.keys()) == {"account_id", "synced_transactions", "persisted", "duplicates", "correlation_id"}
+    assert set(last_pipeline.keys()) == {
+        "account_id",
+        "account_db_id",
+        "synced_transactions",
+        "persisted",
+        "duplicates",
+        "correlation_id",
+    }

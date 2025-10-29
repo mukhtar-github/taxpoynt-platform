@@ -21,6 +21,7 @@ FAILURE_ALERT_THRESHOLD = 5
 LATENCY_ALERT_SECONDS = 2.0
 
 _PROVIDER_LABELS = {"provider": "mono"}
+_ACCOUNT_LABEL = "account_id"
 _STAGE_METRIC = "taxpoynt_mono_pipeline_stage_seconds"
 _ERROR_METRIC = "taxpoynt_mono_pipeline_errors_total"
 _ZERO_TX_METRIC = "taxpoynt_mono_pipeline_zero_transactions_total"
@@ -39,7 +40,7 @@ def _ensure_metrics():
                     name=_STAGE_METRIC,
                     metric_type=PrometheusMetricsType.HISTOGRAM,
                     description="Mono pipeline stage durations in seconds",
-                    labels=["provider", "stage", "outcome"],
+                    labels=["provider", "stage", "outcome", _ACCOUNT_LABEL],
                     buckets=[0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
                 )
             )
@@ -48,7 +49,7 @@ def _ensure_metrics():
                     name=_ERROR_METRIC,
                     metric_type=PrometheusMetricsType.COUNTER,
                     description="Mono pipeline error counts by stage and reason",
-                    labels=["provider", "stage", "reason"],
+                    labels=["provider", "stage", "reason", _ACCOUNT_LABEL],
                 )
             )
             prom.register_metric(
@@ -56,7 +57,7 @@ def _ensure_metrics():
                     name=_ZERO_TX_METRIC,
                     metric_type=PrometheusMetricsType.COUNTER,
                     description="Mono pipeline runs with zero fetched transactions",
-                    labels=["provider"],
+                    labels=["provider", _ACCOUNT_LABEL],
                 )
             )
         except Exception:  # pragma: no cover - defensive registration guard
@@ -67,7 +68,13 @@ def _ensure_metrics():
     return prom
 
 
-def record_stage_duration(stage: str, outcome: str, duration: float) -> None:
+def _label_set(account_id: Optional[str] = None) -> Dict[str, str]:
+    labels = dict(_PROVIDER_LABELS)
+    labels[_ACCOUNT_LABEL] = account_id or "unknown"
+    return labels
+
+
+def record_stage_duration(stage: str, outcome: str, duration: float, *, account_id: Optional[str] = None) -> None:
     prom = _ensure_metrics()
     if not prom:
         return
@@ -75,28 +82,28 @@ def record_stage_duration(stage: str, outcome: str, duration: float) -> None:
         prom.record_metric(
             _STAGE_METRIC,
             duration,
-            {**_PROVIDER_LABELS, "stage": stage, "outcome": outcome},
+            {**_label_set(account_id), "stage": stage, "outcome": outcome},
         )
     except Exception:  # pragma: no cover - metrics should not break flow
         logger.debug("Failed to record Mono stage duration", exc_info=True)
 
 
-def record_stage_error(stage: str, reason: str) -> None:
+def record_stage_error(stage: str, reason: str, *, account_id: Optional[str] = None) -> None:
     prom = _ensure_metrics()
     if not prom:
         return
     try:
-        prom.record_metric(_ERROR_METRIC, 1, {**_PROVIDER_LABELS, "stage": stage, "reason": reason})
+        prom.record_metric(_ERROR_METRIC, 1, {**_label_set(account_id), "stage": stage, "reason": reason})
     except Exception:  # pragma: no cover
         logger.debug("Failed to record Mono stage error metric", exc_info=True)
 
 
-def record_zero_transactions() -> None:
+def record_zero_transactions(*, account_id: Optional[str] = None) -> None:
     prom = _ensure_metrics()
     if not prom:
         return
     try:
-        prom.record_metric(_ZERO_TX_METRIC, 1, _PROVIDER_LABELS)
+        prom.record_metric(_ZERO_TX_METRIC, 1, _label_set(account_id))
     except Exception:  # pragma: no cover
         logger.debug("Failed to record Mono zero transaction metric", exc_info=True)
 

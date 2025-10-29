@@ -13,6 +13,22 @@
   },
   "panels": [
     {
+      "id": 10,
+      "title": "Account Selector",
+      "type": "text",
+      "datasource": null,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "content": "### Account: ${account}",
+        "mode": "markdown"
+      }
+    },
+    {
       "id": 1,
       "title": "Pipeline Stage P95 Latency",
       "type": "timeseries",
@@ -37,12 +53,12 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 4,
         "y": 0
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (stage, le) (rate(taxpoynt_mono_pipeline_stage_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (stage, le) (rate(taxpoynt_mono_pipeline_stage_seconds_bucket{account_id=~\"$account\"}[5m])))",
           "legendFormat": "{{stage}}",
           "refId": "A"
         }
@@ -70,7 +86,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (stage, reason) (increase(taxpoynt_mono_pipeline_errors_total[15m]))",
+          "expr": "sum by (stage, reason) (increase(taxpoynt_mono_pipeline_errors_total{account_id=~\"$account\"}[15m]))",
           "legendFormat": "{{stage}} - {{reason}}",
           "refId": "A"
         }
@@ -98,15 +114,60 @@
       },
       "targets": [
         {
-          "expr": "increase(taxpoynt_mono_pipeline_zero_transactions_total[1h])",
+          "expr": "increase(taxpoynt_mono_pipeline_zero_transactions_total{provider=\"mono\", account_id=~\"$account\"}[1h])",
           "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Alerts & Events",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{job=\"taxpoynt-backend\"} |~ \"mono-pipeline\"",
           "refId": "A"
         }
       ]
     }
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "account",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "refresh": 2,
+        "hide": 0,
+        "definition": "label_values(taxpoynt_mono_pipeline_stage_seconds_count, account_id)",
+        "includeAll": true,
+        "multi": true,
+        "query": "label_values(taxpoynt_mono_pipeline_stage_seconds_count, account_id)",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
   },
   "annotations": {
     "list": [

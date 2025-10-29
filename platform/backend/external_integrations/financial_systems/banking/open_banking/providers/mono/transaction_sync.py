@@ -148,8 +148,8 @@ class MonoTransactionSyncService:
                     break
         except Exception as exc:
             duration = perf_counter() - fetch_started_at
-            record_stage_duration("sync", "error", duration)
-            record_stage_error("sync", reason_from_exception(exc))
+            record_stage_duration("sync", "error", duration, account_id=account_id)
+            record_stage_error("sync", reason_from_exception(exc), account_id=account_id)
             failures = register_failure(account_id)
             await self._emit(
                 "mono.fetch.failed",
@@ -182,7 +182,7 @@ class MonoTransactionSyncService:
 
         await self._state_store.set_cursor(account_id, next_cursor)
         duration = perf_counter() - fetch_started_at
-        record_stage_duration("sync", "success", duration)
+        record_stage_duration("sync", "success", duration, account_id=account_id)
         reset_failure(account_id)
 
         if latency_sla_breached(duration):
@@ -201,7 +201,7 @@ class MonoTransactionSyncService:
             )
 
         if not aggregated:
-            record_zero_transactions()
+            record_zero_transactions(account_id=account_id)
             await self._emit(
                 "mono.fetch.zero_transactions",
                 {

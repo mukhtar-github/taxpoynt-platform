@@ -72,3 +72,13 @@ Describe the end-to-end pipeline for fetching financial transactions from Mono, 
 - Mono API secrets stored in the configuration service; runtime tokens kept in memory for ≤60 minutes.
 - Webhook signature verification remains enabled (HMAC SHA-512 using `MONO_WEBHOOK_SECRET`); no changes required.
 - Observability payloads scrub account identifiers before logging (correlation IDs are opaque UUIDs).
+
+## Day 8 – Staging Dry Run
+- Staging playbook recorded in `docs/integrations/mono_day8_staging_dry_run.md` covering deployment, smoke scripts, dashboard validation, and sign-off checklist.
+- Live runner script `./live_mono_staging_smoke_test.py` executes the full pipeline using staging credentials, persists canonical records, and prints integrity summaries.
+- Prometheus alert rules (`monitoring/prometheus_rules/mono_pipeline_alerts.yml`) and Grafana dashboard (`monitoring/grafana/dashboards/mono_pipeline.json`) wired for latency/failure/zero-transaction monitoring.
+
+## Day 9 – Feedback Buffer
+- Dashboard tweaks incorporate account-level filtering, Markdown context, and Loki log streaming for `mono-pipeline` events.
+- Prometheus alert rules now scope to `provider="mono"` and leverage the new `account_id` label emitted by the observability helpers.
+- Additional notes and operational reminders captured in `docs/integrations/mono_day9_feedback_buffer.md`.

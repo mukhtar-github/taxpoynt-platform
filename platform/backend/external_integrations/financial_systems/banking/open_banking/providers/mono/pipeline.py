@@ -42,9 +42,14 @@ class MonoTransactionPipeline:
         account_db_id,
     ) -> BankingIngestionResult:
         correlation_id = f"mono-pipeline-{uuid4().hex}"
+        account_label = str(account_db_id)
         logger.info(
             "Mono transaction pipeline started",
-            extra={"account_id": account_id, "correlation_id": correlation_id},
+            extra={
+                "account_id": account_id,
+                "account_db_id": account_label,
+                "correlation_id": correlation_id,
+            },
         )
 
         try:
@@ -52,7 +57,7 @@ class MonoTransactionPipeline:
         except Exception:
             logger.exception(
                 "Mono transaction pipeline aborted during sync",
-                extra={"account_id": account_id, "correlation_id": correlation_id},
+                extra={"account_id": account_id, "account_db_id": account_label, "correlation_id": correlation_id},
             )
             raise
 
@@ -69,16 +74,20 @@ class MonoTransactionPipeline:
                 canonical.append(tx)
         except Exception as exc:
             duration = perf_counter() - transform_started_at
-            record_stage_duration("transform", "error", duration)
-            record_stage_error("transform", reason_from_exception(exc))
+            record_stage_duration("transform", "error", duration, account_id=account_label)
+            record_stage_error("transform", reason_from_exception(exc), account_id=account_label)
             logger.exception(
                 "Mono transaction transformation failed",
-                extra={"account_id": account_id, "correlation_id": correlation_id},
+                extra={
+                    "account_id": account_id,
+                    "account_db_id": account_label,
+                    "correlation_id": correlation_id,
+                },
             )
             raise
 
         transform_duration = perf_counter() - transform_started_at
-        record_stage_duration("transform", "success", transform_duration)
+        record_stage_duration("transform", "success", transform_duration, account_id=account_label)
 
         persist_started_at = perf_counter()
         try:
@@ -89,20 +98,25 @@ class MonoTransactionPipeline:
             )
         except Exception as exc:
             duration = perf_counter() - persist_started_at
-            record_stage_duration("persist", "error", duration)
-            record_stage_error("persist", reason_from_exception(exc))
+            record_stage_duration("persist", "error", duration, account_id=account_label)
+            record_stage_error("persist", reason_from_exception(exc), account_id=account_label)
             logger.exception(
                 "Mono transaction persistence failed",
-                extra={"account_id": account_id, "correlation_id": correlation_id},
+                extra={
+                    "account_id": account_id,
+                    "account_db_id": account_label,
+                    "correlation_id": correlation_id,
+                },
             )
             raise
         persist_duration = perf_counter() - persist_started_at
-        record_stage_duration("persist", "success", persist_duration)
+        record_stage_duration("persist", "success", persist_duration, account_id=account_label)
 
         await self._emit(
             "mono.pipeline.completed",
             {
                 "account_id": account_id,
+                "account_db_id": account_label,
                 "synced_transactions": len(sync_result.transactions),
                 "persisted": ingestion_result.inserted_count,
                 "duplicates": ingestion_result.duplicate_count,
@@ -113,6 +127,7 @@ class MonoTransactionPipeline:
             "Mono transaction pipeline completed",
             extra={
                 "account_id": account_id,
+                "account_db_id": account_label,
                 "correlation_id": correlation_id,
                 "synced_transactions": len(sync_result.transactions),
                 "persisted": ingestion_result.inserted_count,
