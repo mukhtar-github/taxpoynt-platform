@@ -18,7 +18,7 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 
 ---
 
-## Phase 0 – Preparation (Day 0)
+## Phase 0 – Preparation (Day 0)✅
 **Branch:** `feat/bootstrap-repo`
 - Initialise repository using scaffold (directories, placeholder files, `.editorconfig`, `.gitignore`, `pyproject.toml` with tooling stub).
 - Add CONTRIBUTING + ADR template in `docs/`.
@@ -30,7 +30,7 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 
 ---
 
-## Phase 1 – Platform Core (Days 1–2)
+## Phase 1 – Platform Core (Days 1–2)✅
 ### Day 1 – Settings & Infrastructure Primitives
 **Branch:** `feat/core-settings`
 - Implement `src/qorebox_einvoice/core/settings.py` with Pydantic Settings (env layering, Secrets support).
@@ -38,7 +38,7 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 - Port existing logging initialisation utilities.
 - Tests: unit tests for settings loader (env precedence, default values).
 
-### Day 2 – Security & Auth Foundations
+### Day 2 – Security & Auth Foundations✅
 **Branch:** `feat/core-security`
 - Migrate JWT manager, permission guard, tenant context helpers into `core/security` and `core/auth`.
 - Provide FastAPI dependency placeholders (`app/dependencies.py`) for tenant + role detection.
@@ -47,14 +47,14 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 ---
 
 ## Phase 2 – HTTP Edge + Middleware (Days 3–4)
-### Day 3 – FastAPI Composition Root
+### Day 3 – FastAPI Composition Root✅
 **Branch:** `feat/app-main`
 - Implement `src/qorebox_einvoice/app/main.py` with `create_app()`, basic middleware chain (CORS, rate limiting placeholder, telemetry stub).
 - Wire health route under `app/routes/v1/health.py`.
 - Add `scripts/smoke_health.py`.
 - Tests: integration test hitting `/health` using `TestClient`.
 
-### Day 4 – Middleware & Dependency Wiring
+### Day 4 – Middleware & Dependency Wiring✅
 **Branch:** `feat/app-middleware`
 - Port middleware implementations (idempotency, observability, request context).
 - Implement dependency providers (db session stub, auth).
@@ -64,14 +64,14 @@ The plan assumes we are migrating capabilities from the existing `platform/backe
 ---
 
 ## Phase 3 – Data Access & Persistence (Days 5–6)
-### Day 5 – Database Layer & Migrations
+### Day 5 – Database Layer & Migrations✅
 **Branch:** `feat/db-alembic`
 - Configure SQLAlchemy engine factory, session management inside `core/db` (or `core/utils/db.py`).
 - Set up Alembic env + initial migration.
 - `scripts/bootstrap_db.py` to run migrations locally.
 - Tests: integration test verifying connection + basic migration runs in SQLite/Postgres (CI-friendly).
 
-### Day 6 – Shared Repository + Value Objects
+### Day 6 – Shared Repository + Value Objects✅
 **Branch:** `feat/core-shared`
 - Port shared DTOs, identifiers, value objects.
 - Implement base repository interfaces (async) for reuse across contexts.
