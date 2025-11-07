@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
-from typing import Dict, Any, Optional, List, Tuple, Union, Literal
+from typing import Dict, Any, Optional, List, Tuple, Union, Literal, Awaitable
 
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -53,10 +53,12 @@ from core_platform.data_management.db_async import get_async_session
 from core_platform.data_management.repositories.onboarding_state_repo_async import (
     OnboardingStateRepositoryAsync,
 )
+from core_platform.services.kyc import SubmitKYCCommand
 
 logger = logging.getLogger(__name__)
 SHARED_CONFIG_DIR = Path(__file__).resolve().parents[3] / "shared_config"
 FREE_EMAIL_DOMAINS_DEFAULT_PATH = SHARED_CONFIG_DIR / "free_email_domains.json"
+submit_kyc_command = SubmitKYCCommand()
 
 # Authentication configuration
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -108,6 +110,8 @@ class EmailVerificationRequest(BaseModel):
     onboarding_token: Optional[str] = None
     terms_accepted: bool = False
     privacy_accepted: bool = False
+    tin: Optional[str] = None
+    rc_number: Optional[str] = None
 
 class OrganizationResponse(BaseModel):
     """Organization response model"""
@@ -279,6 +283,46 @@ async def _record_onboarding_account_status(
             user_id,
             exc,
         )
+
+
+def _launch_submit_kyc_task(coro: Awaitable[Any]) -> None:
+    """Schedule SubmitKYCCommand without blocking the request lifecycle."""
+    try:
+        task = asyncio.create_task(coro)
+    except RuntimeError:
+        logger.debug("SubmitKYCCommand task could not be scheduled (event loop unavailable)")
+        return
+
+    def _handle_task_result(async_task: asyncio.Task) -> None:
+        if async_task.cancelled():
+            return
+        exc = async_task.exception()
+        if exc:
+            logger.error("SubmitKYCCommand task failed: %s", exc, exc_info=True)
+
+    task.add_done_callback(_handle_task_result)
+
+
+async def _run_submit_kyc_command(
+    *,
+    user_id: str,
+    service_package: Optional[str],
+    tin: Optional[str],
+    rc_number: Optional[str],
+    email: Optional[str],
+) -> None:
+    if not submit_kyc_command:
+        return
+    try:
+        await submit_kyc_command.execute(
+            user_id=user_id,
+            service_package=service_package or "si",
+            tin=tin,
+            rc_number=rc_number,
+            email=email,
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("SubmitKYCCommand failed for %s: %s", user_id, exc, exc_info=True)
 
 
 def _normalize_domain_entry(value: Any) -> Optional[str]:
@@ -843,6 +887,19 @@ def create_auth_router(
                 status=organization["status"],
                 service_packages=organization["service_packages"],
             )
+
+            tin_candidate = request.tin or organization.get("tin")
+            rc_candidate = request.rc_number or organization.get("rc_number")
+            if tin_candidate or rc_candidate:
+                _launch_submit_kyc_task(
+                    _run_submit_kyc_command(
+                        user_id=user["id"],
+                        service_package=user.get("service_package"),
+                        tin=tin_candidate,
+                        rc_number=rc_candidate,
+                        email=user.get("email"),
+                    )
+                )
 
             role_str = user["role"] if isinstance(user["role"], str) else user["role"].value
             frontend_role = convert_db_role_to_frontend_role(role_str)

@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pytest
 from fastapi import FastAPI
@@ -39,13 +39,21 @@ def auth_test_app(monkeypatch, tmp_path):
     monkeypatch.setattr(auth_module, "_send_verification_email", fake_send_verification_email)
     monkeypatch.setattr(auth_module, "_record_onboarding_account_status", fake_record_onboarding_status)
 
+    kyc_calls: list[Dict[str, Any]] = []
+
+    class StubSubmitKYCCommand:
+        async def execute(self, **kwargs):
+            kyc_calls.append(kwargs)
+
+    monkeypatch.setattr(auth_module, "submit_kyc_command", StubSubmitKYCCommand())
+
     app = FastAPI()
     message_router = StubMessageRouter()
     router = create_auth_router(HTTPRoleDetector(), APIPermissionGuard, message_router)
     app.include_router(router)
 
     client = TestClient(app)
-    return client, message_router, sent_codes
+    return client, message_router, sent_codes, kyc_calls
 
 
 def _registration_payload(email: str) -> Dict[str, Any]:
@@ -61,7 +69,15 @@ def _registration_payload(email: str) -> Dict[str, Any]:
     }
 
 
-def _verify_payload(email: str, code: str, *, terms: bool = True, privacy: bool = True) -> Dict[str, Any]:
+def _verify_payload(
+    email: str,
+    code: str,
+    *,
+    terms: bool = True,
+    privacy: bool = True,
+    tin: Optional[str] = None,
+    rc_number: Optional[str] = None,
+) -> Dict[str, Any]:
     payload = {
         "email": email,
         "code": code,
@@ -71,11 +87,15 @@ def _verify_payload(email: str, code: str, *, terms: bool = True, privacy: bool 
         payload["terms_accepted"] = True
     if privacy:
         payload["privacy_accepted"] = True
+    if tin:
+        payload["tin"] = tin
+    if rc_number:
+        payload["rc_number"] = rc_number
     return payload
 
 
 def test_registration_returns_pending_contract(auth_test_app):
-    client, message_router, sent_codes = auth_test_app
+    client, message_router, sent_codes, _ = auth_test_app
     email = f"registrant-{uuid.uuid4().hex}@example.com"
 
     response = client.post("/auth/register", json=_registration_payload(email))
@@ -92,7 +112,7 @@ def test_registration_returns_pending_contract(auth_test_app):
 
 
 def test_verify_email_emits_analytics_events(auth_test_app):
-    client, message_router, sent_codes = auth_test_app
+    client, message_router, sent_codes, kyc_calls = auth_test_app
     email = f"verifier-{uuid.uuid4().hex}@example.com"
 
     register = client.post("/auth/register", json=_registration_payload(email))
@@ -100,13 +120,20 @@ def test_verify_email_emits_analytics_events(auth_test_app):
     code = sent_codes[email.lower()]
     message_router.calls.clear()
 
-    verify_response = client.post("/auth/verify-email", json=_verify_payload(email, code))
+    verify_response = client.post(
+        "/auth/verify-email",
+        json=_verify_payload(email, code, tin="12345678901", rc_number="RC-778899"),
+    )
     assert verify_response.status_code == 200
     body = verify_response.json()
 
     assert body["access_token"]
     assert body["user"]["email"] == email
     assert body["user"]["is_email_verified"] is True
+    assert kyc_calls, "SubmitKYCCommand should be triggered"
+    latest_call = kyc_calls[-1]
+    assert latest_call["tin"] == "12345678901"
+    assert latest_call["rc_number"] == "RC-778899"
 
     assert message_router.calls, "Analytics events should be emitted"
     service_role, operation, payload = message_router.calls[0]
@@ -132,7 +159,7 @@ def test_verify_email_emits_analytics_events(auth_test_app):
 
 
 def test_verify_email_legacy_payload_without_terms(auth_test_app):
-    client, message_router, sent_codes = auth_test_app
+    client, message_router, sent_codes, _ = auth_test_app
     email = f"legacy-{uuid.uuid4().hex}@example.com"
 
     register = client.post("/auth/register", json=_registration_payload(email))
