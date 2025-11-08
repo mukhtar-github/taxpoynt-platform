@@ -6,6 +6,7 @@
  * SI-focused registration with checklist preview and minimal required fields
  */
 
+import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AuthLayout } from '../../shared_components/auth/AuthLayout';
 import { TaxPoyntButton } from '../../design_system/components/TaxPoyntButton';
@@ -108,6 +109,8 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showPhaseDetails, setShowPhaseDetails] = useState(false);
+  const [showChecklistDetails, setShowChecklistDetails] = useState(false);
 
   useEffect(() => {
     setFormData((prev) => ({
@@ -138,6 +141,19 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     }
   };
 
+  const handleConsentToggle =
+    (field: 'terms_accepted' | 'privacy_accepted') => (event: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = event.target.checked;
+      setFormData((prev) => ({ ...prev, [field]: checked }));
+      if (fieldErrors[field]) {
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next[field];
+          return next;
+        });
+      }
+    };
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -164,6 +180,12 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
     }
     if (!formData.business_name.trim()) {
       errors.business_name = 'Business or workspace name is required';
+    }
+    if (!formData.terms_accepted) {
+      errors.terms_accepted = 'You must accept the terms of service';
+    }
+    if (!formData.privacy_accepted) {
+      errors.privacy_accepted = 'You must accept the privacy policy';
     }
 
     setFieldErrors(errors);
@@ -197,16 +219,33 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
           </div>
         )}
 
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">What to expect</p>
-          <div className="mt-4 space-y-3">
-            {PHASE_SUMMARY.map((phase) => (
-              <div key={phase.id} className="rounded-xl bg-white/80 p-3 shadow-sm">
-                <p className="text-sm font-semibold text-indigo-900">{phase.title}</p>
-                <p className="text-xs text-indigo-700 leading-relaxed">{phase.description}</p>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-5">
+          <button
+            type="button"
+            onClick={() => setShowPhaseDetails((prev) => !prev)}
+            className="flex w-full items-center justify-between text-left"
+            aria-expanded={showPhaseDetails}
+          >
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">What to expect</p>
+              <p className="mt-1 text-sm text-indigo-900">
+                Three quick phases to move from signup to launch-ready.
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-indigo-600">
+              {showPhaseDetails ? 'Hide' : 'Show'} overview
+            </span>
+          </button>
+          {showPhaseDetails && (
+            <div className="mt-4 space-y-3">
+              {PHASE_SUMMARY.map((phase) => (
+                <div key={phase.id} className="rounded-xl bg-white/80 p-3 shadow-sm">
+                  <p className="text-sm font-semibold text-indigo-900">{phase.title}</p>
+                  <p className="text-xs text-indigo-700 leading-relaxed">{phase.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -242,27 +281,29 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
               />
             </div>
 
-            <FormField
-              label="Work email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={updateField('email')}
-              placeholder="adaobi@example.com"
-              required
-              error={fieldErrors.email}
-            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                label="Work email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={updateField('email')}
+                placeholder="adaobi@example.com"
+                required
+                error={fieldErrors.email}
+              />
 
-            <FormField
-              label="Create password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={updateField('password')}
-              placeholder="Minimum 8 characters"
-              required
-              error={fieldErrors.password}
-            />
+              <FormField
+                label="Create password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={updateField('password')}
+                placeholder="Minimum 8 characters"
+                required
+                error={fieldErrors.password}
+              />
+            </div>
 
             <FormField
               label="Business or workspace name"
@@ -276,22 +317,84 @@ export const StreamlinedRegistration: React.FC<StreamlinedRegistrationProps> = (
           </div>
         </div>
 
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Why the checklist matters</p>
-          <ul className="mt-4 space-y-3">
-            {CHECKLIST_HIGHLIGHTS.map((item) => (
-              <li key={item.id} className="flex gap-3 rounded-xl bg-white/80 p-3 shadow-sm">
-                <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">{item.title}</p>
-                  <p className="text-xs text-blue-700 leading-relaxed">{item.description}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-blue-700">
-            Next stop: <span className="font-semibold">{nextPath}</span> — we&rsquo;ll confirm your email and unlock the SI onboarding checklist.
-          </p>
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
+          <button
+            type="button"
+            onClick={() => setShowChecklistDetails((prev) => !prev)}
+            className="flex w-full items-center justify-between text-left"
+            aria-expanded={showChecklistDetails}
+          >
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Why the checklist matters</p>
+              <p className="mt-1 text-sm text-blue-900">
+                Autosave, guided support, and one shared view across your team.
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-blue-600">
+              {showChecklistDetails ? 'Hide' : 'Show'} details
+            </span>
+          </button>
+          {showChecklistDetails && (
+            <>
+              <ul className="mt-4 space-y-3">
+                {CHECKLIST_HIGHLIGHTS.map((item) => (
+                  <li key={item.id} className="flex gap-3 rounded-xl bg-white/80 p-3 shadow-sm">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900">{item.title}</p>
+                      <p className="text-xs text-blue-700 leading-relaxed">{item.description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-blue-700">
+                Next stop: <span className="font-semibold">{nextPath}</span> — we&rsquo;ll confirm your email and unlock the SI onboarding checklist.
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-900">Review and consent</p>
+          <div className="mt-4 space-y-4 text-sm text-slate-700">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={formData.terms_accepted}
+                onChange={handleConsentToggle('terms_accepted')}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>
+                I agree to the{' '}
+                <Link href="/legal/terms-of-service" className="text-indigo-600 hover:text-indigo-700 underline">
+                  Terms of Service
+                </Link>
+                .
+              </span>
+            </label>
+            {fieldErrors.terms_accepted && (
+              <p className="text-xs text-red-600">{fieldErrors.terms_accepted}</p>
+            )}
+
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={formData.privacy_accepted}
+                onChange={handleConsentToggle('privacy_accepted')}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>
+                I acknowledge the{' '}
+                <Link href="/legal/privacy-policy" className="text-indigo-600 hover:text-indigo-700 underline">
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+            {fieldErrors.privacy_accepted && (
+              <p className="text-xs text-red-600">{fieldErrors.privacy_accepted}</p>
+            )}
+          </div>
         </div>
 
         <TaxPoyntButton
