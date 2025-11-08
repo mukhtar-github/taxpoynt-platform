@@ -368,12 +368,16 @@ class TaxPoyntAPIClient {
       secureLogger.userAction('Sending registration request');
       const response = await this.client.post<AuthResponse | RegisterPendingResponse | { success: boolean; data: any }>(
         '/auth/register',
-        userData
+        userData,
+        { timeout: 45000 }
       );
-      console.log('[registration-debug] raw response payload', response.data);
 
       const payload = (response.data as any)?.success ? (response.data as any).data : response.data;
       const data = payload as AuthResponse | RegisterPendingResponse;
+
+      if (!('status' in data) && !(data as AuthResponse).access_token) {
+        secureLogger.error('Registration unexpected payload shape', { payload: data });
+      }
 
       if ('status' in data && data.status === 'pending') {
         secureLogger.success('Registration pending verification', {
@@ -410,11 +414,6 @@ class TaxPoyntAPIClient {
               method: error.config?.method,
               data: error.config?.data ? secureConfig.sanitizeConfig(JSON.parse(error.config.data)) : null
             }
-          });
-
-          // Log the raw response data to see what's actually being returned
-          secureLogger.error('Raw error response data', { 
-            data: secureConfig.sanitizeConfig(data) 
           });
         
         if (status === 400) {
