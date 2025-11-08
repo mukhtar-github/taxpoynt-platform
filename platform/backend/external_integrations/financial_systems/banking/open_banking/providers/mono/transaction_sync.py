@@ -10,10 +10,16 @@ from datetime import date, datetime
 from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Protocol
 from uuid import uuid4
 
-from platform.backend.external_integrations.connector_framework.shared_utilities.retry_manager import (
-    RetryConfig,
-    RetryManager,
-)
+try:
+    from platform.backend.external_integrations.connector_framework.shared_utilities.retry_manager import (
+        RetryConfig,
+        RetryManager,
+    )
+except ImportError:  # pragma: no cover - local backend execution
+    from external_integrations.connector_framework.shared_utilities.retry_manager import (  # type: ignore
+        RetryConfig,
+        RetryManager,
+    )
 
 from .client import MonoClient
 from .models import MonoTransaction, MonoTransactionsResponse

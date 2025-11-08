@@ -20,24 +20,45 @@ from core_platform.data_management.repositories.banking_repo_async import (
 from .mono_integration_service import MonoIntegrationService
 from core_platform.data_management.models import AuditEventType
 from si_services.utils.audit import record_audit_event
-from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.client import (
-    MonoClient,
-    MonoClientConfig,
-)
-from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.observability import (
-    LATENCY_ALERT_SECONDS,
-)
-from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.pipeline import (
-    MonoTransactionPipeline,
-)
-from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.transaction_sync import (
-    MonoTransactionSyncService,
-    SyncStateStore,
-)
-from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.transformer import (
-    MonoTransactionTransformer,
-)
-from platform.backend.core_platform.services.banking_ingestion_service import BankingIngestionService
+
+try:
+    from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.client import (
+        MonoClient,
+        MonoClientConfig,
+    )
+    from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.observability import (
+        LATENCY_ALERT_SECONDS,
+    )
+    from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.pipeline import (
+        MonoTransactionPipeline,
+    )
+    from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.transaction_sync import (
+        MonoTransactionSyncService,
+        SyncStateStore,
+    )
+    from platform.backend.external_integrations.financial_systems.banking.open_banking.providers.mono.transformer import (
+        MonoTransactionTransformer,
+    )
+    from platform.backend.core_platform.services.banking_ingestion_service import BankingIngestionService
+except ImportError:  # pragma: no cover - backend-local imports
+    from external_integrations.financial_systems.banking.open_banking.providers.mono.client import (  # type: ignore
+        MonoClient,
+        MonoClientConfig,
+    )
+    from external_integrations.financial_systems.banking.open_banking.providers.mono.observability import (  # type: ignore
+        LATENCY_ALERT_SECONDS,
+    )
+    from external_integrations.financial_systems.banking.open_banking.providers.mono.pipeline import (  # type: ignore
+        MonoTransactionPipeline,
+    )
+    from external_integrations.financial_systems.banking.open_banking.providers.mono.transaction_sync import (  # type: ignore
+        MonoTransactionSyncService,
+        SyncStateStore,
+    )
+    from external_integrations.financial_systems.banking.open_banking.providers.mono.transformer import (  # type: ignore
+        MonoTransactionTransformer,
+    )
+    from core_platform.services.banking_ingestion_service import BankingIngestionService  # type: ignore
 
 logger = logging.getLogger(__name__)
 
