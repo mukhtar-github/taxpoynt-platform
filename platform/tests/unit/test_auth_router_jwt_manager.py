@@ -10,22 +10,24 @@ BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+from api_gateway.role_routing import auth_router as auth_module
+
+
+class StubMessageRouter:
+    async def route_message(self, *args, **kwargs):
+        return {"success": True}
+
 
 def create_app_with_auth_router():
     # Defer imports to ensure env vars are set first
-    from api_gateway.role_routing.auth_router import (
-        create_auth_router,
-    )
+    from api_gateway.role_routing.auth_router import create_auth_router
     from api_gateway.role_routing.role_detector import HTTPRoleDetector
     from api_gateway.role_routing.permission_guard import APIPermissionGuard
-    from core_platform.messaging.message_router import MessageRouter
-
     app = FastAPI()
     # Minimal stubs for router factory; router does not use these for register/login
     role_detector = HTTPRoleDetector()
     permission_guard = APIPermissionGuard  # not used by router construction
-    message_router = MessageRouter()  # not used in these endpoints
-    router = create_auth_router(role_detector, permission_guard, message_router)
+    router = create_auth_router(role_detector, permission_guard, StubMessageRouter())
     # Router already has prefix "/auth"; include without extra prefix
     app.include_router(router)
     return app
@@ -37,6 +39,20 @@ def test_register_and_verify_token_with_jwt_manager(tmp_path, monkeypatch):
     # Point sqlite DB to a temp file to avoid polluting repo
     db_file = tmp_path / "taxpoynt_auth.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+    sent_codes = {}
+
+    async def _fake_send(recipient: str, code: str, first_name: str | None = None):
+        sent_codes[recipient.lower()] = code
+
+    class StubSubmitKYCCommand:
+        def __init__(self):
+            self.calls = []
+
+        async def execute(self, **kwargs):
+            self.calls.append(kwargs)
+
+    monkeypatch.setattr(auth_module, "_send_verification_email", _fake_send)
+    monkeypatch.setattr(auth_module, "submit_kyc_command", StubSubmitKYCCommand())
 
     app = create_app_with_auth_router()
     client = TestClient(app)
@@ -52,7 +68,21 @@ def test_register_and_verify_token_with_jwt_manager(tmp_path, monkeypatch):
         "terms_accepted": True,
         "privacy_accepted": True
     }
-    r = client.post("/auth/register", json=payload)
+    register = client.post("/auth/register", json=payload)
+    assert register.status_code == 200, register.text
+    pending = register.json()
+    assert pending["status"] == "pending"
+    code = sent_codes[payload["email"].lower()]
+
+    verify_payload = {
+        "email": payload["email"],
+        "code": code,
+        "service_package": payload["service_package"],
+        "terms_accepted": True,
+        "privacy_accepted": True,
+    }
+
+    r = client.post("/auth/verify-email", json=verify_payload)
     assert r.status_code == 200, r.text
     data = r.json()
     token = data["access_token"]

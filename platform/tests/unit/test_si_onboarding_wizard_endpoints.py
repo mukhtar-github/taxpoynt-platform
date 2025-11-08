@@ -1,20 +1,29 @@
+import sys
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+
+BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from platform.backend.api_gateway.api_versions.v1.si_endpoints.onboarding_endpoints import (
     OnboardingEndpointsV1,
     PlatformRole,
 )
 from platform.backend.api_gateway.role_routing.models import HTTPRoutingContext
-from platform.backend.core_platform.data_management import db_async
-from platform.backend.core_platform.data_management.db_async import (
+
+from core_platform.data_management import db_async
+from core_platform.data_management.db_async import (
     get_async_session,
     init_async_engine,
 )
-from platform.backend.core_platform.data_management.models.base import Base
-from platform.backend.core_platform.data_management.repositories.onboarding_state_repo_async import (
+from core_platform.data_management.models import onboarding_state as onboarding_state_model  # noqa: F401
+from core_platform.data_management.models.base import Base
+from core_platform.data_management.repositories.onboarding_state_repo_async import (
     OnboardingStateRepositoryAsync,
 )
 
