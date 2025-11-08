@@ -370,6 +370,7 @@ class TaxPoyntAPIClient {
         '/auth/register',
         userData
       );
+      console.log('[registration-debug] raw response payload', response.data);
 
       const payload = (response.data as any)?.success ? (response.data as any).data : response.data;
       const data = payload as AuthResponse | RegisterPendingResponse;
