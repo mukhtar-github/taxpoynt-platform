@@ -27,6 +27,7 @@ import {
   sanitizeBankingConnection,
   sanitizeErpConnection,
 } from './connectionState';
+import { useIdleTelemetry } from '../hooks/useIdleTelemetry';
 import { useOnboardingAnalytics } from '../analytics/OnboardingAnalytics';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
@@ -526,9 +527,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [odooError, setOdooError] = useState<string | null>(null);
   const [erpPreviewInvoice, setErpPreviewInvoice] = useState<Record<string, unknown> | null>(null);
   const [erpPreviewVisible, setErpPreviewVisible] = useState(false);
-  const stallTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastConnectivityPersistRef = useRef<boolean>(false);
-  const hasTelemetryIdleEventRef = useRef<boolean>(false);
 
   const connectors = useMemo(
     () => [
@@ -802,64 +801,41 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     }
   }, [odooUseDemo]);
 
-  useEffect(() => {
-    if (!analytics.isInitialized || !userId) {
-      if (stallTimerRef.current) {
-        clearTimeout(stallTimerRef.current);
-        stallTimerRef.current = null;
-      }
+  const handleSystemConnectivityIdle = useCallback(() => {
+    if (!userId) {
       return;
     }
+    analytics.trackCustomEvent('system_connectivity_idle', 'system-connectivity', userId, analyticsUserRole, {
+      bankingStatus: bankingConnectionState.status,
+      erpStatus: erpConnectionState.status,
+    });
+  }, [analytics, analyticsUserRole, bankingConnectionState.status, erpConnectionState.status, userId]);
 
-    if (currentStep?.id !== 'system-connectivity') {
-      if (stallTimerRef.current) {
-        clearTimeout(stallTimerRef.current);
-        stallTimerRef.current = null;
-      }
-      hasTelemetryIdleEventRef.current = false;
+  const systemConnectivityIdleEnabled =
+    analytics.isInitialized && Boolean(userId) && currentStep?.id === 'system-connectivity' && !laneReady;
+
+  useIdleTelemetry({
+    enabled: systemConnectivityIdleEnabled,
+    timeoutMs: 5 * 60 * 1000,
+    onIdle: handleSystemConnectivityIdle,
+  });
+
+  const handleLaunchIdle = useCallback(() => {
+    if (!userId) {
       return;
     }
+    analytics.trackCustomEvent('launch_idle', 'launch', userId, analyticsUserRole, {
+      completedSteps: completedSteps.length,
+    });
+  }, [analytics, analyticsUserRole, completedSteps.length, userId]);
 
-    if (laneReady) {
-      if (stallTimerRef.current) {
-        clearTimeout(stallTimerRef.current);
-        stallTimerRef.current = null;
-      }
-      hasTelemetryIdleEventRef.current = false;
-      return;
-    }
+  const launchIdleEnabled = analytics.isInitialized && Boolean(userId) && currentStep?.id === 'launch';
 
-    if (stallTimerRef.current) {
-      clearTimeout(stallTimerRef.current);
-      stallTimerRef.current = null;
-    }
-
-    stallTimerRef.current = setTimeout(() => {
-      if (hasTelemetryIdleEventRef.current) {
-        return;
-      }
-      analytics.trackCustomEvent('system_connectivity_idle', 'system-connectivity', userId, analyticsUserRole, {
-        bankingStatus: bankingConnectionState.status,
-        erpStatus: erpConnectionState.status,
-      });
-      hasTelemetryIdleEventRef.current = true;
-    }, 5 * 60 * 1000);
-
-    return () => {
-      if (stallTimerRef.current) {
-        clearTimeout(stallTimerRef.current);
-        stallTimerRef.current = null;
-      }
-    };
-  }, [
-    analytics,
-    analyticsUserRole,
-    currentStep?.id,
-    laneReady,
-    bankingConnectionState.status,
-    erpConnectionState.status,
-    userId,
-  ]);
+  useIdleTelemetry({
+    enabled: launchIdleEnabled,
+    timeoutMs: 5 * 60 * 1000,
+    onIdle: handleLaunchIdle,
+  });
 
   const persistBankingState = useCallback(
     async (nextState: BankingConnectionState) => {

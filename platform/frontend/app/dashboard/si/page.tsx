@@ -10,6 +10,8 @@ import { SIDashboardHero, type HeroStatusChipConfig } from '../../../si_interfac
 import { SIDashboardSummary } from '../../../si_interface/components/SIDashboardSummary';
 import { onboardingChecklistApi } from '../../../shared_components/services/onboardingChecklistApi';
 import { TaxPoyntButton } from '../../../design_system';
+import { useOnboardingAnalytics } from '../../../shared_components/analytics/OnboardingAnalytics';
+import { useIdleTelemetry } from '../../../shared_components/hooks/useIdleTelemetry';
 import {
   sanitizeBankingConnection,
   sanitizeErpConnection,
@@ -111,6 +113,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export default function SIDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const analytics = useOnboardingAnalytics();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showHero, setShowHero] = useState(false);
@@ -126,6 +129,7 @@ export default function SIDashboard() {
   });
   const [checklistStatus, setChecklistStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const heroFirstImpressionLogged = React.useRef(false);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -168,6 +172,19 @@ export default function SIDashboard() {
   }, [router, searchParams, user]);
 
   useEffect(() => {
+    if (!analytics.isInitialized || !user?.id) {
+      return;
+    }
+    if (showHero && heroEvaluated && !heroFirstImpressionLogged.current) {
+      heroFirstImpressionLogged.current = true;
+      analytics.trackCustomEvent('dashboard_first_impression', 'dashboard', user.id, 'si', {
+        bankingStatus: connectionChips.banking.label,
+        erpStatus: connectionChips.erp.label,
+      });
+    }
+  }, [analytics, connectionChips.banking.label, connectionChips.erp.label, heroEvaluated, showHero, user?.id]);
+
+  useEffect(() => {
     if (!user) {
       return;
     }
@@ -203,6 +220,24 @@ export default function SIDashboard() {
       cancelled = true;
     };
   }, [user]);
+
+  const heroIdleHandler = React.useCallback(() => {
+    if (!analytics.isInitialized || !user?.id) {
+      return;
+    }
+    analytics.trackCustomEvent('dashboard_intro_idle', 'dashboard', user.id, 'si', {
+      bankingStatus: connectionChips.banking.label,
+      erpStatus: connectionChips.erp.label,
+    });
+  }, [analytics, connectionChips.banking.label, connectionChips.erp.label, user?.id]);
+
+  const heroIdleEnabled = analytics.isInitialized && !!user?.id && showHero;
+
+  useIdleTelemetry({
+    enabled: heroIdleEnabled,
+    timeoutMs: 5 * 60 * 1000,
+    onIdle: heroIdleHandler,
+  });
 
   useEffect(() => {
     if (!user) {
