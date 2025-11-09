@@ -14,6 +14,14 @@ const OnboardingPage: React.FC = () => {
   const [initialService, setInitialService] = useState<ServicePackage | null>(null);
   const [defaultStep, setDefaultStep] = useState<string | undefined>(undefined);
 
+  const normalizeServicePackage = (value?: string | null): ServicePackage | null => {
+    if (!value) return null;
+    if (value === 'si' || value === 'app' || value === 'hybrid') {
+      return value;
+    }
+    return null;
+  };
+
   useEffect(() => {
     const user = authService.getStoredUser();
     if (!authService.isAuthenticated() || !user) {
@@ -22,9 +30,9 @@ const OnboardingPage: React.FC = () => {
     }
 
     const serviceParam = searchParams.get('service');
-    if (serviceParam === 'si' || serviceParam === 'app' || serviceParam === 'hybrid') {
-      setInitialService(serviceParam);
-    }
+    const normalizedParam = normalizeServicePackage(serviceParam);
+    const userService = normalizeServicePackage(user.service_package);
+    setInitialService(normalizedParam ?? userService ?? null);
 
     const stepParam = searchParams.get('step');
     if (stepParam) {

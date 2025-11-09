@@ -12,8 +12,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ShieldCheckIcon } from '@heroicons/react/24/solid';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { onboardingApi, type CompanyProfilePayload } from '../services/onboardingApi';
+import erpIntegrationApi from '../services/erpIntegrationApi';
 import { authService } from '../services/auth';
 import { CrossFormDataManager } from '../utils/formPersistence';
+import {
+  MonoConsentIntegration,
+  type MonoConsentState,
+} from '../../si_interface/components/financial_systems/banking_integration/MonoConsentIntegration';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
 
@@ -58,6 +63,13 @@ interface ServiceConfiguration {
   shareHybridInsights: boolean;
 }
 
+type ConnectivityTestStatus = {
+  state: 'idle' | 'loading' | 'success' | 'error';
+  message?: string;
+  fetchedCount?: number;
+  sampleInvoice?: string;
+};
+
 const SERVICE_OPTIONS: Array<{ id: ServicePackage; title: string; summary: string; points: string[]; badge?: string }> = [
   {
     id: 'si',
@@ -79,6 +91,12 @@ const SERVICE_OPTIONS: Array<{ id: ServicePackage; title: string; summary: strin
     points: ['Unified analytics', 'Shared workflows', 'Enterprise SLAs'],
   },
 ];
+
+const SERVICE_SUMMARY_COPY: Record<ServicePackage, string> = {
+  si: 'Connect ERPs and banking data for your clients with full validation tooling.',
+  app: 'Transmit compliant invoices directly to FIRS with built-in monitoring.',
+  hybrid: 'Blend SI integrations with APP controls for shared analytics.',
+};
 
 const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   companyName: '',
@@ -230,6 +248,20 @@ const sanitizeServiceConfiguration = (
         ? source.shareHybridInsights
         : current.shareHybridInsights,
   };
+};
+
+const extractInvoiceLabel = (invoice: Record<string, unknown> | undefined): string | undefined => {
+  if (!invoice) {
+    return undefined;
+  }
+  const candidateKeys = ['invoice_number', 'name', 'BillingDocument', 'DocNumber'];
+  for (const key of candidateKeys) {
+    const raw = invoice[key];
+    if (typeof raw === 'string' && raw.trim()) {
+      return raw;
+    }
+  }
+  return undefined;
 };
 
 interface RuntimeConnectionItem {
@@ -427,9 +459,9 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   defaultStep,
   onComplete,
 }) => {
-  const showServiceStep = !initialService;
+  const [showServiceSelection, setShowServiceSelection] = useState<boolean>(() => !initialService);
   const [selectedService, setSelectedService] = useState<ServicePackage | null>(initialService);
-  const [currentIndex, setCurrentIndex] = useState<number>(() => (showServiceStep ? 0 : 0));
+  const [currentIndex, setCurrentIndex] = useState<number>(() => (showServiceSelection ? 0 : 0));
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
   const [companyProfileDetails, setCompanyProfileDetails] = useState<CompanyProfileDetails | null>(null);
   const [serviceConfig, setServiceConfig] = useState<ServiceConfiguration>(INITIAL_SERVICE_CONFIGURATION);
@@ -443,6 +475,13 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [serverStepSequence, setServerStepSequence] = useState<string[] | null>(null);
   const hasPrefilledCompanyProfile = useRef(false);
   const [runtimeInsights, setRuntimeInsights] = useState<RuntimeInsights>(EMPTY_RUNTIME_INSIGHTS);
+  const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+  const [expandedConnectivityLane, setExpandedConnectivityLane] = useState<'mono' | 'odoo' | null>('mono');
+  const [monoConsentState, setMonoConsentState] = useState<MonoConsentState | null>(null);
+  const [monoWidgetUrl, setMonoWidgetUrl] = useState<string | null>(null);
+  const [monoStatusMessage, setMonoStatusMessage] = useState<string | null>(null);
+  const [erpInvoiceIdsInput, setErpInvoiceIdsInput] = useState('INV/2024/0001,INV/2024/0002');
+  const [erpTestStatus, setErpTestStatus] = useState<ConnectivityTestStatus>({ state: 'idle' });
 
   const connectors = useMemo(
     () => [
@@ -453,6 +492,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     ],
     [],
   );
+  const displayedService: ServicePackage = selectedService ?? 'si';
+  const serviceSummaryText = SERVICE_SUMMARY_COPY[displayedService];
 
   const computeIsLocked = useCallback(
     (stepId: string) => {
@@ -461,7 +502,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       }
 
       if (stepId === 'company-profile') {
-        return showServiceStep && !selectedService;
+        return showServiceSelection && !selectedService;
       }
 
       if (['system-connectivity', 'review', 'launch'].includes(stepId)) {
@@ -470,7 +511,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
       return false;
     },
-    [selectedService, showServiceStep],
+    [selectedService, showServiceSelection],
   );
 
   const resolvedStepSequence = useMemo(() => {
@@ -478,12 +519,12 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       ? serverStepSequence
       : Array.from(DEFAULT_STEP_SEQUENCE);
 
-    if (showServiceStep) {
+    if (showServiceSelection) {
       return baseSequence;
     }
 
     return baseSequence.filter((stepId) => stepId !== 'service-selection');
-  }, [serverStepSequence, showServiceStep]);
+  }, [serverStepSequence, showServiceSelection]);
 
   const visibleSteps: WizardStep[] = resolvedStepSequence
     .map((stepId) => {
@@ -628,6 +669,9 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
         if (inferredPackage) {
           setSelectedService(inferredPackage);
+          if (showServiceSelection && !initialService) {
+            setShowServiceSelection(false);
+          }
         }
 
         if (metadata.company_profile || metadata.companyProfile) {
@@ -666,7 +710,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         }
 
         setPendingStepId(
-          determineInitialStepId(remoteState.current_step, showServiceStep || !inferredPackage)
+          determineInitialStepId(remoteState.current_step, showServiceSelection || !inferredPackage)
         );
       } catch (error) {
         console.error('Failed to load onboarding state', error);
@@ -771,6 +815,10 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       await persistState(nextStep.id, updatedCompleted, false, preSync ? { preSync } : undefined);
     }
 
+    if (currentStep.id === 'service-selection') {
+      setShowServiceSelection(false);
+    }
+
     setCurrentIndex((index) => Math.min(index + 1, visibleSteps.length - 1));
   };
 
@@ -789,6 +837,12 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     setIsFinishing(false);
 
     onComplete?.(selectedService);
+  };
+
+  const handleChangeService = () => {
+    setShowServiceSelection(true);
+    setPendingStepId('service-selection');
+    setCurrentIndex(0);
   };
 
   const handleCompanyProfileChange = useCallback(
@@ -813,6 +867,95 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         ? prev.connectors.filter((id) => id !== connectorId)
         : [...prev.connectors, connectorId],
     }));
+  };
+
+  const handleMonoConsentUpdate = useCallback((state: MonoConsentState) => {
+    setMonoConsentState(state);
+    if (state.unified) {
+      setServiceConfig((prev) =>
+        prev.connectors.includes('mono')
+          ? prev
+          : { ...prev, connectors: [...prev.connectors, 'mono'] },
+      );
+      setMonoStatusMessage('All required Mono consents granted. Generate a secure link to finish banking setup.');
+    } else {
+      setMonoStatusMessage('Grant the required banking consents to unlock Mono-powered feeds.');
+    }
+  }, []);
+
+  const handleMonoWidgetReady = useCallback((url: string) => {
+    setMonoWidgetUrl(url);
+    setMonoStatusMessage('Secure Mono widget generated. Launch it to complete consent capture.');
+  }, []);
+
+  const handleMonoConsentComplete = useCallback(() => {
+    setMonoStatusMessage('Mono consent captured. Banking data will begin flowing after account linking.');
+  }, []);
+
+  const handleOdooExtraction = useCallback(
+    async (mode: 'specific' | 'batch') => {
+      let invoiceIds: string[] = [];
+      if (mode === 'specific') {
+        invoiceIds = erpInvoiceIdsInput
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean);
+        if (invoiceIds.length === 0) {
+          setErpTestStatus({
+            state: 'error',
+            message: 'Provide at least one invoice ID before running the test fetch.',
+          });
+          return;
+        }
+      }
+
+      const loadingMessage =
+        mode === 'specific'
+          ? 'Requesting targeted invoice pull via erp_data_extractor...'
+          : 'Requesting Odoo sandbox batch via erp_data_extractor...';
+      setErpTestStatus({ state: 'loading', message: loadingMessage });
+
+      try {
+        const response =
+          mode === 'specific'
+            ? await erpIntegrationApi.testFetchOdooInvoices(invoiceIds)
+            : await erpIntegrationApi.testFetchOdooInvoiceBatch({ batchSize: 5 });
+
+        const fetched =
+          response?.data?.fetched_count ??
+          (Array.isArray(response?.data?.invoices) ? response.data.invoices.length : 0);
+        const firstInvoice =
+          Array.isArray(response?.data?.invoices) && response.data.invoices.length > 0
+            ? (response.data.invoices[0] as Record<string, unknown>)
+            : undefined;
+        const sampleInvoice = extractInvoiceLabel(firstInvoice);
+
+        setErpTestStatus({
+          state: 'success',
+          message:
+            fetched && fetched > 0
+              ? `Pulled ${fetched} invoice${fetched === 1 ? '' : 's'} from Odoo via erp_data_extractor.`
+              : 'Request completed but no invoices were returned.',
+          fetchedCount: fetched,
+          sampleInvoice,
+        });
+
+        setServiceConfig((prev) =>
+          prev.connectors.includes('odoo')
+            ? prev
+            : { ...prev, connectors: [...prev.connectors, 'odoo'] },
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to reach ERP data extractor.';
+        setErpTestStatus({ state: 'error', message });
+      }
+    },
+    [erpInvoiceIdsInput],
+  );
+
+  const toggleConnectivityLane = (lane: 'mono' | 'odoo') => {
+    setExpandedConnectivityLane((prev) => (prev === lane ? null : lane));
   };
 
   function renderServiceSelection() {
@@ -883,30 +1026,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           </div>
           <div className="space-y-2">
             <label className="flex items-center justify-between text-sm font-medium text-gray-700">
-              <span>Industry</span>
-              <span className="text-xs font-normal italic text-gray-400">Optional</span>
-            </label>
-            <TaxPoyntInput
-              value={companyProfile.industry}
-              onChange={handleCompanyProfileChange('industry')}
-              placeholder="e.g. Financial Services"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <label className="flex items-center justify-between text-sm font-medium text-gray-700">
-              <span>Team Size</span>
-              <span className="text-xs font-normal italic text-gray-400">Optional</span>
-            </label>
-            <TaxPoyntInput
-              value={companyProfile.teamSize}
-              onChange={handleCompanyProfileChange('teamSize')}
-              placeholder="e.g. 25"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center justify-between text-sm font-medium text-gray-700">
               <span>Country</span>
               <span className="text-red-500">*</span>
             </label>
@@ -916,6 +1035,48 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
               placeholder="Nigeria"
             />
           </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">More details</p>
+              <p className="text-xs text-gray-500">Optional info we use for onboarding recommendations.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCompanyDetails((prev) => !prev)}
+              className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+            >
+              {showCompanyDetails ? 'Hide' : 'Add details'}
+            </button>
+          </div>
+          {showCompanyDetails && (
+            <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+                  <span>Industry</span>
+                  <span className="text-xs font-normal italic text-gray-400">Optional</span>
+                </label>
+                <TaxPoyntInput
+                  value={companyProfile.industry}
+                  onChange={handleCompanyProfileChange('industry')}
+                  placeholder="e.g. Financial Services"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+                  <span>Team Size</span>
+                  <span className="text-xs font-normal italic text-gray-400">Optional</span>
+                </label>
+                <TaxPoyntInput
+                  value={companyProfile.teamSize}
+                  onChange={handleCompanyProfileChange('teamSize')}
+                  placeholder="e.g. 25"
+                />
+              </div>
+            </div>
+          )}
         </div>
         <p className="text-sm text-gray-500">
           We use this information to preconfigure regional settings, currency defaults, and recommended
@@ -930,37 +1091,39 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       return <p className="text-gray-500">Select a service above to continue.</p>;
     }
 
-    if (selectedService === 'si' || selectedService === 'hybrid') {
+    const isSystemIntegrator = selectedService === 'si' || selectedService === 'hybrid';
+
+    if (!isSystemIntegrator) {
       return (
         <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Choose the systems you plan to connect</h3>
-            <p className="text-sm text-gray-600">We will prepare starter playbooks for each connector.</p>
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {connectors.map((connector) => {
-                const isChecked = serviceConfig.connectors.includes(connector.id);
-                return (
-                  <label
-                    key={connector.id}
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border-2 px-4 py-3 transition ${
-                      isChecked ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-sm font-medium text-gray-900">{connector.label}</span>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleConnector(connector.id)}
-                      className="h-4 w-4"
-                    />
-                  </label>
-                );
-              })}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="text-lg font-semibold text-gray-900">Transmission environment</h3>
+            <p className="text-sm text-gray-600">Pick where your first batches should run.</p>
+            <div className="mt-4 flex gap-4">
+              {(['sandbox', 'production'] as const).map((environment) => (
+                <button
+                  key={environment}
+                  type="button"
+                  onClick={() => setServiceConfig((prev) => ({ ...prev, firsEnvironment: environment }))}
+                  className={`flex-1 rounded-xl border-2 px-4 py-3 text-left transition ${
+                    serviceConfig.firsEnvironment === environment
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-gray-900 capitalize">{environment}</div>
+                  <p className="mt-1 text-xs text-gray-600">
+                    {environment === 'sandbox'
+                      ? 'Safe for testing. Fully isolated with sample data.'
+                      : 'Goes straight to FIRS production once credentials are confirmed.'}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <h4 className="font-semibold text-gray-900">Validation preferences</h4>
+            <h3 className="text-lg font-semibold text-gray-900">Operational preferences</h3>
             <div className="mt-3 space-y-2 text-sm text-gray-600">
               <label className="flex items-center space-x-3">
                 <input
@@ -970,7 +1133,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
                     setServiceConfig((prev) => ({ ...prev, enableAutoRetry: event.target.checked }))
                   }
                 />
-                <span>Auto-retry failed validations with exponential backoff</span>
+                <span>Enable automatic retransmission when FIRS responds with transient errors.</span>
               </label>
               <label className="flex items-center space-x-3">
                 <input
@@ -980,80 +1143,276 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
                     setServiceConfig((prev) => ({ ...prev, enableNotifications: event.target.checked }))
                   }
                 />
-                <span>Send email notifications for critical incidents</span>
+                <span>Notify finance teams via email when batches complete or fail.</span>
               </label>
             </div>
           </div>
-
-          {selectedService === 'hybrid' && (
-            <label className="flex items-center space-x-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={serviceConfig.shareHybridInsights}
-                onChange={(event) =>
-                  setServiceConfig((prev) => ({ ...prev, shareHybridInsights: event.target.checked }))
-                }
-              />
-              <span>Share validation and transmission summaries across SI and APP workspaces.</span>
-            </label>
-          )}
         </div>
       );
     }
 
+    const monoReady = Boolean(monoConsentState?.unified);
+    const odooReady =
+      erpTestStatus.state === 'success' || serviceConfig.connectors.includes('odoo');
+    const laneCards: Array<{
+      id: 'mono' | 'odoo';
+      title: string;
+      description: string;
+      helper: string;
+      ready: boolean;
+    }> = [
+      {
+        id: 'mono',
+        title: 'Bank feeds (Mono)',
+        description: 'Use CBN-compliant consent to unlock transaction data.',
+        helper: 'Best when invoices originate from banking activity or reconciliations.',
+        ready: monoReady,
+      },
+      {
+        id: 'odoo',
+        title: 'ERP adapters (Odoo)',
+        description: 'Connect your Odoo workspace and pull invoices instantly.',
+        helper: 'Perfect for structured invoice data already living in an ERP.',
+        ready: odooReady,
+      },
+    ];
+
+    const erpConnectorOptions = connectors.filter((connector) => connector.id !== 'mono');
+
     return (
       <div className="space-y-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="text-lg font-semibold text-gray-900">Transmission environment</h3>
-          <p className="text-sm text-gray-600">Pick where your first batches should run.</p>
-          <div className="mt-4 flex gap-4">
-            {(['sandbox', 'production'] as const).map((environment) => (
-              <button
-                key={environment}
-                type="button"
-                onClick={() => setServiceConfig((prev) => ({ ...prev, firsEnvironment: environment }))}
-                className={`flex-1 rounded-xl border-2 px-4 py-3 text-left transition ${
-                  serviceConfig.firsEnvironment === environment
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-sm font-semibold text-gray-900 capitalize">{environment}</div>
-                <p className="mt-1 text-xs text-gray-600">
-                  {environment === 'sandbox'
-                    ? 'Safe for testing. Fully isolated with sample data.'
-                    : 'Goes straight to FIRS production once credentials are confirmed.'}
-                </p>
-              </button>
-            ))}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">How do you want to feed invoices?</h3>
+          <p className="text-sm text-gray-600">
+            Choose at least one pathway to start syncing invoice-ready data into TaxPoynt.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {laneCards.map((lane) => {
+              const isExpanded = expandedConnectivityLane === lane.id;
+              const statusClass = lane.ready
+                ? 'bg-green-100 text-green-700'
+                : isExpanded
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-gray-100 text-gray-600';
+              const statusLabel = lane.ready
+                ? 'Configured'
+                : isExpanded
+                ? 'In setup'
+                : 'Connect now';
+              return (
+                <button
+                  key={lane.id}
+                  type="button"
+                  onClick={() => toggleConnectivityLane(lane.id)}
+                  className={`text-left rounded-2xl border-2 p-5 transition ${
+                    isExpanded ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-base font-semibold text-gray-900">{lane.title}</p>
+                      <p className="text-sm text-gray-600">{lane.description}</p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-500">{lane.helper}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="text-lg font-semibold text-gray-900">Operational preferences</h3>
-          <div className="mt-3 space-y-2 text-sm text-gray-600">
-            <label className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                checked={serviceConfig.enableAutoRetry}
-                onChange={(event) =>
-                  setServiceConfig((prev) => ({ ...prev, enableAutoRetry: event.target.checked }))
-                }
-              />
-              <span>Enable automatic retransmission when FIRS responds with transient errors.</span>
-            </label>
-            <label className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                checked={serviceConfig.enableNotifications}
-                onChange={(event) =>
-                  setServiceConfig((prev) => ({ ...prev, enableNotifications: event.target.checked }))
-                }
-              />
-              <span>Notify finance teams via email when batches complete or fail.</span>
-            </label>
+        {expandedConnectivityLane === 'mono' && (
+          <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-semibold text-gray-900">Connect bank feeds via Mono</h4>
+                <p className="text-sm text-gray-600">
+                  Launch the Mono consent widget to grant secure access and unlock transaction-to-invoice automation.
+                </p>
+              </div>
+            </div>
+            <MonoConsentIntegration
+              compactMode
+              showDetailed={false}
+              onConsentUpdate={handleMonoConsentUpdate}
+              onMonoWidgetReady={handleMonoWidgetReady}
+              onComplete={handleMonoConsentComplete}
+            />
+            {monoStatusMessage && <p className="text-sm text-gray-600">{monoStatusMessage}</p>}
+            {monoWidgetUrl && (
+              <div className="flex flex-wrap gap-3">
+                <TaxPoyntButton
+                  variant="outline"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.open(monoWidgetUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                >
+                  Launch Mono widget
+                </TaxPoyntButton>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(monoWidgetUrl).catch(() => {});
+                    }
+                  }}
+                >
+                  Copy secure link
+                </button>
+              </div>
+            )}
           </div>
-        </div>
+        )}
+
+        {expandedConnectivityLane === 'odoo' && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
+              <div>
+                <h4 className="text-base font-semibold text-gray-900">Choose the systems you plan to connect</h4>
+                <p className="text-sm text-gray-600">
+                  Select the ERP adapters you expect to use. We&apos;ll preload mapping templates for each.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {erpConnectorOptions.map((connector) => {
+                  const isChecked = serviceConfig.connectors.includes(connector.id);
+                  return (
+                    <label
+                      key={connector.id}
+                      className={`flex cursor-pointer items-center justify-between rounded-xl border-2 px-4 py-3 transition ${
+                        isChecked ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-900">{connector.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleConnector(connector.id)}
+                        className="h-4 w-4"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <h5 className="font-semibold text-gray-900">Validation preferences</h5>
+                <div className="mt-3 space-y-2 text-sm text-gray-600">
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={serviceConfig.enableAutoRetry}
+                      onChange={(event) =>
+                        setServiceConfig((prev) => ({ ...prev, enableAutoRetry: event.target.checked }))
+                      }
+                    />
+                    <span>Auto-retry failed validations with exponential backoff</span>
+                  </label>
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={serviceConfig.enableNotifications}
+                      onChange={(event) =>
+                        setServiceConfig((prev) => ({ ...prev, enableNotifications: event.target.checked }))
+                      }
+                    />
+                    <span>Send email notifications for critical incidents</span>
+                  </label>
+                </div>
+              </div>
+
+              {selectedService === 'hybrid' && (
+                <label className="flex items-center space-x-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={serviceConfig.shareHybridInsights}
+                    onChange={(event) =>
+                      setServiceConfig((prev) => ({ ...prev, shareHybridInsights: event.target.checked }))
+                    }
+                  />
+                  <span>Share validation and transmission summaries across SI and APP workspaces.</span>
+                </label>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900">Test invoice pulls</h4>
+                  <p className="text-sm text-gray-600">
+                    Use live credentials or the shared demo workspace to see erp_data_extractor in action.
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    erpTestStatus.state === 'success' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {erpTestStatus.state === 'success' ? 'Tested' : 'Sandbox ready'}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Sample Odoo invoice IDs
+                  <span className="ml-1 text-xs font-normal text-gray-400">(comma separated)</span>
+                </label>
+                <TaxPoyntInput
+                  value={erpInvoiceIdsInput}
+                  onChange={(event) => setErpInvoiceIdsInput(event.target.value)}
+                  placeholder="INV/2024/0001,INV/2024/0002"
+                />
+                <p className="text-xs text-gray-500">
+                  Provide real IDs from your sandbox or stick with the shared demo data to preview transformations.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <TaxPoyntButton
+                  variant="primary"
+                  onClick={() => {
+                    void handleOdooExtraction('specific');
+                  }}
+                  disabled={erpTestStatus.state === 'loading'}
+                >
+                  {erpTestStatus.state === 'loading' ? 'Running…' : 'Test selected invoices'}
+                </TaxPoyntButton>
+                <TaxPoyntButton
+                  variant="outline"
+                  onClick={() => {
+                    void handleOdooExtraction('batch');
+                  }}
+                  disabled={erpTestStatus.state === 'loading'}
+                >
+                  {erpTestStatus.state === 'loading' ? 'Running…' : 'Run sandbox batch'}
+                </TaxPoyntButton>
+              </div>
+              {erpTestStatus.state !== 'idle' && (
+                <div
+                  className={`rounded-lg border px-4 py-3 text-sm ${
+                    erpTestStatus.state === 'success'
+                      ? 'border-green-200 bg-green-50 text-green-800'
+                      : erpTestStatus.state === 'error'
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-blue-200 bg-blue-50 text-blue-800'
+                  }`}
+                >
+                  <p>{erpTestStatus.message}</p>
+                  {typeof erpTestStatus.fetchedCount === 'number' && (
+                    <p className="mt-1 text-xs">
+                      Fetched count: {erpTestStatus.fetchedCount}
+                      {erpTestStatus.sampleInvoice && ` · Sample invoice ${erpTestStatus.sampleInvoice}`}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1267,6 +1626,27 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           )}
         </section>
       )}
+
+      <section className="rounded-2xl border border-gray-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Service focus</p>
+            <p className="text-lg font-semibold text-slate-900">{serviceTitle(displayedService)}</p>
+            <p className="text-sm text-slate-600">{serviceSummaryText}</p>
+          </div>
+          {!showServiceSelection ? (
+            <button
+              type="button"
+              onClick={handleChangeService}
+              className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+            >
+              Change service
+            </button>
+          ) : (
+            <span className="text-sm text-slate-500">Choose your service above to continue</span>
+          )}
+        </div>
+      </section>
 
       <nav className="flex flex-wrap gap-3">
         {visibleSteps.map((step, index) => {

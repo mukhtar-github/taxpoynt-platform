@@ -146,7 +146,7 @@ const monoBankingConsents: MonoBankingConsent[] = [
   }
 ];
 
-interface MonoConsentState {
+export interface MonoConsentState {
   taxpoynt: Record<string, boolean>; // Existing TaxPoynt consents
   mono: Record<string, boolean>; // Mono banking consents
   unified: boolean; // Overall consent status
