@@ -15,6 +15,7 @@ from core_platform.data_management.repositories.banking_repo_async import (
     delete_banking_connection,
     get_banking_connection,
     list_banking_connections,
+    list_bank_accounts,
     update_banking_connection,
 )
 from .mono_integration_service import MonoIntegrationService
@@ -392,19 +393,70 @@ class SIBankingService:
         sync_enabled = os.getenv(_FLAG_ENV, "false").lower() in _TRUTHY_VALUES
         sync_config = payload.get("sync_config") or {}
 
-        if not sync_enabled:
-            logger.info("Mono transactions sync requested while feature flag disabled", extra={"si_id": si_id})
+        def _build_sync_response(
+            *,
+            sync_started: bool,
+            feature_enabled: bool,
+            credentials_configured: bool,
+            message: Optional[str] = None,
+            fetched_count: int = 0,
+            persisted: int = 0,
+            duplicates: int = 0,
+            connection_id: Optional[str] = None,
+            account_id: Optional[str] = None,
+            mono_account_id: Optional[str] = None,
+            last_cursor: Optional[str] = None,
+            last_synced_at: Optional[str] = None,
+            extra: Optional[Dict[str, Any]] = None,
+        ) -> Dict[str, Any]:
+            data = {
+                "sync_started": sync_started,
+                "feature_enabled": feature_enabled,
+                "credentials_configured": credentials_configured,
+                "fetched_count": fetched_count,
+                "persisted": persisted,
+                "duplicates": duplicates,
+                "connection_id": connection_id,
+                "account_id": account_id,
+                "mono_account_id": mono_account_id,
+                "last_cursor": last_cursor,
+                "last_synced_at": last_synced_at,
+            }
+            if message:
+                data["message"] = message
+            if extra:
+                data.update(extra)
             return {
                 "operation": "sync_banking_transactions",
                 "success": True,
-                "data": {
-                    "sync_started": False,
-                    "feature_enabled": False,
-                    "message": f"Mono transactions disabled – set {_FLAG_ENV}=true to enable pipeline",
-                    "si_id": si_id,
-                },
+                "data": data,
                 "si_id": si_id,
             }
+
+        if not sync_enabled:
+            logger.info("Mono transactions sync requested while feature flag disabled", extra={"si_id": si_id})
+            return _build_sync_response(
+                sync_started=False,
+                feature_enabled=False,
+                credentials_configured=False,
+                message=f"Mono transactions disabled – set {_FLAG_ENV}=true to enable pipeline",
+            )
+
+        mono_secret = os.getenv("MONO_SECRET_KEY")
+        mono_app_id = os.getenv("MONO_APP_ID")
+        mono_base_url = os.getenv("MONO_BASE_URL", "https://api.withmono.com")
+
+        if not mono_secret or not mono_app_id:
+            logger.info(
+                "Mono transactions sync requested without credentials",
+                extra={"si_id": si_id},
+            )
+            return _build_sync_response(
+                sync_started=False,
+                feature_enabled=True,
+                credentials_configured=False,
+                message="Mono credentials missing. Set MONO_SECRET_KEY and MONO_APP_ID to enable syncing.",
+            )
 
         account_db_id_value = sync_config.get("account_db_id") or sync_config.get("account_id")
         if not account_db_id_value:
@@ -417,13 +469,6 @@ class SIBankingService:
 
         mono_account_id = sync_config.get("mono_account_id")
         page_size = int(os.getenv("MONO_PAGE_LIMIT", "100"))
-
-        mono_secret = os.getenv("MONO_SECRET_KEY")
-        mono_app_id = os.getenv("MONO_APP_ID")
-        mono_base_url = os.getenv("MONO_BASE_URL", "https://api.withmono.com")
-
-        if not mono_secret or not mono_app_id:
-            raise RuntimeError("MONO_SECRET_KEY and MONO_APP_ID must be configured to sync transactions")
 
         async for db in get_async_session():
             account: BankAccount = await db.get(BankAccount, account_db_id)
@@ -491,37 +536,42 @@ class SIBankingService:
             finally:
                 await mono_client.aclose()
 
-            response_payload = {
-                "sync_started": True,
-                "feature_enabled": True,
-                "persisted": result.inserted_count,
-                "duplicates": result.duplicate_count,
-                "account_id": str(account.id),
-                "connection_id": str(connection.id),
-                "mono_account_id": mono_account_identifier,
-                "last_cursor": state_store.last_cursor,
-                "latency_sla_seconds": LATENCY_ALERT_SECONDS,
-            }
+            fetched_count = result.inserted_count + result.duplicate_count
+            last_synced_at_iso = connection.last_sync_at.isoformat() if connection.last_sync_at else None
 
-            return {
-                "operation": "sync_banking_transactions",
-                "success": True,
-                "data": response_payload,
-                "si_id": si_id,
-            }
+            return _build_sync_response(
+                sync_started=True,
+                feature_enabled=True,
+                credentials_configured=True,
+                fetched_count=fetched_count,
+                persisted=result.inserted_count,
+                duplicates=result.duplicate_count,
+                account_id=str(account.id),
+                connection_id=str(connection.id),
+                mono_account_id=mono_account_identifier,
+                last_cursor=state_store.last_cursor,
+                last_synced_at=last_synced_at_iso,
+                extra={"latency_sla_seconds": LATENCY_ALERT_SECONDS},
+            )
     
     async def _handle_get_banking_accounts(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle getting banking accounts"""
         filters = payload.get("filters", {})
-        
-        result = await self.mono_service.get_banking_accounts(si_id, filters)
-        
-        return {
-            "operation": "get_banking_accounts",
-            "success": True,
-            "data": result,
-            "si_id": si_id
-        }
+        async for db in get_async_session():
+            result = await list_bank_accounts(
+                db,
+                si_id=si_id,
+                provider=filters.get("provider"),
+                limit=int(filters.get("limit", 50)),
+                offset=int(filters.get("offset", 0)),
+            )
+
+            return {
+                "operation": "get_banking_accounts",
+                "success": True,
+                "data": result,
+                "si_id": si_id
+            }
     
     async def _handle_get_account_balance(self, si_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle getting account balance"""

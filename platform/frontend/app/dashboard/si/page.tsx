@@ -123,6 +123,13 @@ type ManualPullUiState = {
   disabledReason?: string;
 };
 
+type BankingSyncTarget = {
+  accountDbId?: string;
+  connectionId?: string;
+  monoAccountId?: string;
+  lastSyncedAt?: string | null;
+};
+
 const formatLastSyncHelper = (iso?: string): string => {
   if (!iso) {
     return '';
@@ -139,8 +146,9 @@ const formatLastSyncHelper = (iso?: string): string => {
 
 const describeBankingManualHelper = (
   state: BankingConnectionState,
+  lastSyncedOverride?: string | null,
 ): { helper: string; disabledReason?: string } => {
-  const lastSyncSuffix = formatLastSyncHelper(state.lastUpdated);
+  const lastSyncSuffix = formatLastSyncHelper(lastSyncedOverride ?? state.lastUpdated);
   switch (state.status) {
     case 'connected':
       return {
@@ -190,6 +198,7 @@ export default function SIDashboard() {
     banking: defaultBankingChip,
     erp: defaultErpChip,
   });
+  const [bankingConnectionState, setBankingConnectionState] = useState<BankingConnectionState | null>(null);
   const [checklistSummary, setChecklistSummary] = useState({
     remainingPhases: 0,
     nextPhaseTitle: undefined as string | undefined,
@@ -206,6 +215,7 @@ export default function SIDashboard() {
     helper: 'Manual pull available once Mono is connected.',
     disabledReason: undefined,
   });
+  const [bankingSyncTarget, setBankingSyncTarget] = useState<BankingSyncTarget>({});
   const heroFirstImpressionLogged = React.useRef(false);
 
   useEffect(() => {
@@ -286,20 +296,11 @@ export default function SIDashboard() {
           banking: describeBankingChip(bankingState),
           erp: describeErpChip(erpState),
         });
-        const bankingManualMeta = describeBankingManualHelper(bankingState);
-        setBankingManualPullState((prev) => ({
-          status: prev.status === 'running' ? prev.status : 'idle',
-          helper: bankingManualMeta.helper,
-          disabledReason: bankingManualMeta.disabledReason,
-        }));
+        setBankingConnectionState(bankingState);
       } catch (error) {
         console.warn('Failed to load onboarding metadata for dashboard hero:', error);
         setConnectionChips({ banking: defaultBankingChip, erp: defaultErpChip });
-        setBankingManualPullState({
-          status: 'error',
-          helper: 'Unable to load Mono status.',
-          disabledReason: 'Mono state unavailable.',
-        });
+        setBankingConnectionState(null);
       }
     };
 
@@ -308,6 +309,58 @@ export default function SIDashboard() {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!bankingConnectionState) {
+      setBankingManualPullState((prev) => ({
+        status: prev.status === 'running' ? prev.status : 'idle',
+        helper: 'Mono link required before syncing.',
+        disabledReason: 'Mono connection not ready.',
+      }));
+      return;
+    }
+    const manualMeta = describeBankingManualHelper(
+      bankingConnectionState,
+      bankingSyncTarget.lastSyncedAt ?? bankingConnectionState.lastUpdated,
+    );
+    setBankingManualPullState((prev) => {
+      const nextStatus = prev.status === 'running' ? 'running' : prev.status;
+      const helper = nextStatus === 'idle' ? manualMeta.helper : prev.helper;
+      return {
+        status: nextStatus,
+        helper,
+        disabledReason: manualMeta.disabledReason,
+      };
+    });
+  }, [bankingConnectionState, bankingSyncTarget.lastSyncedAt]);
+
+  const refreshBankingAccountTarget = React.useCallback(async () => {
+    if (!user) {
+      setBankingSyncTarget({});
+      return;
+    }
+    try {
+      const response = await siBankingApi.listAccounts({ provider: 'mono' });
+      const account = response?.data?.items?.find((item) => item.provider === 'mono') ?? response?.data?.items?.[0];
+      setBankingSyncTarget(
+        account
+          ? {
+              accountDbId: account.id,
+              connectionId: account.connection_id,
+              monoAccountId: account.provider_account_id,
+              lastSyncedAt: account.last_sync_at ?? null,
+            }
+          : {},
+      );
+    } catch (error) {
+      console.warn('Failed to load Mono banking account metadata', error);
+      setBankingSyncTarget({});
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refreshBankingAccountTarget();
+  }, [refreshBankingAccountTarget]);
 
   const handleManualErpPull = React.useCallback(async () => {
     setErpManualPullState({
@@ -337,17 +390,32 @@ export default function SIDashboard() {
   }, []);
 
   const handleManualBankingPull = React.useCallback(async () => {
+    if (!bankingSyncTarget.accountDbId) {
+      setBankingManualPullState({
+        status: 'error',
+        helper: 'No Mono account metadata available yet. Complete consent or retry after syncing.',
+        disabledReason: 'Mono account metadata unavailable.',
+      });
+      return;
+    }
     setBankingManualPullState({
       status: 'running',
       helper: 'Requesting Mono transaction sync...',
       disabledReason: undefined,
     });
     try {
-      const response = await siBankingApi.syncTransactions();
+      const response = await siBankingApi.syncTransactions({
+        accountDbId: bankingSyncTarget.accountDbId,
+        monoAccountId: bankingSyncTarget.monoAccountId,
+        connectionId: bankingSyncTarget.connectionId,
+      });
       const fetched =
         response?.data?.fetched_count ??
         (typeof response?.data?.fetched_count === 'number' ? response.data.fetched_count : 0);
-      const timeText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const syncTime = response?.data?.last_synced_at
+        ? new Date(response.data.last_synced_at)
+        : new Date();
+      const timeText = syncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setBankingManualPullState({
         status: 'success',
         helper:
@@ -356,6 +424,11 @@ export default function SIDashboard() {
             : `Sync completed at ${timeText}, no new transactions.`,
         disabledReason: undefined,
       });
+      setBankingSyncTarget((prev) => ({
+        ...prev,
+        lastSyncedAt: response?.data?.last_synced_at ?? prev.lastSyncedAt ?? syncTime.toISOString(),
+      }));
+      void refreshBankingAccountTarget();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reach Mono feed.';
       setBankingManualPullState({
@@ -364,7 +437,7 @@ export default function SIDashboard() {
         disabledReason: undefined,
       });
     }
-  }, []);
+  }, [bankingSyncTarget, refreshBankingAccountTarget]);
 
   const erpManualPullConfig = React.useMemo<ManualPullConfig>(
     () => ({
@@ -383,7 +456,11 @@ export default function SIDashboard() {
   );
 
   const bankingManualPullConfig = React.useMemo<ManualPullConfig>(() => {
-    const disabled = Boolean(bankingManualPullState.disabledReason);
+    const missingAccountReason = bankingSyncTarget.accountDbId
+      ? undefined
+      : 'Mono account metadata unavailable.';
+    const effectiveDisabledReason = bankingManualPullState.disabledReason ?? missingAccountReason;
+    const disabled = Boolean(effectiveDisabledReason);
     return {
       modeLabel: 'Manual',
       helper: bankingManualPullState.helper,
@@ -397,7 +474,7 @@ export default function SIDashboard() {
         void handleManualBankingPull();
       },
     };
-  }, [bankingManualPullState, handleManualBankingPull]);
+  }, [bankingManualPullState, bankingSyncTarget.accountDbId, handleManualBankingPull]);
 
   const heroIdleHandler = React.useCallback(() => {
     if (!analytics.isInitialized || !user?.id) {

@@ -6,7 +6,7 @@ Lightweight async helpers to persist and query banking integration state.
 """
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,3 +110,53 @@ def _connection_to_dict(c: BankingConnection) -> Dict[str, Any]:
         "last_sync_at": c.last_sync_at.isoformat() if c.last_sync_at else None,
     }
 
+
+async def list_bank_accounts(
+    db: AsyncSession,
+    *,
+    si_id: Optional[str] = None,
+    provider: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    stmt = select(BankAccount, BankingConnection).join(BankingConnection, BankAccount.connection_id == BankingConnection.id)
+    if si_id:
+        stmt = stmt.where(BankingConnection.si_id == UUID(si_id) if isinstance(si_id, str) else si_id)
+    if provider:
+        stmt = stmt.where(BankingConnection.provider == BankingProvider(provider))
+
+    all_rows: List[Tuple[BankAccount, BankingConnection]] = (await db.execute(stmt)).all()
+    total = len(all_rows)
+    window_rows: List[Tuple[BankAccount, BankingConnection]] = (
+        (await db.execute(stmt.offset(offset).limit(limit))).all()
+    )
+
+    return {
+        "items": [_account_to_dict(account, connection) for account, connection in window_rows],
+        "count": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+def _account_to_dict(account: BankAccount, connection: Optional[BankingConnection] = None) -> Dict[str, Any]:
+    return {
+        "id": str(account.id),
+        "connection_id": str(account.connection_id),
+        "provider_account_id": account.provider_account_id,
+        "account_number": account.account_number,
+        "account_name": account.account_name,
+        "account_type": account.account_type.value if account.account_type else None,
+        "bank_name": account.bank_name,
+        "bank_code": account.bank_code,
+        "currency": account.currency,
+        "is_active": account.is_active,
+        "balance": float(account.balance) if account.balance is not None else None,
+        "available_balance": float(account.available_balance) if account.available_balance is not None else None,
+        "last_balance_update": account.last_balance_update.isoformat() if account.last_balance_update else None,
+        "account_metadata": account.account_metadata or {},
+        "provider": connection.provider.value if connection and connection.provider else None,
+        "connection_status": connection.status.value if connection and connection.status else None,
+        "last_sync_at": connection.last_sync_at.isoformat() if connection and connection.last_sync_at else None,
+        "si_id": str(connection.si_id) if connection else None,
+    }
