@@ -69,6 +69,7 @@ async def test_submit_kyc_command_persists_dojah_metadata(monkeypatch):
         http_method="GET",
         timeout_seconds=5,
         fallback_country="Nigeria",
+        stub_path=None,
     )
 
     command = SubmitKYCCommand(
