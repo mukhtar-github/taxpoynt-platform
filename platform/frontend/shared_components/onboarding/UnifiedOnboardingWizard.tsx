@@ -9,8 +9,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ShieldCheckIcon } from '@heroicons/react/24/solid';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
-import { onboardingApi } from '../services/onboardingApi';
+import { onboardingApi, type CompanyProfilePayload } from '../services/onboardingApi';
 import { authService } from '../services/auth';
 import { CrossFormDataManager } from '../utils/formPersistence';
 
@@ -41,6 +42,12 @@ interface CompanyProfile {
   industry: string;
   teamSize: string;
   country: string;
+}
+
+interface CompanyProfileDetails {
+  source?: string;
+  verifiedAt?: string;
+  status?: string;
 }
 
 interface ServiceConfiguration {
@@ -141,6 +148,11 @@ const normalizeServicePackage = (value: unknown): ServicePackage | null => {
 
 const sanitizeString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
+const sanitizeOptionalString = (value: unknown): string | undefined => {
+  const sanitized = sanitizeString(value);
+  return sanitized ? sanitized : undefined;
+};
+
 const sanitizeCompanyProfile = (value: unknown): CompanyProfile => {
   if (!isRecord(value)) {
     return INITIAL_COMPANY_PROFILE;
@@ -152,6 +164,37 @@ const sanitizeCompanyProfile = (value: unknown): CompanyProfile => {
     country: sanitizeString(value.country) || INITIAL_COMPANY_PROFILE.country,
   };
 };
+
+const sanitizeCompanyProfileDetails = (value: unknown): CompanyProfileDetails | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const details: CompanyProfileDetails = {};
+  const source = sanitizeOptionalString(value.source ?? value.provider);
+  if (source) {
+    details.source = source;
+  }
+
+  const verifiedAt = sanitizeOptionalString(value.verified_at ?? value.verifiedAt);
+  if (verifiedAt) {
+    details.verifiedAt = verifiedAt;
+  }
+
+  const status = sanitizeOptionalString(value.status);
+  if (status) {
+    details.status = status;
+  }
+
+  return Object.keys(details).length > 0 ? details : null;
+};
+
+const buildCompanyProfilePayload = (profile: CompanyProfile): CompanyProfilePayload => ({
+  company_name: profile.companyName.trim(),
+  industry: profile.industry.trim() || undefined,
+  company_size: profile.teamSize.trim() || undefined,
+  current_step: 'company-profile',
+});
 
 const sanitizeServiceConfiguration = (
   value: unknown,
@@ -242,7 +285,7 @@ const parseRuntimeInsights = (value: unknown): RuntimeInsights => {
   if (isRecord(value.connections)) {
     const itemsRaw = Array.isArray(value.connections.items) ? value.connections.items : [];
     const items = itemsRaw
-      .filter((item): item is Record<string, any> => isRecord(item))
+      .filter((item): item is Record<string, unknown> => isRecord(item))
       .map((item, index) => ({
         id:
           typeof item.id === 'string'
@@ -281,7 +324,7 @@ const parseRuntimeInsights = (value: unknown): RuntimeInsights => {
   if (isRecord(irnRaw)) {
     const recentRaw = Array.isArray(irnRaw.recent) ? irnRaw.recent : [];
     const recent = recentRaw
-      .filter((item): item is Record<string, any> => isRecord(item))
+      .filter((item): item is Record<string, unknown> => isRecord(item))
       .map((item) => ({
         irn: typeof item.irn === 'string' ? item.irn : undefined,
         status: typeof item.status === 'string' ? item.status : undefined,
@@ -388,6 +431,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [selectedService, setSelectedService] = useState<ServicePackage | null>(initialService);
   const [currentIndex, setCurrentIndex] = useState<number>(() => (showServiceStep ? 0 : 0));
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
+  const [companyProfileDetails, setCompanyProfileDetails] = useState<CompanyProfileDetails | null>(null);
   const [serviceConfig, setServiceConfig] = useState<ServiceConfiguration>(INITIAL_SERVICE_CONFIGURATION);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [isPersisting, setIsPersisting] = useState(false);
@@ -429,14 +473,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     [selectedService, showServiceStep],
   );
 
-  const stepRenderers: Record<string, () => React.ReactNode> = {
-    'service-selection': renderServiceSelection,
-    'company-profile': renderCompanyProfile,
-    'system-connectivity': renderSystemConnectivity,
-    review: renderReview,
-    launch: renderLaunch,
-  };
-
   const resolvedStepSequence = useMemo(() => {
     const baseSequence = serverStepSequence && serverStepSequence.length > 0
       ? serverStepSequence
@@ -449,29 +485,42 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     return baseSequence.filter((stepId) => stepId !== 'service-selection');
   }, [serverStepSequence, showServiceStep]);
 
-  const visibleSteps: WizardStep[] = useMemo(() => {
-    return resolvedStepSequence
-      .map((stepId) => {
-        const renderer = stepRenderers[stepId];
-        if (!renderer) {
-          return null;
+  const visibleSteps: WizardStep[] = resolvedStepSequence
+    .map((stepId) => {
+      const renderer = (() => {
+        switch (stepId) {
+          case 'service-selection':
+            return renderServiceSelection;
+          case 'company-profile':
+            return renderCompanyProfile;
+          case 'system-connectivity':
+            return renderSystemConnectivity;
+          case 'review':
+            return renderReview;
+          case 'launch':
+            return renderLaunch;
+          default:
+            return undefined;
         }
+      })();
+      if (!renderer) {
+        return null;
+      }
 
-        const definition = stepDefinitions[stepId] ?? FALLBACK_STEP_DEFINITIONS[stepId] ?? {
-          title: stepId,
-          description: '',
-        };
+      const definition = stepDefinitions[stepId] ?? FALLBACK_STEP_DEFINITIONS[stepId] ?? {
+        title: stepId,
+        description: '',
+      };
 
-        return {
-          id: stepId,
-          label: definition.title,
-          description: definition.description,
-          render: renderer,
-          isLocked: computeIsLocked(stepId),
-        };
-      })
-      .filter((step): step is WizardStep => Boolean(step));
-  }, [computeIsLocked, resolvedStepSequence, stepDefinitions, stepRenderers]);
+      return {
+        id: stepId,
+        label: definition.title,
+        description: definition.description,
+        render: renderer,
+        isLocked: computeIsLocked(stepId),
+      };
+    })
+    .filter((step): step is WizardStep => Boolean(step));
 
   useEffect(() => {
     if (!pendingStepId) {
@@ -585,6 +634,9 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           setCompanyProfile(sanitizeCompanyProfile(metadata.company_profile ?? metadata.companyProfile));
         }
 
+        const profileDetailsRaw = metadata.company_profile_details ?? metadata.companyProfileDetails;
+        setCompanyProfileDetails(sanitizeCompanyProfileDetails(profileDetailsRaw));
+
         if (metadata.service_configuration || metadata.serviceConfiguration) {
           setServiceConfig((prev) =>
             sanitizeServiceConfiguration(metadata.service_configuration ?? metadata.serviceConfiguration, prev)
@@ -634,8 +686,38 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const syncCompanyProfile = useCallback(async (): Promise<CompanyProfile> => {
+    const payload = buildCompanyProfilePayload(companyProfile);
+    const state = await onboardingApi.saveCompanyProfile(payload);
+
+    let resolvedProfile: CompanyProfile = {
+      ...companyProfile,
+      companyName: payload.company_name,
+      industry: payload.industry ?? '',
+      teamSize: payload.company_size ?? '',
+    };
+
+    if (state && isRecord(state.metadata)) {
+      const profileRaw = state.metadata.company_profile ?? state.metadata.companyProfile;
+      if (profileRaw) {
+        resolvedProfile = sanitizeCompanyProfile(profileRaw);
+      }
+
+      const detailsRaw = state.metadata.company_profile_details ?? state.metadata.companyProfileDetails;
+      setCompanyProfileDetails(sanitizeCompanyProfileDetails(detailsRaw));
+    }
+
+    setCompanyProfile(resolvedProfile);
+    return resolvedProfile;
+  }, [companyProfile]);
+
   const persistState = useCallback(
-    async (stepId: string, completionList: string[], markComplete: boolean = false) => {
+    async (
+      stepId: string,
+      completionList: string[],
+      markComplete: boolean = false,
+      options?: { preSync?: () => Promise<CompanyProfile> },
+    ) => {
       if (!selectedService) {
         return;
       }
@@ -644,12 +726,17 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         setIsPersisting(true);
         setPersistError(null);
 
+        let profileForMetadata = companyProfile;
+        if (options?.preSync) {
+          profileForMetadata = await options.preSync();
+        }
+
         await onboardingApi.updateOnboardingState({
           current_step: stepId,
           completed_steps: completionList,
           metadata: {
             service_package: selectedService,
-            company_profile: companyProfile,
+            company_profile: profileForMetadata,
             service_configuration: serviceConfig,
             system_connectivity: serviceConfig,
             milestone_complete: markComplete,
@@ -678,8 +765,10 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
     setCompletedSteps(updatedCompleted);
 
+    const preSync = currentStep.id === 'company-profile' ? syncCompanyProfile : undefined;
+
     if (selectedService) {
-      await persistState(nextStep.id, updatedCompleted);
+      await persistState(nextStep.id, updatedCompleted, false, preSync ? { preSync } : undefined);
     }
 
     setCurrentIndex((index) => Math.min(index + 1, visibleSteps.length - 1));
@@ -763,8 +852,23 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   }
 
   function renderCompanyProfile() {
+    const isDojahVerified = companyProfileDetails?.source?.toLowerCase() === 'dojah';
+
     return (
       <div className="space-y-6">
+        {isDojahVerified && (
+          <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+            <ShieldCheckIcon className="h-5 w-5 flex-shrink-0 text-green-600" />
+            <div>
+              <p className="text-sm font-semibold text-green-800">Verified via Dojah</p>
+              <p className="text-xs text-green-700">
+                {companyProfileDetails?.verifiedAt
+                  ? `Matched ${formatRuntimeTimestamp(companyProfileDetails.verifiedAt)}`
+                  : 'We prefilled these fields from your Dojah company profile. You can still make edits.'}
+              </p>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="space-y-2">
             <label className="flex items-center justify-between text-sm font-medium text-gray-700">

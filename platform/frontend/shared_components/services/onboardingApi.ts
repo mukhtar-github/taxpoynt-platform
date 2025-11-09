@@ -85,6 +85,7 @@ export interface CompanyProfilePayload {
   industry?: string | null;
   company_size?: string | null;
   compliance_contact?: string | null;
+  current_step?: string | null;
 }
 
 const generateIdempotencyKey = (): string => {
