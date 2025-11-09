@@ -15,7 +15,26 @@ export interface OdooInvoiceTestResult {
 
 const ERP_BASE_PATH = '/si/business/erp';
 
+export interface CreateOdooConnectionRequest {
+  erp_system: string;
+  organization_id?: string;
+  connection_name: string;
+  connection_config: {
+    url: string;
+    database?: string;
+    username?: string;
+    api_key?: string;
+    password?: string;
+    use_api_key?: boolean;
+    demo?: boolean;
+  };
+}
+
 export const erpIntegrationApi = {
+  async createOdooConnection(payload: CreateOdooConnectionRequest): Promise<V1Response<any>> {
+    return apiClient.post<V1Response<any>>(`${ERP_BASE_PATH}/connections`, payload);
+  },
+
   async testFetchOdooInvoices(
     invoiceIds: string[],
     options?: {

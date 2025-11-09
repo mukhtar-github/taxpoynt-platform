@@ -100,6 +100,14 @@ const SERVICE_SUMMARY_COPY: Record<ServicePackage, string> = {
   hybrid: 'Blend SI integrations with APP controls for shared analytics.',
 };
 
+const DEMO_ODOO_CONFIG = {
+  url: process.env.NEXT_PUBLIC_ODOO_DEMO_URL ?? 'https://odoo-demo.taxpoynt.com',
+  database: process.env.NEXT_PUBLIC_ODOO_DEMO_DB ?? 'taxpoynt_demo',
+  username: process.env.NEXT_PUBLIC_ODOO_DEMO_USER ?? 'demo@taxpoynt.com',
+  apiKey: process.env.NEXT_PUBLIC_ODOO_DEMO_API_KEY ?? 'demo-api-key',
+  password: process.env.NEXT_PUBLIC_ODOO_DEMO_PASSWORD ?? '',
+};
+
 const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   companyName: '',
   industry: '',
@@ -277,6 +285,33 @@ const sanitizeBankingConnection = (value: unknown): BankingConnectionState => {
     bankName: sanitizeString(value.bankName ?? value.bank_name),
     lastMessage: sanitizeString(value.lastMessage ?? value.last_message),
     lastUpdated: sanitizeOptionalString(value.lastUpdated ?? value.last_updated),
+  };
+};
+
+type ERPConnectionStatus = 'not_connected' | 'connecting' | 'connected' | 'error' | 'demo';
+
+interface ERPConnectionState {
+  status: ERPConnectionStatus;
+  connectionName?: string;
+  lastMessage?: string;
+  lastTestAt?: string;
+  sampleInvoice?: Record<string, unknown> | null;
+}
+
+const sanitizeErpConnection = (value: unknown): ERPConnectionState => {
+  if (!isRecord(value)) {
+    return { status: 'not_connected', sampleInvoice: null };
+  }
+  const status = typeof value.status === 'string' ? (value.status as ERPConnectionStatus) : 'not_connected';
+  const sampleInvoice = isRecord(value.sampleInvoice ?? value.sample_invoice)
+    ? ((value.sampleInvoice ?? value.sample_invoice) as Record<string, unknown>)
+    : null;
+  return {
+    status,
+    connectionName: sanitizeString(value.connectionName ?? value.connection_name),
+    lastMessage: sanitizeString(value.lastMessage ?? value.last_message),
+    lastTestAt: sanitizeOptionalString(value.lastTestAt ?? value.last_test_at),
+    sampleInvoice,
   };
 };
 
@@ -491,6 +526,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 }) => {
   const storedUserRef = useRef(authService.getStoredUser());
   const storedUser = storedUserRef.current;
+  const storedOrganizationId = storedUser?.organization?.id;
   const [showServiceSelection, setShowServiceSelection] = useState<boolean>(() => !initialService);
   const [selectedService, setSelectedService] = useState<ServicePackage | null>(initialService);
   const [currentIndex, setCurrentIndex] = useState<number>(() => (showServiceSelection ? 0 : 0));
@@ -525,6 +561,19 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [bankOwnerEmail, setBankOwnerEmail] = useState<string>(() => storedUser?.email ?? '');
   const [bankCallbackUrl, setBankCallbackUrl] = useState<string>('');
   const [monoLinkError, setMonoLinkError] = useState<string | null>(null);
+  const [erpConnectionState, setErpConnectionState] = useState<ERPConnectionState>({
+    status: 'not_connected',
+    sampleInvoice: null,
+  });
+  const [odooUrl, setOdooUrl] = useState('');
+  const [odooDatabase, setOdooDatabase] = useState('');
+  const [odooUsername, setOdooUsername] = useState('');
+  const [odooApiKey, setOdooApiKey] = useState('');
+  const [odooPassword, setOdooPassword] = useState('');
+  const [odooUseDemo, setOdooUseDemo] = useState(false);
+  const [odooError, setOdooError] = useState<string | null>(null);
+  const [erpPreviewInvoice, setErpPreviewInvoice] = useState<Record<string, unknown> | null>(null);
+  const [erpPreviewVisible, setErpPreviewVisible] = useState(false);
 
   const connectors = useMemo(
     () => [
@@ -559,7 +608,10 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     }
   }, [bankingConnectionState]);
   const buildMetadataPayload = useCallback(
-    (options?: { bankingConnection?: BankingConnectionState }) => ({
+    (options?: {
+      bankingConnection?: BankingConnectionState;
+      erpConnection?: ERPConnectionState;
+    }) => ({
       service_package: selectedService,
       company_profile: companyProfile,
       service_configuration: serviceConfig,
@@ -567,8 +619,11 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       banking_connections: {
         mono: options?.bankingConnection ?? bankingConnectionState,
       },
+      erp_connections: {
+        odoo: options?.erpConnection ?? erpConnectionState,
+      },
     }),
-    [selectedService, companyProfile, serviceConfig, bankingConnectionState],
+    [selectedService, companyProfile, serviceConfig, bankingConnectionState, erpConnectionState],
   );
 
   const computeIsLocked = useCallback(
@@ -741,6 +796,16 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const currentStep = visibleSteps[currentIndex];
   const progress = Math.round(((currentIndex + 1) / visibleSteps.length) * 100);
 
+  useEffect(() => {
+    if (odooUseDemo) {
+      setOdooUrl(DEMO_ODOO_CONFIG.url);
+      setOdooDatabase(DEMO_ODOO_CONFIG.database);
+      setOdooUsername(DEMO_ODOO_CONFIG.username);
+      setOdooApiKey(DEMO_ODOO_CONFIG.apiKey);
+      setOdooPassword(DEMO_ODOO_CONFIG.password);
+    }
+  }, [odooUseDemo]);
+
   const persistBankingState = useCallback(
     async (nextState: BankingConnectionState) => {
       setBankingConnectionState(nextState);
@@ -755,6 +820,25 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         });
       } catch (error) {
         console.error('Failed to persist banking connection state', error);
+      }
+    },
+    [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
+  );
+
+  const persistErpState = useCallback(
+    async (nextState: ERPConnectionState) => {
+      setErpConnectionState(nextState);
+      if (!selectedService) {
+        return;
+      }
+      try {
+        await onboardingApi.updateOnboardingState({
+          current_step: currentStep?.id ?? 'system-connectivity',
+          completed_steps: completedSteps,
+          metadata: buildMetadataPayload({ erpConnection: nextState }),
+        });
+      } catch (error) {
+        console.error('Failed to persist ERP connection state', error);
       }
     },
     [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
@@ -844,6 +928,15 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         const bankingConnectionsRaw = isRecord(metadata.banking_connections) ? metadata.banking_connections : null;
         const monoConnectionRaw = bankingConnectionsRaw?.mono ?? metadata.mono_connection;
         setBankingConnectionState(sanitizeBankingConnection(monoConnectionRaw));
+
+        const erpConnectionsRaw = isRecord(metadata.erp_connections) ? metadata.erp_connections : null;
+        const odooConnectionRaw = erpConnectionsRaw?.odoo ?? metadata.odoo_connection;
+        setErpConnectionState(sanitizeErpConnection(odooConnectionRaw));
+        setErpPreviewInvoice(
+          isRecord(odooConnectionRaw?.sampleInvoice ?? odooConnectionRaw?.sample_invoice)
+            ? ((odooConnectionRaw?.sampleInvoice ?? odooConnectionRaw?.sample_invoice) as Record<string, unknown>)
+            : null,
+        );
 
         if (metadata.service_configuration || metadata.serviceConfiguration) {
           setServiceConfig((prev) =>
@@ -1159,6 +1252,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             ? (response.data.invoices[0] as Record<string, unknown>)
             : undefined;
         const sampleInvoice = extractInvoiceLabel(firstInvoice);
+        setErpPreviewInvoice(firstInvoice ?? null);
 
         setErpTestStatus({
           state: 'success',
@@ -1175,13 +1269,102 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
             ? prev
             : { ...prev, connectors: [...prev.connectors, 'odoo'] },
         );
+        await persistErpState({
+          ...erpConnectionState,
+          status: odooUseDemo ? 'demo' : 'connected',
+          lastMessage:
+            fetched && fetched > 0
+              ? `Fetched ${fetched} invoice${fetched === 1 ? '' : 's'}`
+              : 'No invoices returned',
+          lastTestAt: new Date().toISOString(),
+          sampleInvoice: firstInvoice ?? null,
+        });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to reach ERP data extractor.';
         setErpTestStatus({ state: 'error', message });
+        setOdooError(message);
+        await persistErpState({
+          ...erpConnectionState,
+          status: 'error',
+          lastMessage: message,
+        });
       }
     },
-    [erpInvoiceIdsInput],
+    [erpConnectionState, erpInvoiceIdsInput, odooUseDemo, persistErpState],
+  );
+
+  const handleOdooConnectionSubmit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      setOdooError(null);
+      if (!odooUrl.trim()) {
+        setOdooError('Provide your Odoo URL before connecting.');
+        return;
+      }
+      if (!odooUsername.trim()) {
+        setOdooError('Provide your Odoo username/email.');
+        return;
+      }
+      if (!odooApiKey.trim() && !odooPassword.trim()) {
+        setOdooError('Provide an API key or password.');
+        return;
+      }
+
+      const connectionName = odooUseDemo ? 'Odoo Demo Workspace' : `Odoo @ ${odooUrl.trim()}`;
+      const connectionPayload = {
+        erp_system: 'odoo',
+        organization_id: storedOrganizationId,
+        connection_name: connectionName,
+        connection_config: {
+          url: odooUrl.trim(),
+          database: odooDatabase.trim() || undefined,
+          username: odooUsername.trim(),
+          api_key: odooApiKey.trim() || undefined,
+          password: odooPassword.trim() || undefined,
+          use_api_key: Boolean(odooApiKey.trim()),
+          demo: odooUseDemo,
+        },
+      };
+
+      setErpConnectionState((prev) => ({
+        ...prev,
+        status: odooUseDemo ? 'demo' : 'connecting',
+        connectionName,
+        lastMessage: 'Creating connection…',
+      }));
+
+      try {
+        await erpIntegrationApi.createOdooConnection(connectionPayload);
+        await persistErpState({
+          status: odooUseDemo ? 'demo' : 'connected',
+          connectionName,
+          lastMessage: 'Connection established. Running invoice pull…',
+          sampleInvoice: null,
+        });
+        await handleOdooExtraction('batch');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to save Odoo connection.';
+        setOdooError(message);
+        await persistErpState({
+          status: 'error',
+          connectionName,
+          lastMessage: message,
+          sampleInvoice: null,
+        });
+      }
+    },
+    [
+      handleOdooExtraction,
+      odooApiKey,
+      odooDatabase,
+      odooPassword,
+      odooUrl,
+      odooUseDemo,
+      odooUsername,
+      persistErpState,
+      storedOrganizationId,
+    ],
   );
 
   const toggleConnectivityLane = (lane: 'mono' | 'odoo') => {
@@ -1555,6 +1738,107 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
         {expandedConnectivityLane === 'odoo' && (
           <div className="space-y-6">
+            <form
+              className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4"
+              onSubmit={handleOdooConnectionSubmit}
+            >
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900">Connect your Odoo workspace</h4>
+                  <p className="text-sm text-gray-600">
+                    Enter your Odoo credentials or try the shared demo instance to see invoice pulls in action.
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    erpConnectionState.status === 'connected' || erpConnectionState.status === 'demo'
+                      ? 'bg-green-100 text-green-700'
+                      : erpConnectionState.status === 'connecting'
+                      ? 'bg-blue-100 text-blue-700'
+                      : erpConnectionState.status === 'error'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {erpConnectionState.status === 'connected'
+                    ? 'Connected'
+                    : erpConnectionState.status === 'demo'
+                    ? 'Demo connected'
+                    : erpConnectionState.status === 'connecting'
+                    ? 'Connecting…'
+                    : erpConnectionState.status === 'error'
+                    ? 'Action required'
+                    : 'Not connected'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Odoo URL</label>
+                  <TaxPoyntInput
+                    value={odooUrl}
+                    onChange={(event) => setOdooUrl(event.target.value)}
+                    placeholder="https://company.odoo.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Database <span className="text-xs font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <TaxPoyntInput
+                    value={odooDatabase}
+                    onChange={(event) => setOdooDatabase(event.target.value)}
+                    placeholder="company_db"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Username / Email</label>
+                  <TaxPoyntInput
+                    value={odooUsername}
+                    onChange={(event) => setOdooUsername(event.target.value)}
+                    placeholder="finance@example.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    API key <span className="text-xs font-normal text-gray-400">(preferred)</span>
+                  </label>
+                  <TaxPoyntInput
+                    value={odooApiKey}
+                    onChange={(event) => setOdooApiKey(event.target.value)}
+                    placeholder="Copy from Odoo user settings"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Password <span className="text-xs font-normal text-gray-400">(optional fallback)</span>
+                  </label>
+                  <TaxPoyntInput
+                    type="password"
+                    value={odooPassword}
+                    onChange={(event) => setOdooPassword(event.target.value)}
+                    placeholder="Only if API key unavailable"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center space-x-3 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={odooUseDemo}
+                  onChange={(event) => setOdooUseDemo(event.target.checked)}
+                />
+                <span>Use TaxPoynt&apos;s demo Odoo workspace</span>
+              </label>
+              {odooError && <p className="text-sm text-red-600">{odooError}</p>}
+              <div className="flex flex-wrap gap-3">
+                <TaxPoyntButton type="submit" variant="primary">
+                  {erpConnectionState.status === 'connecting' ? 'Connecting…' : 'Connect workspace'}
+                </TaxPoyntButton>
+                <p className="text-xs text-gray-500">
+                  Your credentials are encrypted and stored securely. You can rotate them after onboarding.
+                </p>
+              </div>
+            </form>
+
             <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
               <div>
                 <h4 className="text-base font-semibold text-gray-900">Choose the systems you plan to connect</h4>
@@ -1690,6 +1974,25 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
                       Fetched count: {erpTestStatus.fetchedCount}
                       {erpTestStatus.sampleInvoice && ` · Sample invoice ${erpTestStatus.sampleInvoice}`}
                     </p>
+                  )}
+                </div>
+              )}
+              {erpPreviewInvoice && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900">Preview sample invoice</p>
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+                      onClick={() => setErpPreviewVisible((prev) => !prev)}
+                    >
+                      {erpPreviewVisible ? 'Hide preview' : 'Show JSON'}
+                    </button>
+                  </div>
+                  {erpPreviewVisible && (
+                    <pre className="mt-3 max-h-64 overflow-auto rounded bg-white p-3 text-xs text-gray-800">
+                      {JSON.stringify(erpPreviewInvoice, null, 2)}
+                    </pre>
                   )}
                 </div>
               )}
