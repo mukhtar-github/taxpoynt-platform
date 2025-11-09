@@ -152,6 +152,11 @@ export interface MonoConsentState {
   unified: boolean; // Overall consent status
 }
 
+export interface MonoLinkRequest {
+  grantedScopes: string[];
+  grantedConsentIds: string[];
+}
+
 interface MonoConsentIntegrationProps {
   existingConsents?: Record<string, boolean>; // From ConsentIntegratedRegistration
   onConsentUpdate: (consents: MonoConsentState) => void;
@@ -160,6 +165,7 @@ interface MonoConsentIntegrationProps {
   compactMode?: boolean;
   onComplete?: () => void; // Called when banking consent process is complete
   onSkip?: () => void; // Called when user chooses to skip banking
+  onGenerateLink?: (request: MonoLinkRequest) => Promise<string>;
 }
 
 export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
@@ -169,7 +175,8 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
   showDetailed = true,
   compactMode = false,
   onComplete,
-  onSkip
+  onSkip,
+  onGenerateLink,
 }) => {
   const [consentState, setConsentState] = useState<MonoConsentState>({
     taxpoynt: existingConsents,
@@ -177,9 +184,13 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
     unified: false
   });
 
-  const [showDetails, setShowDetails] = useState(!compactMode);
+  const [showDetails, setShowDetails] = useState(showDetailed);
   const [monoWidgetUrl, setMonoWidgetUrl] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
+  useEffect(() => {
+    setShowDetails(showDetailed);
+  }, [showDetailed]);
 
   // Initialize Mono consents
   useEffect(() => {
@@ -196,22 +207,20 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
 
   // Update unified consent status
   useEffect(() => {
-    const allRequired = [
-      ...monoBankingConsents.filter(c => c.required).map(c => c.id)
-    ];
-    
-    const allRequiredGranted = allRequired.every(id => 
-      consentState.mono[id] === true
-    );
-    
-    const updatedState = {
-      ...consentState,
-      unified: allRequiredGranted
-    };
-    
-    setConsentState(updatedState);
-    onConsentUpdate(updatedState);
-  }, [consentState.mono, consentState.taxpoynt]);
+    const allRequired = monoBankingConsents.filter((c) => c.required).map((c) => c.id);
+    const allRequiredGranted = allRequired.every((id) => consentState.mono[id] === true);
+
+    if (consentState.unified !== allRequiredGranted) {
+      const updatedState = {
+        ...consentState,
+        unified: allRequiredGranted,
+      };
+      setConsentState(updatedState);
+      onConsentUpdate(updatedState);
+    } else {
+      onConsentUpdate(consentState);
+    }
+  }, [consentState, onConsentUpdate]);
 
   const handleMonoConsentChange = (consentId: string, granted: boolean) => {
     setConsentState(prev => ({
@@ -232,41 +241,48 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
     setIsGeneratingLink(true);
     
     try {
-      // Get the granted scopes for Mono
       const grantedScopes = monoBankingConsents
-        .filter(consent => consentState.mono[consent.id])
-        .flatMap(consent => consent.monoScope)
-        .filter((scope, index, array) => array.indexOf(scope) === index); // Remove duplicates
+        .filter((consent) => consentState.mono[consent.id])
+        .flatMap((consent) => consent.monoScope)
+        .filter((scope, index, array) => array.indexOf(scope) === index);
+      const grantedConsentIds = Object.keys(consentState.mono).filter((k) => consentState.mono[k]);
 
-      const data = await apiClient.post<{
-        data?: { mono_url?: string };
-      }>('/si/banking/open-banking/mono/link', {
-        customer: {
-          name: 'Business User', // This would come from user context
-          email: 'user@business.com' // This would come from user context
-        },
-        scope: grantedScopes.join(' '), // Join scopes for Mono
-        redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
-        meta: {
-          ref: `taxpoynt_consent_${Date.now()}`,
-          consents_granted: Object.keys(consentState.mono).filter(k => consentState.mono[k]),
-          consent_timestamp: new Date().toISOString()
-        }
-      });
-      
-      if (data.data?.mono_url) {
-        setMonoWidgetUrl(data.data.mono_url);
-        onMonoWidgetReady(data.data.mono_url);
-        
-        // Call onComplete when banking setup is ready
+      let monoUrl: string | null = null;
+      if (onGenerateLink) {
+        monoUrl = await onGenerateLink({
+          grantedScopes,
+          grantedConsentIds,
+        });
+      } else {
+        const data = await apiClient.post<{
+          data?: { mono_url?: string };
+        }>('/si/banking/open-banking/mono/link', {
+          customer: {
+            name: 'Business User',
+            email: 'user@business.com',
+          },
+          scope: grantedScopes.join(' '),
+          redirect_url: `${window.location.origin}/onboarding/si/banking-callback`,
+          meta: {
+            ref: `taxpoynt_consent_${Date.now()}`,
+            consents_granted: grantedConsentIds,
+            consent_timestamp: new Date().toISOString(),
+          },
+        });
+        monoUrl = data.data?.mono_url ?? null;
+      }
+
+      if (monoUrl) {
+        setMonoWidgetUrl(monoUrl);
+        onMonoWidgetReady(monoUrl);
         if (onComplete) {
           onComplete();
         }
       }
-
     } catch (error) {
       console.error('Failed to generate Mono widget link:', error);
-      alert('Failed to generate banking link. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to generate banking link. Please try again.';
+      alert(message);
     } finally {
       setIsGeneratingLink(false);
     }
@@ -509,6 +525,11 @@ export const MonoConsentIntegration: React.FC<MonoConsentIntegrationProps> = ({
           >
             {showDetails ? 'Hide' : 'Show'} Technical Details
           </button>
+          {onSkip && (
+            <Button onClick={onSkip} variant="outline" size="lg">
+              Skip banking
+            </Button>
+          )}
           
           <Button
             onClick={generateMonoWidgetLink}

@@ -14,10 +14,12 @@ import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { onboardingApi, type CompanyProfilePayload } from '../services/onboardingApi';
 import erpIntegrationApi from '../services/erpIntegrationApi';
 import { authService } from '../services/auth';
+import siBankingApi from '../services/siBankingApi';
 import { CrossFormDataManager } from '../utils/formPersistence';
 import {
   MonoConsentIntegration,
   type MonoConsentState,
+  type MonoLinkRequest,
 } from '../../si_interface/components/financial_systems/banking_integration/MonoConsentIntegration';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
@@ -250,6 +252,34 @@ const sanitizeServiceConfiguration = (
   };
 };
 
+type BankingConnectionStatus =
+  | 'not_started'
+  | 'link_created'
+  | 'awaiting_consent'
+  | 'connected'
+  | 'error'
+  | 'skipped';
+
+interface BankingConnectionState {
+  status: BankingConnectionStatus;
+  bankName?: string;
+  lastMessage?: string;
+  lastUpdated?: string;
+}
+
+const sanitizeBankingConnection = (value: unknown): BankingConnectionState => {
+  if (!isRecord(value)) {
+    return { status: 'not_started' };
+  }
+  const status = typeof value.status === 'string' ? (value.status as BankingConnectionStatus) : 'not_started';
+  return {
+    status,
+    bankName: sanitizeString(value.bankName ?? value.bank_name),
+    lastMessage: sanitizeString(value.lastMessage ?? value.last_message),
+    lastUpdated: sanitizeOptionalString(value.lastUpdated ?? value.last_updated),
+  };
+};
+
 const extractInvoiceLabel = (invoice: Record<string, unknown> | undefined): string | undefined => {
   if (!invoice) {
     return undefined;
@@ -459,6 +489,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   defaultStep,
   onComplete,
 }) => {
+  const storedUserRef = useRef(authService.getStoredUser());
+  const storedUser = storedUserRef.current;
   const [showServiceSelection, setShowServiceSelection] = useState<boolean>(() => !initialService);
   const [selectedService, setSelectedService] = useState<ServicePackage | null>(initialService);
   const [currentIndex, setCurrentIndex] = useState<number>(() => (showServiceSelection ? 0 : 0));
@@ -482,6 +514,17 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [monoStatusMessage, setMonoStatusMessage] = useState<string | null>(null);
   const [erpInvoiceIdsInput, setErpInvoiceIdsInput] = useState('INV/2024/0001,INV/2024/0002');
   const [erpTestStatus, setErpTestStatus] = useState<ConnectivityTestStatus>({ state: 'idle' });
+  const [bankingConnectionState, setBankingConnectionState] = useState<BankingConnectionState>({
+    status: 'not_started',
+  });
+  const [bankOwnerName, setBankOwnerName] = useState<string>(() => {
+    if (!storedUser) return '';
+    const candidate = `${storedUser.first_name ?? ''} ${storedUser.last_name ?? ''}`.trim();
+    return candidate || storedUser.email || '';
+  });
+  const [bankOwnerEmail, setBankOwnerEmail] = useState<string>(() => storedUser?.email ?? '');
+  const [bankCallbackUrl, setBankCallbackUrl] = useState<string>('');
+  const [monoLinkError, setMonoLinkError] = useState<string | null>(null);
 
   const connectors = useMemo(
     () => [
@@ -494,6 +537,39 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   );
   const displayedService: ServicePackage = selectedService ?? 'si';
   const serviceSummaryText = SERVICE_SUMMARY_COPY[displayedService];
+  const bankingStatusDescriptor = useMemo(() => {
+    switch (bankingConnectionState.status) {
+      case 'connected':
+        return {
+          label: bankingConnectionState.bankName
+            ? `Connected to ${bankingConnectionState.bankName}`
+            : 'Connected via Mono',
+          className: 'bg-green-100 text-green-700',
+        };
+      case 'link_created':
+        return { label: 'Link generated', className: 'bg-blue-100 text-blue-700' };
+      case 'awaiting_consent':
+        return { label: 'Waiting for bank confirmation', className: 'bg-yellow-100 text-yellow-700' };
+      case 'error':
+        return { label: 'Action required', className: 'bg-red-100 text-red-700' };
+      case 'skipped':
+        return { label: 'Skipped', className: 'bg-gray-200 text-gray-600' };
+      default:
+        return { label: 'Not connected', className: 'bg-gray-100 text-gray-600' };
+    }
+  }, [bankingConnectionState]);
+  const buildMetadataPayload = useCallback(
+    (options?: { bankingConnection?: BankingConnectionState }) => ({
+      service_package: selectedService,
+      company_profile: companyProfile,
+      service_configuration: serviceConfig,
+      system_connectivity: serviceConfig,
+      banking_connections: {
+        mono: options?.bankingConnection ?? bankingConnectionState,
+      },
+    }),
+    [selectedService, companyProfile, serviceConfig, bankingConnectionState],
+  );
 
   const computeIsLocked = useCallback(
     (stepId: string) => {
@@ -575,6 +651,71 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   }, [pendingStepId, visibleSteps]);
 
   useEffect(() => {
+    if (!['link_created', 'awaiting_consent'].includes(bankingConnectionState.status)) {
+      return;
+    }
+    let isCancelled = false;
+    const intervalId = setInterval(async () => {
+      try {
+        const refreshedState = await onboardingApi.getOnboardingState();
+        if (!refreshedState || isCancelled) {
+          return;
+        }
+        const metadata = isRecord(refreshedState.metadata) ? refreshedState.metadata : {};
+        const bankingConnectionsRaw = isRecord(metadata.banking_connections) ? metadata.banking_connections : null;
+        const monoConnectionRaw = bankingConnectionsRaw?.mono ?? metadata.mono_connection;
+        if (monoConnectionRaw) {
+          const sanitized = sanitizeBankingConnection(monoConnectionRaw);
+          setBankingConnectionState((prev) => {
+            if (
+              prev.status === sanitized.status &&
+              prev.bankName === sanitized.bankName &&
+              prev.lastMessage === sanitized.lastMessage &&
+              prev.lastUpdated === sanitized.lastUpdated
+            ) {
+              return prev;
+            }
+            return sanitized;
+          });
+        }
+      } catch (error) {
+        console.warn('Banking status poll failed:', error);
+      }
+    }, 10000);
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [bankingConnectionState.status]);
+
+  useEffect(() => {
+    if (bankingConnectionState.lastMessage) {
+      setMonoStatusMessage(bankingConnectionState.lastMessage);
+      return;
+    }
+    switch (bankingConnectionState.status) {
+      case 'connected':
+        setMonoStatusMessage(
+          bankingConnectionState.bankName
+            ? `Connected to ${bankingConnectionState.bankName} via Mono.`
+            : 'Mono connection confirmed.',
+        );
+        break;
+      case 'link_created':
+        setMonoStatusMessage('Secure Mono widget generated. Complete the consent to finish setup.');
+        break;
+      case 'awaiting_consent':
+        setMonoStatusMessage('Waiting for your bank to confirm consent via Mono.');
+        break;
+      case 'skipped':
+        setMonoStatusMessage('Bank feeds skipped. Connect Mono later from the dashboard.');
+        break;
+      default:
+        break;
+    }
+  }, [bankingConnectionState]);
+
+  useEffect(() => {
     if (hasPrefilledCompanyProfile.current) {
       return;
     }
@@ -599,6 +740,25 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
   const currentStep = visibleSteps[currentIndex];
   const progress = Math.round(((currentIndex + 1) / visibleSteps.length) * 100);
+
+  const persistBankingState = useCallback(
+    async (nextState: BankingConnectionState) => {
+      setBankingConnectionState(nextState);
+      if (!selectedService) {
+        return;
+      }
+      try {
+        await onboardingApi.updateOnboardingState({
+          current_step: currentStep?.id ?? 'system-connectivity',
+          completed_steps: completedSteps,
+          metadata: buildMetadataPayload({ bankingConnection: nextState }),
+        });
+      } catch (error) {
+        console.error('Failed to persist banking connection state', error);
+      }
+    },
+    [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
+  );
 
   const canProceed = useMemo(() => {
     if (isLoadingState) return false;
@@ -680,6 +840,10 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
         const profileDetailsRaw = metadata.company_profile_details ?? metadata.companyProfileDetails;
         setCompanyProfileDetails(sanitizeCompanyProfileDetails(profileDetailsRaw));
+
+        const bankingConnectionsRaw = isRecord(metadata.banking_connections) ? metadata.banking_connections : null;
+        const monoConnectionRaw = bankingConnectionsRaw?.mono ?? metadata.mono_connection;
+        setBankingConnectionState(sanitizeBankingConnection(monoConnectionRaw));
 
         if (metadata.service_configuration || metadata.serviceConfiguration) {
           setServiceConfig((prev) =>
@@ -779,10 +943,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           current_step: stepId,
           completed_steps: completionList,
           metadata: {
-            service_package: selectedService,
+            ...buildMetadataPayload(),
             company_profile: profileForMetadata,
-            service_configuration: serviceConfig,
-            system_connectivity: serviceConfig,
             milestone_complete: markComplete,
           },
         });
@@ -794,7 +956,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         setIsPersisting(false);
       }
     },
-    [companyProfile, selectedService, serviceConfig],
+    [buildMetadataPayload, companyProfile, selectedService],
   );
 
   const handleNext = async () => {
@@ -877,20 +1039,88 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           ? prev
           : { ...prev, connectors: [...prev.connectors, 'mono'] },
       );
+      setMonoLinkError(null);
       setMonoStatusMessage('All required Mono consents granted. Generate a secure link to finish banking setup.');
     } else {
       setMonoStatusMessage('Grant the required banking consents to unlock Mono-powered feeds.');
     }
   }, []);
 
-  const handleMonoWidgetReady = useCallback((url: string) => {
-    setMonoWidgetUrl(url);
-    setMonoStatusMessage('Secure Mono widget generated. Launch it to complete consent capture.');
-  }, []);
+  const handleMonoWidgetReady = useCallback(
+    (url: string) => {
+      setMonoWidgetUrl(url);
+      setMonoStatusMessage('Secure Mono widget generated. Complete the consent to finish setup.');
+    },
+    [],
+  );
 
   const handleMonoConsentComplete = useCallback(() => {
-    setMonoStatusMessage('Mono consent captured. Banking data will begin flowing after account linking.');
-  }, []);
+    setMonoStatusMessage('Waiting for your bank to confirm consent via Mono.');
+    void persistBankingState({
+      status: 'awaiting_consent',
+      lastMessage: 'Waiting for bank confirmation',
+      lastUpdated: new Date().toISOString(),
+    });
+  }, [persistBankingState]);
+
+  const handleMonoGenerateLink = useCallback(
+    async ({ grantedScopes, grantedConsentIds }: MonoLinkRequest) => {
+      const trimmedName = bankOwnerName.trim();
+      const trimmedEmail = bankOwnerEmail.trim();
+      if (!trimmedName || !trimmedEmail) {
+        const error = 'Provide the account holder name and email before generating the link.';
+        setMonoLinkError(error);
+        throw new Error(error);
+      }
+      setMonoLinkError(null);
+      const redirectUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/onboarding/si/banking-callback`
+          : '/onboarding/si/banking-callback';
+      try {
+        const monoUrl = await siBankingApi.createMonoLink({
+          customer: {
+            name: trimmedName,
+            email: trimmedEmail,
+          },
+          scope: grantedScopes.join(' '),
+          redirect_url: redirectUrl,
+          callback_url: bankCallbackUrl.trim() || undefined,
+          meta: {
+            ref: `taxpoynt_consent_${Date.now()}`,
+            consents_granted: grantedConsentIds,
+            consent_timestamp: new Date().toISOString(),
+          },
+        });
+        await persistBankingState({
+          status: 'link_created',
+          lastMessage: 'Secure Mono link generated. Launch the widget to continue.',
+          lastUpdated: new Date().toISOString(),
+        });
+        return monoUrl;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to generate Mono link';
+        setMonoLinkError(message);
+        await persistBankingState({
+          status: 'error',
+          lastMessage: message,
+          lastUpdated: new Date().toISOString(),
+        });
+        throw error;
+      }
+    },
+    [bankOwnerName, bankOwnerEmail, bankCallbackUrl, persistBankingState],
+  );
+
+  const handleSkipBanking = useCallback(() => {
+    setMonoStatusMessage('Bank feeds skipped. You can connect Mono later from the dashboard.');
+    setExpandedConnectivityLane('odoo');
+    void persistBankingState({
+      status: 'skipped',
+      lastMessage: 'User skipped Mono connection during onboarding',
+      lastUpdated: new Date().toISOString(),
+    });
+  }, [persistBankingState]);
 
   const handleOdooExtraction = useCallback(
     async (mode: 'specific' | 'batch') => {
@@ -1225,48 +1455,101 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         </div>
 
         {expandedConnectivityLane === 'mono' && (
-          <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-base font-semibold text-gray-900">Connect bank feeds via Mono</h4>
-                <p className="text-sm text-gray-600">
-                  Launch the Mono consent widget to grant secure access and unlock transaction-to-invoice automation.
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900">Connect bank feeds via Mono</h4>
+                  <p className="text-sm text-gray-600">
+                    Provide the authorised contact and we&apos;ll route them through Mono&apos;s consent flow.
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${bankingStatusDescriptor.className}`}
+                >
+                  {bankingStatusDescriptor.label}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Account holder name</label>
+                  <TaxPoyntInput
+                    value={bankOwnerName}
+                    onChange={(event) => setBankOwnerName(event.target.value)}
+                    placeholder="e.g. Adaobi O."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Account holder email</label>
+                  <TaxPoyntInput
+                    type="email"
+                    value={bankOwnerEmail}
+                    onChange={(event) => setBankOwnerEmail(event.target.value)}
+                    placeholder="billing@example.com"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Callback URL <span className="text-xs font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <TaxPoyntInput
+                    value={bankCallbackUrl}
+                    onChange={(event) => setBankCallbackUrl(event.target.value)}
+                    placeholder="https://example.com/mono/callback"
+                  />
+                </div>
+              </div>
+              {monoLinkError && <p className="text-sm text-red-600">{monoLinkError}</p>}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSkipBanking}
+                  className="text-sm font-semibold text-gray-600 hover:text-gray-900"
+                >
+                  Skip for now
+                </button>
+                <p className="text-xs text-gray-500">
+                  Skipping means no automated reconciliations until you connect Mono later.
                 </p>
               </div>
             </div>
-            <MonoConsentIntegration
-              compactMode
-              showDetailed={false}
-              onConsentUpdate={handleMonoConsentUpdate}
-              onMonoWidgetReady={handleMonoWidgetReady}
-              onComplete={handleMonoConsentComplete}
-            />
-            {monoStatusMessage && <p className="text-sm text-gray-600">{monoStatusMessage}</p>}
-            {monoWidgetUrl && (
-              <div className="flex flex-wrap gap-3">
-                <TaxPoyntButton
-                  variant="outline"
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      window.open(monoWidgetUrl, '_blank', 'noopener,noreferrer');
-                    }
-                  }}
-                >
-                  Launch Mono widget
-                </TaxPoyntButton>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                  onClick={() => {
-                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                      navigator.clipboard.writeText(monoWidgetUrl).catch(() => {});
-                    }
-                  }}
-                >
-                  Copy secure link
-                </button>
-              </div>
-            )}
+            <div className="rounded-2xl border border-indigo-100 bg-white p-5 space-y-4">
+              <MonoConsentIntegration
+                compactMode
+                showDetailed={false}
+                onConsentUpdate={handleMonoConsentUpdate}
+                onMonoWidgetReady={handleMonoWidgetReady}
+                onComplete={handleMonoConsentComplete}
+                onGenerateLink={handleMonoGenerateLink}
+                onSkip={handleSkipBanking}
+              />
+              {monoStatusMessage && <p className="text-sm text-gray-600">{monoStatusMessage}</p>}
+              {monoWidgetUrl && (
+                <div className="flex flex-wrap gap-3">
+                  <TaxPoyntButton
+                    variant="outline"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.open(monoWidgetUrl, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                  >
+                    Launch Mono widget
+                  </TaxPoyntButton>
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(monoWidgetUrl).catch(() => {});
+                      }
+                    }}
+                  >
+                    Copy secure link
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
