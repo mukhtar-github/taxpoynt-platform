@@ -48,6 +48,10 @@ const VerifyEmailPage: React.FC = () => {
 
   const normalizedEmail = email.trim();
 
+  const relaxedMode = (process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_MODE || '').toLowerCase() === 'relaxed';
+  const bypassMode = (process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_BYPASS || '').toLowerCase() === 'true';
+  const demoVerification = relaxedMode || bypassMode;
+
   const headerSubtitle = useMemo(() => {
     if (!normalizedEmail) {
       return 'Enter the verification code sent to your email to continue.';
@@ -121,6 +125,11 @@ const VerifyEmailPage: React.FC = () => {
             <p className="text-xs text-slate-600">
               Confirm your email and accept our policies to start the SI onboarding checklist.
             </p>
+            {demoVerification && (
+              <span className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900" data-testid="demo-email-chip">
+                Demo mode: verification auto-approved
+              </span>
+            )}
           </div>
           <AutosaveStatusChip status={status} lastSavedAt={lastVerifiedAt ?? undefined} />
         </div>

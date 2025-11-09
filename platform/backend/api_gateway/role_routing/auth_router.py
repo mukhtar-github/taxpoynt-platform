@@ -840,7 +840,13 @@ def create_auth_router(
             else:
                 token_hash = user.get("email_verification_token")
                 code_valid = token_hash and verify_password(request.code, token_hash)
-                if not code_valid and not (bypass_enabled and request.code == "000000"):
+                bypassing = bypass_enabled and request.code == "000000"
+                if bypassing:
+                    logger.warning(
+                        "EMAIL_VERIFICATION_BYPASS active – accepting static code for %s",
+                        request.email,
+                    )
+                if not code_valid and not bypassing:
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
 
                 updated_user = db.mark_email_verified(
