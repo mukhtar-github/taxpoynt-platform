@@ -21,6 +21,7 @@ import {
   type MonoConsentState,
   type MonoLinkRequest,
 } from '../../si_interface/components/financial_systems/banking_integration/MonoConsentIntegration';
+import { useOnboardingAnalytics } from '../analytics/OnboardingAnalytics';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
 
@@ -524,6 +525,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   defaultStep,
   onComplete,
 }) => {
+  const analytics = useOnboardingAnalytics();
   const storedUserRef = useRef(authService.getStoredUser());
   const storedUser = storedUserRef.current;
   const storedOrganizationId = storedUser?.organization?.id;
@@ -545,7 +547,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [runtimeInsights, setRuntimeInsights] = useState<RuntimeInsights>(EMPTY_RUNTIME_INSIGHTS);
   const [showCompanyDetails, setShowCompanyDetails] = useState(false);
   const [expandedConnectivityLane, setExpandedConnectivityLane] = useState<'mono' | 'odoo' | null>('mono');
-  const [monoConsentState, setMonoConsentState] = useState<MonoConsentState | null>(null);
   const [monoWidgetUrl, setMonoWidgetUrl] = useState<string | null>(null);
   const [monoStatusMessage, setMonoStatusMessage] = useState<string | null>(null);
   const [erpInvoiceIdsInput, setErpInvoiceIdsInput] = useState('INV/2024/0001,INV/2024/0002');
@@ -574,6 +575,9 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [odooError, setOdooError] = useState<string | null>(null);
   const [erpPreviewInvoice, setErpPreviewInvoice] = useState<Record<string, unknown> | null>(null);
   const [erpPreviewVisible, setErpPreviewVisible] = useState(false);
+  const stallTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastConnectivityPersistRef = useRef<boolean>(false);
+  const hasTelemetryIdleEventRef = useRef<boolean>(false);
 
   const connectors = useMemo(
     () => [
@@ -586,6 +590,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   );
   const displayedService: ServicePackage = selectedService ?? 'si';
   const serviceSummaryText = SERVICE_SUMMARY_COPY[displayedService];
+  const analyticsUserRole = displayedService;
+  const userId = storedUser?.id ?? null;
   const bankingStatusDescriptor = useMemo(() => {
     switch (bankingConnectionState.status) {
       case 'connected':
@@ -607,6 +613,48 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return { label: 'Not connected', className: 'bg-gray-100 text-gray-600' };
     }
   }, [bankingConnectionState]);
+  const monoReady = bankingConnectionState.status === 'connected' || bankingConnectionState.status === 'demo';
+  const odooReady = erpConnectionState.status === 'connected' || erpConnectionState.status === 'demo';
+
+  const bankingStatusDescriptor = useMemo(() => {
+    switch (bankingConnectionState.status) {
+      case 'connected':
+        return {
+          label: bankingConnectionState.bankName
+            ? `Connected to ${bankingConnectionState.bankName}`
+            : 'Connected via Mono',
+          className: 'bg-green-100 text-green-700',
+        };
+      case 'link_created':
+        return { label: 'Link generated', className: 'bg-blue-100 text-blue-700' };
+      case 'awaiting_consent':
+        return { label: 'Awaiting confirmation', className: 'bg-yellow-100 text-yellow-700' };
+      case 'error':
+        return { label: 'Action required', className: 'bg-red-100 text-red-700' };
+      case 'skipped':
+        return { label: 'Skipped', className: 'bg-gray-200 text-gray-600' };
+      default:
+        return { label: 'Not connected', className: 'bg-gray-100 text-gray-600' };
+    }
+  }, [bankingConnectionState]);
+
+  const erpStatusDescriptor = useMemo(() => {
+    switch (erpConnectionState.status) {
+      case 'connected':
+        return { label: erpConnectionState.connectionName || 'Connected', className: 'bg-green-100 text-green-700' };
+      case 'demo':
+        return { label: 'Demo workspace', className: 'bg-purple-100 text-purple-700' };
+      case 'connecting':
+        return { label: 'Connecting…', className: 'bg-blue-100 text-blue-700' };
+      case 'error':
+        return { label: 'Action required', className: 'bg-red-100 text-red-700' };
+      default:
+        return { label: 'Not connected', className: 'bg-gray-100 text-gray-600' };
+    }
+  }, [erpConnectionState]);
+
+  const laneReady = monoReady || odooReady;
+
   const buildMetadataPayload = useCallback(
     (options?: {
       bankingConnection?: BankingConnectionState;
@@ -771,6 +819,24 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   }, [bankingConnectionState]);
 
   useEffect(() => {
+    if (!analytics.isInitialized || !userId || !monoLinkError) {
+      return;
+    }
+    analytics.trackStepError('system-connectivity', userId, analyticsUserRole, monoLinkError, {
+      lane: 'mono',
+    });
+  }, [analytics, analyticsUserRole, monoLinkError, userId]);
+
+  useEffect(() => {
+    if (!analytics.isInitialized || !userId || !odooError) {
+      return;
+    }
+    analytics.trackStepError('system-connectivity', userId, analyticsUserRole, odooError, {
+      lane: 'odoo',
+    });
+  }, [analytics, analyticsUserRole, odooError, userId]);
+
+  useEffect(() => {
     if (hasPrefilledCompanyProfile.current) {
       return;
     }
@@ -805,6 +871,65 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       setOdooPassword(DEMO_ODOO_CONFIG.password);
     }
   }, [odooUseDemo]);
+
+  useEffect(() => {
+    if (!analytics.isInitialized || !userId) {
+      if (stallTimerRef.current) {
+        clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (currentStep?.id !== 'system-connectivity') {
+      if (stallTimerRef.current) {
+        clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+      hasTelemetryIdleEventRef.current = false;
+      return;
+    }
+
+    if (laneReady) {
+      if (stallTimerRef.current) {
+        clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+      hasTelemetryIdleEventRef.current = false;
+      return;
+    }
+
+    if (stallTimerRef.current) {
+      clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+
+    stallTimerRef.current = setTimeout(() => {
+      if (hasTelemetryIdleEventRef.current) {
+        return;
+      }
+      analytics.trackCustomEvent('system_connectivity_idle', 'system-connectivity', userId, analyticsUserRole, {
+        bankingStatus: bankingConnectionState.status,
+        erpStatus: erpConnectionState.status,
+      });
+      hasTelemetryIdleEventRef.current = true;
+    }, 5 * 60 * 1000);
+
+    return () => {
+      if (stallTimerRef.current) {
+        clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+    };
+  }, [
+    analytics,
+    analyticsUserRole,
+    currentStep?.id,
+    laneReady,
+    bankingConnectionState.status,
+    erpConnectionState.status,
+    userId,
+  ]);
 
   const persistBankingState = useCallback(
     async (nextState: BankingConnectionState) => {
@@ -844,6 +969,31 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
   );
 
+  useEffect(() => {
+    if (!selectedService || !['si', 'hybrid'].includes(analyticsUserRole)) {
+      return;
+    }
+    if (!laneReady) {
+      lastConnectivityPersistRef.current = false;
+      return;
+    }
+    if (completedSteps.includes('system-connectivity')) {
+      lastConnectivityPersistRef.current = true;
+      return;
+    }
+    if (lastConnectivityPersistRef.current) {
+      return;
+    }
+    const updatedCompleted = completedSteps.includes('system-connectivity')
+      ? completedSteps
+      : [...completedSteps, 'system-connectivity'];
+    lastConnectivityPersistRef.current = true;
+    if (!completedSteps.includes('system-connectivity')) {
+      setCompletedSteps(updatedCompleted);
+    }
+    void persistState('system-connectivity', updatedCompleted);
+  }, [analyticsUserRole, completedSteps, laneReady, persistState, selectedService]);
+
   const canProceed = useMemo(() => {
     if (isLoadingState) return false;
     if (!currentStep) return false;
@@ -856,8 +1006,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return Boolean(companyProfile.companyName.trim());
       case 'system-connectivity':
         if (!selectedService) return false;
-        if (selectedService === 'si') {
-          return serviceConfig.connectors.length > 0;
+        if (selectedService === 'si' || selectedService === 'hybrid') {
+          return laneReady;
         }
         return true;
       case 'launch':
@@ -865,7 +1015,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       default:
         return true;
     }
-  }, [companyProfile.companyName, currentStep, selectedService, serviceConfig.connectors.length, isLoadingState]);
+  }, [companyProfile.companyName, currentStep, isLoadingState, laneReady, selectedService]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -1125,7 +1275,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   };
 
   const handleMonoConsentUpdate = useCallback((state: MonoConsentState) => {
-    setMonoConsentState(state);
     if (state.unified) {
       setServiceConfig((prev) =>
         prev.connectors.includes('mono')
@@ -1564,9 +1713,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       );
     }
 
-    const monoReady = Boolean(monoConsentState?.unified);
-    const odooReady =
-      erpTestStatus.state === 'success' || serviceConfig.connectors.includes('odoo');
     const laneCards: Array<{
       id: 'mono' | 'odoo';
       title: string;
@@ -1578,7 +1724,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         id: 'mono',
         title: 'Bank feeds (Mono)',
         description: 'Use CBN-compliant consent to unlock transaction data.',
-        helper: 'Best when invoices originate from banking activity or reconciliations.',
+        helper: 'Ideal when invoices are derived from banking transactions or reconciliations.',
         ready: monoReady,
       },
       {
@@ -1594,6 +1740,16 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
 
     return (
       <div className="space-y-6">
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${bankingStatusDescriptor.className}`}
+          >
+            Bank feeds: {bankingStatusDescriptor.label}
+          </span>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${erpStatusDescriptor.className}`}>
+            ERP adapters: {erpStatusDescriptor.label}
+          </span>
+        </div>
         <div>
           <h3 className="text-lg font-semibold text-gray-900">How do you want to feed invoices?</h3>
           <p className="text-sm text-gray-600">

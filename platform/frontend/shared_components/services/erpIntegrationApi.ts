@@ -13,6 +13,12 @@ export interface OdooInvoiceTestResult {
   [key: string]: unknown;
 }
 
+export interface CreateOdooConnectionResponse {
+  connection_id?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
 const ERP_BASE_PATH = '/si/business/erp';
 
 export interface CreateOdooConnectionRequest {
@@ -31,8 +37,10 @@ export interface CreateOdooConnectionRequest {
 }
 
 export const erpIntegrationApi = {
-  async createOdooConnection(payload: CreateOdooConnectionRequest): Promise<V1Response<any>> {
-    return apiClient.post<V1Response<any>>(`${ERP_BASE_PATH}/connections`, payload);
+  async createOdooConnection(
+    payload: CreateOdooConnectionRequest,
+  ): Promise<V1Response<CreateOdooConnectionResponse>> {
+    return apiClient.post<V1Response<CreateOdooConnectionResponse>>(`${ERP_BASE_PATH}/connections`, payload);
   },
 
   async testFetchOdooInvoices(
