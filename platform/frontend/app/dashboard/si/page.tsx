@@ -24,6 +24,7 @@ import {
   type ERPConnectionState,
 } from '../../../shared_components/onboarding/connectionState';
 import { erpIntegrationApi } from '../../../shared_components/services/erpIntegrationApi';
+import siBankingApi from '../../../shared_components/services/siBankingApi';
 
 const HERO_STORAGE_KEY = 'si_dashboard_intro_dismissed_v1';
 
@@ -119,6 +120,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 type ManualPullUiState = {
   status: ManualPullStatus;
   helper: string;
+  disabledReason?: string;
 };
 
 export default function SIDashboard() {
@@ -143,6 +145,11 @@ export default function SIDashboard() {
   const [erpManualPullState, setErpManualPullState] = useState<ManualPullUiState>({
     status: 'idle',
     helper: 'Ready to trigger a sample batch pull.',
+  });
+  const [bankingManualPullState, setBankingManualPullState] = useState<ManualPullUiState>({
+    status: 'idle',
+    helper: 'Manual pull available once Mono is connected.',
+    disabledReason: undefined,
   });
   const heroFirstImpressionLogged = React.useRef(false);
 
@@ -224,9 +231,30 @@ export default function SIDashboard() {
           banking: describeBankingChip(bankingState),
           erp: describeErpChip(erpState),
         });
+        const bankingHelper =
+          bankingState.status === 'connected'
+            ? bankingState.bankName
+              ? `Linked to ${bankingState.bankName}`
+              : 'Connected via Mono'
+            : bankingState.status === 'skipped'
+            ? 'Connect Mono later to enable manual pulls.'
+            : bankingState.lastMessage ?? 'Mono link required before syncing.';
+        setBankingManualPullState((prev) => ({
+          status: prev.status === 'running' ? prev.status : 'idle',
+          helper: bankingHelper,
+          disabledReason:
+            bankingState.status === 'connected' || bankingState.status === 'demo'
+              ? undefined
+              : 'Mono connection required before triggering a pull.',
+        }));
       } catch (error) {
         console.warn('Failed to load onboarding metadata for dashboard hero:', error);
         setConnectionChips({ banking: defaultBankingChip, erp: defaultErpChip });
+        setBankingManualPullState({
+          status: 'error',
+          helper: 'Unable to load Mono status.',
+          disabledReason: 'Mono state unavailable.',
+        });
       }
     };
 
@@ -263,6 +291,36 @@ export default function SIDashboard() {
     }
   }, []);
 
+  const handleManualBankingPull = React.useCallback(async () => {
+    setBankingManualPullState({
+      status: 'running',
+      helper: 'Requesting Mono transaction sync...',
+      disabledReason: undefined,
+    });
+    try {
+      const response = await siBankingApi.syncTransactions();
+      const fetched =
+        response?.data?.fetched_count ??
+        (typeof response?.data?.fetched_count === 'number' ? response.data.fetched_count : 0);
+      const timeText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setBankingManualPullState({
+        status: 'success',
+        helper:
+          fetched && fetched > 0
+            ? `Fetched ${fetched} transaction${fetched === 1 ? '' : 's'} at ${timeText}.`
+            : `Sync completed at ${timeText}, no new transactions.`,
+        disabledReason: undefined,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reach Mono feed.';
+      setBankingManualPullState({
+        status: 'error',
+        helper: `Manual pull failed: ${message}`,
+        disabledReason: undefined,
+      });
+    }
+  }, []);
+
   const erpManualPullConfig = React.useMemo<ManualPullConfig>(
     () => ({
       modeLabel: 'Manual',
@@ -278,6 +336,23 @@ export default function SIDashboard() {
     }),
     [erpManualPullState, handleManualErpPull],
   );
+
+  const bankingManualPullConfig = React.useMemo<ManualPullConfig>(() => {
+    const disabled = Boolean(bankingManualPullState.disabledReason);
+    return {
+      modeLabel: 'Manual',
+      helper: bankingManualPullState.helper,
+      status: bankingManualPullState.status,
+      ariaLabel: 'Trigger manual Mono transaction sync',
+      isDisabled: disabled,
+      onRun: () => {
+        if (bankingManualPullState.status === 'running' || disabled) {
+          return;
+        }
+        void handleManualBankingPull();
+      },
+    };
+  }, [bankingManualPullState, handleManualBankingPull]);
 
   const heroIdleHandler = React.useCallback(() => {
     if (!analytics.isInitialized || !user?.id) {
@@ -368,6 +443,7 @@ export default function SIDashboard() {
         <SIDashboardHero
           userName={user.first_name || 'System Integrator'}
           bankingStatus={connectionChips.banking}
+          bankingManualPull={bankingManualPullConfig}
           erpStatus={connectionChips.erp}
           erpManualPull={erpManualPullConfig}
           onPrimaryAction={handleHeroPrimary}
@@ -389,6 +465,7 @@ export default function SIDashboard() {
         <SIDashboardSummary
           userName={user.first_name || 'System Integrator'}
           bankingStatus={connectionChips.banking}
+          bankingManualPull={bankingManualPullConfig}
           erpStatus={connectionChips.erp}
           erpManualPull={erpManualPullConfig}
           checklist={checklistSummary}

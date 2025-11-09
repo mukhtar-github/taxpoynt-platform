@@ -18,6 +18,19 @@ interface MonoLinkResponse {
   mono_url?: string;
 }
 
+interface V1Response<T> {
+  success: boolean;
+  action: string;
+  data: T;
+  meta?: Record<string, unknown>;
+}
+
+interface BankingSyncResponse {
+  fetched_count?: number;
+  last_synced_at?: string;
+  connection_id?: string;
+}
+
 const siBankingApi = {
   async createMonoLink(payload: MonoLinkPayload): Promise<string> {
     const response = await apiClient.post<MonoLinkResponse>(
@@ -29,6 +42,13 @@ const siBankingApi = {
       throw new Error('Mono link missing in response payload');
     }
     return monoUrl;
+  },
+
+  async syncTransactions(): Promise<V1Response<BankingSyncResponse>> {
+    return apiClient.post<V1Response<BankingSyncResponse>>(
+      '/si/banking/transactions/sync',
+      {},
+    );
   },
 };
 
