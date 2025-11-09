@@ -1,14 +1,131 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { authService, type User } from '../../../shared_components/services/auth';
+import { onboardingApi } from '../../../shared_components/services/onboardingApi';
 import { EnhancedSIInterface } from '../../../si_interface/EnhancedSIInterface';
+import { DashboardLayout } from '../../../shared_components/layouts/DashboardLayout';
+import { SIDashboardHero, type HeroStatusChipConfig } from '../../../si_interface/components/SIDashboardHero';
+import { SIDashboardSummary } from '../../../si_interface/components/SIDashboardSummary';
+import { onboardingChecklistApi } from '../../../shared_components/services/onboardingChecklistApi';
+import { TaxPoyntButton } from '../../../design_system';
+import {
+  sanitizeBankingConnection,
+  sanitizeErpConnection,
+  type BankingConnectionState,
+  type ERPConnectionState,
+} from '../../../shared_components/onboarding/connectionState';
+
+const HERO_STORAGE_KEY = 'si_dashboard_intro_dismissed_v1';
+
+const defaultBankingChip: HeroStatusChipConfig = {
+  label: 'Bank feeds',
+  helper: 'Connect Mono to unlock automations',
+  tone: 'muted',
+};
+
+const defaultErpChip: HeroStatusChipConfig = {
+  label: 'ERP adapters',
+  helper: 'Connect Odoo or another ERP to start pulling invoices',
+  tone: 'muted',
+};
+
+const describeBankingChip = (state: BankingConnectionState): HeroStatusChipConfig => {
+  switch (state.status) {
+    case 'connected':
+      return {
+        label: 'Bank feeds',
+        helper: state.bankName ? `Connected to ${state.bankName}` : 'Connected via Mono',
+        tone: 'success',
+      };
+    case 'demo':
+      return {
+        label: 'Bank feeds',
+        helper: 'Demo feed active',
+        tone: 'demo',
+      };
+    case 'link_created':
+      return {
+        label: 'Bank feeds',
+        helper: 'Link generated – launch the Mono widget',
+        tone: 'info',
+      };
+    case 'awaiting_consent':
+      return {
+        label: 'Bank feeds',
+        helper: 'Awaiting bank confirmation',
+        tone: 'warning',
+      };
+    case 'error':
+      return {
+        label: 'Bank feeds',
+        helper: state.lastMessage ?? 'Action required before syncing',
+        tone: 'danger',
+      };
+    case 'skipped':
+      return {
+        label: 'Bank feeds',
+        helper: 'Skipped during onboarding',
+        tone: 'muted',
+      };
+    default:
+      return defaultBankingChip;
+  }
+};
+
+const describeErpChip = (state: ERPConnectionState): HeroStatusChipConfig => {
+  switch (state.status) {
+    case 'connected':
+      return {
+        label: 'ERP adapters',
+        helper: state.connectionName ? `Connected to ${state.connectionName}` : 'ERP connected',
+        tone: 'success',
+      };
+    case 'demo':
+      return {
+        label: 'ERP adapters',
+        helper: 'Demo workspace configured',
+        tone: 'demo',
+      };
+    case 'connecting':
+      return {
+        label: 'ERP adapters',
+        helper: 'Connecting…',
+        tone: 'info',
+      };
+    case 'error':
+      return {
+        label: 'ERP adapters',
+        helper: state.lastMessage ?? 'Resolve connection issues',
+        tone: 'danger',
+      };
+    default:
+      return defaultErpChip;
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export default function SIDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showHero, setShowHero] = useState(false);
+  const [heroEvaluated, setHeroEvaluated] = useState(false);
+  const [connectionChips, setConnectionChips] = useState({
+    banking: defaultBankingChip,
+    erp: defaultErpChip,
+  });
+  const [checklistSummary, setChecklistSummary] = useState({
+    remainingPhases: 0,
+    nextPhaseTitle: undefined as string | undefined,
+    lastUpdated: undefined as string | undefined,
+  });
+  const [checklistStatus, setChecklistStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     const currentUser = authService.getStoredUser();
@@ -28,6 +145,98 @@ export default function SIDashboard() {
     setIsLoading(false);
   }, [router]);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      setShowHero(false);
+      setHeroEvaluated(true);
+      return;
+    }
+    const introParam = searchParams.get('intro');
+    const dismissed = window.localStorage.getItem(HERO_STORAGE_KEY) === 'true';
+    const shouldShow = introParam === '1' || !dismissed;
+    setShowHero(shouldShow);
+    setHeroEvaluated(true);
+    if (introParam === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('intro');
+      const nextQuery = params.toString();
+      router.replace(`/dashboard/si${nextQuery ? `?${nextQuery}` : ''}`, { scroll: false });
+    }
+  }, [router, searchParams, user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    let cancelled = false;
+
+    const fetchConnectionMetadata = async () => {
+      try {
+        const state = await onboardingApi.getOnboardingState();
+        if (cancelled || !state) {
+          return;
+        }
+        const metadata = isRecord(state.metadata) ? state.metadata : {};
+        const bankingConnectionsRaw = isRecord(metadata.banking_connections) ? metadata.banking_connections : null;
+        const monoConnectionRaw = bankingConnectionsRaw?.mono ?? metadata.mono_connection;
+        const erpConnectionsRaw = isRecord(metadata.erp_connections) ? metadata.erp_connections : null;
+        const odooConnectionRaw = erpConnectionsRaw?.odoo ?? metadata.odoo_connection;
+
+        const bankingState = sanitizeBankingConnection(monoConnectionRaw);
+        const erpState = sanitizeErpConnection(odooConnectionRaw);
+
+        setConnectionChips({
+          banking: describeBankingChip(bankingState),
+          erp: describeErpChip(erpState),
+        });
+      } catch (error) {
+        console.warn('Failed to load onboarding metadata for dashboard hero:', error);
+        setConnectionChips({ banking: defaultBankingChip, erp: defaultErpChip });
+      }
+    };
+
+    fetchConnectionMetadata();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    let cancelled = false;
+    const fetchChecklist = async () => {
+      try {
+        setChecklistStatus('loading');
+        const data = await onboardingChecklistApi.fetchChecklist();
+        if (cancelled || !data) {
+          return;
+        }
+        const remaining = data.summary?.remaining_phases?.length ?? 0;
+        setChecklistSummary({
+          remainingPhases: remaining,
+          nextPhaseTitle: data.summary?.remaining_phases?.[0]?.title,
+          lastUpdated: data.summary?.last_updated,
+        });
+        setChecklistStatus('ready');
+      } catch (error) {
+        console.warn('Failed to fetch onboarding checklist for summary:', error);
+        if (!cancelled) {
+          setChecklistStatus('error');
+        }
+      }
+    };
+
+    fetchChecklist();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -40,10 +249,76 @@ export default function SIDashboard() {
     return null;
   }
 
+  const handleHeroDismiss = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(HERO_STORAGE_KEY, 'true');
+    }
+    setShowHero(false);
+  };
+
+  const handleHeroPrimary = () => {
+    router.push('/dashboard/si/firs-invoice-generator');
+  };
+
+  const handleHeroSecondary = () => {
+    router.push('/dashboard/si/setup');
+  };
+
+  if (showHero || !heroEvaluated) {
+    return (
+      <DashboardLayout
+        role="si"
+        userName={`${user.first_name} ${user.last_name}`.trim() || 'System Integrator'}
+        userEmail={user.email}
+        activeTab="dashboard"
+      >
+        <SIDashboardHero
+          userName={user.first_name || 'System Integrator'}
+          bankingStatus={connectionChips.banking}
+          erpStatus={connectionChips.erp}
+          onPrimaryAction={handleHeroPrimary}
+          onSecondaryAction={handleHeroSecondary}
+          onDismiss={handleHeroDismiss}
+        />
+      </DashboardLayout>
+    );
+  }
+
+  if (!showAdvanced) {
+    return (
+      <DashboardLayout
+        role="si"
+        userName={`${user.first_name} ${user.last_name}`.trim() || 'System Integrator'}
+        userEmail={user.email}
+        activeTab="dashboard"
+      >
+        <SIDashboardSummary
+          userName={user.first_name || 'System Integrator'}
+          bankingStatus={connectionChips.banking}
+          erpStatus={connectionChips.erp}
+          checklist={checklistSummary}
+          onResumeOnboarding={() => router.push('/onboarding')}
+          onPrimaryAction={() => router.push('/dashboard/si/firs-invoice-generator')}
+          onSecondaryAction={() => router.push('/dashboard/si/setup')}
+          onOpenAdvanced={() => setShowAdvanced(true)}
+        />
+        {checklistStatus === 'error' && (
+          <p className="mt-4 text-sm text-amber-600" data-testid="checklist-warning">
+            Unable to load the latest checklist status. You can still resume onboarding from the checklist panel.
+          </p>
+        )}
+      </DashboardLayout>
+    );
+  }
+
   return (
-    <EnhancedSIInterface 
-      userName={`${user.first_name} ${user.last_name}`}
-      userEmail={user.email}
-    />
+    <div className="space-y-4">
+      <div className="flex items-center justify-end px-6 pt-4">
+        <TaxPoyntButton variant="outline" size="sm" onClick={() => setShowAdvanced(false)}>
+          Back to summary
+        </TaxPoyntButton>
+      </div>
+      <EnhancedSIInterface userName={`${user.first_name} ${user.last_name}`} userEmail={user.email} />
+    </div>
   );
 }

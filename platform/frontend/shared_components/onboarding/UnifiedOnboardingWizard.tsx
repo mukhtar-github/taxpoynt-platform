@@ -21,6 +21,12 @@ import {
   type MonoConsentState,
   type MonoLinkRequest,
 } from '../../si_interface/components/financial_systems/banking_integration/MonoConsentIntegration';
+import {
+  BankingConnectionState,
+  ERPConnectionState,
+  sanitizeBankingConnection,
+  sanitizeErpConnection,
+} from './connectionState';
 import { useOnboardingAnalytics } from '../analytics/OnboardingAnalytics';
 
 export type ServicePackage = 'si' | 'app' | 'hybrid';
@@ -258,61 +264,6 @@ const sanitizeServiceConfiguration = (
       typeof source.shareHybridInsights === 'boolean'
         ? source.shareHybridInsights
         : current.shareHybridInsights,
-  };
-};
-
-type BankingConnectionStatus =
-  | 'not_started'
-  | 'link_created'
-  | 'awaiting_consent'
-  | 'connected'
-  | 'error'
-  | 'skipped';
-
-interface BankingConnectionState {
-  status: BankingConnectionStatus;
-  bankName?: string;
-  lastMessage?: string;
-  lastUpdated?: string;
-}
-
-const sanitizeBankingConnection = (value: unknown): BankingConnectionState => {
-  if (!isRecord(value)) {
-    return { status: 'not_started' };
-  }
-  const status = typeof value.status === 'string' ? (value.status as BankingConnectionStatus) : 'not_started';
-  return {
-    status,
-    bankName: sanitizeString(value.bankName ?? value.bank_name),
-    lastMessage: sanitizeString(value.lastMessage ?? value.last_message),
-    lastUpdated: sanitizeOptionalString(value.lastUpdated ?? value.last_updated),
-  };
-};
-
-type ERPConnectionStatus = 'not_connected' | 'connecting' | 'connected' | 'error' | 'demo';
-
-interface ERPConnectionState {
-  status: ERPConnectionStatus;
-  connectionName?: string;
-  lastMessage?: string;
-  lastTestAt?: string;
-  sampleInvoice?: Record<string, unknown> | null;
-}
-
-const sanitizeErpConnection = (value: unknown): ERPConnectionState => {
-  if (!isRecord(value)) {
-    return { status: 'not_connected', sampleInvoice: null };
-  }
-  const status = typeof value.status === 'string' ? (value.status as ERPConnectionStatus) : 'not_connected';
-  const sampleInvoice = isRecord(value.sampleInvoice ?? value.sample_invoice)
-    ? ((value.sampleInvoice ?? value.sample_invoice) as Record<string, unknown>)
-    : null;
-  return {
-    status,
-    connectionName: sanitizeString(value.connectionName ?? value.connection_name),
-    lastMessage: sanitizeString(value.lastMessage ?? value.last_message),
-    lastTestAt: sanitizeOptionalString(value.lastTestAt ?? value.last_test_at),
-    sampleInvoice,
   };
 };
 
