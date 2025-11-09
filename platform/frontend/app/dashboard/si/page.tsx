@@ -123,6 +123,61 @@ type ManualPullUiState = {
   disabledReason?: string;
 };
 
+const formatLastSyncHelper = (iso?: string): string => {
+  if (!iso) {
+    return '';
+  }
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  return ` · Last sync ${parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  })} ${parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+const describeBankingManualHelper = (
+  state: BankingConnectionState,
+): { helper: string; disabledReason?: string } => {
+  const lastSyncSuffix = formatLastSyncHelper(state.lastUpdated);
+  switch (state.status) {
+    case 'connected':
+      return {
+        helper: state.bankName ? `Linked to ${state.bankName}${lastSyncSuffix}` : `Connected via Mono${lastSyncSuffix}`,
+      };
+    case 'demo':
+      return {
+        helper: `Demo feed active${lastSyncSuffix}`,
+      };
+    case 'link_created':
+      return {
+        helper: 'Link generated—launch the Mono widget before running a pull.',
+        disabledReason: 'Launch the Mono widget to finish setup.',
+      };
+    case 'awaiting_consent':
+      return {
+        helper: 'Consent required before pulling transactions.',
+        disabledReason: 'Awaiting consent from the banking user.',
+      };
+    case 'error':
+      return {
+        helper: state.lastMessage ?? 'Resolve Mono errors before pulling.',
+        disabledReason: 'Resolve Mono connection issues first.',
+      };
+    case 'skipped':
+      return {
+        helper: 'Connect Mono later to enable manual pulls.',
+        disabledReason: 'Mono was skipped during onboarding.',
+      };
+    default:
+      return {
+        helper: 'Mono link required before syncing.',
+        disabledReason: 'Mono connection not ready.',
+      };
+  }
+};
+
 export default function SIDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -231,21 +286,11 @@ export default function SIDashboard() {
           banking: describeBankingChip(bankingState),
           erp: describeErpChip(erpState),
         });
-        const bankingHelper =
-          bankingState.status === 'connected'
-            ? bankingState.bankName
-              ? `Linked to ${bankingState.bankName}`
-              : 'Connected via Mono'
-            : bankingState.status === 'skipped'
-            ? 'Connect Mono later to enable manual pulls.'
-            : bankingState.lastMessage ?? 'Mono link required before syncing.';
+        const bankingManualMeta = describeBankingManualHelper(bankingState);
         setBankingManualPullState((prev) => ({
           status: prev.status === 'running' ? prev.status : 'idle',
-          helper: bankingHelper,
-          disabledReason:
-            bankingState.status === 'connected' || bankingState.status === 'demo'
-              ? undefined
-              : 'Mono connection required before triggering a pull.',
+          helper: bankingManualMeta.helper,
+          disabledReason: bankingManualMeta.disabledReason,
         }));
       } catch (error) {
         console.warn('Failed to load onboarding metadata for dashboard hero:', error);
