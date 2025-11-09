@@ -193,7 +193,13 @@ def _generate_verification_code(length: int = 6) -> str:
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
-def _smtp_config() -> Dict[str, Any]:
+def _dev_email_fallback_enabled() -> bool:
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    allow_fallback = os.getenv("ALLOW_DEV_EMAIL_FALLBACK", "true").lower() not in {"false", "0", "no"}
+    return env != "production" and allow_fallback
+
+
+def _smtp_config() -> Optional[Dict[str, Any]]:
     host = os.getenv("SMTP_HOST")
     username = os.getenv("SMTP_USERNAME")
     password = os.getenv("SMTP_PASSWORD")
@@ -203,6 +209,11 @@ def _smtp_config() -> Dict[str, Any]:
     use_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
 
     if not all([host, username, password, from_email]):
+        if _dev_email_fallback_enabled():
+            logger.warning(
+                "SMTP configuration incomplete; using development fallback for verification email delivery."
+            )
+            return None
         raise RuntimeError("SMTP configuration is incomplete. Ensure SMTP_* and EMAILS_FROM_* variables are set.")
 
     return {
@@ -218,6 +229,14 @@ def _smtp_config() -> Dict[str, Any]:
 
 async def _send_verification_email(recipient: str, code: str, first_name: Optional[str] = None) -> None:
     config = _smtp_config()
+
+    if not config:
+        logger.info(
+            "DEV EMAIL FALLBACK ACTIVE - verification code for %s: %s",
+            recipient,
+            code,
+        )
+        return
 
     subject = "Verify your TaxPoynt email"
     greeting = first_name or recipient.split("@")[0]
@@ -236,15 +255,31 @@ async def _send_verification_email(recipient: str, code: str, first_name: Option
     message["To"] = recipient
     message.attach(MIMEText(body, "plain"))
 
+    timeout_seconds = float(os.getenv("SMTP_TIMEOUT_SECONDS", "15"))
+
     def _send():
-        with smtplib.SMTP(config["host"], config["port"]) as server:
+        with smtplib.SMTP(config["host"], config["port"], timeout=timeout_seconds) as server:
             if config.get("use_tls", True):
                 server.starttls()
             server.login(config["username"], config["password"])
             server.send_message(message)
 
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, _send)
+    try:
+        await loop.run_in_executor(None, _send)
+    except Exception as exc:
+        if _dev_email_fallback_enabled():
+            logger.warning(
+                "Verification email send failed, falling back to development console delivery: %s",
+                exc,
+            )
+            logger.info(
+                "DEV EMAIL FALLBACK ACTIVE - verification code for %s: %s",
+                recipient,
+                code,
+            )
+            return
+        raise
 
 
 def _isoformat_utc(value: datetime) -> str:
