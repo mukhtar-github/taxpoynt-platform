@@ -65,6 +65,11 @@ logger = logging.getLogger(__name__)
 
 _FLAG_ENV = "MONO_TRANSACTIONS_ENABLED"
 _TRUTHY_VALUES = {"1", "true", "yes", "on"}
+_DEMO_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _is_demo_mode() -> bool:
+    return os.getenv("DEMO_MODE", "false").strip().lower() in _DEMO_TRUE_VALUES
 
 
 @dataclass
@@ -392,6 +397,7 @@ class SIBankingService:
         """Handle syncing banking transactions"""
         sync_enabled = os.getenv(_FLAG_ENV, "false").lower() in _TRUTHY_VALUES
         sync_config = payload.get("sync_config") or {}
+        demo_mode = _is_demo_mode()
 
         def _build_sync_response(
             *,
@@ -440,6 +446,26 @@ class SIBankingService:
                 feature_enabled=False,
                 credentials_configured=False,
                 message=f"Mono transactions disabled – set {_FLAG_ENV}=true to enable pipeline",
+            )
+
+        if demo_mode:
+            demo_account_id = sync_config.get("account_db_id") or sync_config.get("account_id") or "demo-account-0001"
+            demo_connection_id = sync_config.get("connection_id") or "demo-connection-0001"
+            demo_mono_account_id = sync_config.get("mono_account_id") or "mono-demo-account"
+            demo_time = self._current_timestamp()
+            return _build_sync_response(
+                sync_started=True,
+                feature_enabled=True,
+                credentials_configured=True,
+                fetched_count=3,
+                persisted=3,
+                duplicates=0,
+                account_id=demo_account_id,
+                connection_id=demo_connection_id,
+                mono_account_id=demo_mono_account_id,
+                last_cursor="demo-cursor",
+                last_synced_at=demo_time,
+                extra={"demo": True, "message": "Demo Mono sync completed"},
             )
 
         mono_secret = os.getenv("MONO_SECRET_KEY")
@@ -565,6 +591,39 @@ class SIBankingService:
                 limit=int(filters.get("limit", 50)),
                 offset=int(filters.get("offset", 0)),
             )
+
+            if result.get("count", 0) == 0 and _is_demo_mode():
+                demo_timestamp = self._current_timestamp()
+                demo_account = {
+                    "id": "demo-account-0001",
+                    "connection_id": "demo-connection-0001",
+                    "provider_account_id": "mono-demo-account",
+                    "account_number": "1234567890",
+                    "account_name": "Demo Holdings NG",
+                    "account_type": "current",
+                    "bank_name": "Demo Bank",
+                    "bank_code": "999",
+                    "currency": "NGN",
+                    "is_active": True,
+                    "balance": 1500000,
+                    "available_balance": 1500000,
+                    "last_balance_update": demo_timestamp,
+                    "account_metadata": {
+                        "demo": True,
+                        "mono_last_synced_at": demo_timestamp,
+                        "mono_last_cursor": "demo-cursor",
+                    },
+                    "provider": "mono",
+                    "connection_status": "demo",
+                    "last_sync_at": demo_timestamp,
+                    "si_id": si_id,
+                }
+                result = {
+                    "items": [demo_account],
+                    "count": 1,
+                    "limit": int(filters.get("limit", 50)),
+                    "offset": int(filters.get("offset", 0)),
+                }
 
             return {
                 "operation": "get_banking_accounts",

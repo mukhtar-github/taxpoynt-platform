@@ -1,0 +1,22 @@
+{
+  "status": "success",
+  "data": {
+    "company_name": "Demo Logistics Limited",
+    "rc_number": "RC123456",
+    "tin": "01234567-0001",
+    "industry": "Logistics",
+    "status": "ACTIVE",
+    "country": "Nigeria",
+    "registered_address": "123 Demo Way, Victoria Island, Lagos",
+    "directors": [
+      {
+        "name": "Ada Demo",
+        "role": "CEO"
+      },
+      {
+        "name": "Chinedu Sample",
+        "role": "CTO"
+      }
+    ]
+  }
+}

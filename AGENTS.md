@@ -132,6 +132,8 @@ Common Tasks (How-To)
   - After launch, `/dashboard/si` must show the hero with the “Next pull: Manual (Run now)” controls and chip helpers sourced from the stored Mono/Odoo metadata. The Playwright spec now asserts hero visibility plus chip copy after onboarding.
   - Keep the hero chip controls accessible: preserve the existing `aria-live` helper text, descriptive `aria-label` on the “Run now” buttons, and the current focus order (chip card → manual pull button → hero CTAs).
   - Email verification shortcuts are staging-only. If `EMAIL_VERIFICATION_MODE=relaxed`, new users are auto-verified and no OTP is sent. If `EMAIL_VERIFICATION_BYPASS=true`, `/auth/verify-email` accepts `000000` as a valid code. **Never** enable these flags in production; keep the default strict mode for live signups.
+  - Dojah stubs: set `DOJAH_STUB_PATH=platform/backend/core_platform/services/kyc/stubs/dojah_company_sample.json` (or another sanitized payload) on Railway to auto-prefill the Company step. Production should rely on real Dojah credentials (`DOJAH_API_KEY`/`DOJAH_APP_ID`) and leave the stub unset.
+  - Demo mode: set `DEMO_MODE=true` on staging to preseed `banking_connections.mono`/`erp_connections.odoo` metadata and expose a deterministic Mono demo account via `/si/banking/accounts`. `sync_banking_transactions` will return stub data in this mode, so keep it disabled in production.
 - Accessibility/responsive notes for the Mono/Odoo UI live in `docs/ONBOARDING_ACCESSIBILITY_NOTES.md`. Review them before altering card layouts or status chips to keep the new flows screen-reader friendly.
 
 - Register a new APP service

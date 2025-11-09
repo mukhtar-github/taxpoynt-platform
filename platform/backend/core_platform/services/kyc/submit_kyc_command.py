@@ -38,6 +38,7 @@ class SubmitKYCCommandConfig:
     http_method: str
     timeout_seconds: float
     fallback_country: str
+    stub_path: Optional[str]
 
     @classmethod
     def from_env(cls) -> "SubmitKYCCommandConfig":
@@ -49,11 +50,12 @@ class SubmitKYCCommandConfig:
             http_method=os.getenv("DOJAH_LOOKUP_METHOD", "GET").upper(),
             timeout_seconds=float(os.getenv("DOJAH_TIMEOUT_SECONDS", "10")),
             fallback_country=os.getenv("DOJAH_FALLBACK_COUNTRY", "Nigeria"),
+            stub_path=os.getenv("DOJAH_STUB_PATH"),
         )
 
     @property
     def is_enabled(self) -> bool:
-        return bool(self.api_key)
+        return bool(self.api_key) or bool(self.stub_path)
 
     @property
     def endpoint(self) -> str:
@@ -162,6 +164,18 @@ class SubmitKYCCommand:
         self, config: SubmitKYCCommandConfig, params: Dict[str, str]
     ) -> Optional[Dict[str, Any]]:
         """Call Dojah's company lookup endpoint."""
+        if config.stub_path:
+            try:
+                with open(config.stub_path, "r", encoding="utf-8") as stub_file:
+                    logger.warning(
+                        "DOJAH_STUB_PATH active – using stubbed company profile from %s",
+                        config.stub_path,
+                    )
+                    return json.load(stub_file)
+            except Exception as exc:
+                logger.error("Failed to load Dojah stub payload: %s", exc, exc_info=True)
+                return None
+
         headers = {
             "Authorization": f"Bearer {config.api_key}",
             "x-api-key": config.api_key or "",
@@ -324,4 +338,3 @@ class SubmitKYCCommand:
     @staticmethod
     def _now_iso() -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-

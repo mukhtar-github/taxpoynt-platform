@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import os
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +47,12 @@ _DEFAULT_STEP_DEFINITIONS: Dict[str, Dict[str, Any]] = {
 
 _ALLOWED_WIZARD_SECTIONS = {"company_profile", "service_focus"}
 
+_DEMO_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _is_demo_mode() -> bool:
+    return os.getenv("DEMO_MODE", "false").strip().lower() in _DEMO_TRUE_VALUES
+
 
 class OnboardingStateRepositoryAsync:
     """Repository for CRUD operations on onboarding states."""
@@ -79,6 +86,27 @@ class OnboardingStateRepositoryAsync:
                 for step in steps
             },
         }
+
+        if _is_demo_mode():
+            demo_timestamp = now.isoformat()
+            metadata.setdefault("banking_connections", {}).setdefault(
+                "mono",
+                {
+                    "status": "demo",
+                    "bankName": "Demo Bank",
+                    "lastMessage": "Demo feed active",
+                    "lastUpdated": demo_timestamp,
+                },
+            )
+            metadata.setdefault("erp_connections", {}).setdefault(
+                "odoo",
+                {
+                    "status": "demo",
+                    "connectionName": "Demo Odoo Workspace",
+                    "lastMessage": "Demo workspace configured",
+                    "lastTestAt": demo_timestamp,
+                },
+            )
 
         record = OnboardingStateORM(
             user_id=user_id,
