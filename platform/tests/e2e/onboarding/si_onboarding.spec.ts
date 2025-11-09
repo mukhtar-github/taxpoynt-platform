@@ -45,11 +45,16 @@ test.describe('SI onboarding happy path', () => {
     });
 
     await test.step('Connect Mono via contact form (skipped when env missing)', async () => {
+      await page.getByRole('button', { name: /Bank feeds/i }).click();
       if (!process.env.MONO_PUBLIC_KEY) {
-        test.info().annotations.push({ type: 'info', description: 'Mono credentials missing; skipping consent launch.' });
+        test.info().annotations.push({
+          type: 'info',
+          description: 'Mono credentials missing; persisting "skipped" state for manual verification.',
+        });
+        await page.getByRole('button', { name: /^Skip for now$/i }).click();
+        await expect(page.getByText(/Bank feeds skipped/i)).toBeVisible();
         return;
       }
-      await page.getByRole('button', { name: /Bank feeds/i }).click();
       await page.getByLabel(/Account holder name/i).fill('QA Automation');
       await page.getByLabel(/Account holder email/i).fill(email);
       await page.getByRole('button', { name: /Connect workspace/i }).click();
@@ -65,6 +70,31 @@ test.describe('SI onboarding happy path', () => {
       await page.getByRole('button', { name: /Test selected invoices/i }).click();
       await expect(page.getByText(/Pulled/i)).toBeVisible({ timeout: 120000 });
       await expect(page.getByText(/Preview sample invoice/i)).toBeVisible();
+    });
+
+    await test.step('Review selections, launch workspace, and verify dashboard hero', async () => {
+      await page.getByRole('button', { name: /^Continue$/i }).click();
+      await expect(page.getByText(/Launch summary/i)).toBeVisible();
+      await page.getByRole('button', { name: /^Continue$/i }).click();
+      await expect(page.getByText(/Ready for launch/i)).toBeVisible();
+      await page.getByRole('button', { name: /Launch Dashboard/i }).click();
+      await page.waitForURL('**/dashboard/si', { timeout: 120000 });
+
+      const hero = page.getByTestId('si-dashboard-hero');
+      await expect(hero).toBeVisible({ timeout: 120000 });
+
+      const bankingChip = page.getByTestId('banking-status-chip');
+      const erpChip = page.getByTestId('erp-status-chip');
+      await expect(bankingChip).toBeVisible();
+
+      if (process.env.MONO_PUBLIC_KEY) {
+        await expect(bankingChip).toContainText(/Mono|Bank feeds|Connected|Awaiting|Link/i);
+      } else {
+        await expect(bankingChip).toContainText(/Skipped during onboarding/i);
+      }
+
+      await expect(erpChip).toContainText(/Demo workspace configured|ERP connected|Demo workspace/i);
+      await expect(page.getByTestId('erp-status-chip-manual-run')).toBeVisible();
     });
   });
 });

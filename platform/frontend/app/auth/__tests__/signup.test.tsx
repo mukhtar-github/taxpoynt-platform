@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react';
 import SignUpPageWrapper from '../signup/page';
+import type { StreamlinedRegistrationProps } from '../../../business_interface/auth/StreamlinedRegistration';
 
 const mockPush = jest.fn();
 
@@ -31,7 +32,7 @@ jest.mock('../../../shared_components/services/onboardingApi', () => ({
 }));
 
 jest.mock('../../../business_interface/auth/StreamlinedRegistration', () => ({
-  StreamlinedRegistration: ({ onCompleteRegistration }: any) => (
+  StreamlinedRegistration: ({ onCompleteRegistration }: StreamlinedRegistrationProps) => (
     <button
       type="button"
       onClick={() =>

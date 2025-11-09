@@ -129,6 +129,8 @@ Common Tasks (How-To)
   - Run the Playwright suite (`RUN_ONBOARDING_E2E=true PLAYWRIGHT_BASE_URL=http://localhost:3001 npx playwright test platform/tests/e2e/onboarding/si_onboarding.spec.ts`) whenever you touch signup/email/Dojah/Mono/Odoo flows. The spec exercises signup → email verification → Dojah hydrate → Mono consent → Odoo demo connection; Mono steps auto-skip when credentials are unavailable, but you should supply them for full coverage.
   - Keep the wizard collapsible (Mono + Odoo cards). Updates must continue persisting `banking_connections.mono` and `erp_connections.odoo` metadata so telemetry + auto-completion of the `system-connectivity` step stay accurate.
   - We intentionally keep Mono/Odoo extraction on-demand in development/staging; **do not** add a background 15-minute scheduler until the production go-live doc requests it. Capture any cadence proposals in `docs/development/sync_cadence_notes.md`.
+  - After launch, `/dashboard/si` must show the hero with the “Next pull: Manual (Run now)” controls and chip helpers sourced from the stored Mono/Odoo metadata. The Playwright spec now asserts hero visibility plus chip copy after onboarding.
+  - Keep the hero chip controls accessible: preserve the existing `aria-live` helper text, descriptive `aria-label` on the “Run now” buttons, and the current focus order (chip card → manual pull button → hero CTAs).
 - Accessibility/responsive notes for the Mono/Odoo UI live in `docs/ONBOARDING_ACCESSIBILITY_NOTES.md`. Review them before altering card layouts or status chips to keep the new flows screen-reader friendly.
 
 - Register a new APP service

@@ -268,6 +268,7 @@ export default function SIDashboard() {
       modeLabel: 'Manual',
       helper: erpManualPullState.helper,
       status: erpManualPullState.status,
+      ariaLabel: 'Trigger manual ERP pull for Odoo adapters',
       onRun: () => {
         if (erpManualPullState.status === 'running') {
           return;

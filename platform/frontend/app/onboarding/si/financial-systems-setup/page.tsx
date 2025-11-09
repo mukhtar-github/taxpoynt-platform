@@ -321,15 +321,6 @@ export default function FinancialSystemsSetupPage() {
     setIsLoading(false);
   };
 
-  const getComplexityColor = (complexity: string) => {
-    const colors = {
-      'Easy': 'text-green-600 bg-green-100',
-      'Medium': 'text-yellow-600 bg-yellow-100',
-      'Advanced': 'text-red-600 bg-red-100'
-    };
-    return colors[complexity as keyof typeof colors] || 'text-gray-600 bg-gray-100';
-  };
-
   const getStatusColor = (status: string) => {
     const colors = {
       'available': 'text-green-600 bg-green-100',

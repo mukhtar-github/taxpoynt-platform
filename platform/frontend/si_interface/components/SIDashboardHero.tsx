@@ -19,6 +19,7 @@ export interface ManualPullConfig {
   helper?: string;
   status?: ManualPullStatus;
   isDisabled?: boolean;
+  ariaLabel?: string;
   onRun: () => Promise<void> | void;
 }
 
@@ -54,40 +55,44 @@ export const HeroStatusChip: React.FC<{
   const isRunning = manualStatus === 'running';
 
   return (
-  <div
-    data-testid={dataTestId}
-    className={`inline-flex min-w-[180px] flex-col rounded-2xl border px-4 py-3 text-left text-sm shadow-sm ${toneClasses[config.tone]}`}
-  >
-    <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{icon} {config.label}</span>
-    <span className="mt-1 text-sm font-medium">{config.helper}</span>
-    {manualPull && (
-      <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-slate-700 shadow-inner" data-testid={dataTestId ? `${dataTestId}-manual` : undefined}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">Next pull</p>
-            <p className="text-sm font-semibold text-slate-900">
-              {manualPull.modeLabel ?? 'Manual'}
-              {isRunning ? ' - running' : ''}
-            </p>
+    <div
+      data-testid={dataTestId}
+      className={`inline-flex min-w-[180px] flex-col rounded-2xl border px-4 py-3 text-left text-sm shadow-sm ${toneClasses[config.tone]}`}
+    >
+      <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{icon} {config.label}</span>
+      <span className="mt-1 text-sm font-medium">{config.helper}</span>
+      {manualPull && (
+        <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-slate-700 shadow-inner" data-testid={dataTestId ? `${dataTestId}-manual` : undefined}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">Next pull</p>
+              <p className="text-sm font-semibold text-slate-900">
+                {manualPull.modeLabel ?? 'Manual'}
+                {isRunning ? ' - running' : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void manualPull.onRun()}
+              disabled={isRunning || manualPull.isDisabled}
+              className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-70"
+              data-testid={dataTestId ? `${dataTestId}-manual-run` : undefined}
+              aria-label={
+                manualPull.ariaLabel ??
+                `Run ${manualPull.modeLabel ?? 'manual'} pull for ${config.label}`
+              }
+            >
+              {isRunning ? 'Running...' : manualPull.ctaLabel ?? 'Run now'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void manualPull.onRun()}
-            disabled={isRunning || manualPull.isDisabled}
-            className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-70"
-            data-testid={dataTestId ? `${dataTestId}-manual-run` : undefined}
-          >
-            {isRunning ? 'Running...' : manualPull.ctaLabel ?? 'Run now'}
-          </button>
+          {manualPull.helper && (
+            <p className="mt-2 text-xs text-slate-600" aria-live="polite">
+              {manualPull.helper}
+            </p>
+          )}
         </div>
-        {manualPull.helper && (
-          <p className="mt-2 text-xs text-slate-600" aria-live="polite">
-            {manualPull.helper}
-          </p>
-        )}
-      </div>
-    )}
-  </div>
+      )}
+    </div>
   );
 };
 
