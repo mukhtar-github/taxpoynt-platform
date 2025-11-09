@@ -76,4 +76,23 @@ describe('SIDashboardSummary', () => {
     expect(advanced).toHaveBeenCalledTimes(1);
     expect(manual.onRun).toHaveBeenCalledTimes(1);
   });
+
+  it('shows disabled manual pull state for banking chip', () => {
+    render(
+      <SIDashboardSummary
+        userName="Ops"
+        bankingStatus={chip('Awaiting consent', 'warning')}
+        erpStatus={chip('Ready', 'success')}
+        bankingManualPull={manualPull({ isDisabled: true, helper: 'Connect Mono first' })}
+        checklist={{ remainingPhases: 0 }}
+        onResumeOnboarding={() => {}}
+        onPrimaryAction={() => {}}
+        onSecondaryAction={() => {}}
+        onOpenAdvanced={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('summary-banking-chip-manual-run')).toBeDisabled();
+    expect(screen.getByTestId('summary-banking-chip-manual')).toHaveTextContent('Connect Mono first');
+  });
 });

@@ -95,6 +95,20 @@ test.describe('SI onboarding happy path', () => {
 
       await expect(erpChip).toContainText(/Demo workspace configured|ERP connected|Demo workspace/i);
       await expect(page.getByTestId('erp-status-chip-manual-run')).toBeVisible();
+
+      const bankingManualButton = page.getByTestId('banking-status-chip-manual-run');
+      const bankingManualHelper = page.getByTestId('banking-status-chip-manual');
+
+      if (process.env.MONO_PUBLIC_KEY) {
+        await expect(bankingManualButton).toBeEnabled({ timeout: 120000 });
+        await bankingManualButton.click();
+        await expect(bankingManualHelper).toContainText(/Fetched|Sync completed/i, {
+          timeout: 120000,
+        });
+      } else {
+        await expect(bankingManualButton).toBeDisabled();
+        await expect(bankingManualHelper).toContainText(/Mono|Connect/i);
+      }
     });
   });
 });

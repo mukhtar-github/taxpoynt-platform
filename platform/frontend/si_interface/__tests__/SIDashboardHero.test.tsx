@@ -43,7 +43,7 @@ describe('SIDashboardHero', () => {
     expect(screen.getByTestId('hero-primary-cta')).toHaveTextContent('Upload first invoices');
     expect(screen.getByTestId('hero-secondary-cta')).toHaveTextContent('Invite a teammate');
     expect(screen.getAllByText(/Next pull/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: /Run now/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Run .*pull/i }).length).toBeGreaterThan(0);
   });
 
   it('invokes callbacks when CTAs or manual pull buttons are clicked', () => {
@@ -73,5 +73,24 @@ describe('SIDashboardHero', () => {
     expect(secondary).toHaveBeenCalledTimes(1);
     expect(dismiss).toHaveBeenCalledTimes(1);
     expect(manual.onRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables manual pull button when banking config is disabled', () => {
+    render(
+      <SIDashboardHero
+        userName="Ada"
+        bankingStatus={status({ helper: 'Awaiting consent' })}
+        erpStatus={status()}
+        bankingManualPull={manualPull({ isDisabled: true, helper: 'Consent required' })}
+        onPrimaryAction={() => {}}
+        onSecondaryAction={() => {}}
+        onDismiss={() => {}}
+      />, 
+    );
+
+    const button = screen.getByTestId('banking-status-chip-manual-run');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-label', expect.stringContaining('Bank feeds'));
+    expect(screen.getByTestId('banking-status-chip-manual')).toHaveTextContent('Consent required');
   });
 });
