@@ -131,6 +131,7 @@ Common Tasks (How-To)
   - We intentionally keep Mono/Odoo extraction on-demand in development/staging; **do not** add a background 15-minute scheduler until the production go-live doc requests it. Capture any cadence proposals in `docs/development/sync_cadence_notes.md`.
   - After launch, `/dashboard/si` must show the hero with the “Next pull: Manual (Run now)” controls and chip helpers sourced from the stored Mono/Odoo metadata. The Playwright spec now asserts hero visibility plus chip copy after onboarding.
   - Keep the hero chip controls accessible: preserve the existing `aria-live` helper text, descriptive `aria-label` on the “Run now” buttons, and the current focus order (chip card → manual pull button → hero CTAs).
+  - Email verification shortcuts are staging-only. If `EMAIL_VERIFICATION_MODE=relaxed`, new users are auto-verified and no OTP is sent. If `EMAIL_VERIFICATION_BYPASS=true`, `/auth/verify-email` accepts `000000` as a valid code. **Never** enable these flags in production; keep the default strict mode for live signups.
 - Accessibility/responsive notes for the Mono/Odoo UI live in `docs/ONBOARDING_ACCESSIBILITY_NOTES.md`. Review them before altering card layouts or status chips to keep the new flows screen-reader friendly.
 
 - Register a new APP service
