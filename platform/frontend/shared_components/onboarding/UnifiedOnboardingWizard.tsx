@@ -592,27 +592,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const serviceSummaryText = SERVICE_SUMMARY_COPY[displayedService];
   const analyticsUserRole = displayedService;
   const userId = storedUser?.id ?? null;
-  const bankingStatusDescriptor = useMemo(() => {
-    switch (bankingConnectionState.status) {
-      case 'connected':
-        return {
-          label: bankingConnectionState.bankName
-            ? `Connected to ${bankingConnectionState.bankName}`
-            : 'Connected via Mono',
-          className: 'bg-green-100 text-green-700',
-        };
-      case 'link_created':
-        return { label: 'Link generated', className: 'bg-blue-100 text-blue-700' };
-      case 'awaiting_consent':
-        return { label: 'Waiting for bank confirmation', className: 'bg-yellow-100 text-yellow-700' };
-      case 'error':
-        return { label: 'Action required', className: 'bg-red-100 text-red-700' };
-      case 'skipped':
-        return { label: 'Skipped', className: 'bg-gray-200 text-gray-600' };
-      default:
-        return { label: 'Not connected', className: 'bg-gray-100 text-gray-600' };
-    }
-  }, [bankingConnectionState]);
   const monoReady = bankingConnectionState.status === 'connected' || bankingConnectionState.status === 'demo';
   const odooReady = erpConnectionState.status === 'connected' || erpConnectionState.status === 'demo';
 

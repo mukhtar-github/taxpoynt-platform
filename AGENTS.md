@@ -123,7 +123,13 @@ Common Tasks (How-To)
   2) Define an async route handler with `Depends(self._require_si_role)` or appropriate guard.
   3) If it calls a service, route via the MessageRouter to the correct service callback.
   4) Return response using existing v1 response model patterns (see `version_models.py`).
-  5) Add the route to `main_router.py` for SI if it belongs in the main grouping.
+ 5) Add the route to `main_router.py` for SI if it belongs in the main grouping.
+
+- Unified onboarding QA expectations:
+  - Run the Playwright suite (`RUN_ONBOARDING_E2E=true PLAYWRIGHT_BASE_URL=http://localhost:3001 npx playwright test platform/tests/e2e/onboarding/si_onboarding.spec.ts`) whenever you touch signup/email/Dojah/Mono/Odoo flows. The spec exercises signup → email verification → Dojah hydrate → Mono consent → Odoo demo connection; Mono steps auto-skip when credentials are unavailable, but you should supply them for full coverage.
+  - Keep the wizard collapsible (Mono + Odoo cards). Updates must continue persisting `banking_connections.mono` and `erp_connections.odoo` metadata so telemetry + auto-completion of the `system-connectivity` step stay accurate.
+  - We intentionally keep Mono/Odoo extraction on-demand in development/staging; **do not** add a background 15-minute scheduler until the production go-live doc requests it. Capture any cadence proposals in `docs/development/sync_cadence_notes.md`.
+- Accessibility/responsive notes for the Mono/Odoo UI live in `docs/ONBOARDING_ACCESSIBILITY_NOTES.md`. Review them before altering card layouts or status chips to keep the new flows screen-reader friendly.
 
 - Register a new APP service
   1) Implement the service logic (or wrap an external client) in `app_services/...`.
