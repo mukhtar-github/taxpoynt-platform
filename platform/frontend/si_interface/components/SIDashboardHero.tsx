@@ -11,10 +11,23 @@ export interface HeroStatusChipConfig {
   tone: HeroStatusTone;
 }
 
+export type ManualPullStatus = 'idle' | 'running' | 'success' | 'error';
+
+export interface ManualPullConfig {
+  modeLabel?: string;
+  ctaLabel?: string;
+  helper?: string;
+  status?: ManualPullStatus;
+  isDisabled?: boolean;
+  onRun: () => Promise<void> | void;
+}
+
 export interface SIDashboardHeroProps {
   userName: string;
   bankingStatus: HeroStatusChipConfig;
   erpStatus: HeroStatusChipConfig;
+  bankingManualPull?: ManualPullConfig;
+  erpManualPull?: ManualPullConfig;
   onPrimaryAction: () => void;
   onSecondaryAction: () => void;
   onDismiss: () => void;
@@ -34,21 +47,56 @@ const toneClasses: Record<HeroStatusTone, string> = {
 export const HeroStatusChip: React.FC<{
   config: HeroStatusChipConfig;
   icon: string;
+  manualPull?: ManualPullConfig;
   'data-testid'?: string;
-}> = ({ config, icon, 'data-testid': dataTestId }) => (
+}> = ({ config, icon, manualPull, 'data-testid': dataTestId }) => {
+  const manualStatus = manualPull?.status ?? 'idle';
+  const isRunning = manualStatus === 'running';
+
+  return (
   <div
     data-testid={dataTestId}
     className={`inline-flex min-w-[180px] flex-col rounded-2xl border px-4 py-3 text-left text-sm shadow-sm ${toneClasses[config.tone]}`}
   >
     <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{icon} {config.label}</span>
     <span className="mt-1 text-sm font-medium">{config.helper}</span>
+    {manualPull && (
+      <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-slate-700 shadow-inner" data-testid={dataTestId ? `${dataTestId}-manual` : undefined}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-slate-500">Next pull</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {manualPull.modeLabel ?? 'Manual'}
+              {isRunning ? ' - running' : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void manualPull.onRun()}
+            disabled={isRunning || manualPull.isDisabled}
+            className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-70"
+            data-testid={dataTestId ? `${dataTestId}-manual-run` : undefined}
+          >
+            {isRunning ? 'Running...' : manualPull.ctaLabel ?? 'Run now'}
+          </button>
+        </div>
+        {manualPull.helper && (
+          <p className="mt-2 text-xs text-slate-600" aria-live="polite">
+            {manualPull.helper}
+          </p>
+        )}
+      </div>
+    )}
   </div>
-);
+  );
+};
 
 export const SIDashboardHero: React.FC<SIDashboardHeroProps> = ({
   userName,
   bankingStatus,
   erpStatus,
+  bankingManualPull,
+  erpManualPull,
   onPrimaryAction,
   onSecondaryAction,
   onDismiss,
@@ -69,9 +117,21 @@ export const SIDashboardHero: React.FC<SIDashboardHeroProps> = ({
             connections—all from this workspace hub.
           </p>
           <div className="flex flex-wrap gap-3">
-            <HeroStatusChip config={bankingStatus} icon="🔌" data-testid="banking-status-chip" />
-            <HeroStatusChip config={erpStatus} icon="🧩" data-testid="erp-status-chip" />
+            <HeroStatusChip config={bankingStatus} icon="🔌" manualPull={bankingManualPull} data-testid="banking-status-chip" />
+            <HeroStatusChip config={erpStatus} icon="🧩" manualPull={erpManualPull} data-testid="erp-status-chip" />
           </div>
+          <p className="text-xs text-indigo-200">
+            Manual pulls stay enabled in this workspace. Production will expose a 15-minute auto-sync toggle per{' '}
+            <a
+              href="https://github.com/mukhtar-github/taxpoynt-platform/blob/main/docs/development/sync_cadence_notes.md"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold underline underline-offset-2"
+            >
+              the sync cadence plan
+            </a>
+            .
+          </p>
         </div>
         <div className="flex flex-col gap-4 rounded-2xl bg-white/10 p-6 backdrop-blur">
           <h2 className="text-lg font-semibold">Next actions</h2>

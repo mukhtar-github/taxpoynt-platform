@@ -6,7 +6,12 @@ import { authService, type User } from '../../../shared_components/services/auth
 import { onboardingApi } from '../../../shared_components/services/onboardingApi';
 import { EnhancedSIInterface } from '../../../si_interface/EnhancedSIInterface';
 import { DashboardLayout } from '../../../shared_components/layouts/DashboardLayout';
-import { SIDashboardHero, type HeroStatusChipConfig } from '../../../si_interface/components/SIDashboardHero';
+import {
+  SIDashboardHero,
+  type HeroStatusChipConfig,
+  type ManualPullConfig,
+  type ManualPullStatus,
+} from '../../../si_interface/components/SIDashboardHero';
 import { SIDashboardSummary } from '../../../si_interface/components/SIDashboardSummary';
 import { onboardingChecklistApi } from '../../../shared_components/services/onboardingChecklistApi';
 import { TaxPoyntButton } from '../../../design_system';
@@ -18,6 +23,7 @@ import {
   type BankingConnectionState,
   type ERPConnectionState,
 } from '../../../shared_components/onboarding/connectionState';
+import { erpIntegrationApi } from '../../../shared_components/services/erpIntegrationApi';
 
 const HERO_STORAGE_KEY = 'si_dashboard_intro_dismissed_v1';
 
@@ -110,6 +116,11 @@ const describeErpChip = (state: ERPConnectionState): HeroStatusChipConfig => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+type ManualPullUiState = {
+  status: ManualPullStatus;
+  helper: string;
+};
+
 export default function SIDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -129,6 +140,10 @@ export default function SIDashboard() {
   });
   const [checklistStatus, setChecklistStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [erpManualPullState, setErpManualPullState] = useState<ManualPullUiState>({
+    status: 'idle',
+    helper: 'Ready to trigger a sample batch pull.',
+  });
   const heroFirstImpressionLogged = React.useRef(false);
 
   useEffect(() => {
@@ -221,6 +236,48 @@ export default function SIDashboard() {
     };
   }, [user]);
 
+  const handleManualErpPull = React.useCallback(async () => {
+    setErpManualPullState({
+      status: 'running',
+      helper: 'Requesting Odoo sandbox batch...',
+    });
+    try {
+      const response = await erpIntegrationApi.testFetchOdooInvoiceBatch({ batchSize: 5 });
+      const fetched =
+        response?.data?.fetched_count ??
+        (Array.isArray(response?.data?.invoices) ? response.data.invoices.length : 0);
+      const timeText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setErpManualPullState({
+        status: 'success',
+        helper:
+          fetched && fetched > 0
+            ? `Fetched ${fetched} invoice${fetched === 1 ? '' : 's'} at ${timeText}.`
+            : `Pull completed at ${timeText}, no invoices returned.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reach ERP data extractor.';
+      setErpManualPullState({
+        status: 'error',
+        helper: `Manual pull failed: ${message}`,
+      });
+    }
+  }, []);
+
+  const erpManualPullConfig = React.useMemo<ManualPullConfig>(
+    () => ({
+      modeLabel: 'Manual',
+      helper: erpManualPullState.helper,
+      status: erpManualPullState.status,
+      onRun: () => {
+        if (erpManualPullState.status === 'running') {
+          return;
+        }
+        void handleManualErpPull();
+      },
+    }),
+    [erpManualPullState, handleManualErpPull],
+  );
+
   const heroIdleHandler = React.useCallback(() => {
     if (!analytics.isInitialized || !user?.id) {
       return;
@@ -311,6 +368,7 @@ export default function SIDashboard() {
           userName={user.first_name || 'System Integrator'}
           bankingStatus={connectionChips.banking}
           erpStatus={connectionChips.erp}
+          erpManualPull={erpManualPullConfig}
           onPrimaryAction={handleHeroPrimary}
           onSecondaryAction={handleHeroSecondary}
           onDismiss={handleHeroDismiss}
@@ -331,6 +389,7 @@ export default function SIDashboard() {
           userName={user.first_name || 'System Integrator'}
           bankingStatus={connectionChips.banking}
           erpStatus={connectionChips.erp}
+          erpManualPull={erpManualPullConfig}
           checklist={checklistSummary}
           onResumeOnboarding={() => router.push('/onboarding')}
           onPrimaryAction={() => router.push('/dashboard/si/firs-invoice-generator')}

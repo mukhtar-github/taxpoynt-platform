@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { TaxPoyntButton } from '../../design_system';
-import { HeroStatusChip, type HeroStatusChipConfig } from './SIDashboardHero';
+import { HeroStatusChip, type HeroStatusChipConfig, type ManualPullConfig } from './SIDashboardHero';
 
 interface ChecklistSummary {
   remainingPhases: number;
@@ -14,6 +14,8 @@ interface SIDashboardSummaryProps {
   userName: string;
   bankingStatus: HeroStatusChipConfig;
   erpStatus: HeroStatusChipConfig;
+  bankingManualPull?: ManualPullConfig;
+  erpManualPull?: ManualPullConfig;
   checklist: ChecklistSummary;
   onResumeOnboarding: () => void;
   onPrimaryAction: () => void;
@@ -25,6 +27,8 @@ export const SIDashboardSummary: React.FC<SIDashboardSummaryProps> = ({
   userName,
   bankingStatus,
   erpStatus,
+  bankingManualPull,
+  erpManualPull,
   checklist,
   onResumeOnboarding,
   onPrimaryAction,
@@ -43,8 +47,18 @@ export const SIDashboardSummary: React.FC<SIDashboardSummaryProps> = ({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <HeroStatusChip config={bankingStatus} icon="🔌" data-testid="summary-banking-chip" />
-            <HeroStatusChip config={erpStatus} icon="🧩" data-testid="summary-erp-chip" />
+            <HeroStatusChip
+              config={bankingStatus}
+              icon="🔌"
+              manualPull={bankingManualPull}
+              data-testid="summary-banking-chip"
+            />
+            <HeroStatusChip
+              config={erpStatus}
+              icon="🧩"
+              manualPull={erpManualPull}
+              data-testid="summary-erp-chip"
+            />
           </div>
         </div>
       </section>
