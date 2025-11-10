@@ -118,6 +118,15 @@ class OnboardingApiClient {
     this.baseUrl = resolvedBase.replace(/\/+$/, '');
   }
 
+  private hasAuthSession(): boolean {
+    try {
+      return Boolean(authService.getToken());
+    } catch (error) {
+      console.warn('Unable to determine auth session status:', error);
+      return false;
+    }
+  }
+
   /**
    * Get the authorization headers for API requests
    */
@@ -281,6 +290,10 @@ class OnboardingApiClient {
    * Get current onboarding state for the authenticated user
    */
   async getOnboardingState(): Promise<OnboardingState | null> {
+    if (!this.hasAuthSession()) {
+      console.warn('onboardingApi.getOnboardingState skipped: user not authenticated');
+      return this.getLocalOnboardingState();
+    }
     try {
       const state = await this.makeRequest<OnboardingState>('GET', '/state');
       const localState = this.getLocalOnboardingState();
@@ -307,20 +320,30 @@ class OnboardingApiClient {
    * Update onboarding state with new progress
    */
   async updateOnboardingState(request: OnboardingStateRequest): Promise<OnboardingState> {
+    if (!this.hasAuthSession()) {
+      console.warn('onboardingApi.updateOnboardingState skipped: user not authenticated');
+      const localState = this.getLocalOnboardingState();
+      if (localState) {
+        return localState;
+      }
+      throw new Error('Authentication required');
+    }
     try {
       const state = await this.makeRequest<OnboardingState>('PUT', '/state', request);
-      
+
       // Also update local storage for offline scenarios
       await this.updateLocalOnboardingState(state);
       
       return state;
     } catch (error) {
       console.error('Failed to update onboarding state:', error);
-      
-      // Fallback to localStorage update
-      const localState = await this.updateLocalOnboardingStateFallback(request);
-      if (localState) {
-        return localState;
+
+      if (this.hasAuthSession()) {
+        // Fallback to localStorage update when authenticated (e.g., offline)
+        const localState = await this.updateLocalOnboardingStateFallback(request);
+        if (localState) {
+          return localState;
+        }
       }
       throw error; // Still throw error so caller knows sync failed
     }
@@ -330,9 +353,12 @@ class OnboardingApiClient {
    * Complete a specific onboarding step
    */
   async completeOnboardingStep(stepName: string, metadata?: Record<string, any>): Promise<OnboardingState> {
+    if (!this.hasAuthSession()) {
+      throw new Error('Authentication required');
+    }
     try {
       const state = await this.makeRequest<OnboardingState>(
-        'POST', 
+        'POST',
         `/state/step/${encodeURIComponent(stepName)}/complete`,
         { metadata }
       );
@@ -351,6 +377,9 @@ class OnboardingApiClient {
    * Mark entire onboarding as complete
    */
   async completeOnboarding(metadata?: Record<string, any>): Promise<OnboardingState> {
+    if (!this.hasAuthSession()) {
+      throw new Error('Authentication required');
+    }
     try {
       const state = await this.makeRequest<OnboardingState>(
         'POST', 
@@ -372,6 +401,10 @@ class OnboardingApiClient {
    * Reset onboarding state (admin/testing only)
    */
   async resetOnboardingState(): Promise<void> {
+    if (!this.hasAuthSession()) {
+      console.warn('onboardingApi.resetOnboardingState skipped: user not authenticated');
+      return;
+    }
     try {
       await this.makeRequest<void>('DELETE', '/state/reset');
       
@@ -474,7 +507,7 @@ class OnboardingApiClient {
 
       localStorage.setItem(`onboarding_${user.id}`, JSON.stringify(state));
     } catch (error) {
-      console.error('Failed to update local onboarding state:', error);
+      console.warn('Failed to update local onboarding state:', error);
     }
   }
 
@@ -504,7 +537,7 @@ class OnboardingApiClient {
       await this.updateLocalOnboardingState(updated);
       return updated;
     } catch (error) {
-      console.error('Failed to update local onboarding state fallback:', error);
+      console.warn('Failed to update local onboarding state fallback:', error);
       return null;
     }
   }
