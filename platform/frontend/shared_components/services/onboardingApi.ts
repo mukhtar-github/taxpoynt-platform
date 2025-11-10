@@ -613,6 +613,29 @@ const computeSignature = (
   return `${step}|${completed ? '1' : '0'}|${normalized}`;
 };
 
+const safePersistLocalState = (userId: string, state: {
+  currentStep: string;
+  completedSteps: string[];
+  lastActiveDate: string;
+}) => {
+  const storageKey = `onboarding_${userId}`;
+  try {
+    const payload = JSON.stringify({
+      currentStep: state.currentStep,
+      completedSteps: state.completedSteps,
+      lastActiveDate: state.lastActiveDate,
+    });
+    localStorage.setItem(storageKey, payload);
+  } catch (error) {
+    console.warn('Failed to persist local onboarding cache. Clearing fallback.', error);
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (cleanupError) {
+      console.warn('Failed to clear onboarding cache key', cleanupError);
+    }
+  }
+};
+
 export const OnboardingStateManager = {
   /**
    * Get current onboarding state (with backend sync)
@@ -677,6 +700,10 @@ export const OnboardingStateManager = {
       onboardingUpdateSignature.set(cacheKey, signature);
     } catch (error) {
       console.error('Failed to update onboarding step:', error);
+      if (!hasAuthSession()) {
+        console.warn('Skipping local onboarding fallback because user is not authenticated.');
+        return;
+      }
       // Fallback to old localStorage method
       const user = authService.getStoredUser();
       if (!user?.id) return;
@@ -693,7 +720,11 @@ export const OnboardingStateManager = {
             : current.completedSteps || [],
           lastActiveDate: new Date().toISOString()
         };
-        localStorage.setItem(`onboarding_${user.id}`, JSON.stringify(updated));
+        safePersistLocalState(user.id, {
+          currentStep: updated.currentStep,
+          completedSteps: updated.completedSteps ?? [],
+          lastActiveDate: updated.lastActiveDate,
+        });
        updateStateCache(cacheKey, {
          user_id: user.id,
          current_step: updated.currentStep,
@@ -787,7 +818,11 @@ export const OnboardingStateManager = {
     } catch (error) {
       console.error('Failed to reset onboarding state:', error);
       // Fallback to localStorage
-      localStorage.removeItem(`onboarding_${userId}`);
+      try {
+        localStorage.removeItem(`onboarding_${userId}`);
+      } catch (storageError) {
+        console.warn('Failed to clear onboarding cache key', storageError);
+      }
       updateStateCache(cacheKey, null);
     }
   }
