@@ -595,6 +595,15 @@ const updateStateCache = (userId: string, state: OnboardingState | null) => {
   }
 };
 
+const hasAuthSession = (): boolean => {
+  try {
+    return Boolean(authService.getToken());
+  } catch (error) {
+    console.warn('Unable to inspect auth token:', error);
+    return false;
+  }
+};
+
 const computeSignature = (
   step: string,
   completedSteps: readonly string[],
@@ -615,6 +624,11 @@ export const OnboardingStateManager = {
       return cached;
     }
 
+     if (!hasAuthSession()) {
+       console.warn('OnboardingStateManager.getOnboardingState skipped: user not authenticated');
+       return null;
+     }
+
     try {
       const state = await onboardingApi.getOnboardingState();
       updateStateCache(cacheKey, state);
@@ -630,6 +644,10 @@ export const OnboardingStateManager = {
    */
   updateStep: async (userId: string, step: string, completed: boolean = false): Promise<void> => {
     const cacheKey = resolveUserCacheKey(userId);
+    if (!hasAuthSession()) {
+      console.warn('OnboardingStateManager.updateStep skipped: user not authenticated');
+      return;
+    }
 
     try {
       let current = onboardingStateCache.get(cacheKey);
@@ -700,6 +718,10 @@ export const OnboardingStateManager = {
    */
   completeOnboarding: async (userId: string): Promise<void> => {
     const cacheKey = resolveUserCacheKey(userId);
+    if (!hasAuthSession()) {
+      console.warn('OnboardingStateManager.completeOnboarding skipped: user not authenticated');
+      return;
+    }
 
     try {
       const completedState = await onboardingApi.completeOnboarding({
@@ -728,6 +750,10 @@ export const OnboardingStateManager = {
   isOnboardingComplete: async (userId: string): Promise<boolean> => {
     const cacheKey = resolveUserCacheKey(userId);
 
+    if (!hasAuthSession()) {
+      return false;
+    }
+
     try {
       let state = onboardingStateCache.get(cacheKey);
       if (!state) {
@@ -749,6 +775,11 @@ export const OnboardingStateManager = {
    */
   resetOnboarding: async (userId: string): Promise<void> => {
     const cacheKey = resolveUserCacheKey(userId);
+
+    if (!hasAuthSession()) {
+      console.warn('OnboardingStateManager.resetOnboarding skipped: user not authenticated');
+      return;
+    }
 
     try {
       await onboardingApi.resetOnboardingState();
