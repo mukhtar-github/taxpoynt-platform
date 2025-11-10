@@ -505,7 +505,11 @@ class OnboardingApiClient {
       const user = authService.getStoredUser();
       if (!user?.id) return;
 
-      localStorage.setItem(`onboarding_${user.id}`, JSON.stringify(state));
+      safePersistLocalState(user.id, {
+        currentStep: state.current_step,
+        completedSteps: state.completed_steps ?? [],
+        lastActiveDate: state.updated_at ?? new Date().toISOString(),
+      });
     } catch (error) {
       console.warn('Failed to update local onboarding state:', error);
     }
