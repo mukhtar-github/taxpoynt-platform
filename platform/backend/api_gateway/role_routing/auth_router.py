@@ -779,8 +779,8 @@ def create_auth_router(
                 )
                 updated_user = db.mark_email_verified(
                     user_id=user_id,
-                    terms_accepted=payload.terms_accepted,
-                    privacy_accepted=payload.privacy_accepted,
+                    terms_accepted=user_data.terms_accepted,
+                    privacy_accepted=user_data.privacy_accepted,
                 )
                 user.update(updated_user)
             else:
