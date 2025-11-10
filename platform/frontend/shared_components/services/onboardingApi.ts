@@ -698,6 +698,7 @@ export const onboardingApi = new OnboardingApiClient();
 // Export utility functions
 const onboardingStateCache: Map<string, OnboardingState | null> = new Map();
 const onboardingUpdateSignature: Map<string, string> = new Map();
+const onboardingPendingSignature: Map<string, string> = new Map();
 
 const resolveUserCacheKey = (explicitUserId?: string): string => {
   if (explicitUserId) return explicitUserId;
@@ -801,13 +802,15 @@ export const OnboardingStateManager = {
         completedSteps.add(step);
       }
 
-      const signature = computeSignature(step, Array.from(completedSteps), completed);
-      if (onboardingUpdateSignature.get(cacheKey) === signature) {
+      const completedStepsArray = Array.from(completedSteps);
+      const signature = computeSignature(step, completedStepsArray, completed);
+      const lastSignature = onboardingUpdateSignature.get(cacheKey);
+      const pendingSignature = onboardingPendingSignature.get(cacheKey);
+      if (lastSignature === signature || pendingSignature === signature) {
         return;
       }
 
-      const completedStepsArray = Array.from(completedSteps);
-
+      onboardingPendingSignature.set(cacheKey, signature);
       const nextState = await onboardingApi.updateOnboardingState({
         current_step: step,
         completed_steps: completedStepsArray,
@@ -815,8 +818,10 @@ export const OnboardingStateManager = {
       });
       updateStateCache(cacheKey, nextState);
       onboardingUpdateSignature.set(cacheKey, signature);
+      onboardingPendingSignature.delete(cacheKey);
     } catch (error) {
       console.error('Failed to update onboarding step:', error);
+      onboardingPendingSignature.delete(cacheKey);
       if (!hasAuthSession()) {
         console.warn('Skipping local onboarding fallback because user is not authenticated.');
         return;
@@ -853,10 +858,10 @@ export const OnboardingStateManager = {
          created_at: updated.lastActiveDate,
          updated_at: updated.lastActiveDate
        });
-        onboardingUpdateSignature.set(
-          cacheKey,
-          computeSignature(updated.currentStep, updated.completedSteps ?? [], completed)
-        );
+       onboardingUpdateSignature.set(
+         cacheKey,
+         computeSignature(updated.currentStep, updated.completedSteps ?? [], completed)
+       );
       }
     }
   },
