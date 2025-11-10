@@ -18,6 +18,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient, { APIError } from '../shared_components/api/client';
+import { secureTokenStorage } from '../shared_components/utils/secureTokenStorage';
 
 // Types based on backend role management system
 export enum PlatformRole {
@@ -340,14 +341,24 @@ class FrontendRoleDetector {
   }
 
   private getAuthToken(): string {
-    // Get auth token from secure token storage (consistent with API client)
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
     try {
-      // Import the secure token storage utility
-      const { secureTokenStorage } = require('../shared_components/utils/secureTokenStorage');
-      return secureTokenStorage.getToken() || '';
+      const token = secureTokenStorage.getToken();
+      if (token) {
+        return token;
+      }
     } catch (error) {
-      // Fallback to localStorage for backward compatibility
+      console.warn('Secure token lookup failed for role detection:', error);
+    }
+
+    try {
       return localStorage.getItem('taxpoynt_auth_token') || '';
+    } catch (storageError) {
+      console.warn('Local auth token fallback lookup failed:', storageError);
+      return '';
     }
   }
 }

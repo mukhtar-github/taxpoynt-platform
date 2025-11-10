@@ -6,6 +6,7 @@
  */
 
 import apiClient, { APIError, RegisterPendingResponse, VerifyEmailRequest } from '../api/client';
+import { secureTokenStorage } from '../utils/secureTokenStorage';
 
 export interface User {
   id: string;
@@ -146,9 +147,12 @@ class AuthService {
 
   getToken(): string | null {
     if (typeof window === 'undefined') return null;
-    // Use the same secure token storage as API client
-    const { secureTokenStorage } = require('../utils/secureTokenStorage');
-    return secureTokenStorage.getToken();
+    try {
+      return secureTokenStorage.getToken();
+    } catch (error) {
+      console.warn('Secure token lookup failed in authService:', error);
+      return null;
+    }
   }
 
   getStoredUser(): User | null {
