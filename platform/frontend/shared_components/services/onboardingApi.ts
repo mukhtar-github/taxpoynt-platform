@@ -100,6 +100,11 @@ class OnboardingApiClient {
   private retryAttempts: number = 4;
   private baseRetryDelay: number = 1500; // start at 1.5s
   private maxRetryDelay: number = 12000; // 12 seconds cap
+  private readonly MIN_UPDATE_INTERVAL_MS = 1200;
+  private lastUpdateAt: Map<string, number> = new Map();
+  private pendingUpdateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private pendingUpdatePayloads: Map<string, OnboardingStateRequest> = new Map();
+  private pendingUpdateSignatures: Map<string, string> = new Map();
   private lastUpdateSignatures: Map<string, string> = new Map();
 
   constructor() {
@@ -136,6 +141,18 @@ class OnboardingApiClient {
   private computeUpdateSignature(request: OnboardingStateRequest): string {
     const completed = Array.isArray(request.completed_steps) ? request.completed_steps.slice().sort().join('|') : '';
     return `${request.current_step}|${completed}`;
+  }
+
+  private async performUpdate(
+    request: OnboardingStateRequest,
+    cacheKey: string,
+    signature: string,
+  ): Promise<OnboardingState> {
+    const state = await this.makeRequest<OnboardingState>('PUT', '/state', request);
+    await this.updateLocalOnboardingState(state);
+    this.lastUpdateSignatures.set(cacheKey, signature);
+    this.lastUpdateAt.set(cacheKey, Date.now());
+    return state;
   }
 
   /**
@@ -348,14 +365,54 @@ class OnboardingApiClient {
         return cached;
       }
     }
+
+    const now = Date.now();
+    const lastAt = this.lastUpdateAt.get(cacheKey) ?? 0;
+    if (now - lastAt < this.MIN_UPDATE_INTERVAL_MS) {
+      this.pendingUpdatePayloads.set(cacheKey, request);
+      if (!this.pendingUpdateTimers.has(cacheKey)) {
+        const wait = this.MIN_UPDATE_INTERVAL_MS - (now - lastAt);
+        this.pendingUpdateTimers.set(
+          cacheKey,
+          setTimeout(async () => {
+            this.pendingUpdateTimers.delete(cacheKey);
+            const pending = this.pendingUpdatePayloads.get(cacheKey);
+            if (!pending) {
+              return;
+            }
+            this.pendingUpdatePayloads.delete(cacheKey);
+            try {
+              const pendingSignature = this.computeUpdateSignature(pending);
+              await this.performUpdate(pending, cacheKey, pendingSignature);
+            } catch (err) {
+              console.error('Deferred onboarding state update failed:', err);
+            }
+          }, wait),
+        );
+      }
+      const fallback = await this.updateLocalOnboardingStateFallback(request);
+      if (fallback) {
+        return fallback;
+      }
+      const cached = this.getLocalOnboardingState();
+      if (cached) {
+        return cached;
+      }
+      return {
+        user_id: cacheKey,
+        current_step: request.current_step,
+        completed_steps: request.completed_steps ?? [],
+        has_started: true,
+        is_complete: request.completed_steps?.includes('onboarding_complete') ?? false,
+        last_active_date: new Date().toISOString(),
+        metadata: request.metadata ?? {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+
     try {
-      const state = await this.makeRequest<OnboardingState>('PUT', '/state', request);
-
-      // Also update local storage for offline scenarios
-      await this.updateLocalOnboardingState(state);
-      this.lastUpdateSignatures.set(cacheKey, signature);
-
-      return state;
+      return await this.performUpdate(request, cacheKey, signature);
     } catch (error) {
       console.error('Failed to update onboarding state:', error);
 
@@ -364,6 +421,7 @@ class OnboardingApiClient {
         const localState = await this.updateLocalOnboardingStateFallback(request);
         if (localState) {
           this.lastUpdateSignatures.set(cacheKey, signature);
+          this.lastUpdateAt.set(cacheKey, Date.now());
           return localState;
         }
       }
