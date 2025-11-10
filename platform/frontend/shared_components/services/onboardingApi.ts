@@ -100,6 +100,7 @@ class OnboardingApiClient {
   private retryAttempts: number = 4;
   private baseRetryDelay: number = 1500; // start at 1.5s
   private maxRetryDelay: number = 12000; // 12 seconds cap
+  private lastUpdateSignatures: Map<string, string> = new Map();
 
   constructor() {
     const primaryApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -125,6 +126,16 @@ class OnboardingApiClient {
       console.warn('Unable to determine auth session status:', error);
       return false;
     }
+  }
+
+  private resolveUserCacheKey(): string {
+    const storedUser = authService.getStoredUser();
+    return storedUser?.id ?? 'anonymous';
+  }
+
+  private computeUpdateSignature(request: OnboardingStateRequest): string {
+    const completed = Array.isArray(request.completed_steps) ? request.completed_steps.slice().sort().join('|') : '';
+    return `${request.current_step}|${completed}`;
   }
 
   /**
@@ -328,12 +339,22 @@ class OnboardingApiClient {
       }
       throw new Error('Authentication required');
     }
+    const cacheKey = this.resolveUserCacheKey();
+    const signature = this.computeUpdateSignature(request);
+    if (this.lastUpdateSignatures.get(cacheKey) === signature) {
+      console.info('Skipping duplicate onboarding state update for', request.current_step);
+      const cached = this.getLocalOnboardingState();
+      if (cached) {
+        return cached;
+      }
+    }
     try {
       const state = await this.makeRequest<OnboardingState>('PUT', '/state', request);
 
       // Also update local storage for offline scenarios
       await this.updateLocalOnboardingState(state);
-      
+      this.lastUpdateSignatures.set(cacheKey, signature);
+
       return state;
     } catch (error) {
       console.error('Failed to update onboarding state:', error);
@@ -342,6 +363,7 @@ class OnboardingApiClient {
         // Fallback to localStorage update when authenticated (e.g., offline)
         const localState = await this.updateLocalOnboardingStateFallback(request);
         if (localState) {
+          this.lastUpdateSignatures.set(cacheKey, signature);
           return localState;
         }
       }
