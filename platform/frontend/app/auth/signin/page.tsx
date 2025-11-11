@@ -97,6 +97,15 @@ const SignInPageContent: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  return (
+    <EnhancedSignInPage 
+      onSignIn={handleSignIn}
+      isLoading={isLoading}
+      error={error}
+    />
+  );
 };
 
 const SignInPageFallback: React.FC = () => (
@@ -110,14 +119,5 @@ export default function SignInPageWrapper() {
     <Suspense fallback={<SignInPageFallback />}>
       <SignInPageContent />
     </Suspense>
-  );
-}
-
-  return (
-    <EnhancedSignInPage 
-      onSignIn={handleSignIn}
-      isLoading={isLoading}
-      error={error}
-    />
   );
 }
