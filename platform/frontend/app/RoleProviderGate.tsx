@@ -14,9 +14,8 @@ const ROLE_REQUIRED_PREFIXES = ['/dashboard'];
 
 /**
  * Ensures the role management stack is only mounted when needed.
- * - Always wraps dashboard routes so `useRoleDetector` consumers stay wired.
- * - Skips mounting for public/auth pages unless a valid session exists,
- *   preventing unauthenticated flows from crashing the role provider.
+ * Dashboard routes always require it; public/auth/onboarding pages always skip it
+ * even if a stale token exists to avoid false-positive initialization errors.
  */
 export function RoleProviderGate({ children }: RoleProviderGateProps) {
   const pathname = usePathname() || '';
@@ -51,14 +50,24 @@ export function RoleProviderGate({ children }: RoleProviderGateProps) {
     };
   }, []);
 
-  const requiresRoleProvider = useMemo(() => {
-    return ROLE_REQUIRED_PREFIXES.some((prefix) =>
-      pathname.startsWith(prefix)
-    );
-  }, [pathname]);
+  const requiresRoleProvider = useMemo(
+    () => ROLE_REQUIRED_PREFIXES.some((prefix) => pathname.startsWith(prefix)),
+    [pathname]
+  );
 
-  if (!hasSession && !requiresRoleProvider) {
+  if (!requiresRoleProvider) {
     return <>{children}</>;
+  }
+
+  if (!hasSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-slate-600">Preparing your dashboard…</p>
+        </div>
+      </div>
+    );
   }
 
   return <CombinedRoleProvider>{children}</CombinedRoleProvider>;

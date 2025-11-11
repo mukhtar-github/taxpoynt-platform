@@ -796,32 +796,70 @@ const safePersistLocalState = (userId: string, state: {
   }
 };
 
-const ONBOARDING_UPDATE_MIN_INTERVAL_MS = 800;
-const onboardingLastUpdateAt: Map<string, number> = new Map();
-const onboardingUpdateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-const onboardingQueuedUpdates: Map<string, {
+const ONBOARDING_UPDATE_MIN_INTERVAL_MS = 1200;
+
+type QueuedPayload = {
   step: string;
   completed: boolean;
   completedSteps: string[];
   signature: string;
-}> = new Map();
+};
 
-const performRemoteOnboardingUpdate = async (
-  cacheKey: string,
-  payload: { step: string; completed: boolean; completedSteps: string[]; signature: string; }
-) => {
-  onboardingPendingSignature.set(cacheKey, payload.signature);
+const onboardingUpdateControllers: Map<
+  string,
+  {
+    lastRun: number;
+    pendingPayload: QueuedPayload | null;
+    isProcessing: boolean;
+  }
+> = new Map();
+
+const scheduleOnboardingUpdate = async (cacheKey: string, payload: QueuedPayload) => {
+  let controller = onboardingUpdateControllers.get(cacheKey);
+  if (!controller) {
+    controller = {
+      lastRun: 0,
+      pendingPayload: null,
+      isProcessing: false
+    };
+    onboardingUpdateControllers.set(cacheKey, controller);
+  }
+
+  controller.pendingPayload = payload;
+
+  if (controller.isProcessing) {
+    return;
+  }
+
+  controller.isProcessing = true;
   try {
-    const nextState = await onboardingApi.updateOnboardingState({
-      current_step: payload.step,
-      completed_steps: payload.completedSteps,
-      metadata: { step_updated_at: new Date().toISOString() }
-    });
-    updateStateCache(cacheKey, nextState);
-    onboardingUpdateSignature.set(cacheKey, payload.signature);
-    onboardingLastUpdateAt.set(cacheKey, Date.now());
+    while (controller.pendingPayload) {
+      const next = controller.pendingPayload;
+      controller.pendingPayload = null;
+
+      const elapsed = Date.now() - controller.lastRun;
+      if (elapsed < ONBOARDING_UPDATE_MIN_INTERVAL_MS) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, ONBOARDING_UPDATE_MIN_INTERVAL_MS - elapsed)
+        );
+      }
+
+      onboardingPendingSignature.set(cacheKey, next.signature);
+      try {
+        const nextState = await onboardingApi.updateOnboardingState({
+          current_step: next.step,
+          completed_steps: next.completedSteps,
+          metadata: { step_updated_at: new Date().toISOString() }
+        });
+        updateStateCache(cacheKey, nextState);
+        onboardingUpdateSignature.set(cacheKey, next.signature);
+        controller.lastRun = Date.now();
+      } finally {
+        onboardingPendingSignature.delete(cacheKey);
+      }
+    }
   } finally {
-    onboardingPendingSignature.delete(cacheKey);
+    controller.isProcessing = false;
   }
 };
 
@@ -888,45 +926,11 @@ export const OnboardingStateManager = {
         signature
       };
 
-      const queuedPayload = onboardingQueuedUpdates.get(cacheKey);
-      if (queuedPayload?.signature === signature) {
-        return;
-      }
-
-      const now = Date.now();
-      const lastAt = onboardingLastUpdateAt.get(cacheKey) ?? 0;
-      if (now - lastAt < ONBOARDING_UPDATE_MIN_INTERVAL_MS) {
-        onboardingQueuedUpdates.set(cacheKey, payload);
-        if (!onboardingUpdateTimers.has(cacheKey)) {
-          const wait = Math.max(ONBOARDING_UPDATE_MIN_INTERVAL_MS - (now - lastAt), 0);
-          onboardingUpdateTimers.set(
-            cacheKey,
-            setTimeout(async () => {
-              onboardingUpdateTimers.delete(cacheKey);
-              const queued = onboardingQueuedUpdates.get(cacheKey);
-              if (!queued) {
-                return;
-              }
-              onboardingQueuedUpdates.delete(cacheKey);
-              try {
-                await performRemoteOnboardingUpdate(cacheKey, queued);
-              } catch (deferredError) {
-                console.error('Delayed onboarding step update failed:', deferredError);
-              }
-            }, wait)
-          );
-        }
-        return;
-      }
-
-      await performRemoteOnboardingUpdate(cacheKey, payload);
+      await scheduleOnboardingUpdate(cacheKey, payload);
     } catch (error) {
-      onboardingPendingSignature.delete(cacheKey);
       const isAuthError = error instanceof Error && error.name === 'OnboardingApiAuthError';
       if (isAuthError || !hasAuthSession()) {
         console.info('Onboarding step update skipped: no valid authentication session.');
-        onboardingQueuedUpdates.delete(cacheKey);
-        onboardingLastUpdateAt.delete(cacheKey);
         return;
       }
       console.error('Failed to update onboarding step:', error);
