@@ -16,7 +16,6 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import apiClient, { APIError } from '../shared_components/api/client';
 import { authService } from '../shared_components/services/auth';
 
@@ -416,7 +415,6 @@ export function RoleDetectorProvider({
   const [detectionResult, setDetectionResult] = useState<RoleDetectionResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   const detector = FrontendRoleDetector.getInstance();
 
