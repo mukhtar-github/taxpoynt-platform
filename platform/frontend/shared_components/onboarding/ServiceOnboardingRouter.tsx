@@ -39,6 +39,13 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     const initializeOnboarding = async () => {
       try {
         console.log('🚀 Initializing onboarding with backend sync...');
+
+        if (!authService.isAuthenticated()) {
+          console.warn('⚠️ Skipping onboarding init because user is not authenticated.');
+          setIsLoading(false);
+          router.push('/auth/signin');
+          return;
+        }
         
         // Try to get onboarding state from backend first, fallback to localStorage
         let state: OnboardingState | null = null;
