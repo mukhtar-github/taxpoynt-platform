@@ -19,7 +19,6 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import apiClient, { APIError } from '../shared_components/api/client';
 import { authService } from '../shared_components/services/auth';
-import { secureTokenStorage } from '../shared_components/utils/secureTokenStorage';
 
 // Types based on backend role management system
 export enum PlatformRole {
@@ -85,6 +84,34 @@ export interface RoleDetectorContextValue {
 
 // Create context
 const RoleDetectorContext = createContext<RoleDetectorContextValue | undefined>(undefined);
+
+const ROLE_CACHE_KEY = 'taxpoynt_user_roles';
+const USER_CACHE_KEY = 'taxpoynt_user';
+const SECURE_TOKEN_STORAGE_KEY = 'taxpoynt_secure_tokens';
+const LEGACY_TOKEN_KEYS = ['taxpoynt_token', 'taxpoynt_auth_token'];
+
+const clearRoleAuthCaches = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    [ROLE_CACHE_KEY, USER_CACHE_KEY, SECURE_TOKEN_STORAGE_KEY].forEach((key) => {
+      sessionStorage.removeItem(key);
+    });
+  } catch (sessionError) {
+    console.warn('Failed to clear session-scoped auth caches after unauthorized response:', sessionError);
+  }
+
+  try {
+    const localKeys = [ROLE_CACHE_KEY, USER_CACHE_KEY, SECURE_TOKEN_STORAGE_KEY, ...LEGACY_TOKEN_KEYS];
+    localKeys.forEach((key) => {
+      localStorage.removeItem(key);
+    });
+  } catch (localError) {
+    console.warn('Failed to clear local auth caches after unauthorized response:', localError);
+  }
+};
 
 // Hook for using role detector context
 export const useRoleDetector = (): RoleDetectorContextValue => {
@@ -357,15 +384,6 @@ class FrontendRoleDetector {
     }
 
     try {
-      const secureToken = secureTokenStorage.getToken();
-      if (secureToken) {
-        return secureToken;
-      }
-    } catch (error) {
-      console.warn('Secure token lookup failed for role detection:', error);
-    }
-
-    try {
       return (
         localStorage.getItem('taxpoynt_token') ||
         localStorage.getItem('taxpoynt_auth_token') ||
@@ -377,36 +395,8 @@ class FrontendRoleDetector {
     }
   }
 
-  private handleUnauthorizedAccess(status: number): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      sessionStorage.removeItem('taxpoynt_user_roles');
-    } catch (roleCacheError) {
-      console.warn('Failed to clear cached role assignments after unauthorized response:', roleCacheError);
-    }
-
-    try {
-      secureTokenStorage.clearToken();
-    } catch (tokenError) {
-      console.warn('Secure token cleanup failed after unauthorized response:', tokenError);
-    }
-
-    try {
-      sessionStorage.removeItem('taxpoynt_user');
-      localStorage.removeItem('taxpoynt_user');
-    } catch (userCacheError) {
-      console.warn('Failed to clear cached user data after unauthorized response:', userCacheError);
-    }
-
-    try {
-      localStorage.removeItem('taxpoynt_token');
-      localStorage.removeItem('taxpoynt_auth_token');
-    } catch (legacyTokenError) {
-      console.warn('Failed to clear legacy auth tokens after unauthorized response:', legacyTokenError);
-    }
+  private handleUnauthorizedAccess(_status: number): void {
+    clearRoleAuthCaches();
   }
 }
 
