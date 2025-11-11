@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DataMapping from '../../../../si_interface/pages/data_mapping';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
 
-export default function SIDataMappingPage() {
+const SIDataMappingContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isSystemIntegrator, isLoading, organizationId } = useUserContext({
@@ -81,5 +81,19 @@ export default function SIDataMappingPage() {
       onResetSelection={handleResetSelection}
       onMappingComplete={handleMappingComplete}
     />
+  );
+};
+
+const SIDataMappingFallback: React.FC = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+  </div>
+);
+
+export default function SIDataMappingPage() {
+  return (
+    <Suspense fallback={<SIDataMappingFallback />}>
+      <SIDataMappingContent />
+    </Suspense>
   );
 }

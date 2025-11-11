@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthLayout } from '../../../shared_components/auth/AuthLayout';
 import { FormField } from '../../../design_system/components/FormField';
@@ -30,7 +30,7 @@ const CHECKLIST_TIPS = [
   'Need help? Support links are in each phase once you land in the wizard.',
 ];
 
-const VerifyEmailPage: React.FC = () => {
+const VerifyEmailPageContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -233,5 +233,23 @@ const VerifyEmailPage: React.FC = () => {
     </AuthLayout>
   );
 };
+
+const VerifyEmailFallback: React.FC = () => (
+  <AuthLayout
+    title="Verifying your email"
+    subtitle="One moment while we load your verification wizard."
+    showBackToHome={false}
+  >
+    <div className="flex justify-center py-12">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+    </div>
+  </AuthLayout>
+);
+
+const VerifyEmailPage: React.FC = () => (
+  <Suspense fallback={<VerifyEmailFallback />}>
+    <VerifyEmailPageContent />
+  </Suspense>
+);
 
 export default VerifyEmailPage;

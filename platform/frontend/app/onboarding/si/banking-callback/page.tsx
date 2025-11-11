@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserContext } from '../../../../shared_components/hooks/useUserContext';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
@@ -26,7 +26,7 @@ interface BankingCallbackResponse {
   token?: string;
 }
 
-export default function BankingCallbackPage() {
+const BankingCallbackContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading } = useUserContext({ requireAuth: true });
@@ -393,5 +393,22 @@ export default function BankingCallbackPage() {
         </div>
       </div>
     </div>
+  );
+};
+
+const BankingCallbackFallback: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+      <p className="text-sm text-gray-600">Processing Mono callback…</p>
+    </div>
+  </div>
+);
+
+export default function BankingCallbackPage() {
+  return (
+    <Suspense fallback={<BankingCallbackFallback />}>
+      <BankingCallbackContent />
+    </Suspense>
   );
 }

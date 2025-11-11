@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ERPOnboarding } from '../../../../si_interface/workflows/erp_onboarding';
 import { getPostOnboardingUrl } from '../../../../shared_components/utils/dashboardRouting';
@@ -41,7 +41,7 @@ const resolveStepId = (value?: string | null): string | undefined => {
   return VALID_STEP_IDS.has(resolved) ? resolved : undefined;
 };
 
-export default function SIIntegrationSetupPage() {
+const SIIntegrationSetupContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -97,5 +97,19 @@ export default function SIIntegrationSetupPage() {
         />
       </div>
     </div>
+  );
+};
+
+const SIIntegrationSetupFallback: React.FC = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+  </div>
+);
+
+export default function SIIntegrationSetupPage() {
+  return (
+    <Suspense fallback={<SIIntegrationSetupFallback />}>
+      <SIIntegrationSetupContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { OnboardingStateManager } from '../../../../shared_components/services/onboardingApi';
@@ -15,7 +15,7 @@ interface ConnectedSystemInfo {
   dataTypes: string[];
 }
 
-export default function BusinessSystemsCallbackPage() {
+const BusinessSystemsCallbackContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -257,5 +257,22 @@ export default function BusinessSystemsCallbackPage() {
 
       </div>
     </div>
+  );
+};
+
+const BusinessSystemsCallbackFallback: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+      <p className="text-sm text-gray-600">Processing business system callback…</p>
+    </div>
+  </div>
+);
+
+export default function BusinessSystemsCallbackPage() {
+  return (
+    <Suspense fallback={<BusinessSystemsCallbackFallback />}>
+      <BusinessSystemsCallbackContent />
+    </Suspense>
   );
 }

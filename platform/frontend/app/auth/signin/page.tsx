@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { EnhancedSignInPage } from '../../../business_interface/auth/EnhancedSignInPage';
 import { authService } from '../../../shared_components/services/auth';
@@ -12,7 +12,7 @@ type ServicePackage = 'si' | 'app' | 'hybrid';
 const isValidService = (value: string | null | undefined): value is ServicePackage =>
   value === 'si' || value === 'app' || value === 'hybrid';
 
-export default function SignInPageWrapper() {
+const SignInPageContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -97,7 +97,21 @@ export default function SignInPageWrapper() {
     } finally {
       setIsLoading(false);
     }
-  };
+};
+
+const SignInPageFallback: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+  </div>
+);
+
+export default function SignInPageWrapper() {
+  return (
+    <Suspense fallback={<SignInPageFallback />}>
+      <SignInPageContent />
+    </Suspense>
+  );
+}
 
   return (
     <EnhancedSignInPage 

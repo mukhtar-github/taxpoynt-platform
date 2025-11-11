@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import UnifiedOnboardingWizardComponent, {
   ServicePackage,
 } from '../../shared_components/onboarding/UnifiedOnboardingWizard';
 import { authService } from '../../shared_components/services/auth';
 
-const OnboardingPage: React.FC = () => {
+const OnboardingPageContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
@@ -80,5 +80,20 @@ const OnboardingPage: React.FC = () => {
     </main>
   );
 };
+
+const OnboardingPageFallback: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+      <p className="text-sm text-gray-600">Preparing your onboarding experience…</p>
+    </div>
+  </div>
+);
+
+const OnboardingPage: React.FC = () => (
+  <Suspense fallback={<OnboardingPageFallback />}>
+    <OnboardingPageContent />
+  </Suspense>
+);
 
 export default OnboardingPage;

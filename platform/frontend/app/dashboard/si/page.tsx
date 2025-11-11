@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authService, type User } from '../../../shared_components/services/auth';
 import { onboardingApi } from '../../../shared_components/services/onboardingApi';
@@ -186,7 +186,7 @@ const describeBankingManualHelper = (
   }
 };
 
-export default function SIDashboard() {
+const SIDashboardContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const analytics = useOnboardingAnalytics();
@@ -614,5 +614,19 @@ export default function SIDashboard() {
       </div>
       <EnhancedSIInterface userName={`${user.first_name} ${user.last_name}`} userEmail={user.email} />
     </div>
+  );
+};
+
+const SIDashboardFallback: React.FC = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+  </div>
+);
+
+export default function SIDashboard() {
+  return (
+    <Suspense fallback={<SIDashboardFallback />}>
+      <SIDashboardContent />
+    </Suspense>
   );
 }

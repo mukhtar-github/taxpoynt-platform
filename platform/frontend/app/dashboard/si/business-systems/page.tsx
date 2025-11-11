@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authService, type User } from '../../../../shared_components/services/auth';
 import { DashboardLayout } from '../../../../shared_components/layouts/DashboardLayout';
@@ -137,7 +137,7 @@ const getStatusBadgeClass = (status?: string): string => {
 
 const CONNECTION_MANAGER_ORG_KEY = 'taxpoynt_connection_manager_org';
 
-const BusinessSystemsManagementPage = (): JSX.Element | null => {
+const BusinessSystemsManagementPageContent = (): JSX.Element | null => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -529,4 +529,16 @@ const BusinessSystemsManagementPage = (): JSX.Element | null => {
   );
 };
 
-export default BusinessSystemsManagementPage;
+const BusinessSystemsManagementFallback: React.FC = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+  </div>
+);
+
+export default function BusinessSystemsManagementPage() {
+  return (
+    <Suspense fallback={<BusinessSystemsManagementFallback />}>
+      <BusinessSystemsManagementPageContent />
+    </Suspense>
+  );
+}
