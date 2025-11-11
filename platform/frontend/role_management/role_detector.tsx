@@ -187,6 +187,7 @@ class FrontendRoleDetector {
       const status = (error as APIError)?.status;
       if (status === 401 || status === 403) {
         console.log(`Role fetch returned ${status}, likely not authenticated yet`);
+        this.handleUnauthorizedAccess(status);
         return null;
       }
 
@@ -373,6 +374,38 @@ class FrontendRoleDetector {
     } catch (storageError) {
       console.warn('Local auth token fallback lookup failed:', storageError);
       return '';
+    }
+  }
+
+  private handleUnauthorizedAccess(status: number): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      sessionStorage.removeItem('taxpoynt_user_roles');
+    } catch (roleCacheError) {
+      console.warn('Failed to clear cached role assignments after unauthorized response:', roleCacheError);
+    }
+
+    try {
+      secureTokenStorage.clearToken();
+    } catch (tokenError) {
+      console.warn('Secure token cleanup failed after unauthorized response:', tokenError);
+    }
+
+    try {
+      sessionStorage.removeItem('taxpoynt_user');
+      localStorage.removeItem('taxpoynt_user');
+    } catch (userCacheError) {
+      console.warn('Failed to clear cached user data after unauthorized response:', userCacheError);
+    }
+
+    try {
+      localStorage.removeItem('taxpoynt_token');
+      localStorage.removeItem('taxpoynt_auth_token');
+    } catch (legacyTokenError) {
+      console.warn('Failed to clear legacy auth tokens after unauthorized response:', legacyTokenError);
     }
   }
 }

@@ -15,6 +15,7 @@
 
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { authService } from './auth';
+import { secureTokenStorage } from '../utils/secureTokenStorage';
 
 export interface OnboardingState {
   user_id: string;
@@ -67,6 +68,8 @@ export interface ApiResponse<T = any> {
   meta?: Record<string, any>;
 }
 
+type ClientApiError = Error & { status?: number };
+
 export interface ServiceSelectionPayload {
   selected_package?: string | null;
   integration_targets?: string[] | null;
@@ -93,6 +96,25 @@ const generateIdempotencyKey = (): string => {
     return crypto.randomUUID();
   }
   return `idemp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const clearCachedAuthState = (): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    secureTokenStorage.clearToken();
+  } catch (error) {
+    console.warn('Failed to clear secure token after onboarding auth error:', error);
+  }
+
+  try {
+    sessionStorage.removeItem('taxpoynt_user');
+    localStorage.removeItem('taxpoynt_user');
+  } catch (storageError) {
+    console.warn('Failed to clear cached auth user after onboarding auth error:', storageError);
+  }
 };
 
 class OnboardingApiClient {
@@ -283,15 +305,18 @@ class OnboardingApiClient {
   private handleApiError(error: any): Error {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<ApiResponse>;
+      const statusCode = axiosError.response?.status;
       
-      if (axiosError.response?.status === 401) {
-        // Authentication error - clear stored auth data
-        authService.logout();
-        return new Error('Authentication expired. Please log in again.');
-      }
-      
-      if (axiosError.response?.status === 403) {
-        return new Error('Access denied. Insufficient permissions.');
+      if (statusCode === 401 || statusCode === 403) {
+        clearCachedAuthState();
+        const authError: ClientApiError = new Error(
+          statusCode === 401
+            ? 'Authentication expired. Please log in again.'
+            : 'Session is no longer valid. Please sign in again.'
+        );
+        authError.name = 'OnboardingApiAuthError';
+        authError.status = statusCode;
+        return authError;
       }
       
       const payload = axiosError.response?.data;
@@ -299,14 +324,20 @@ class OnboardingApiClient {
       const metaMessage = typeof payload?.meta?.message === 'string' ? payload.meta.message : undefined;
 
       if (metaError || metaMessage) {
-        return new Error(metaError || metaMessage!);
+        const metaIssue: ClientApiError = new Error(metaError || metaMessage!);
+        metaIssue.status = statusCode;
+        return metaIssue;
       }
 
       if (typeof payload?.action === 'string') {
-        return new Error(payload.action);
+        const actionError: ClientApiError = new Error(payload.action);
+        actionError.status = statusCode;
+        return actionError;
       }
-      
-      return new Error(`API request failed: ${axiosError.message}`);
+
+      const fallbackError: ClientApiError = new Error(`API request failed: ${axiosError.message}`);
+      fallbackError.status = statusCode;
+      return fallbackError;
     }
     
     return error instanceof Error ? error : new Error('Unknown API error');
