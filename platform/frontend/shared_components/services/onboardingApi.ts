@@ -785,6 +785,35 @@ const safePersistLocalState = (userId: string, state: {
   }
 };
 
+const ONBOARDING_UPDATE_MIN_INTERVAL_MS = 800;
+const onboardingLastUpdateAt: Map<string, number> = new Map();
+const onboardingUpdateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+const onboardingQueuedUpdates: Map<string, {
+  step: string;
+  completed: boolean;
+  completedSteps: string[];
+  signature: string;
+}> = new Map();
+
+const performRemoteOnboardingUpdate = async (
+  cacheKey: string,
+  payload: { step: string; completed: boolean; completedSteps: string[]; signature: string; }
+) => {
+  onboardingPendingSignature.set(cacheKey, payload.signature);
+  try {
+    const nextState = await onboardingApi.updateOnboardingState({
+      current_step: payload.step,
+      completed_steps: payload.completedSteps,
+      metadata: { step_updated_at: new Date().toISOString() }
+    });
+    updateStateCache(cacheKey, nextState);
+    onboardingUpdateSignature.set(cacheKey, payload.signature);
+    onboardingLastUpdateAt.set(cacheKey, Date.now());
+  } finally {
+    onboardingPendingSignature.delete(cacheKey);
+  }
+};
+
 export const OnboardingStateManager = {
   /**
    * Get current onboarding state (with backend sync)
@@ -841,15 +870,45 @@ export const OnboardingStateManager = {
         return;
       }
 
-      onboardingPendingSignature.set(cacheKey, signature);
-      const nextState = await onboardingApi.updateOnboardingState({
-        current_step: step,
-        completed_steps: completedStepsArray,
-        metadata: { step_updated_at: new Date().toISOString() }
-      });
-      updateStateCache(cacheKey, nextState);
-      onboardingUpdateSignature.set(cacheKey, signature);
-      onboardingPendingSignature.delete(cacheKey);
+      const payload = {
+        step,
+        completed,
+        completedSteps: completedStepsArray,
+        signature
+      };
+
+      const queuedPayload = onboardingQueuedUpdates.get(cacheKey);
+      if (queuedPayload?.signature === signature) {
+        return;
+      }
+
+      const now = Date.now();
+      const lastAt = onboardingLastUpdateAt.get(cacheKey) ?? 0;
+      if (now - lastAt < ONBOARDING_UPDATE_MIN_INTERVAL_MS) {
+        onboardingQueuedUpdates.set(cacheKey, payload);
+        if (!onboardingUpdateTimers.has(cacheKey)) {
+          const wait = Math.max(ONBOARDING_UPDATE_MIN_INTERVAL_MS - (now - lastAt), 0);
+          onboardingUpdateTimers.set(
+            cacheKey,
+            setTimeout(async () => {
+              onboardingUpdateTimers.delete(cacheKey);
+              const queued = onboardingQueuedUpdates.get(cacheKey);
+              if (!queued) {
+                return;
+              }
+              onboardingQueuedUpdates.delete(cacheKey);
+              try {
+                await performRemoteOnboardingUpdate(cacheKey, queued);
+              } catch (deferredError) {
+                console.error('Delayed onboarding step update failed:', deferredError);
+              }
+            }, wait)
+          );
+        }
+        return;
+      }
+
+      await performRemoteOnboardingUpdate(cacheKey, payload);
     } catch (error) {
       console.error('Failed to update onboarding step:', error);
       onboardingPendingSignature.delete(cacheKey);

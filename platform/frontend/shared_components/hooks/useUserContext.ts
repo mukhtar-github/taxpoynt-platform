@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * User Context Hook
  * =================
