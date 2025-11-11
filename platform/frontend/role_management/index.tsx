@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Role Management System - TaxPoynt Frontend
  * =========================================

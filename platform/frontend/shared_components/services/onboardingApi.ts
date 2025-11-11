@@ -385,7 +385,18 @@ class OnboardingApiClient {
       if (localState) {
         return localState;
       }
-      throw new Error('Authentication required');
+      const now = new Date().toISOString();
+      return {
+        user_id: this.resolveUserCacheKey(),
+        current_step: request.current_step,
+        completed_steps: request.completed_steps ?? [],
+        has_started: true,
+        is_complete: request.completed_steps?.includes('onboarding_complete') ?? false,
+        last_active_date: now,
+        metadata: request.metadata ?? {},
+        created_at: now,
+        updated_at: now
+      };
     }
     const cacheKey = this.resolveUserCacheKey();
     const signature = this.computeUpdateSignature(request);
@@ -910,12 +921,15 @@ export const OnboardingStateManager = {
 
       await performRemoteOnboardingUpdate(cacheKey, payload);
     } catch (error) {
-      console.error('Failed to update onboarding step:', error);
       onboardingPendingSignature.delete(cacheKey);
-      if (!hasAuthSession()) {
-        console.warn('Skipping local onboarding fallback because user is not authenticated.');
+      const isAuthError = error instanceof Error && error.name === 'OnboardingApiAuthError';
+      if (isAuthError || !hasAuthSession()) {
+        console.info('Onboarding step update skipped: no valid authentication session.');
+        onboardingQueuedUpdates.delete(cacheKey);
+        onboardingLastUpdateAt.delete(cacheKey);
         return;
       }
+      console.error('Failed to update onboarding step:', error);
       // Fallback to old localStorage method
       const user = authService.getStoredUser();
       if (!user?.id) return;
