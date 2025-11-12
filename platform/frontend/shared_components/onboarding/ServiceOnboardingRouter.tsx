@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '../services/auth';
 import { onboardingApi, OnboardingState } from '../services/onboardingApi';
+import { onboardingStateQueue } from '../services/onboardingStateQueue';
 import { Logo } from '../../design_system/components/Logo';
 
 interface ServiceOnboardingRouterProps {
@@ -219,35 +220,44 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
     if (!onboardingState || !userId) return;
 
     try {
-      const completedSteps = completed 
-        ? [...onboardingState.completed_steps, step]
+      const completedSteps = completed
+        ? Array.from(new Set([...onboardingState.completed_steps, step]))
         : onboardingState.completed_steps;
 
-      const updatedState = await onboardingApi.updateOnboardingState({
-        current_step: step,
-        completed_steps: completedSteps,
+      await onboardingStateQueue.enqueue({
+        step,
+        completed,
+        completedSteps,
         metadata: {
           ...onboardingState.metadata,
-          step_updated_at: new Date().toISOString()
-        }
+          step_updated_at: new Date().toISOString(),
+        },
+        userId,
+        source: 'ServiceOnboardingRouter.update',
       });
 
-      setOnboardingState(updatedState);
-      console.log('✅ Onboarding state updated:', updatedState);
+      setOnboardingState((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_step: step,
+              completed_steps: completedSteps,
+              last_active_date: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+          : prev,
+      );
     } catch (error) {
-      console.error('❌ Failed to update onboarding state:', error);
-      
-      // Fallback to localStorage update
+      console.error('❌ Failed to queue onboarding state update:', error);
       const updatedState: OnboardingState = {
         ...onboardingState,
         current_step: step,
-        completed_steps: completed 
-          ? [...onboardingState.completed_steps, step]
+        completed_steps: completed
+          ? Array.from(new Set([...onboardingState.completed_steps, step]))
           : onboardingState.completed_steps,
         last_active_date: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
-
       setOnboardingState(updatedState);
       localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updatedState));
     }

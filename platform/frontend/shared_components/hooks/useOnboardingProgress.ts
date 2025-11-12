@@ -20,6 +20,7 @@ import { useUserContext } from './useUserContext';
 import { useOnboardingAnalytics } from '../analytics/OnboardingAnalytics';
 import apiClient from '../api/client';
 import { onboardingApi } from '../services/onboardingApi';
+import { onboardingStateQueue } from '../services/onboardingStateQueue';
 import type { OnboardingState as BackendUnifiedState } from '../services/onboardingApi';
 
 interface OnboardingProgressState {
@@ -323,9 +324,9 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
       localStorage.setItem(localStorageKey, JSON.stringify(newState));
 
       try {
-        await onboardingApi.updateOnboardingState({
-          current_step: newState.currentStep,
-          completed_steps: newState.completedSteps,
+        await onboardingStateQueue.enqueue({
+          step: newState.currentStep,
+          completedSteps: newState.completedSteps,
           metadata: newState.metadata,
         });
       } catch (syncError) {
@@ -375,19 +376,28 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 
       // Update backend (with legacy fallback)
       try {
-        await onboardingApi.updateOnboardingState({
-          current_step: updatedState.currentStep,
-          completed_steps: updatedState.completedSteps,
-          metadata: updatedState.metadata,
-        });
-      } catch (syncError) {
-        console.warn('Primary onboarding update failed, attempting legacy endpoint.', syncError);
         const fallbackNamespace = user.role === 'access_point_provider' ? 'app' : 'si';
-        await apiClient.put(`/${fallbackNamespace}/onboarding/state`, {
-          current_step: updatedState.currentStep,
-          completed_steps: updatedState.completedSteps,
-          metadata: updatedState.metadata,
-        });
+        await onboardingStateQueue.enqueue(
+          {
+            step: updatedState.currentStep,
+            completed: completed,
+            completedSteps: updatedState.completedSteps,
+            metadata: updatedState.metadata,
+            userId: user.id,
+            source: 'useOnboardingProgress.updateProgress',
+          },
+          {
+            fallback: async () => {
+              await apiClient.put(`/${fallbackNamespace}/onboarding/state`, {
+                current_step: updatedState.currentStep,
+                completed_steps: updatedState.completedSteps,
+                metadata: updatedState.metadata,
+              });
+            },
+          }
+        );
+      } catch (syncError) {
+        console.warn('Failed to persist onboarding update.', syncError);
       }
 
       // Update localStorage as backup

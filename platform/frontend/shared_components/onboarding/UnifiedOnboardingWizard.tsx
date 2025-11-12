@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ShieldCheckIcon } from '@heroicons/react/24/solid';
 import { TaxPoyntButton, TaxPoyntInput } from '../../design_system';
 import { onboardingApi, type CompanyProfilePayload } from '../services/onboardingApi';
+import { onboardingStateQueue } from '../services/onboardingStateQueue';
 import erpIntegrationApi from '../services/erpIntegrationApi';
 import { authService } from '../services/auth';
 import siBankingApi from '../services/siBankingApi';
@@ -844,13 +845,14 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return;
       }
       try {
-        await onboardingApi.updateOnboardingState({
-          current_step: currentStep?.id ?? 'system-connectivity',
-          completed_steps: completedSteps,
+        await onboardingStateQueue.enqueue({
+          step: currentStep?.id ?? 'system-connectivity',
+          completedSteps,
           metadata: buildMetadataPayload({ bankingConnection: nextState }),
+          source: 'UnifiedOnboardingWizard.persistBankingState',
         });
       } catch (error) {
-        console.error('Failed to persist banking connection state', error);
+        console.error('Failed to queue banking connection state', error);
       }
     },
     [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
@@ -863,13 +865,14 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return;
       }
       try {
-        await onboardingApi.updateOnboardingState({
-          current_step: currentStep?.id ?? 'system-connectivity',
-          completed_steps: completedSteps,
+        await onboardingStateQueue.enqueue({
+          step: currentStep?.id ?? 'system-connectivity',
+          completedSteps,
           metadata: buildMetadataPayload({ erpConnection: nextState }),
+          source: 'UnifiedOnboardingWizard.persistErpState',
         });
       } catch (error) {
-        console.error('Failed to persist ERP connection state', error);
+        console.error('Failed to queue ERP connection state', error);
       }
     },
     [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
@@ -1088,14 +1091,16 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           profileForMetadata = await options.preSync();
         }
 
-        await onboardingApi.updateOnboardingState({
-          current_step: stepId,
-          completed_steps: completionList,
+        await onboardingStateQueue.enqueue({
+          step: stepId,
+          completed: markComplete,
+          completedSteps: completionList,
           metadata: {
             ...buildMetadataPayload(),
             company_profile: profileForMetadata,
             milestone_complete: markComplete,
           },
+          source: 'UnifiedOnboardingWizard.persistState',
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to save onboarding progress';
