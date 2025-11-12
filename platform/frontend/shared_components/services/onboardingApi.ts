@@ -841,7 +841,7 @@ const safePersistLocalState = (userId: string, state: {
   }
 };
 
-const ONBOARDING_UPDATE_MIN_INTERVAL_MS = 1200;
+const ONBOARDING_UPDATE_MIN_INTERVAL_MS = 5000;
 
 type QueuedPayload = {
   step: string;

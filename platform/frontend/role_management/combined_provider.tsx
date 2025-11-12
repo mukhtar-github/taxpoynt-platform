@@ -20,6 +20,7 @@ import React, { ReactNode, useState, useEffect } from 'react';
 import { RoleDetectorProvider, PlatformRole } from './role_detector';
 import { PermissionProvider, Permission } from './permission_provider';
 import { FeatureFlagProvider } from './feature_flag_provider';
+import { authService } from '../shared_components/services/auth';
 
 // Combined provider props
 interface CombinedRoleProviderProps {
@@ -130,8 +131,39 @@ export function CombinedRoleProvider({
   enableDevTools = false,
   enableAuditLogging = false
 }: CombinedRoleProviderProps) {
+  const detectSession = () => {
+    if (authToken) return true;
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    try {
+      return Boolean(authService.getToken());
+    } catch {
+      return false;
+    }
+  };
+
+  const [hasSession, setHasSession] = useState<boolean>(detectSession);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const refreshSession = () => {
+      setHasSession(detectSession());
+    };
+
+    const interval = window.setInterval(refreshSession, 2000);
+    window.addEventListener('storage', refreshSession);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('storage', refreshSession);
+    };
+  }, [authToken]);
 
   // Initialize the system
   useEffect(() => {
@@ -151,6 +183,10 @@ export function CombinedRoleProvider({
 
     initializeRoleSystem();
   }, [authToken, onError]);
+
+  if (!hasSession) {
+    return <>{children}</>;
+  }
 
   // Show loading while initializing
   if (!isInitialized && !initializationError) {
