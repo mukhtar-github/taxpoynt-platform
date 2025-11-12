@@ -15,6 +15,7 @@ import {
   ServiceSelectionPayload,
   CompanyProfilePayload,
 } from '../../shared_components/services/onboardingApi';
+import { onboardingStateQueue } from '../../shared_components/services/onboardingStateQueue';
 import { authService } from '../../shared_components/services/auth';
 import sessionPersistence from '../../shared_components/utils/onboardingSessionPersistence';
 
@@ -453,16 +454,27 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
 
     setIsSubmitting(true);
     try {
+      let latestState: OnboardingState | null = null;
       const updatedCompleted = new Set(completedSteps);
       updatedCompleted.add(currentStep.id);
 
-      const state = await onboardingApi.updateOnboardingState({
-        current_step: currentStep.id,
-        completed_steps: Array.from(updatedCompleted),
+      await onboardingStateQueue.enqueue({
+        step: currentStep.id,
+        completed: true,
+        completedSteps: Array.from(updatedCompleted),
         metadata: buildWizardMetadata(),
+        userId: storedUser?.id,
+        source: 'erp_onboarding.handleContinue',
       });
 
-      updateFromState(state);
+      try {
+        latestState = await onboardingApi.getOnboardingState();
+        if (latestState) {
+          updateFromState(latestState);
+        }
+      } catch (refreshError) {
+        console.warn('Failed to refresh onboarding state after queue dispatch:', refreshError);
+      }
 
       const nextIndex =
         currentStepIndex < ENTRY_STEPS.length - 1 ? currentStepIndex + 1 : currentStepIndex;
@@ -471,7 +483,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
         sessionPersistence.completeSession();
         const resolvedOrgId =
           organizationId ||
-          state.metadata?.organization_id ||
+          latestState?.metadata?.organization_id ||
           authService.getStoredUser()?.organization?.id ||
           'unknown';
         if (onComplete) {
@@ -504,6 +516,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
     onComplete,
     organizationId,
     router,
+    storedUser?.id,
     updateFromState,
     updateSessionState,
   ]);

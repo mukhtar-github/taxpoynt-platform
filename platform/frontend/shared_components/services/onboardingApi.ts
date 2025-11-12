@@ -16,6 +16,7 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { authService } from './auth';
 import { secureTokenStorage } from '../utils/secureTokenStorage';
+import { onboardingStateQueue, configureOnboardingStateDispatcher } from './onboardingStateQueue';
 
 export interface OnboardingState {
   user_id: string;
@@ -740,10 +741,13 @@ class OnboardingApiClient {
 // Export singleton instance
 export const onboardingApi = new OnboardingApiClient();
 
+configureOnboardingStateDispatcher((request) =>
+  onboardingApi.updateOnboardingState(request)
+);
+
 // Export utility functions
 const onboardingStateCache: Map<string, OnboardingState | null> = new Map();
 const onboardingUpdateSignature: Map<string, string> = new Map();
-const onboardingPendingSignature: Map<string, string> = new Map();
 const VOLATILE_METADATA_KEYS = new Set([
   'step_updated_at',
   'lastUpdate',
@@ -841,74 +845,6 @@ const safePersistLocalState = (userId: string, state: {
   }
 };
 
-const ONBOARDING_UPDATE_MIN_INTERVAL_MS = 5000;
-
-type QueuedPayload = {
-  step: string;
-  completed: boolean;
-  completedSteps: string[];
-  signature: string;
-  metadata?: Record<string, any>;
-};
-
-const onboardingUpdateControllers: Map<
-  string,
-  {
-    lastRun: number;
-    pendingPayload: QueuedPayload | null;
-    isProcessing: boolean;
-  }
-> = new Map();
-
-const scheduleOnboardingUpdate = async (cacheKey: string, payload: QueuedPayload) => {
-  let controller = onboardingUpdateControllers.get(cacheKey);
-  if (!controller) {
-    controller = {
-      lastRun: 0,
-      pendingPayload: null,
-      isProcessing: false
-    };
-    onboardingUpdateControllers.set(cacheKey, controller);
-  }
-
-  controller.pendingPayload = payload;
-
-  if (controller.isProcessing) {
-    return;
-  }
-
-  controller.isProcessing = true;
-  try {
-    while (controller.pendingPayload) {
-      const next = controller.pendingPayload;
-      controller.pendingPayload = null;
-
-      const elapsed = Date.now() - controller.lastRun;
-      if (elapsed < ONBOARDING_UPDATE_MIN_INTERVAL_MS) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, ONBOARDING_UPDATE_MIN_INTERVAL_MS - elapsed)
-        );
-      }
-
-      onboardingPendingSignature.set(cacheKey, next.signature);
-      try {
-        const nextState = await onboardingApi.updateOnboardingState({
-          current_step: next.step,
-          completed_steps: next.completedSteps,
-          metadata: next.metadata
-        });
-        updateStateCache(cacheKey, nextState);
-        onboardingUpdateSignature.set(cacheKey, next.signature);
-        controller.lastRun = Date.now();
-      } finally {
-        onboardingPendingSignature.delete(cacheKey);
-      }
-    }
-  } finally {
-    controller.isProcessing = false;
-  }
-};
-
 export const OnboardingStateManager = {
   /**
    * Get current onboarding state (with backend sync)
@@ -958,21 +894,49 @@ export const OnboardingStateManager = {
       }
 
       const completedStepsArray = Array.from(completedSteps);
-      const signature = computeSignature(step, completedStepsArray);
+      const metadata = {
+        ...(current?.metadata ?? {}),
+        step_updated_at: new Date().toISOString(),
+      };
+      const signature = computeSignature(step, completedStepsArray, metadata);
       const lastSignature = onboardingUpdateSignature.get(cacheKey);
-      const pendingSignature = onboardingPendingSignature.get(cacheKey);
-      if (lastSignature === signature || pendingSignature === signature) {
+      if (lastSignature === signature) {
         return;
       }
 
-      const payload = {
+      await onboardingStateQueue.enqueue({
         step,
         completed,
         completedSteps: completedStepsArray,
-        signature
-      };
+        metadata,
+        userId: cacheKey,
+        source: 'OnboardingStateManager.updateStep',
+      });
 
-      await scheduleOnboardingUpdate(cacheKey, payload);
+      const now = new Date().toISOString();
+      const updatedState: OnboardingState = {
+        ...(current ?? {
+          user_id: cacheKey,
+          current_step: step,
+          completed_steps: [],
+          has_started: true,
+          is_complete: false,
+          last_active_date: now,
+          metadata: {},
+          created_at: now,
+          updated_at: now,
+        }),
+        user_id: cacheKey,
+        current_step: step,
+        completed_steps: completedStepsArray,
+        has_started: true,
+        is_complete: completedStepsArray.includes('onboarding_complete'),
+        last_active_date: now,
+        updated_at: now,
+        metadata,
+      };
+      updateStateCache(cacheKey, updatedState);
+      onboardingUpdateSignature.set(cacheKey, signature);
     } catch (error) {
       const isAuthError = error instanceof Error && error.name === 'OnboardingApiAuthError';
       if (isAuthError || !hasAuthSession()) {
@@ -1001,21 +965,21 @@ export const OnboardingStateManager = {
           completedSteps: updated.completedSteps ?? [],
           lastActiveDate: updated.lastActiveDate,
         });
-       updateStateCache(cacheKey, {
-         user_id: user.id,
-         current_step: updated.currentStep,
-         completed_steps: updated.completedSteps,
-         has_started: true,
-         is_complete: updated.completedSteps?.includes('onboarding_complete') ?? false,
-         last_active_date: updated.lastActiveDate,
-         metadata: updated.metadata ?? {},
-         created_at: updated.lastActiveDate,
-         updated_at: updated.lastActiveDate
-       });
-       onboardingUpdateSignature.set(
-         cacheKey,
-         computeSignature(updated.currentStep, updated.completedSteps ?? [])
-       );
+        updateStateCache(cacheKey, {
+          user_id: user.id,
+          current_step: updated.currentStep,
+          completed_steps: updated.completedSteps,
+          has_started: true,
+          is_complete: updated.completedSteps?.includes('onboarding_complete') ?? false,
+          last_active_date: updated.lastActiveDate,
+          metadata: updated.metadata ?? {},
+          created_at: updated.lastActiveDate,
+          updated_at: updated.lastActiveDate
+        });
+        onboardingUpdateSignature.set(
+          cacheKey,
+          computeSignature(updated.currentStep, updated.completedSteps ?? [])
+        );
       }
     }
   },

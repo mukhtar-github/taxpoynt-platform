@@ -80,17 +80,21 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
         // If no state exists, initialize new onboarding
         if (!state) {
           try {
-            state = await onboardingApi.updateOnboardingState({
-              current_step: 'service_introduction',
-              completed_steps: [],
-              metadata: { 
+            await onboardingStateQueue.enqueue({
+              step: 'service_introduction',
+              completed: false,
+              completedSteps: [],
+              metadata: {
                 service_package: userServicePackage,
                 initialization_source: 'frontend'
-              }
+              },
+              userId,
+              source: 'ServiceOnboardingRouter.initialize',
             });
+            state = await onboardingApi.getOnboardingState();
             console.log('🚀 Started new onboarding:', state);
           } catch (updateError) {
-            console.warn('⚠️ Failed to create backend state, using local fallback');
+            console.warn('⚠️ Failed to create backend state, using local fallback', updateError);
             // Complete fallback - create local state
             state = {
               user_id: userId,
@@ -323,152 +327,5 @@ export const ServiceOnboardingRouter: React.FC<ServiceOnboardingRouterProps> = (
 
 export default ServiceOnboardingRouter;
 
-// Legacy utility functions for backward compatibility
-// New code should use onboardingApi and OnboardingStateManager from services/onboardingApi.ts
-export const OnboardingStateManager = {
-  /**
-   * Get current onboarding state for user (with backend sync)
-   * @deprecated Use onboardingApi.getOnboardingState() instead
-   */
-  getOnboardingState: async (userId: string): Promise<OnboardingState | null> => {
-    try {
-      return await onboardingApi.getOnboardingState();
-    } catch (error) {
-      console.error('Failed to get onboarding state:', error);
-      // Fallback to localStorage
-      try {
-        const saved = localStorage.getItem(`onboarding_${userId}`);
-        if (!saved) return null;
-        
-        const legacy = JSON.parse(saved);
-        // Convert legacy format to new format
-        return {
-          user_id: userId,
-          current_step: legacy.currentStep || 'service_introduction',
-          completed_steps: legacy.completedSteps || [],
-          has_started: legacy.hasStarted ?? true,
-          is_complete: legacy.completedSteps?.includes('onboarding_complete') ?? false,
-          last_active_date: legacy.lastActiveDate || new Date().toISOString(),
-          metadata: legacy.metadata || {},
-          created_at: legacy.lastActiveDate || new Date().toISOString(),
-          updated_at: legacy.lastActiveDate || new Date().toISOString()
-        };
-      } catch (legacyError) {
-        console.error('Failed to get legacy onboarding state:', legacyError);
-        return null;
-      }
-    }
-  },
-
-  /**
-   * Update onboarding step (with backend sync)
-   * @deprecated Use onboardingApi.updateOnboardingState() instead
-   */
-  updateStep: async (userId: string, step: string, completed: boolean = false): Promise<void> => {
-    try {
-      const current = await onboardingApi.getOnboardingState();
-      const existingSteps = Array.isArray(current?.completed_steps)
-        ? current.completed_steps
-        : [];
-      const alreadyCompleted = existingSteps.includes(step);
-      const alreadyCurrent = current?.current_step === step;
-
-      if (alreadyCurrent && (!completed || alreadyCompleted)) {
-        return;
-      }
-
-      const completedSteps = completed
-        ? Array.from(new Set([...existingSteps, step]))
-        : existingSteps;
-
-      await onboardingApi.updateOnboardingState({
-        current_step: step,
-        completed_steps: completedSteps,
-        metadata: { step_updated_at: new Date().toISOString() }
-      });
-    } catch (error) {
-      console.error('Failed to update onboarding step:', error);
-      // Fallback to localStorage
-      try {
-        const saved = localStorage.getItem(`onboarding_${userId}`);
-        const current = saved ? JSON.parse(saved) : null;
-        
-        if (current) {
-          const legacyCompleted: string[] = Array.isArray(current.completedSteps)
-            ? current.completedSteps
-            : [];
-          const alreadyCompleted = legacyCompleted.includes(step);
-
-          if (current.currentStep === step && (!completed || alreadyCompleted)) {
-            return;
-          }
-
-          const updated = {
-            ...current,
-            currentStep: step,
-            completedSteps: completed
-              ? Array.from(new Set([...legacyCompleted, step]))
-              : legacyCompleted,
-            lastActiveDate: new Date().toISOString()
-          };
-          localStorage.setItem(`onboarding_${userId}`, JSON.stringify(updated));
-        }
-      } catch (legacyError) {
-        console.error('Failed to update legacy onboarding state:', legacyError);
-      }
-    }
-  },
-
-  /**
-   * Mark onboarding as complete (with backend sync)
-   * @deprecated Use onboardingApi.completeOnboarding() instead
-   */
-  completeOnboarding: async (userId: string): Promise<void> => {
-    try {
-      await onboardingApi.completeOnboarding({
-        completion_source: 'legacy_manager',
-        completed_at: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Failed to complete onboarding:', error);
-      // Fallback to updateStep
-      await OnboardingStateManager.updateStep(userId, 'onboarding_complete', true);
-    }
-  },
-
-  /**
-   * Check if onboarding is complete (with backend sync)
-   * @deprecated Use onboardingApi.getOnboardingState() instead
-   */
-  isOnboardingComplete: async (userId: string): Promise<boolean> => {
-    try {
-      const state = await onboardingApi.getOnboardingState();
-      return state?.is_complete || false;
-    } catch (error) {
-      console.error('Failed to check onboarding completion:', error);
-      // Fallback to localStorage
-      try {
-        const saved = localStorage.getItem(`onboarding_${userId}`);
-        const state = saved ? JSON.parse(saved) : null;
-        return state?.completedSteps?.includes('onboarding_complete') || false;
-      } catch (legacyError) {
-        console.error('Failed to check legacy onboarding completion:', legacyError);
-        return false;
-      }
-    }
-  },
-
-  /**
-   * Reset onboarding state (with backend sync)
-   * @deprecated Use onboardingApi.resetOnboardingState() instead
-   */
-  resetOnboarding: async (userId: string): Promise<void> => {
-    try {
-      await onboardingApi.resetOnboardingState();
-    } catch (error) {
-      console.error('Failed to reset onboarding state:', error);
-      // Fallback to localStorage
-      localStorage.removeItem(`onboarding_${userId}`);
-    }
-  }
-};
+// Maintain legacy export for compatibility while delegating to the primary implementation.
+export { OnboardingStateManager } from '../services/onboardingApi';

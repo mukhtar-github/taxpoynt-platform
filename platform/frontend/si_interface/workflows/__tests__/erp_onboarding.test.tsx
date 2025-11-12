@@ -3,6 +3,7 @@ import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globa
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import ERPOnboarding from '../erp_onboarding';
 import { onboardingApi } from '../../../shared_components/services/onboardingApi';
+import { onboardingStateQueue } from '../../../shared_components/services/onboardingStateQueue';
 import type { OnboardingState } from '../../../shared_components/services/onboardingApi';
 
 jest.mock('next/navigation', () => ({
@@ -61,8 +62,21 @@ jest.mock('../../../shared_components/utils/onboardingSessionPersistence', () =>
   },
 }));
 
+jest.mock('../../../shared_components/services/onboardingStateQueue', () => {
+  const enqueue = jest.fn().mockResolvedValue(undefined);
+  const clear = jest.fn();
+  const configureOnboardingStateDispatcher = jest.fn();
+  return {
+    onboardingStateQueue: { enqueue, clear },
+    configureOnboardingStateDispatcher,
+  };
+});
+
 const mockUpdateState = onboardingApi.updateOnboardingState as jest.MockedFunction<
   typeof onboardingApi.updateOnboardingState
+>;
+const mockGetState = onboardingApi.getOnboardingState as jest.MockedFunction<
+  typeof onboardingApi.getOnboardingState
 >;
 const mockSaveServiceSelection = onboardingApi.saveServiceSelection as jest.MockedFunction<
   typeof onboardingApi.saveServiceSelection
@@ -70,9 +84,14 @@ const mockSaveServiceSelection = onboardingApi.saveServiceSelection as jest.Mock
 const mockSaveCompanyProfile = onboardingApi.saveCompanyProfile as jest.MockedFunction<
   typeof onboardingApi.saveCompanyProfile
 >;
+const mockQueueEnqueue = onboardingStateQueue.enqueue as jest.MockedFunction<
+  typeof onboardingStateQueue.enqueue
+>;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetState.mockResolvedValue(null);
+  mockQueueEnqueue.mockResolvedValue(undefined);
   jest.useFakeTimers();
 });
 
@@ -104,12 +123,14 @@ test('renders service focus step by default', async () => {
 });
 
 test('advances to company profile after saving service focus', async () => {
-  mockUpdateState.mockResolvedValueOnce(
-    buildState({
-      current_step: 'company-profile',
-      completed_steps: ['service-selection'],
-    }),
-  );
+  mockGetState
+    .mockResolvedValueOnce(null) // initial load
+    .mockResolvedValueOnce(
+      buildState({
+        current_step: 'company-profile',
+        completed_steps: ['service-selection'],
+      }),
+    );
 
   render(<ERPOnboarding />);
 
@@ -119,7 +140,8 @@ test('advances to company profile after saving service focus', async () => {
   await waitFor(() => {
     expect(screen.getByText('Company Profile')).toBeInTheDocument();
   });
-  expect(mockUpdateState).toHaveBeenCalledTimes(1);
+  expect(mockQueueEnqueue).toHaveBeenCalled();
+  expect(mockGetState).toHaveBeenCalled();
 });
 
 test('autosaves company profile changes', async () => {

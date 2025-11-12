@@ -1,6 +1,5 @@
 'use client';
 
-import { onboardingApi } from './onboardingApi';
 import { authService } from './auth';
 
 export interface QueuePayload {
@@ -16,6 +15,20 @@ interface QueueEntry {
   payload: QueuePayload;
   fallback?: () => Promise<void>;
 }
+
+interface OnboardingStateUpdateRequest {
+  current_step: string;
+  completed_steps?: string[];
+  metadata?: Record<string, any>;
+}
+
+type DispatchHandler = (request: OnboardingStateUpdateRequest) => Promise<unknown>;
+
+let dispatcher: DispatchHandler | null = null;
+
+export const configureOnboardingStateDispatcher = (handler: DispatchHandler) => {
+  dispatcher = handler;
+};
 
 const VOLATILE_KEYS = new Set([
   'step_updated_at',
@@ -111,7 +124,10 @@ class OnboardingStateQueue {
         };
 
         try {
-          await onboardingApi.updateOnboardingState(request);
+          if (!dispatcher) {
+            throw new Error('Onboarding state dispatcher not configured');
+          }
+          await dispatcher(request);
           this.lastDispatched.set(userKey, signature);
         } catch (error) {
           console.error('[OnboardingStateQueue] Failed to persist onboarding state:', error);

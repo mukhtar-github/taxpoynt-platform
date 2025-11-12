@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { CombinedRoleProvider } from '../../role_management/combined_provider';
 
