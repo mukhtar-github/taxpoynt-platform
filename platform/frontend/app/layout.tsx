@@ -1,6 +1,5 @@
 import React from 'react';
 import './globals.css';
-import RoleProviderGate from './RoleProviderGate';
 
 export const metadata = {
   title: 'TaxPoynt - Secure E-invoicing Solution',
@@ -53,9 +52,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <RoleProviderGate>
-          {children}
-        </RoleProviderGate>
+        {children}
       </body>
     </html>
   );

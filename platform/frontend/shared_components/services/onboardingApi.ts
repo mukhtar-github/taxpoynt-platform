@@ -122,7 +122,7 @@ class OnboardingApiClient {
   private retryAttempts: number = 4;
   private baseRetryDelay: number = 1500; // start at 1.5s
   private maxRetryDelay: number = 12000; // 12 seconds cap
-  private readonly MIN_UPDATE_INTERVAL_MS = 1200;
+  private readonly MIN_UPDATE_INTERVAL_MS = 5000;
   private lastUpdateAt: Map<string, number> = new Map();
   private pendingUpdateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private pendingUpdatePayloads: Map<string, OnboardingStateRequest> = new Map();
@@ -161,8 +161,11 @@ class OnboardingApiClient {
   }
 
   private computeUpdateSignature(request: OnboardingStateRequest): string {
-    const completed = Array.isArray(request.completed_steps) ? request.completed_steps.slice().sort().join('|') : '';
-    return `${request.current_step}|${completed}`;
+    return buildRequestSignature(
+      request.current_step,
+      request.completed_steps ?? [],
+      request.metadata
+    );
   }
 
   private async performUpdate(
@@ -741,6 +744,51 @@ export const onboardingApi = new OnboardingApiClient();
 const onboardingStateCache: Map<string, OnboardingState | null> = new Map();
 const onboardingUpdateSignature: Map<string, string> = new Map();
 const onboardingPendingSignature: Map<string, string> = new Map();
+const VOLATILE_METADATA_KEYS = new Set([
+  'step_updated_at',
+  'lastUpdate',
+  'last_update',
+  'lastActiveDate',
+  'last_active_date',
+  'timestamp',
+]);
+
+const normalizeMetadataForSignature = (metadata: Record<string, any> | undefined): any => {
+  const deepNormalize = (value: any): any => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      return value.map(deepNormalize);
+    }
+    if (typeof value === 'object') {
+      const entries = Object.entries(value)
+        .filter(([key]) => !VOLATILE_METADATA_KEYS.has(key))
+        .map(([key, val]) => [key, deepNormalize(val)] as [string, any])
+        .sort(([a], [b]) => a.localeCompare(b));
+      return entries.reduce<Record<string, any>>((acc, [key, val]) => {
+        acc[key] = val;
+        return acc;
+      }, {});
+    }
+    return value;
+  };
+
+  if (!metadata) {
+    return null;
+  }
+  return deepNormalize(metadata);
+};
+
+const buildRequestSignature = (
+  step: string,
+  completedSteps: readonly string[],
+  metadata?: Record<string, any>
+): string => {
+  const normalizedSteps = [...new Set(completedSteps)].sort().join('|');
+  const metadataHash = metadata ? JSON.stringify(normalizeMetadataForSignature(metadata)) : '';
+  return `${step}|${normalizedSteps}|${metadataHash}`;
+};
 
 const resolveUserCacheKey = (explicitUserId?: string): string => {
   if (explicitUserId) return explicitUserId;
@@ -767,11 +815,8 @@ const hasAuthSession = (): boolean => {
 const computeSignature = (
   step: string,
   completedSteps: readonly string[],
-  completed: boolean
-) => {
-  const normalized = [...new Set(completedSteps)].sort().join('|');
-  return `${step}|${completed ? '1' : '0'}|${normalized}`;
-};
+  metadata?: Record<string, any>
+) => buildRequestSignature(step, completedSteps, metadata);
 
 const safePersistLocalState = (userId: string, state: {
   currentStep: string;
@@ -803,6 +848,7 @@ type QueuedPayload = {
   completed: boolean;
   completedSteps: string[];
   signature: string;
+  metadata?: Record<string, any>;
 };
 
 const onboardingUpdateControllers: Map<
@@ -849,7 +895,7 @@ const scheduleOnboardingUpdate = async (cacheKey: string, payload: QueuedPayload
         const nextState = await onboardingApi.updateOnboardingState({
           current_step: next.step,
           completed_steps: next.completedSteps,
-          metadata: { step_updated_at: new Date().toISOString() }
+          metadata: next.metadata
         });
         updateStateCache(cacheKey, nextState);
         onboardingUpdateSignature.set(cacheKey, next.signature);
@@ -912,7 +958,7 @@ export const OnboardingStateManager = {
       }
 
       const completedStepsArray = Array.from(completedSteps);
-      const signature = computeSignature(step, completedStepsArray, completed);
+      const signature = computeSignature(step, completedStepsArray);
       const lastSignature = onboardingUpdateSignature.get(cacheKey);
       const pendingSignature = onboardingPendingSignature.get(cacheKey);
       if (lastSignature === signature || pendingSignature === signature) {
@@ -968,7 +1014,7 @@ export const OnboardingStateManager = {
        });
        onboardingUpdateSignature.set(
          cacheKey,
-         computeSignature(updated.currentStep, updated.completedSteps ?? [], completed)
+         computeSignature(updated.currentStep, updated.completedSteps ?? [])
        );
       }
     }
@@ -994,8 +1040,7 @@ export const OnboardingStateManager = {
         cacheKey,
         computeSignature(
           completedState.current_step,
-          completedState.completed_steps,
-          completedState.completed_steps.includes(completedState.current_step)
+          completedState.completed_steps
         )
       );
     } catch (error) {
