@@ -72,6 +72,8 @@ class OnboardingStateQueue {
   private pending = new Map<string, QueueEntry>();
   private processing = new Set<string>();
   private lastDispatched = new Map<string, string>();
+  private lastDispatchAt = new Map<string, number>();
+  private readonly MIN_DISPATCH_INTERVAL_MS = 1500;
 
   private resolveUserId(explicit?: string): string {
     if (explicit) {
@@ -114,10 +116,20 @@ class OnboardingStateQueue {
         if (!entry) {
           break;
         }
+
+        const lastAt = this.lastDispatchAt.get(userKey) ?? 0;
+        const elapsed = Date.now() - lastAt;
+        if (elapsed < this.MIN_DISPATCH_INTERVAL_MS) {
+          const wait = this.MIN_DISPATCH_INTERVAL_MS - elapsed;
+          await new Promise((resolve) => setTimeout(resolve, wait));
+          continue;
+        }
+
         this.pending.delete(userKey);
 
         const signature = buildSignature(entry.payload);
         if (this.lastDispatched.get(userKey) === signature) {
+          this.lastDispatchAt.set(userKey, Date.now());
           continue;
         }
 
@@ -133,18 +145,21 @@ class OnboardingStateQueue {
           }
           await dispatcher(request);
           this.lastDispatched.set(userKey, signature);
+          this.lastDispatchAt.set(userKey, Date.now());
         } catch (error) {
           console.error('[OnboardingStateQueue] Failed to persist onboarding state:', error);
           if (entry.fallback) {
             try {
               await entry.fallback();
               this.lastDispatched.set(userKey, signature);
+              this.lastDispatchAt.set(userKey, Date.now());
               continue;
             } catch (fallbackError) {
               console.error('[OnboardingStateQueue] Fallback also failed:', fallbackError);
             }
           }
-          this.pending.set(userKey, entry);
+          const existing = this.pending.get(userKey);
+          this.pending.set(userKey, this.mergeEntries(existing, entry));
           break;
         }
       }
@@ -171,6 +186,7 @@ class OnboardingStateQueue {
     this.pending.delete(key);
     this.processing.delete(key);
     this.lastDispatched.delete(key);
+    this.lastDispatchAt.delete(key);
   }
 }
 
