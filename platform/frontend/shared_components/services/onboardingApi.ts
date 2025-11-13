@@ -752,8 +752,12 @@ const VOLATILE_METADATA_KEYS = new Set([
   'step_updated_at',
   'lastUpdate',
   'last_update',
+  'lastUpdated',
+  'last_updated',
   'lastActiveDate',
   'last_active_date',
+  'lastTestAt',
+  'last_test_at',
   'timestamp',
 ]);
 
