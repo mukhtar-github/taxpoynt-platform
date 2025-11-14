@@ -25,7 +25,7 @@ export interface OnboardingState {
   has_started: boolean;
   is_complete: boolean;
   last_active_date: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -33,7 +33,7 @@ export interface OnboardingState {
 export interface OnboardingStateRequest {
   current_step: string;
   completed_steps?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface OnboardingAnalytics {
@@ -60,13 +60,13 @@ export interface OnboardingAnalytics {
   };
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   action: string;
   api_version: string;
   timestamp: string;
   data: T;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 type ClientApiError = Error & { status?: number };
@@ -223,7 +223,7 @@ class OnboardingApiClient {
   private async makeRequest<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    data?: any,
+    data?: unknown,
     attempt: number = 1,
     extraHeaders?: Record<string, string>
   ): Promise<T> {
@@ -283,7 +283,7 @@ class OnboardingApiClient {
   /**
    * Check if an error is retryable
    */
-  private isRetryableError(error: any): boolean {
+  private isRetryableError(error: unknown): boolean {
     if (axios.isAxiosError(error)) {
       // Retry on network errors or 5xx server errors
       return !error.response || (error.response.status >= 500 && error.response.status < 600);
@@ -306,7 +306,7 @@ class OnboardingApiClient {
   /**
    * Handle and transform API errors
    */
-  private handleApiError(error: any): Error {
+  private handleApiError(error: unknown): Error {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<ApiResponse>;
       const statusCode = axiosError.response?.status;
@@ -478,7 +478,7 @@ class OnboardingApiClient {
   /**
    * Complete a specific onboarding step
    */
-  async completeOnboardingStep(stepName: string, metadata?: Record<string, any>): Promise<OnboardingState> {
+  async completeOnboardingStep(stepName: string, metadata?: Record<string, unknown>): Promise<OnboardingState> {
     if (!this.hasAuthSession()) {
       throw new Error('Authentication required');
     }
@@ -502,7 +502,7 @@ class OnboardingApiClient {
   /**
    * Mark entire onboarding as complete
    */
-  async completeOnboarding(metadata?: Record<string, any>): Promise<OnboardingState> {
+  async completeOnboarding(metadata?: Record<string, unknown>): Promise<OnboardingState> {
     if (!this.hasAuthSession()) {
       throw new Error('Authentication required');
     }
@@ -761,8 +761,8 @@ const VOLATILE_METADATA_KEYS = new Set([
   'timestamp',
 ]);
 
-const normalizeMetadataForSignature = (metadata: Record<string, any> | undefined): any => {
-  const deepNormalize = (value: any): any => {
+const normalizeMetadataForSignature = (metadata: Record<string, unknown> | undefined): unknown => {
+  const deepNormalize = (value: unknown): unknown => {
     if (value === null || value === undefined) {
       return null;
     }
@@ -770,11 +770,11 @@ const normalizeMetadataForSignature = (metadata: Record<string, any> | undefined
       return value.map(deepNormalize);
     }
     if (typeof value === 'object') {
-      const entries = Object.entries(value)
+      const entries = Object.entries(value as Record<string, unknown>)
         .filter(([key]) => !VOLATILE_METADATA_KEYS.has(key))
-        .map(([key, val]) => [key, deepNormalize(val)] as [string, any])
+        .map(([key, val]) => [key, deepNormalize(val)] as const)
         .sort(([a], [b]) => a.localeCompare(b));
-      return entries.reduce<Record<string, any>>((acc, [key, val]) => {
+      return entries.reduce<Record<string, unknown>>((acc, [key, val]) => {
         acc[key] = val;
         return acc;
       }, {});
@@ -791,7 +791,7 @@ const normalizeMetadataForSignature = (metadata: Record<string, any> | undefined
 const buildRequestSignature = (
   step: string,
   completedSteps: readonly string[],
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): string => {
   const normalizedSteps = [...new Set(completedSteps)].sort().join('|');
   const metadataHash = metadata ? JSON.stringify(normalizeMetadataForSignature(metadata)) : '';
@@ -823,7 +823,7 @@ const hasAuthSession = (): boolean => {
 const computeSignature = (
   step: string,
   completedSteps: readonly string[],
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ) => buildRequestSignature(step, completedSteps, metadata);
 
 const safePersistLocalState = (userId: string, state: {

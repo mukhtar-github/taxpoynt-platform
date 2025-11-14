@@ -73,6 +73,7 @@ class OnboardingStateQueue {
   private processing = new Set<string>();
   private lastDispatched = new Map<string, string>();
   private lastDispatchAt = new Map<string, number>();
+  private lastCommittedState = new Map<string, { step: string; completedSignature: string }>();
   private readonly MIN_DISPATCH_INTERVAL_MS = 1500;
 
   private resolveUserId(explicit?: string): string {
@@ -133,10 +134,35 @@ class OnboardingStateQueue {
           continue;
         }
 
+        const completedSignature = [...new Set(entry.payload.completedSteps || [])]
+          .sort()
+          .join('|');
+        const forceSync =
+          Boolean(entry.payload.metadata?.forceSync) ||
+          Boolean(entry.payload.metadata?.force_resync);
+        const lastState = this.lastCommittedState.get(userKey);
+        if (
+          !forceSync &&
+          lastState &&
+          lastState.step === entry.payload.step &&
+          lastState.completedSignature === completedSignature
+        ) {
+          this.lastDispatchAt.set(userKey, Date.now());
+          continue;
+        }
+
+        const sanitizedMetadata = entry.payload.metadata
+          ? Object.fromEntries(
+              Object.entries(entry.payload.metadata).filter(
+                ([key]) => key !== 'forceSync' && key !== 'force_resync'
+              )
+            )
+          : undefined;
+
         const request = {
           current_step: entry.payload.step,
           completed_steps: entry.payload.completedSteps,
-          metadata: entry.payload.metadata,
+          metadata: sanitizedMetadata,
         };
 
         try {
@@ -146,6 +172,10 @@ class OnboardingStateQueue {
           await dispatcher(request);
           this.lastDispatched.set(userKey, signature);
           this.lastDispatchAt.set(userKey, Date.now());
+          this.lastCommittedState.set(userKey, {
+            step: entry.payload.step,
+            completedSignature,
+          });
         } catch (error) {
           console.error('[OnboardingStateQueue] Failed to persist onboarding state:', error);
           if (entry.fallback) {
@@ -153,6 +183,10 @@ class OnboardingStateQueue {
               await entry.fallback();
               this.lastDispatched.set(userKey, signature);
               this.lastDispatchAt.set(userKey, Date.now());
+              this.lastCommittedState.set(userKey, {
+                step: entry.payload.step,
+                completedSignature,
+              });
               continue;
             } catch (fallbackError) {
               console.error('[OnboardingStateQueue] Fallback also failed:', fallbackError);
@@ -187,6 +221,7 @@ class OnboardingStateQueue {
     this.processing.delete(key);
     this.lastDispatched.delete(key);
     this.lastDispatchAt.delete(key);
+    this.lastCommittedState.delete(key);
   }
 }
 

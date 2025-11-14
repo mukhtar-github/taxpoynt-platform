@@ -269,6 +269,7 @@ export const ERPOnboarding: React.FC<ERPOnboardingProps> = ({
       company_profile: buildCompanyPayload(companyProfile),
       system_connectivity: buildConnectivityMetadata(systemConnectivity),
     };
+    (base as Record<string, any>).forceSync = true;
     return base;
   }, [companyProfile, serviceSelection, systemConnectivity, serverMetadata]);
 

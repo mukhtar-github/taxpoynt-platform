@@ -845,10 +845,14 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return;
       }
       try {
+        const metadataPayload = {
+          ...buildMetadataPayload({ bankingConnection: nextState }),
+          forceSync: true,
+        };
         await onboardingStateQueue.enqueue({
           step: currentStep?.id ?? 'system-connectivity',
           completedSteps,
-          metadata: buildMetadataPayload({ bankingConnection: nextState }),
+          metadata: metadataPayload,
           source: 'UnifiedOnboardingWizard.persistBankingState',
         });
       } catch (error) {
@@ -865,10 +869,14 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
         return;
       }
       try {
+        const metadataPayload = {
+          ...buildMetadataPayload({ erpConnection: nextState }),
+          forceSync: true,
+        };
         await onboardingStateQueue.enqueue({
           step: currentStep?.id ?? 'system-connectivity',
           completedSteps,
-          metadata: buildMetadataPayload({ erpConnection: nextState }),
+          metadata: metadataPayload,
           source: 'UnifiedOnboardingWizard.persistErpState',
         });
       } catch (error) {
@@ -1091,15 +1099,18 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
           profileForMetadata = await options.preSync();
         }
 
+        const metadataPayload = {
+          ...buildMetadataPayload(),
+          company_profile: profileForMetadata,
+          milestone_complete: markComplete,
+          forceSync: true,
+        };
+
         await onboardingStateQueue.enqueue({
           step: stepId,
           completed: markComplete,
           completedSteps: completionList,
-          metadata: {
-            ...buildMetadataPayload(),
-            company_profile: profileForMetadata,
-            milestone_complete: markComplete,
-          },
+          metadata: metadataPayload,
           source: 'UnifiedOnboardingWizard.persistState',
         });
       } catch (error) {

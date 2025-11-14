@@ -324,10 +324,14 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
       localStorage.setItem(localStorageKey, JSON.stringify(newState));
 
       try {
+        const metadataPayload = {
+          ...newState.metadata,
+          forceSync: true,
+        };
         await onboardingStateQueue.enqueue({
           step: newState.currentStep,
           completedSteps: newState.completedSteps,
-          metadata: newState.metadata,
+          metadata: metadataPayload,
         });
       } catch (syncError) {
         console.warn('Failed to synchronise initial onboarding state.', syncError);
@@ -376,13 +380,17 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 
       // Update backend (with legacy fallback)
       try {
+        const metadataPayload = {
+          ...updatedState.metadata,
+          forceSync: true,
+        };
         const fallbackNamespace = user.role === 'access_point_provider' ? 'app' : 'si';
         await onboardingStateQueue.enqueue(
           {
             step: updatedState.currentStep,
             completed: completed,
             completedSteps: updatedState.completedSteps,
-            metadata: updatedState.metadata,
+            metadata: metadataPayload,
             userId: user.id,
             source: 'useOnboardingProgress.updateProgress',
           },
