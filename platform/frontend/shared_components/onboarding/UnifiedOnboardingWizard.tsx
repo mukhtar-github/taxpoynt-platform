@@ -140,6 +140,8 @@ const DEFAULT_STEP_SEQUENCE = [
   'launch',
 ] as const;
 
+const PERSIST_STATE_DEBOUNCE_MS = 600;
+
 const FALLBACK_STEP_DEFINITIONS: Record<string, StepDefinition> = {
   'service-selection': {
     title: 'Select Your Service Focus',
@@ -529,6 +531,7 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
   const [erpPreviewInvoice, setErpPreviewInvoice] = useState<Record<string, unknown> | null>(null);
   const [erpPreviewVisible, setErpPreviewVisible] = useState(false);
   const lastConnectivityPersistRef = useRef<boolean>(false);
+  const lastPersistSignatureRef = useRef<{ signature: string; timestamp: number } | null>(null);
 
   const connectors = useMemo(
     () => [
@@ -886,6 +889,76 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     [selectedService, currentStep?.id, completedSteps, buildMetadataPayload],
   );
 
+  const persistState = useCallback(
+    async (
+      stepId: string,
+      completionList: string[],
+      markComplete: boolean = false,
+      options?: { preSync?: () => Promise<CompanyProfile> },
+    ) => {
+      if (!selectedService) {
+        return;
+      }
+
+      if (!authService.isAuthenticated()) {
+        console.warn('[UnifiedOnboardingWizard] Skipping persistState: user not authenticated.');
+        return;
+      }
+
+      const signaturePayload = JSON.stringify({
+        stepId,
+        completedSteps: completionList,
+        markComplete,
+        service: selectedService,
+        preSync: Boolean(options?.preSync),
+      });
+      const nowTimestamp = Date.now();
+      const lastPersist = lastPersistSignatureRef.current;
+      if (
+        lastPersist &&
+        lastPersist.signature === signaturePayload &&
+        nowTimestamp - lastPersist.timestamp < PERSIST_STATE_DEBOUNCE_MS
+      ) {
+        console.info(`[UnifiedOnboardingWizard] Throttled duplicate persist for ${stepId}.`);
+        return;
+      }
+
+      try {
+        lastPersistSignatureRef.current = { signature: signaturePayload, timestamp: nowTimestamp };
+        setIsPersisting(true);
+        setPersistError(null);
+
+        let profileForMetadata = companyProfile;
+        if (options?.preSync) {
+          profileForMetadata = await options.preSync();
+        }
+
+        const metadataPayload = {
+          ...buildMetadataPayload(),
+          company_profile: profileForMetadata,
+          milestone_complete: markComplete,
+          forceSync: true,
+        };
+
+        await onboardingStateQueue.enqueue({
+          step: stepId,
+          completed: markComplete,
+          completedSteps: completionList,
+          metadata: metadataPayload,
+          source: 'UnifiedOnboardingWizard.persistState',
+        });
+      } catch (error) {
+        lastPersistSignatureRef.current = null;
+        const message = error instanceof Error ? error.message : 'Failed to save onboarding progress';
+        console.error('Onboarding persist failed:', error);
+        setPersistError(message);
+      } finally {
+        setIsPersisting(false);
+      }
+    },
+    [buildMetadataPayload, companyProfile, selectedService],
+  );
+
   useEffect(() => {
     if (!selectedService || !['si', 'hybrid'].includes(analyticsUserRole)) {
       return;
@@ -1078,51 +1151,6 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
     setCompanyProfile(resolvedProfile);
     return resolvedProfile;
   }, [companyProfile]);
-
-  const persistState = useCallback(
-    async (
-      stepId: string,
-      completionList: string[],
-      markComplete: boolean = false,
-      options?: { preSync?: () => Promise<CompanyProfile> },
-    ) => {
-      if (!selectedService) {
-        return;
-      }
-
-      try {
-        setIsPersisting(true);
-        setPersistError(null);
-
-        let profileForMetadata = companyProfile;
-        if (options?.preSync) {
-          profileForMetadata = await options.preSync();
-        }
-
-        const metadataPayload = {
-          ...buildMetadataPayload(),
-          company_profile: profileForMetadata,
-          milestone_complete: markComplete,
-          forceSync: true,
-        };
-
-        await onboardingStateQueue.enqueue({
-          step: stepId,
-          completed: markComplete,
-          completedSteps: completionList,
-          metadata: metadataPayload,
-          source: 'UnifiedOnboardingWizard.persistState',
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to save onboarding progress';
-        console.error('Onboarding persist failed:', error);
-        setPersistError(message);
-      } finally {
-        setIsPersisting(false);
-      }
-    },
-    [buildMetadataPayload, companyProfile, selectedService],
-  );
 
   const handleNext = async () => {
     if (!currentStep || currentIndex >= visibleSteps.length - 1) {
