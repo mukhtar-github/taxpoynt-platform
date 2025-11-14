@@ -849,21 +849,157 @@ const safePersistLocalState = (userId: string, state: {
   }
 };
 
+const getPendingSyncKey = (userId: string): string => `onboarding_pending_sync_${userId}`;
+const pendingSyncOperations: Map<string, Promise<void>> = new Map();
+
+const markPendingSyncFlag = (userId: string): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    localStorage.setItem(getPendingSyncKey(userId), new Date().toISOString());
+  } catch (error) {
+    console.warn('Failed to mark onboarding state for deferred sync:', error);
+  }
+};
+
+const clearPendingSyncFlag = (userId: string): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    localStorage.removeItem(getPendingSyncKey(userId));
+  } catch (error) {
+    console.warn('Failed to clear onboarding deferred sync flag:', error);
+  }
+};
+
+const hasPendingSyncFlag = (userId: string): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  try {
+    return Boolean(localStorage.getItem(getPendingSyncKey(userId)));
+  } catch {
+    return false;
+  }
+};
+
+const commitSignatureFromState = (userId: string, state: OnboardingState): void => {
+  const signature = buildRequestSignature(
+    state.current_step,
+    state.completed_steps ?? [],
+    state.metadata
+  );
+  onboardingUpdateSignature.set(userId, signature);
+};
+
+const recordOfflineStateUpdate = (userId: string, step: string, completed: boolean): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const cached = onboardingStateCache.get(userId);
+    const now = new Date().toISOString();
+    const completedSteps = new Set(cached?.completed_steps ?? []);
+    if (completed) {
+      completedSteps.add(step);
+    }
+
+    const completedStepsArray = Array.from(completedSteps);
+    const metadata = {
+      ...(cached?.metadata ?? {}),
+      step_updated_at: now,
+      pending_sync: true,
+    };
+
+    const offlineState: OnboardingState = {
+      ...(cached ?? {
+        user_id: userId,
+        current_step: step,
+        completed_steps: [],
+        has_started: true,
+        is_complete: false,
+        last_active_date: now,
+        metadata: {},
+        created_at: now,
+        updated_at: now,
+      }),
+      user_id: userId,
+      current_step: step,
+      completed_steps: completedStepsArray,
+      has_started: true,
+      is_complete: completedSteps.has('onboarding_complete'),
+      last_active_date: now,
+      updated_at: now,
+      metadata,
+    };
+
+    updateStateCache(userId, offlineState);
+    onboardingUpdateSignature.delete(userId);
+    safePersistLocalState(userId, {
+      currentStep: offlineState.current_step,
+      completedSteps: offlineState.completed_steps,
+      lastActiveDate: offlineState.last_active_date,
+    });
+    markPendingSyncFlag(userId);
+  } catch (error) {
+    console.warn('Failed to cache offline onboarding update:', error);
+  }
+};
+
+const flushOfflineStateToBackend = async (userId: string): Promise<void> => {
+  if (typeof window === 'undefined' || !hasAuthSession() || !hasPendingSyncFlag(userId)) {
+    return;
+  }
+
+  if (pendingSyncOperations.has(userId)) {
+    await pendingSyncOperations.get(userId);
+    return;
+  }
+
+  const operation = (async () => {
+    try {
+      const syncedState = await onboardingApi.syncLocalStateWithBackend();
+      if (syncedState) {
+        updateStateCache(userId, syncedState);
+        commitSignatureFromState(userId, syncedState);
+      }
+      clearPendingSyncFlag(userId);
+    } catch (error) {
+      console.warn('Failed to sync deferred onboarding updates:', error);
+      throw error;
+    }
+  })();
+
+  pendingSyncOperations.set(userId, operation);
+  try {
+    await operation;
+  } finally {
+    pendingSyncOperations.delete(userId);
+  }
+};
+
 export const OnboardingStateManager = {
   /**
    * Get current onboarding state (with backend sync)
    */
   getOnboardingState: async (userId: string): Promise<OnboardingState | null> => {
     const cacheKey = resolveUserCacheKey(userId);
+    if (hasAuthSession()) {
+      await flushOfflineStateToBackend(cacheKey);
+    }
+
     const cached = onboardingStateCache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-     if (!hasAuthSession()) {
-       console.warn('OnboardingStateManager.getOnboardingState skipped: user not authenticated');
-       return null;
-     }
+    if (!hasAuthSession()) {
+      console.warn('OnboardingStateManager.getOnboardingState skipped: user not authenticated');
+      return null;
+    }
 
     try {
       const state = await onboardingApi.getOnboardingState();
@@ -882,8 +1018,11 @@ export const OnboardingStateManager = {
     const cacheKey = resolveUserCacheKey(userId);
     if (!hasAuthSession()) {
       console.warn('OnboardingStateManager.updateStep skipped: user not authenticated');
+      recordOfflineStateUpdate(cacheKey, step, completed);
       return;
     }
+
+    await flushOfflineStateToBackend(cacheKey);
 
     try {
       let current = onboardingStateCache.get(cacheKey);
@@ -945,46 +1084,11 @@ export const OnboardingStateManager = {
       const isAuthError = error instanceof Error && error.name === 'OnboardingApiAuthError';
       if (isAuthError || !hasAuthSession()) {
         console.info('Onboarding step update skipped: no valid authentication session.');
+        recordOfflineStateUpdate(cacheKey, step, completed);
         return;
       }
       console.error('Failed to update onboarding step:', error);
-      // Fallback to old localStorage method
-      const user = authService.getStoredUser();
-      if (!user?.id) return;
-
-      const saved = localStorage.getItem(`onboarding_${user.id}`);
-      const current = saved ? JSON.parse(saved) : null;
-      
-      if (current) {
-        const updated = {
-          ...current,
-          currentStep: step,
-          completedSteps: completed 
-            ? [...(current.completedSteps || []), step]
-            : current.completedSteps || [],
-          lastActiveDate: new Date().toISOString()
-        };
-        safePersistLocalState(user.id, {
-          currentStep: updated.currentStep,
-          completedSteps: updated.completedSteps ?? [],
-          lastActiveDate: updated.lastActiveDate,
-        });
-        updateStateCache(cacheKey, {
-          user_id: user.id,
-          current_step: updated.currentStep,
-          completed_steps: updated.completedSteps,
-          has_started: true,
-          is_complete: updated.completedSteps?.includes('onboarding_complete') ?? false,
-          last_active_date: updated.lastActiveDate,
-          metadata: updated.metadata ?? {},
-          created_at: updated.lastActiveDate,
-          updated_at: updated.lastActiveDate
-        });
-        onboardingUpdateSignature.set(
-          cacheKey,
-          computeSignature(updated.currentStep, updated.completedSteps ?? [])
-        );
-      }
+      recordOfflineStateUpdate(cacheKey, step, completed);
     }
   },
 
