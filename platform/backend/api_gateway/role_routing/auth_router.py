@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 import jwt
+import httpx
 
 # Fix import paths
 import sys
@@ -199,12 +200,22 @@ def _dev_email_fallback_enabled() -> bool:
     return env != "production" and allow_fallback
 
 
+def _email_sender_identity() -> Tuple[str, str]:
+    from_email = os.getenv("EMAILS_FROM_EMAIL") or os.getenv("SMTP_FROM_EMAIL")
+    if not from_email:
+        raise RuntimeError("EMAILS_FROM_EMAIL (or SMTP_FROM_EMAIL) must be configured for verification emails.")
+    from_name = os.getenv("EMAILS_FROM_NAME", "TaxPoynt Platform")
+    return from_email, from_name
+
+
 def _smtp_config() -> Optional[Dict[str, Any]]:
     host = os.getenv("SMTP_HOST")
     username = os.getenv("SMTP_USERNAME")
     password = os.getenv("SMTP_PASSWORD")
-    from_email = os.getenv("EMAILS_FROM_EMAIL") or os.getenv("SMTP_FROM_EMAIL")
-    from_name = os.getenv("EMAILS_FROM_NAME", "TaxPoynt Platform")
+    try:
+        from_email, from_name = _email_sender_identity()
+    except RuntimeError:
+        from_email = from_name = None  # Defer to fallback handling
     port = int(os.getenv("SMTP_PORT", "587"))
     use_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
 
@@ -227,17 +238,39 @@ def _smtp_config() -> Optional[Dict[str, Any]]:
     }
 
 
+async def _send_via_sendgrid(
+    *,
+    api_key: str,
+    recipient: str,
+    subject: str,
+    body: str,
+    from_email: str,
+    from_name: str,
+) -> None:
+    timeout = float(os.getenv("SENDGRID_TIMEOUT_SECONDS", os.getenv("SMTP_TIMEOUT_SECONDS", "15")))
+    payload = {
+        "personalizations": [
+            {
+                "to": [{"email": recipient}],
+            }
+        ],
+        "from": {"email": from_email, "name": from_name},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": body},
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post("https://api.sendgrid.com/v3/mail/send", json=payload, headers=headers)
+        response.raise_for_status()
+
+
 async def _send_verification_email(recipient: str, code: str, first_name: Optional[str] = None) -> None:
-    config = _smtp_config()
-
-    if not config:
-        logger.info(
-            "DEV EMAIL FALLBACK ACTIVE - verification code for %s: %s",
-            recipient,
-            code,
-        )
-        return
-
+    from_email, from_name = _email_sender_identity()
     subject = "Verify your TaxPoynt email"
     greeting = first_name or recipient.split("@")[0]
     body = (
@@ -248,6 +281,41 @@ async def _send_verification_email(recipient: str, code: str, first_name: Option
         "If you did not create this account, please contact support immediately.\n\n"
         "— TaxPoynt Platform"
     )
+
+    sendgrid_key = os.getenv("SENDGRID_API_KEY")
+    if sendgrid_key:
+        try:
+            await _send_via_sendgrid(
+                api_key=sendgrid_key,
+                recipient=recipient,
+                subject=subject,
+                body=body,
+                from_email=from_email,
+                from_name=from_name,
+            )
+            return
+        except Exception as exc:
+            logger.error("SendGrid verification email delivery failed: %s", exc, exc_info=True)
+            if not os.getenv("SMTP_HOST"):
+                if _dev_email_fallback_enabled():
+                    logger.info(
+                        "DEV EMAIL FALLBACK ACTIVE - verification code for %s: %s",
+                        recipient,
+                        code,
+                    )
+                    return
+                raise
+            logger.warning("Falling back to SMTP delivery after SendGrid failure: %s", exc)
+
+    config = _smtp_config()
+
+    if not config:
+        logger.info(
+            "DEV EMAIL FALLBACK ACTIVE - verification code for %s: %s",
+            recipient,
+            code,
+        )
+        return
 
     message = MIMEMultipart("alternative")
     message["Subject"] = subject

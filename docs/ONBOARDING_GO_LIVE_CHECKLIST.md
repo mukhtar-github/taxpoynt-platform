@@ -26,6 +26,7 @@ This checklist captures every runtime toggle that must be set before enabling th
 - `SMTP_TLS=true`
 - `EMAILS_FROM_EMAIL=noreply@taxpoynt.com`
 - `EMAILS_FROM_NAME=TaxPoynt Platform`
+- `SENDGRID_API_KEY=<sendgrid api key>` (enables API-based delivery; falls back to SMTP if unset)
 
 ## 3. Frontend Environment Variables
 - `NEXT_PUBLIC_API_URL=https://<railway-backend-domain>/api/v1`
