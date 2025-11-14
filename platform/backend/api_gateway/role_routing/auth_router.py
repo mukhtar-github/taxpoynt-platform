@@ -27,6 +27,7 @@ from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 import jwt
 import httpx
+import httpx
 
 # Fix import paths
 import sys

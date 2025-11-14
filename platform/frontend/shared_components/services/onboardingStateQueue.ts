@@ -74,7 +74,7 @@ class OnboardingStateQueue {
   private lastDispatched = new Map<string, string>();
   private lastDispatchAt = new Map<string, number>();
   private lastCommittedState = new Map<string, { step: string; completedSignature: string }>();
-  private readonly MIN_DISPATCH_INTERVAL_MS = 1500;
+  private readonly MIN_DISPATCH_INTERVAL_MS = 5000;
 
   private resolveUserId(explicit?: string): string {
     if (explicit) {
