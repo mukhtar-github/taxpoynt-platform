@@ -75,6 +75,7 @@ class OnboardingStateQueue {
   private lastDispatchAt = new Map<string, number>();
   private lastCommittedState = new Map<string, { step: string; completedSignature: string }>();
   private readonly MIN_DISPATCH_INTERVAL_MS = 5000;
+  private enabled = true;
 
   private resolveUserId(explicit?: string): string {
     if (explicit) {
@@ -203,6 +204,10 @@ class OnboardingStateQueue {
   }
 
   public async enqueue(payload: QueuePayload, options?: { fallback?: () => Promise<void> }): Promise<void> {
+    if (!this.enabled) {
+      console.info('[OnboardingStateQueue] Queue paused; skipping dispatch.');
+      return;
+    }
     if (!authService.isAuthenticated()) {
       console.info('[OnboardingStateQueue] Skip enqueue: user not authenticated.');
       return;
@@ -222,6 +227,13 @@ class OnboardingStateQueue {
     this.lastDispatched.delete(key);
     this.lastDispatchAt.delete(key);
     this.lastCommittedState.delete(key);
+  }
+
+  public setEnabled(value: boolean, userId?: string): void {
+    this.enabled = value;
+    if (!value) {
+      this.clear(userId);
+    }
   }
 }
 

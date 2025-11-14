@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { EnhancedSignInPage } from '../../../business_interface/auth/EnhancedSignInPage';
 import { authService } from '../../../shared_components/services/auth';
 import { onboardingApi } from '../../../shared_components/services/onboardingApi';
+import { onboardingStateQueue } from '../../../shared_components/services/onboardingStateQueue';
 import type { OnboardingState } from '../../../shared_components/services/onboardingApi';
 
 type ServicePackage = 'si' | 'app' | 'hybrid';
@@ -17,6 +18,11 @@ const SignInPageContent: React.FC = () => {
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+
+  React.useEffect(() => {
+    onboardingStateQueue.setEnabled(false);
+    return () => onboardingStateQueue.setEnabled(true);
+  }, []);
 
   const handleSignIn = async (credentials: { email: string; password: string; rememberMe?: boolean }) => {
     setIsLoading(true);
@@ -75,21 +81,26 @@ const SignInPageContent: React.FC = () => {
       }
 
       if (shouldRedirectToOnboarding) {
+        onboardingStateQueue.setEnabled(true);
         router.push(`/onboarding?service=${resolvedService}`);
         return;
       }
 
       switch (userRole) {
         case 'system_integrator':
+          onboardingStateQueue.setEnabled(true);
           router.push('/dashboard/si');
           break;
         case 'access_point_provider':
+          onboardingStateQueue.setEnabled(true);
           router.push('/dashboard/app');
           break;
         case 'hybrid_user':
+          onboardingStateQueue.setEnabled(true);
           router.push('/dashboard/hybrid');
           break;
         default:
+          onboardingStateQueue.setEnabled(true);
           router.push('/dashboard');
       }
     } catch (err) {
