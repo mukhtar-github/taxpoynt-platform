@@ -161,9 +161,20 @@ class TaxPoyntAPIClient {
       },
       async (error: AxiosError) => {
         const originalRequest = error.config as any;
+        const requestUrl = typeof originalRequest?.url === 'string' ? originalRequest.url : '';
+        const isAuthEndpoint = ['/auth/login', '/auth/register', '/auth/verify-email', '/auth/logout']
+          .some((path) => requestUrl.includes(path));
 
         // Handle 401 Unauthorized
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401) {
+          if (isAuthEndpoint) {
+            return Promise.reject(this.formatError(error));
+          }
+
+          if (originalRequest._retry) {
+            return Promise.reject(this.formatError(error));
+          }
+
           if (this.isRefreshing) {
             // Queue the request if token refresh is in progress
             return new Promise((resolve, reject) => {
