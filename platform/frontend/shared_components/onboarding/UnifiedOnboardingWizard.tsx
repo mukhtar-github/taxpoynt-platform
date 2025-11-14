@@ -58,12 +58,17 @@ interface CompanyProfile {
   industry: string;
   teamSize: string;
   country: string;
+  tin: string;
+  rcNumber: string;
 }
 
 interface CompanyProfileDetails {
   source?: string;
   verifiedAt?: string;
   status?: string;
+  tin?: string;
+  rcNumber?: string;
+  identifier?: Record<string, string>;
 }
 
 interface ServiceConfiguration {
@@ -122,6 +127,8 @@ const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   industry: '',
   teamSize: '',
   country: 'Nigeria',
+  tin: '',
+  rcNumber: '',
 };
 
 const INITIAL_SERVICE_CONFIGURATION: ServiceConfiguration = {
@@ -201,6 +208,8 @@ const sanitizeCompanyProfile = (value: unknown): CompanyProfile => {
     industry: sanitizeString(value.industry),
     teamSize: sanitizeString(value.teamSize ?? value.team_size),
     country: sanitizeString(value.country) || INITIAL_COMPANY_PROFILE.country,
+    tin: sanitizeString(value.tin ?? value.tax_identification_number ?? value.TIN),
+    rcNumber: sanitizeString(value.rcNumber ?? value.rc_number ?? value.registration_number ?? value.RC),
   };
 };
 
@@ -225,11 +234,35 @@ const sanitizeCompanyProfileDetails = (value: unknown): CompanyProfileDetails | 
     details.status = status;
   }
 
+  const identifierRaw = value.identifier;
+  if (isRecord(identifierRaw)) {
+    details.identifier = Object.entries(identifierRaw).reduce<Record<string, string>>((acc, [key, val]) => {
+      const normalized = sanitizeOptionalString(val);
+      if (normalized) {
+        acc[key] = normalized;
+      }
+      return acc;
+    }, {});
+  }
+
+  const tinFromPayload = sanitizeOptionalString(value.tin ?? details.identifier?.tin ?? details.identifier?.tax_identification_number);
+  if (tinFromPayload) {
+    details.tin = tinFromPayload;
+  }
+  const rcFromPayload = sanitizeOptionalString(
+    value.rc_number ?? value.rcNumber ?? value.registration_number ?? details.identifier?.rc_number ?? details.identifier?.rc
+  );
+  if (rcFromPayload) {
+    details.rcNumber = rcFromPayload;
+  }
+
   return Object.keys(details).length > 0 ? details : null;
 };
 
 const buildCompanyProfilePayload = (profile: CompanyProfile): CompanyProfilePayload => ({
   company_name: profile.companyName.trim(),
+  tin: profile.tin.trim() || undefined,
+  rc_number: profile.rcNumber.trim() || undefined,
   industry: profile.industry.trim() || undefined,
   company_size: profile.teamSize.trim() || undefined,
   current_step: 'company-profile',
@@ -1587,6 +1620,31 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
                   placeholder="e.g. 25"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+                  <span>TIN</span>
+                  <span className="text-xs font-normal italic text-gray-400">Optional but recommended</span>
+                </label>
+                <TaxPoyntInput
+                  value={companyProfile.tin}
+                  onChange={handleCompanyProfileChange('tin')}
+                  placeholder="e.g. 01234567-0001"
+                />
+                <p className="text-xs text-gray-500">
+                  Providing a TIN helps us auto-verify your company via Dojah and prefill compliance data.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between text-sm font-medium text-gray-700">
+                  <span>RC Number</span>
+                  <span className="text-xs font-normal italic text-gray-400">Optional</span>
+                </label>
+                <TaxPoyntInput
+                  value={companyProfile.rcNumber}
+                  onChange={handleCompanyProfileChange('rcNumber')}
+                  placeholder="e.g. RC-123456"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -2118,6 +2176,8 @@ export const UnifiedOnboardingWizard: React.FC<UnifiedOnboardingWizardProps> = (
       { label: 'Service Package', value: serviceTitle(selectedService) },
       { label: 'Company', value: companyProfile.companyName || 'Not provided' },
       { label: 'Country', value: companyProfile.country || 'Not provided' },
+      { label: 'TIN', value: companyProfile.tin || 'Not provided' },
+      { label: 'RC Number', value: companyProfile.rcNumber || 'Not provided' },
       {
         label: 'Integrations',
         value:

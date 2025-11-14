@@ -244,6 +244,13 @@ class SubmitKYCCommand:
             "country": str(country) if country else self._config.fallback_country,
         }
 
+        tin_value = pick("tin", "tax_identification_number")
+        if tin_value:
+            company_profile["tin"] = str(tin_value)
+        rc_value = pick("rc_number", "rc", "registration_number")
+        if rc_value:
+            company_profile["rcNumber"] = str(rc_value)
+
         details: Dict[str, Any] = {
             "source": "dojah",
             "verified_at": self._now_iso(),
@@ -258,10 +265,8 @@ class SubmitKYCCommand:
             "raw_keys": sorted(list(data.keys())),
         }
 
-        tin_value = pick("tin", "tax_identification_number")
         if tin_value:
             details.setdefault("tin", str(tin_value))
-        rc_value = pick("rc_number", "rc", "registration_number")
         if rc_value:
             details.setdefault("rc_number", str(rc_value))
 
